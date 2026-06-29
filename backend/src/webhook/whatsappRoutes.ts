@@ -1,0 +1,88 @@
+import { Router } from "express";
+import { resolveBusinessByPhoneNumberId } from "../tenants/resolve.js";
+import { sendWhatsAppMessage, sendWhatsAppList, type ListRow } from "./whatsappClient.js";
+import { handleIncomingMessage } from "../bot/claudeBot.js";
+import { decryptSecret } from "../lib/crypto.js";
+import { hasActiveSubscription } from "../lib/subscriptionGate.js";
+
+export const whatsappRouter = Router();
+
+// Meta calls this once to verify the webhook URL when you configure it in the Meta dashboard.
+whatsappRouter.get("/", (req, res) => {
+  const mode = req.query["hub.mode"];
+  const token = req.query["hub.verify_token"];
+  const challenge = req.query["hub.challenge"];
+
+  if (mode === "subscribe" && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+    res.status(200).send(challenge);
+  } else {
+    res.sendStatus(403);
+  }
+});
+
+/** Extracts the customer's text from either a typed message or a tapped interactive list row. */
+function extractMessageText(message: any): string | null {
+  if (message.type === "text") return message.text.body as string;
+  if (message.type === "interactive" && message.interactive?.type === "list_reply") {
+    // The row id is the slot's ISO start time (see buildSlotRows); phrase it as a natural reply
+    // so Claude's book_appointment tool call still has the exact ISO time to work with.
+    return `I'll take the ${message.interactive.list_reply.title} slot (${message.interactive.list_reply.id})`;
+  }
+  return null;
+}
+
+function buildSlotRows(slots: { startTime: string }[]): ListRow[] {
+  return slots.map((s) => {
+    const d = new Date(s.startTime);
+    return {
+      id: s.startTime,
+      title: d.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" }).slice(0, 24),
+    };
+  });
+}
+
+whatsappRouter.post("/", async (req, res) => {
+  // Acknowledge immediately; Meta retries aggressively if it doesn't get a fast 200.
+  res.sendStatus(200);
+
+  try {
+    const entry = req.body?.entry?.[0];
+    const change = entry?.changes?.[0]?.value;
+    const phoneNumberId = change?.metadata?.phone_number_id;
+    const message = change?.messages?.[0];
+    if (!phoneNumberId || !message) return;
+
+    const text = extractMessageText(message);
+    if (!text) return;
+
+    const business = await resolveBusinessByPhoneNumberId(phoneNumberId);
+    if (!business?.whatsappAccessToken) {
+      console.warn(`No business configured for phone_number_id ${phoneNumberId}`);
+      return;
+    }
+    if (!(await hasActiveSubscription(business.id))) {
+      console.warn(`Ignoring message for business ${business.id}: subscription not active`);
+      return;
+    }
+
+    const customerPhone = message.from as string;
+    const accessToken = decryptSecret(business.whatsappAccessToken);
+
+    const { text: reply, offeredSlots } = await handleIncomingMessage(business.id, customerPhone, text);
+
+    if (offeredSlots && offeredSlots.length > 0) {
+      await sendWhatsAppList({
+        phoneNumberId,
+        accessToken,
+        to: customerPhone,
+        bodyText: reply,
+        buttonText: "Pick a time",
+        rows: buildSlotRows(offeredSlots),
+      });
+    } else {
+      await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: reply });
+    }
+  } catch (err) {
+    console.error("Error handling WhatsApp webhook event:", err);
+  }
+});

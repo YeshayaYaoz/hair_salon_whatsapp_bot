@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Business {
+  id                String   @id @default(cuid())
+  name              String
+  timezone          String   @default("Asia/Jerusalem")
+  email             String   @unique
+  passwordHash      String
+  subscriptionStatus String  @default("trial") // trial | active | past_due | canceled
+  stripeCustomerId     String? @unique
+  stripeSubscriptionId String? @unique
+  address           String?
+  whatsappPhoneNumberId String? @unique
+  whatsappAccessToken   String? // encrypted at rest
+  createdAt         DateTime @default(now())
+
+  services      Service[]
+  staff         StaffMember[]
+  hours         BusinessHours[]
+  customers     Customer[]
+  appointments  Appointment[]
+  faqEntries    FaqEntry[]
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  business    Business @relation(fields: [businessId], references: [id])
+  businessId  String
+  name        String
+  description String?
+  priceCents  Int
+  durationMin Int
+  appointments Appointment[]
+
+  @@index([businessId])
+}
+
+model StaffMember {
+  id         String   @id @default(cuid())
+  business   Business @relation(fields: [businessId], references: [id])
+  businessId String
+  name       String
+  appointments Appointment[]
+
+  @@index([businessId])
+}
+
+model BusinessHours {
+  id         String   @id @default(cuid())
+  business   Business @relation(fields: [businessId], references: [id])
+  businessId String
+  dayOfWeek  Int      // 0 = Sunday ... 6 = Saturday
+  openMin    Int      // minutes from midnight
+  closeMin   Int
+
+  @@index([businessId])
+  @@unique([businessId, dayOfWeek])
+}
+
+model Customer {
+  id          String   @id @default(cuid())
+  business    Business @relation(fields: [businessId], references: [id])
+  businessId  String
+  phone       String
+  name        String?
+  appointments Appointment[]
+
+  @@index([businessId])
+  @@unique([businessId, phone])
+}
+
+model Appointment {
+  id          String   @id @default(cuid())
+  business    Business @relation(fields: [businessId], references: [id])
+  businessId  String
+  customer    Customer @relation(fields: [customerId], references: [id])
+  customerId  String
+  service     Service  @relation(fields: [serviceId], references: [id])
+  serviceId   String
+  staff       StaffMember? @relation(fields: [staffId], references: [id])
+  staffId     String?
+  startTime   DateTime
+  endTime     DateTime
+  status      String   @default("confirmed") // confirmed | cancelled
+  createdAt   DateTime @default(now())
+
+  @@index([businessId, startTime])
+}
+
+model FaqEntry {
+  id         String   @id @default(cuid())
+  business   Business @relation(fields: [businessId], references: [id])
+  businessId String
+  question   String
+  answer     String
+
+  @@index([businessId])
+}
