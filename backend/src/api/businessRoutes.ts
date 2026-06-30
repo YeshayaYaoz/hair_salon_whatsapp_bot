@@ -32,6 +32,9 @@ const profileSchema = z.object({
   name: z.string().min(1).optional(),
   address: z.string().optional(),
   timezone: z.string().optional(),
+  notificationPhone: z.string().optional(),
+  botGreeting: z.string().optional(),
+  botPersonality: z.string().optional(),
 });
 
 businessRouter.put("/me", async (req: AuthedRequest, res) => {
@@ -154,6 +157,42 @@ businessRouter.patch("/appointments/:id/cancel", async (req: AuthedRequest, res)
     data: { status: "cancelled" },
   });
   if (result.count === 0) return res.status(404).json({ error: "Not found" });
+  res.json({ ok: true });
+});
+
+// --- Customers ---
+
+businessRouter.get("/customers", async (req: AuthedRequest, res) => {
+  const customers = await prisma.customer.findMany({
+    where: { businessId: req.businessId! },
+    include: { _count: { select: { appointments: true } } },
+    orderBy: { appointments: { _count: "desc" } },
+  });
+  res.json(customers);
+});
+
+// --- Waitlist ---
+
+businessRouter.get("/waitlist", async (req: AuthedRequest, res) => {
+  const entries = await prisma.waitlistEntry.findMany({
+    where: { businessId: req.businessId! },
+    include: { customer: true, service: true },
+    orderBy: { createdAt: "asc" },
+  });
+  res.json(entries);
+});
+
+businessRouter.patch("/waitlist/:id/notify", async (req: AuthedRequest, res) => {
+  const result = await prisma.waitlistEntry.updateMany({
+    where: { id: req.params.id, businessId: req.businessId! },
+    data: { notified: true },
+  });
+  if (result.count === 0) return res.status(404).json({ error: "Not found" });
+  res.json({ ok: true });
+});
+
+businessRouter.delete("/waitlist/:id", async (req: AuthedRequest, res) => {
+  await prisma.waitlistEntry.deleteMany({ where: { id: req.params.id, businessId: req.businessId! } });
   res.json({ ok: true });
 });
 

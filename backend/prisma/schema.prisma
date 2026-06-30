@@ -19,14 +19,18 @@ model Business {
   address           String?
   whatsappPhoneNumberId String? @unique
   whatsappAccessToken   String? // encrypted at rest
+  notificationPhone     String? // owner's personal phone for booking alerts
+  botGreeting           String? // custom greeting override
+  botPersonality        String? // tone/personality instructions for the bot
   createdAt         DateTime @default(now())
 
-  services      Service[]
-  staff         StaffMember[]
-  hours         BusinessHours[]
-  customers     Customer[]
-  appointments  Appointment[]
-  faqEntries    FaqEntry[]
+  services       Service[]
+  staff          StaffMember[]
+  hours          BusinessHours[]
+  customers      Customer[]
+  appointments   Appointment[]
+  faqEntries     FaqEntry[]
+  waitlistEntries WaitlistEntry[]
 }
 
 model Service {
@@ -37,7 +41,8 @@ model Service {
   description String?
   priceCents  Int
   durationMin Int
-  appointments Appointment[]
+  appointments    Appointment[]
+  waitlistEntries WaitlistEntry[]
 
   @@index([businessId])
 }
@@ -70,7 +75,8 @@ model Customer {
   businessId  String
   phone       String
   name        String?
-  appointments Appointment[]
+  appointments    Appointment[]
+  waitlistEntries WaitlistEntry[]
 
   @@index([businessId])
   @@unique([businessId, phone])
@@ -92,6 +98,20 @@ model Appointment {
   createdAt   DateTime @default(now())
 
   @@index([businessId, startTime])
+}
+
+model WaitlistEntry {
+  id         String      @id @default(cuid())
+  business   Business    @relation(fields: [businessId], references: [id])
+  businessId String
+  customer   Customer    @relation(fields: [customerId], references: [id])
+  customerId String
+  service    Service     @relation(fields: [serviceId], references: [id])
+  serviceId  String
+  notified   Boolean     @default(false)
+  createdAt  DateTime    @default(now())
+
+  @@index([businessId])
 }
 
 model FaqEntry {

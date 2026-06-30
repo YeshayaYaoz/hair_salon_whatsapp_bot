@@ -3,6 +3,8 @@ import { prisma } from "../lib/prisma.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { appendTurn, getHistory } from "./conversationStore.js";
 import { findAvailableSlots, createAppointment, type AvailableSlot } from "../booking/availability.js";
+import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
+import { decryptSecret } from "../lib/crypto.js";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = "claude-sonnet-4-6";
@@ -49,12 +51,42 @@ const tools: Anthropic.Tool[] = [
       required: ["startTime"],
     },
   },
+  {
+    name: "add_to_waitlist",
+    description: "Add the customer to the waitlist for a service when no slots are available. The salon will contact them when a slot opens.",
+    input_schema: {
+      type: "object",
+      properties: {
+        serviceName: { type: "string", description: "Name of the service they want to wait for" },
+        customerName: { type: "string", description: "Customer's name, if known" },
+      },
+      required: ["serviceName"],
+    },
+  },
 ];
 
-/** Slots offered by the most recent check_availability call, kept so the webhook can render a tappable WhatsApp list instead of plain text. */
 export interface BotResult {
   text: string;
   offeredSlots?: AvailableSlot[];
+}
+
+async function notifyOwner(businessId: string, message: string) {
+  try {
+    const business = await prisma.business.findUnique({
+      where: { id: businessId },
+      select: { notificationPhone: true, whatsappPhoneNumberId: true, whatsappAccessToken: true },
+    });
+    if (!business?.notificationPhone || !business.whatsappPhoneNumberId || !business.whatsappAccessToken) return;
+    const accessToken = decryptSecret(business.whatsappAccessToken);
+    await sendWhatsAppMessage({
+      phoneNumberId: business.whatsappPhoneNumberId,
+      accessToken,
+      to: business.notificationPhone,
+      text: message,
+    });
+  } catch (err) {
+    console.error("Owner notification failed (non-fatal):", err);
+  }
 }
 
 async function runTool(
@@ -89,6 +121,13 @@ async function runTool(
       startTime: new Date(input.startTime as string),
     });
     lastOfferedSlots.value = undefined;
+
+    const when = new Date(appointment.startTime).toLocaleString("he-IL", {
+      weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+    });
+    const customerLabel = input.customerName ? `${input.customerName} (${customerPhone})` : customerPhone;
+    notifyOwner(businessId, `📅 הזמנה חדשה!\nלקוח: ${customerLabel}\nשירות: ${service.name}\nמועד: ${when}`);
+
     return JSON.stringify({ booked: true, startTime: appointment.startTime, endTime: appointment.endTime });
   }
 
@@ -113,10 +152,28 @@ async function runTool(
     return JSON.stringify({ cancelled: true });
   }
 
+  if (name === "add_to_waitlist") {
+    const service = await prisma.service.findFirst({
+      where: { businessId, name: { equals: input.serviceName as string, mode: "insensitive" } },
+    });
+    if (!service) return JSON.stringify({ error: "Unknown service" });
+
+    const customer = await prisma.customer.upsert({
+      where: { businessId_phone: { businessId, phone: customerPhone } },
+      update: input.customerName ? { name: input.customerName as string } : {},
+      create: { businessId, phone: customerPhone, name: input.customerName as string | undefined },
+    });
+
+    await prisma.waitlistEntry.create({
+      data: { businessId, customerId: customer.id, serviceId: service.id },
+    });
+
+    return JSON.stringify({ addedToWaitlist: true, service: service.name });
+  }
+
   return JSON.stringify({ error: "Unknown tool" });
 }
 
-/** Runs one turn of the conversation: sends the customer's message to Claude, executes any tool calls, returns the final reply text plus any slots to render as a tappable list. */
 export async function handleIncomingMessage(businessId: string, customerPhone: string, messageText: string): Promise<BotResult> {
   const system = await buildSystemPrompt(businessId, new Date().toISOString().slice(0, 10));
   const history = getHistory(businessId, customerPhone);
@@ -136,7 +193,6 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     messages,
   });
 
-  // Tool-use loop: keep executing tools and feeding results back until Claude returns a plain text answer.
   while (response.stop_reason === "tool_use") {
     const toolResults: Anthropic.ToolResultBlockParam[] = [];
     for (const block of response.content) {

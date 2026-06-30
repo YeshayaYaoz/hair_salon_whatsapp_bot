@@ -21,6 +21,17 @@ const STATUS_STYLES: Record<string, string> = {
 
 type Filter = "upcoming" | "past" | "cancelled" | "all";
 
+function googleCalendarUrl(a: Appointment) {
+  const fmt = (d: string) => new Date(d).toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: `${a.service.name} — ${a.customer.name ?? a.customer.phone}`,
+    dates: `${fmt(a.startTime)}/${fmt(a.endTime)}`,
+    details: `Customer: ${a.customer.name ?? ""} (${a.customer.phone})${a.staff ? `\nStaff: ${a.staff.name}` : ""}`,
+  });
+  return `https://calendar.google.com/calendar/render?${params}`;
+}
+
 export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [filter, setFilter] = useState<Filter>("upcoming");
@@ -122,15 +133,30 @@ export default function AppointmentsPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {a.status === "confirmed" && new Date(a.startTime) >= new Date() && (
-                      <button
-                        onClick={() => cancel(a.id)}
-                        disabled={cancellingId === a.id}
-                        className="text-xs text-zinc-500 hover:text-red-400 disabled:opacity-50 transition px-2 py-1 rounded hover:bg-red-950/30"
-                      >
-                        {cancellingId === a.id ? "Cancelling..." : "Cancel"}
-                      </button>
-                    )}
+                    <div className="flex items-center justify-end gap-1">
+                      {a.status === "confirmed" && (
+                        <a
+                          href={googleCalendarUrl(a)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Add to Google Calendar"
+                          className="text-xs text-zinc-500 hover:text-violet-400 transition px-2 py-1 rounded hover:bg-violet-950/30"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </a>
+                      )}
+                      {a.status === "confirmed" && new Date(a.startTime) >= new Date() && (
+                        <button
+                          onClick={() => cancel(a.id)}
+                          disabled={cancellingId === a.id}
+                          className="text-xs text-zinc-500 hover:text-red-400 disabled:opacity-50 transition px-2 py-1 rounded hover:bg-red-950/30"
+                        >
+                          {cancellingId === a.id ? "Cancelling..." : "Cancel"}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
