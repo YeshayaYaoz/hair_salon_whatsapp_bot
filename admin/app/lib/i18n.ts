@@ -7,103 +7,184 @@ const translations = {
       waitlist: "Waitlist", services: "Services", staff: "Staff", hours: "Hours",
       whatsapp: "WhatsApp", faq: "FAQ", settings: "Settings", billing: "Billing", logout: "Log out",
     },
+    days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+    daysShort: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+
+    // Analytics
     analyticsTitle: "Analytics", analyticsSubtitle: "Overview of your salon's performance",
+    thisMonth: "This month", revenue: "Revenue this month",
+    newCustomers: "New customers", allTime: "All-time bookings",
+    last7Days: "Last 7 days", topServices: "Top services",
+    setupChecklist: "Get started", setupSubtitle: "Complete these steps to go live:",
+    stepServices: "Add your services", stepHours: "Set your opening hours",
+    stepWhatsapp: "Connect WhatsApp", stepBilling: "Activate subscription",
+
+    // Appointments
     appointmentsTitle: "Appointments", appointmentsSubtitle: "Bookings made through WhatsApp",
-    customersTitle: "Customers", waitlistTitle: "Waitlist", servicesTitle: "Services",
-    staffTitle: "Staff", hoursTitle: "Hours", settingsTitle: "Settings", billingTitle: "Billing",
-    faqTitle: "FAQ", whatsappTitle: "WhatsApp",
-    save: "Save changes", saving: "Saving…", saved: "Saved",
-    loading: "Loading…", cancel: "Cancel", delete: "Delete", add: "Add", edit: "Edit",
-    search: "Search…", exportCsv: "Export CSV",
-    noAppointments: "No appointments found.",
-    setupChecklist: "Get started",
-    setupSubtitle: "Complete these steps to go live:",
-    stepServices: "Add your services",
-    stepHours: "Set your opening hours",
-    stepWhatsapp: "Connect WhatsApp",
-    stepBilling: "Activate subscription",
-    thisMonth: "This month",
-    revenue: "Revenue this month",
-    newCustomers: "New customers",
-    allTime: "All-time bookings",
-    last7Days: "Last 7 days",
-    topServices: "Top services",
-    addService: "Add a service",
-    serviceName: "Service name",
-    price: "Price (₪)",
-    duration: "Duration (min)",
     upcoming: "Upcoming", past: "Past", cancelled: "Cancelled", all: "All",
     when: "When", customer: "Customer", service: "Service", staff: "Staff", status: "Status",
-    noBookings: "No bookings yet.",
-    searchPlaceholder: "Search by name or phone…",
+    noAppointments: "No appointments found.", searchPlaceholder: "Search by name or phone…",
+    exportCsv: "Export CSV",
+
+    // Services
+    servicesTitle: "Services", addService: "Add a service",
+    serviceName: "Service name", price: "Price (₪)", duration: "Duration (min)",
+    noServices: "No services yet. Add one below.",
+
+    // Staff
+    staffTitle: "Staff",
+    staffSubtitle: "Add the people who work at your salon. Customers can specify a preferred stylist when booking.",
+    addStaffMember: "Add a staff member", staffName: "Name",
+    noStaff: "No staff members yet. Add one below.", remove: "Remove",
+
+    // Hours
+    hoursTitle: "Opening Hours", hoursSubtitle: "Set when your salon is open for bookings",
+    saveHours: "Save hours", to: "to",
+
+    // WhatsApp
+    whatsappTitle: "WhatsApp", whatsappSubtitle: "Connect your Meta WhatsApp Business number",
+    connected: "Connected", notConnected: "Not connected",
+    phoneNumberId: "Phone Number ID", accessToken: "Access Token",
+    whatsappHint: "Find these in your Meta Business app under WhatsApp › API Setup. Use a permanent token.",
+
+    // FAQ
+    faqTitle: "FAQ",
+    faqSubtitle: "Common questions your WhatsApp bot can use to answer customers (e.g. parking, payment, cancellation policy).",
+    addFaqEntry: "Add an entry", question: "Question", answer: "Answer",
+    noFaq: "No FAQ entries yet. Add one below.",
+    questionPlaceholder: "Question (e.g. Do you have parking?)", answerPlaceholder: "Answer",
+
+    // Customers
+    customersTitle: "Customers", totalCustomers: "total customers", totalBookings: "Total bookings",
+    noCustomers: "No customers yet — they'll appear here after their first booking.",
+
+    // Waitlist
+    waitlistTitle: "Waitlist", waitlistSubtitle: "Customers waiting for a slot to open up",
     pendingWaitlist: "Pending", notifiedWaitlist: "Notified",
     markNotified: "Mark notified", noWaitlist: "No one on the waitlist yet.",
-    noCustomers: "No customers yet — they'll appear here after their first booking.",
-    totalCustomers: "total customers",
-    totalBookings: "Total bookings",
-    botPersonalityTitle: "Bot personality",
-    botPersonalityDesc: "Customize how the bot introduces itself and speaks to customers.",
-    greeting: "Opening greeting",
-    personality: "Personality & tone",
-    notifPhone: "Your WhatsApp number",
-    notifPhoneHint: "Include country code, e.g. 972501234567.",
-    businessProfile: "Business profile",
-    businessProfileDesc: "Basic info shown to customers via the bot.",
+
+    // Settings
+    settingsTitle: "Settings", settingsSubtitle: "Salon profile and bot configuration",
+    businessProfile: "Business profile", businessProfileDesc: "Basic info shown to customers via the bot.",
     bookingNotifications: "Booking notifications",
     bookingNotificationsDesc: "Get a WhatsApp message on your phone every time a customer books.",
+    botPersonalityTitle: "Bot personality",
+    botPersonalityDesc: "Customize how the bot introduces itself and speaks to customers.",
     salonName: "Salon name", address: "Address", timezone: "Timezone", loginEmail: "Login email",
+    notifPhone: "Your WhatsApp number", notifPhoneHint: "Include country code, e.g. 972501234567.",
+    greeting: "Opening greeting", personality: "Personality & tone",
+
+    // Billing
+    billingTitle: "Billing", billingSubtitle: "Manage your subscription",
+    subscriptionStatus: "Subscription status",
+    subscribeNow: "Subscribe now", reactivate: "Reactivate subscription",
+    manageBilling: "Manage billing & invoices",
+    redirecting: "Redirecting…",
+    whatsappWarning: "Connect your WhatsApp number before subscribing — the bot won't go live without it.",
+    billingStatuses: {
+      trial: { label: "Trial", description: "You're on a free trial. Subscribe to keep the bot running." },
+      active: { label: "Active", description: "Your subscription is active. The bot is live." },
+      past_due: { label: "Past due", description: "Payment failed. Update your payment method to restore access." },
+      canceled: { label: "Canceled", description: "Your subscription has been canceled." },
+    },
+
+    // Common
+    save: "Save changes", saving: "Saving…", saved: "Saved",
+    loading: "Loading…", cancel: "Cancel", delete: "Delete", add: "Add", edit: "Edit",
+    search: "Search…", noBookings: "No bookings yet.",
   },
+
   he: {
     nav: {
       analytics: "סטטיסטיקות", appointments: "תורים", customers: "לקוחות",
       waitlist: "רשימת המתנה", services: "שירותים", staff: "צוות", hours: "שעות פעילות",
       whatsapp: "וואטסאפ", faq: "שאלות נפוצות", settings: "הגדרות", billing: "תשלום", logout: "התנתקות",
     },
+    days: ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"],
+    daysShort: ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"],
+
+    // Analytics
     analyticsTitle: "סטטיסטיקות", analyticsSubtitle: "סקירת ביצועי הסלון שלך",
+    thisMonth: "החודש", revenue: "הכנסות החודש",
+    newCustomers: "לקוחות חדשים", allTime: "סה\"כ הזמנות",
+    last7Days: "7 הימים האחרונים", topServices: "שירותים מובילים",
+    setupChecklist: "מתחילים להגדיר", setupSubtitle: "השלם את השלבים הבאים כדי להתחיל:",
+    stepServices: "הוסף שירותים", stepHours: "הגדר שעות פעילות",
+    stepWhatsapp: "חבר וואטסאפ", stepBilling: "הפעל מנוי",
+
+    // Appointments
     appointmentsTitle: "תורים", appointmentsSubtitle: "הזמנות שנקבעו דרך וואטסאפ",
-    customersTitle: "לקוחות", waitlistTitle: "רשימת המתנה", servicesTitle: "שירותים",
-    staffTitle: "צוות", hoursTitle: "שעות פעילות", settingsTitle: "הגדרות", billingTitle: "תשלום",
-    faqTitle: "שאלות נפוצות", whatsappTitle: "וואטסאפ",
-    save: "שמור שינויים", saving: "שומר…", saved: "נשמר",
-    loading: "טוען…", cancel: "ביטול", delete: "מחק", add: "הוסף", edit: "עריכה",
-    search: "חיפוש…", exportCsv: "ייצוא CSV",
-    noAppointments: "לא נמצאו תורים.",
-    setupChecklist: "התחל להגדיר",
-    setupSubtitle: "השלם את השלבים הבאים כדי להתחיל:",
-    stepServices: "הוסף שירותים",
-    stepHours: "הגדר שעות פעילות",
-    stepWhatsapp: "חבר וואטסאפ",
-    stepBilling: "הפעל מנוי",
-    thisMonth: "החודש",
-    revenue: "הכנסות החודש",
-    newCustomers: "לקוחות חדשים",
-    allTime: "סה\"כ הזמנות",
-    last7Days: "7 הימים האחרונים",
-    topServices: "שירותים מובילים",
-    addService: "הוסף שירות",
-    serviceName: "שם השירות",
-    price: "מחיר (₪)",
-    duration: "משך (דקות)",
     upcoming: "קרובים", past: "עבר", cancelled: "בוטלו", all: "הכל",
-    when: "מתי", customer: "לקוח", service: "שירות", staff: "עובד", status: "סטטוס",
-    noBookings: "אין הזמנות עדיין.",
-    searchPlaceholder: "חפש לפי שם או טלפון…",
+    when: "מועד", customer: "לקוח", service: "שירות", staff: "עובד", status: "סטטוס",
+    noAppointments: "לא נמצאו תורים.", searchPlaceholder: "חיפוש לפי שם או טלפון…",
+    exportCsv: "ייצוא CSV",
+
+    // Services
+    servicesTitle: "שירותים", addService: "הוסף שירות",
+    serviceName: "שם השירות", price: "מחיר (₪)", duration: "משך (דקות)",
+    noServices: "אין שירותים עדיין. הוסף אחד למטה.",
+
+    // Staff
+    staffTitle: "צוות",
+    staffSubtitle: "הוסף את אנשי הצוות בסלון. לקוחות יכולים לבחור ספר/ית מועדפ/ת בעת ההזמנה.",
+    addStaffMember: "הוסף איש/ת צוות", staffName: "שם",
+    noStaff: "אין אנשי צוות עדיין. הוסף למטה.", remove: "הסר",
+
+    // Hours
+    hoursTitle: "שעות פעילות", hoursSubtitle: "הגדר מתי הסלון פתוח לקביעת תורים",
+    saveHours: "שמור שעות", to: "עד",
+
+    // WhatsApp
+    whatsappTitle: "וואטסאפ", whatsappSubtitle: "חבר את מספר הוואטסאפ העסקי שלך",
+    connected: "מחובר", notConnected: "לא מחובר",
+    phoneNumberId: "מזהה מספר הטלפון", accessToken: "טוקן גישה",
+    whatsappHint: "ניתן למצוא את הפרטים בממשק מטא תחת WhatsApp › API Setup. השתמש בטוקן קבוע.",
+
+    // FAQ
+    faqTitle: "שאלות נפוצות",
+    faqSubtitle: "שאלות ותשובות שהבוט ישתמש בהן כדי לענות ללקוחות (לדוג׳ חניה, תשלום, מדיניות ביטול).",
+    addFaqEntry: "הוסף שאלה", question: "שאלה", answer: "תשובה",
+    noFaq: "אין שאלות נפוצות עדיין. הוסף למטה.",
+    questionPlaceholder: "שאלה (לדוג׳ האם יש חניה?)", answerPlaceholder: "תשובה",
+
+    // Customers
+    customersTitle: "לקוחות", totalCustomers: "לקוחות בסה\"כ", totalBookings: "סה\"כ הזמנות",
+    noCustomers: "אין לקוחות עדיין — הם יופיעו כאן לאחר ההזמנה הראשונה.",
+
+    // Waitlist
+    waitlistTitle: "רשימת המתנה", waitlistSubtitle: "לקוחות שממתינים למועד פנוי",
     pendingWaitlist: "ממתינים", notifiedWaitlist: "עודכנו",
     markNotified: "סמן כמעודכן", noWaitlist: "אין ממתינים ברשימה.",
-    noCustomers: "אין לקוחות עדיין — הם יופיעו כאן לאחר ההזמנה הראשונה.",
-    totalCustomers: "לקוחות בסה\"כ",
-    totalBookings: "סה\"כ הזמנות",
+
+    // Settings
+    settingsTitle: "הגדרות", settingsSubtitle: "פרופיל הסלון והגדרות הבוט",
+    businessProfile: "פרופיל העסק", businessProfileDesc: "מידע בסיסי שמוצג ללקוחות דרך הבוט.",
+    bookingNotifications: "התראות הזמנה",
+    bookingNotificationsDesc: "קבל הודעת וואטסאפ בכל פעם שלקוח קובע תור.",
     botPersonalityTitle: "אישיות הבוט",
     botPersonalityDesc: "התאם כיצד הבוט מציג את עצמו ומדבר עם לקוחות.",
-    greeting: "ברכת פתיחה",
-    personality: "אישיות וטון",
-    notifPhone: "מספר הוואטסאפ שלך",
-    notifPhoneHint: "כולל קידומת מדינה, לדוג׳ 972501234567.",
-    businessProfile: "פרופיל העסק",
-    businessProfileDesc: "מידע בסיסי שמוצג ללקוחות דרך הבוט.",
-    bookingNotifications: "התראות הזמנה",
-    bookingNotificationsDesc: "קבל הודעת וואטסאפ בכל פעם שלקוח מזמין.",
     salonName: "שם הסלון", address: "כתובת", timezone: "אזור זמן", loginEmail: "אימייל כניסה",
+    notifPhone: "מספר הוואטסאפ שלך", notifPhoneHint: "כולל קידומת מדינה, לדוג׳ 972501234567.",
+    greeting: "ברכת פתיחה", personality: "אישיות וטון",
+
+    // Billing
+    billingTitle: "תשלום", billingSubtitle: "נהל את המנוי שלך",
+    subscriptionStatus: "סטטוס מנוי",
+    subscribeNow: "הירשם עכשיו", reactivate: "הפעל מנוי מחדש",
+    manageBilling: "נהל חיוב וחשבוניות",
+    redirecting: "מפנה…",
+    whatsappWarning: "חבר את מספר הוואטסאפ לפני ההרשמה — הבוט לא יעלה לאוויר בלי זה.",
+    billingStatuses: {
+      trial: { label: "ניסיון", description: "אתה בתקופת ניסיון חינמית. הירשם כדי להמשיך." },
+      active: { label: "פעיל", description: "המנוי שלך פעיל. הבוט עובד." },
+      past_due: { label: "חוב", description: "התשלום נכשל. עדכן את אמצעי התשלום לשחזור הגישה." },
+      canceled: { label: "בוטל", description: "המנוי שלך בוטל." },
+    },
+
+    // Common
+    save: "שמור שינויים", saving: "שומר…", saved: "נשמר",
+    loading: "טוען…", cancel: "ביטול", delete: "מחק", add: "הוסף", edit: "עריכה",
+    search: "חיפוש…", noBookings: "אין הזמנות עדיין.",
   },
 } as const;
 
