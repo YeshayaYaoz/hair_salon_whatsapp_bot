@@ -7,7 +7,7 @@ const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
 
 interface DayHours {
   dayOfWeek: number;
-  open: string; // "HH:MM"
+  open: string;
   close: string;
   enabled: boolean;
 }
@@ -55,19 +55,61 @@ export default function HoursPage() {
   }
 
   return (
-    <main>
-      <h2>Opening Hours</h2>
-      {hours.map((h, i) => (
-        <div key={h.dayOfWeek} style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 8 }}>
-          <input type="checkbox" checked={h.enabled} onChange={(e) => update(i, { enabled: e.target.checked })} />
-          <span style={{ width: 100 }}>{DAYS[h.dayOfWeek]}</span>
-          <input type="time" value={h.open} onChange={(e) => update(i, { open: e.target.value })} disabled={!h.enabled} />
-          <span>to</span>
-          <input type="time" value={h.close} onChange={(e) => update(i, { close: e.target.value })} disabled={!h.enabled} />
-        </div>
-      ))}
-      <button onClick={save}>Save hours</button>
-      {saved && <span style={{ marginLeft: 8, color: "green" }}>Saved</span>}
-    </main>
+    <div className="max-w-lg">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-white">Opening Hours</h1>
+        <p className="text-zinc-400 text-sm mt-1">Set when your salon is open for bookings</p>
+      </div>
+
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mb-4">
+        {hours.map((h, i) => (
+          <div
+            key={h.dayOfWeek}
+            className={`flex items-center gap-4 px-5 py-3.5 ${i !== hours.length - 1 ? "border-b border-zinc-800/50" : ""} ${!h.enabled ? "opacity-50" : ""}`}
+          >
+            <input
+              type="checkbox"
+              checked={h.enabled}
+              onChange={(e) => update(i, { enabled: e.target.checked })}
+            />
+            <span className="w-24 text-sm font-medium text-zinc-200">{DAYS[h.dayOfWeek]}</span>
+            <div className="flex items-center gap-2 ml-auto">
+              <input
+                type="time"
+                value={h.open}
+                onChange={(e) => update(i, { open: e.target.value })}
+                disabled={!h.enabled}
+                className="text-sm py-1.5 px-2"
+              />
+              <span className="text-zinc-500 text-sm">to</span>
+              <input
+                type="time"
+                value={h.close}
+                onChange={(e) => update(i, { close: e.target.value })}
+                disabled={!h.enabled}
+                className="text-sm py-1.5 px-2"
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          onClick={save}
+          className="bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition"
+        >
+          Save hours
+        </button>
+        {saved && (
+          <span className="text-green-400 text-sm flex items-center gap-1">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            Saved
+          </span>
+        )}
+      </div>
+    </div>
   );
 }

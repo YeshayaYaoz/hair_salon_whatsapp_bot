@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-zinc-950 text-zinc-100;
+  }
+
+  input, textarea, select {
+    @apply bg-zinc-800 border border-zinc-700 text-zinc-100 rounded-lg px-3 py-2 text-sm outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-400 transition placeholder:text-zinc-500;
+  }
+
+  input[type="checkbox"] {
+    @apply w-4 h-4 accent-violet-500;
+  }
+
+  input[type="time"] {
+    @apply bg-zinc-800 border border-zinc-700 text-zinc-100 rounded-lg px-3 py-2 text-sm;
+  }
+}
