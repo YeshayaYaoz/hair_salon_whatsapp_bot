@@ -3,8 +3,16 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { signBusinessToken } from "../lib/auth.js";
+import { rateLimit } from "../lib/rateLimit.js";
 
 export const authRouter = Router();
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyPrefix: "auth",
+  message: "Too many attempts. Please try again later.",
+});
 
 const signupSchema = z.object({
   name: z.string().min(1),
@@ -12,7 +20,7 @@ const signupSchema = z.object({
   password: z.string().min(8),
 });
 
-authRouter.post("/signup", async (req, res) => {
+authRouter.post("/signup", authLimiter, async (req, res) => {
   const parsed = signupSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
@@ -30,7 +38,7 @@ const loginSchema = z.object({
   password: z.string(),
 });
 
-authRouter.post("/login", async (req, res) => {
+authRouter.post("/login", authLimiter, async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 

@@ -4,8 +4,15 @@ import { sendWhatsAppMessage, sendWhatsAppList, type ListRow } from "./whatsappC
 import { handleIncomingMessage } from "../bot/claudeBot.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { hasActiveSubscription } from "../lib/subscriptionGate.js";
+import { rateLimit } from "../lib/rateLimit.js";
 
 export const whatsappRouter = Router();
+
+const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyPrefix: "wa",
+});
 
 // Meta calls this once to verify the webhook URL when you configure it in the Meta dashboard.
 whatsappRouter.get("/", (req, res) => {
@@ -41,7 +48,7 @@ function buildSlotRows(slots: { startTime: string }[]): ListRow[] {
   });
 }
 
-whatsappRouter.post("/", async (req, res) => {
+whatsappRouter.post("/", webhookLimiter, async (req, res) => {
   // Acknowledge immediately; Meta retries aggressively if it doesn't get a fast 200.
   res.sendStatus(200);
 
