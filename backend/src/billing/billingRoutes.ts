@@ -30,6 +30,19 @@ billingRouter.post("/checkout", requireAuth, async (req: AuthedRequest, res) => 
   res.json({ url: session.url });
 });
 
+/** Opens the Stripe-hosted billing portal so a business can update its card, view invoices, or cancel. */
+billingRouter.post("/portal", requireAuth, async (req: AuthedRequest, res) => {
+  const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! } });
+  if (!business.stripeCustomerId) return res.status(400).json({ error: "No billing account yet" });
+
+  const session = await stripe.billingPortal.sessions.create({
+    customer: business.stripeCustomerId,
+    return_url: req.body.returnUrl,
+  });
+
+  res.json({ url: session.url });
+});
+
 /** Stripe webhook: keeps Business.subscriptionStatus in sync with the subscription lifecycle. Must receive the raw body for signature verification. */
 const stripeWebhookMiddleware = express.raw({ type: "application/json" });
 
@@ -43,21 +56,30 @@ stripeWebhookRouter.post("/", stripeWebhookMiddleware, async (req, res) => {
     return res.sendStatus(400);
   }
 
-  const subscription = event.data.object as { customer: string; status?: string; id?: string };
-
   switch (event.type) {
-    case "checkout.session.completed":
+    // The session payload has no subscription "status" field (it has "complete"/"open"/"expired"
+    // instead) — pull the real subscription to get its actual status rather than misreading the session's.
+    case "checkout.session.completed": {
+      const session = event.data.object as { customer: string; subscription: string | null };
+      if (!session.subscription) break;
+      const sub = await stripe.subscriptions.retrieve(session.subscription);
+      await prisma.business.updateMany({
+        where: { stripeCustomerId: session.customer },
+        data: { subscriptionStatus: mapStripeStatus(sub.status), stripeSubscriptionId: sub.id },
+      });
+      break;
+    }
     case "customer.subscription.created":
     case "customer.subscription.updated": {
-      const customerId = subscription.customer;
-      const status = mapStripeStatus(subscription.status);
+      const subscription = event.data.object as { customer: string; status?: string; id?: string };
       await prisma.business.updateMany({
-        where: { stripeCustomerId: customerId },
-        data: { subscriptionStatus: status, stripeSubscriptionId: subscription.id },
+        where: { stripeCustomerId: subscription.customer },
+        data: { subscriptionStatus: mapStripeStatus(subscription.status), stripeSubscriptionId: subscription.id },
       });
       break;
     }
     case "customer.subscription.deleted": {
+      const subscription = event.data.object as { customer: string };
       await prisma.business.updateMany({
         where: { stripeCustomerId: subscription.customer },
         data: { subscriptionStatus: "canceled" },
