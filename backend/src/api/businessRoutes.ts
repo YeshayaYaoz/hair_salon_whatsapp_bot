@@ -157,6 +157,78 @@ businessRouter.patch("/appointments/:id/cancel", async (req: AuthedRequest, res)
   res.json({ ok: true });
 });
 
+// --- Analytics ---
+
+businessRouter.get("/analytics", async (req: AuthedRequest, res) => {
+  const bizId = req.businessId!;
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const sevenDaysAgo = new Date(now);
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+  sevenDaysAgo.setHours(0, 0, 0, 0);
+
+  const [monthAppts, weekAppts, topServices, newCustomers, allTimeCount] = await Promise.all([
+    prisma.appointment.findMany({
+      where: { businessId: bizId, startTime: { gte: startOfMonth } },
+      include: { service: { select: { priceCents: true } } },
+    }),
+    prisma.appointment.findMany({
+      where: { businessId: bizId, startTime: { gte: sevenDaysAgo }, status: "confirmed" },
+      select: { startTime: true },
+    }),
+    prisma.appointment.groupBy({
+      by: ["serviceId"],
+      where: { businessId: bizId, status: "confirmed" },
+      _count: { id: true },
+      orderBy: { _count: { id: "desc" } },
+      take: 5,
+    }),
+    prisma.customer.count({
+      where: { businessId: bizId, appointments: { some: { startTime: { gte: startOfMonth } } } },
+    }),
+    prisma.appointment.count({ where: { businessId: bizId, status: "confirmed" } }),
+  ]);
+
+  const confirmedThisMonth = monthAppts.filter((a) => a.status === "confirmed");
+  const cancelledThisMonth = monthAppts.filter((a) => a.status === "cancelled").length;
+  const revenueThisMonth = confirmedThisMonth.reduce((sum, a) => sum + a.service.priceCents, 0);
+
+  // Build daily counts for the last 7 days
+  const dailyMap: Record<string, number> = {};
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(sevenDaysAgo);
+    d.setDate(d.getDate() + i);
+    dailyMap[d.toISOString().slice(0, 10)] = 0;
+  }
+  for (const a of weekAppts) {
+    const key = a.startTime.toISOString().slice(0, 10);
+    if (key in dailyMap) dailyMap[key]++;
+  }
+  const dailyThisWeek = Object.entries(dailyMap).map(([date, count]) => ({ date, count }));
+
+  // Resolve service names for top services
+  const serviceIds = topServices.map((s) => s.serviceId);
+  const services = await prisma.service.findMany({
+    where: { id: { in: serviceIds } },
+    select: { id: true, name: true },
+  });
+  const nameMap = Object.fromEntries(services.map((s) => [s.id, s.name]));
+  const topServicesList = topServices.map((s) => ({
+    name: nameMap[s.serviceId] ?? "Unknown",
+    count: s._count.id,
+  }));
+
+  res.json({
+    confirmedThisMonth: confirmedThisMonth.length,
+    cancelledThisMonth,
+    revenueThisMonth,
+    newCustomersThisMonth: newCustomers,
+    allTimeConfirmed: allTimeCount,
+    dailyThisWeek,
+    topServices: topServicesList,
+  });
+});
+
 // --- FAQ entries ---
 
 const faqSchema = z.object({ question: z.string().min(1), answer: z.string().min(1) });
