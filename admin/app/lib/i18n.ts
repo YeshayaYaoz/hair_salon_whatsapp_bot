@@ -188,5 +188,11 @@ const translations = {
   },
 } as const;
 
-export type Translations = typeof translations.en;
+type DeepString<T> = T extends string
+  ? string
+  : T extends readonly string[]
+  ? readonly string[]
+  : { [K in keyof T]: DeepString<T[K]> };
+
+export type Translations = DeepString<typeof translations.en>;
 export { translations };
