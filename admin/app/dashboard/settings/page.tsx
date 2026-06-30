@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
+import { useLanguage } from "../../lib/LanguageContext";
 
 interface BusinessProfile {
   name: string;
@@ -34,6 +35,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 }
 
 export default function SettingsPage() {
+  const { t } = useLanguage();
   const [fields, setFields] = useState<BusinessProfile>({
     name: "", address: "", timezone: "Asia/Jerusalem", email: "",
     notificationPhone: "", botGreeting: "", botPersonality: "",
@@ -90,8 +92,8 @@ export default function SettingsPage() {
   if (!loaded) {
     return (
       <div>
-        <h1 className="text-2xl font-bold text-white mb-6">Settings</h1>
-        <p className="text-zinc-500 text-sm">Loading...</p>
+        <h1 className="text-2xl font-bold text-white mb-6">{t.settingsTitle}</h1>
+        <p className="text-zinc-500 text-sm">{t.loading}</p>
       </div>
     );
   }
@@ -99,31 +101,28 @@ export default function SettingsPage() {
   return (
     <div className="max-w-lg">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Settings</h1>
-        <p className="text-zinc-400 text-sm mt-1">Salon profile and bot configuration</p>
+        <h1 className="text-2xl font-bold text-white">{t.settingsTitle}</h1>
+        <p className="text-zinc-400 text-sm mt-1">{t.settingsSubtitle}</p>
       </div>
 
       <form onSubmit={save}>
-        <Section title="Business profile" description="Basic info shown to customers via the bot.">
-          <Field label="Salon name">
+        <Section title={t.businessProfile} description={t.businessProfileDesc}>
+          <Field label={t.salonName}>
             <input value={fields.name} onChange={(e) => set("name", e.target.value)} required className="w-full" />
           </Field>
-          <Field label="Address" hint="e.g. Rothschild 12, Tel Aviv">
+          <Field label={t.address}>
             <input value={fields.address} onChange={(e) => set("address", e.target.value)} className="w-full" />
           </Field>
-          <Field label="Timezone">
+          <Field label={t.timezone}>
             <input value={fields.timezone} onChange={(e) => set("timezone", e.target.value)} className="w-full" />
           </Field>
-          <Field label="Login email">
+          <Field label={t.loginEmail}>
             <input value={fields.email} disabled className="w-full opacity-60 cursor-not-allowed" />
           </Field>
         </Section>
 
-        <Section
-          title="Booking notifications"
-          description="Get a WhatsApp message on your phone every time a customer books."
-        >
-          <Field label="Your WhatsApp number" hint="Include country code, e.g. 972501234567. Must be a WhatsApp number.">
+        <Section title={t.bookingNotifications} description={t.bookingNotificationsDesc}>
+          <Field label={t.notifPhone} hint={t.notifPhoneHint}>
             <input
               placeholder="972501234567"
               value={fields.notificationPhone}
@@ -133,11 +132,8 @@ export default function SettingsPage() {
           </Field>
         </Section>
 
-        <Section
-          title="Bot personality"
-          description="Customize how the bot introduces itself and speaks to customers."
-        >
-          <Field label="Opening greeting" hint="How the bot greets customers at the start of a conversation.">
+        <Section title={t.botPersonalityTitle} description={t.botPersonalityDesc}>
+          <Field label={t.greeting}>
             <textarea
               rows={2}
               placeholder="e.g. שלום! ברוכים הבאים לסלון שיר 💇‍♀️ במה אוכל לעזור?"
@@ -146,10 +142,10 @@ export default function SettingsPage() {
               className="w-full"
             />
           </Field>
-          <Field label="Personality & tone" hint="Additional instructions for how the bot should speak.">
+          <Field label={t.personality}>
             <textarea
               rows={3}
-              placeholder="e.g. Be friendly and use emojis occasionally. Always respond in Hebrew. Address customers formally."
+              placeholder="e.g. Be friendly and use emojis occasionally. Always respond in Hebrew."
               value={fields.botPersonality}
               onChange={(e) => set("botPersonality", e.target.value)}
               className="w-full"
@@ -163,14 +159,14 @@ export default function SettingsPage() {
             disabled={saving}
             className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition"
           >
-            {saving ? "Saving..." : "Save changes"}
+            {saving ? t.saving : t.save}
           </button>
           {saved && (
             <span className="text-green-400 text-sm flex items-center gap-1">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              Saved
+              {t.saved}
             </span>
           )}
           {error && <p className="text-red-400 text-sm">{error}</p>}

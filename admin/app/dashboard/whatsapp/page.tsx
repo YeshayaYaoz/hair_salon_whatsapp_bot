@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
+import { useLanguage } from "../../lib/LanguageContext";
 
 export default function WhatsAppPage() {
+  const { t } = useLanguage();
   const [phoneNumberId, setPhoneNumberId] = useState("");
   const [accessToken, setAccessToken] = useState("");
   const [connected, setConnected] = useState(false);
@@ -26,22 +28,21 @@ export default function WhatsAppPage() {
   return (
     <div className="max-w-lg">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">WhatsApp Connection</h1>
-        <p className="text-zinc-400 text-sm mt-1">Connect your Meta WhatsApp Business number</p>
+        <h1 className="text-2xl font-bold text-white">{t.whatsappTitle}</h1>
+        <p className="text-zinc-400 text-sm mt-1">{t.whatsappSubtitle}</p>
       </div>
 
-      {/* Status badge */}
       <div className="flex items-center gap-2 mb-6">
         <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${connected ? "bg-green-950/50 text-green-400 border border-green-800" : "bg-zinc-800 text-zinc-400 border border-zinc-700"}`}>
           <span className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-green-400" : "bg-zinc-500"}`} />
-          {connected ? "Connected" : "Not connected"}
+          {connected ? t.connected : t.notConnected}
         </span>
       </div>
 
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-4">
         <form onSubmit={save} className="flex flex-col gap-3">
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1.5">Phone Number ID</label>
+            <label className="block text-xs font-medium text-zinc-400 mb-1.5">{t.phoneNumberId}</label>
             <input
               placeholder="e.g. 123456789012345"
               value={phoneNumberId}
@@ -51,7 +52,7 @@ export default function WhatsAppPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1.5">Access Token</label>
+            <label className="block text-xs font-medium text-zinc-400 mb-1.5">{t.accessToken}</label>
             <input
               placeholder="Permanent access token from Meta"
               value={accessToken}
@@ -66,23 +67,21 @@ export default function WhatsAppPage() {
               disabled={saving}
               className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition"
             >
-              {saving ? "Saving..." : "Save"}
+              {saving ? t.saving : t.save}
             </button>
             {saved && (
               <span className="text-green-400 text-sm flex items-center gap-1">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                Saved
+                {t.saved}
               </span>
             )}
           </div>
         </form>
       </div>
 
-      <p className="text-xs text-zinc-500">
-        Find these in your Meta Business app under <span className="text-zinc-400">WhatsApp › API Setup</span>. Use a permanent token, not a temporary one.
-      </p>
+      <p className="text-xs text-zinc-500">{t.whatsappHint}</p>
     </div>
   );
 }

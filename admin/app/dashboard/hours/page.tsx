@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
-
-const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+import { useLanguage } from "../../lib/LanguageContext";
 
 interface DayHours {
   dayOfWeek: number;
@@ -22,8 +21,9 @@ function toHHMM(min: number): string {
 }
 
 export default function HoursPage() {
+  const { t } = useLanguage();
   const [hours, setHours] = useState<DayHours[]>(
-    DAYS.map((_, i) => ({ dayOfWeek: i, open: "09:00", close: "18:00", enabled: i !== 6 }))
+    t.days.map((_, i) => ({ dayOfWeek: i, open: "09:00", close: "18:00", enabled: i !== 6 }))
   );
   const [saved, setSaved] = useState(false);
 
@@ -31,7 +31,7 @@ export default function HoursPage() {
     apiFetch<{ dayOfWeek: number; openMin: number; closeMin: number }[]>("/api/business/hours").then((existing) => {
       if (existing.length === 0) return;
       setHours(
-        DAYS.map((_, i) => {
+        t.days.map((_, i) => {
           const match = existing.find((h) => h.dayOfWeek === i);
           return match
             ? { dayOfWeek: i, open: toHHMM(match.openMin), close: toHHMM(match.closeMin), enabled: true }
@@ -57,8 +57,8 @@ export default function HoursPage() {
   return (
     <div className="max-w-lg">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Opening Hours</h1>
-        <p className="text-zinc-400 text-sm mt-1">Set when your salon is open for bookings</p>
+        <h1 className="text-2xl font-bold text-white">{t.hoursTitle}</h1>
+        <p className="text-zinc-400 text-sm mt-1">{t.hoursSubtitle}</p>
       </div>
 
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mb-4">
@@ -72,8 +72,8 @@ export default function HoursPage() {
               checked={h.enabled}
               onChange={(e) => update(i, { enabled: e.target.checked })}
             />
-            <span className="w-24 text-sm font-medium text-zinc-200">{DAYS[h.dayOfWeek]}</span>
-            <div className="flex items-center gap-2 ml-auto">
+            <span className="w-24 text-sm font-medium text-zinc-200">{t.days[h.dayOfWeek]}</span>
+            <div className="flex items-center gap-2 ms-auto">
               <input
                 type="time"
                 value={h.open}
@@ -81,7 +81,7 @@ export default function HoursPage() {
                 disabled={!h.enabled}
                 className="text-sm py-1.5 px-2"
               />
-              <span className="text-zinc-500 text-sm">to</span>
+              <span className="text-zinc-500 text-sm">{t.to}</span>
               <input
                 type="time"
                 value={h.close}
@@ -99,14 +99,14 @@ export default function HoursPage() {
           onClick={save}
           className="bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition"
         >
-          Save hours
+          {t.saveHours}
         </button>
         {saved && (
           <span className="text-green-400 text-sm flex items-center gap-1">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
-            Saved
+            {t.saved}
           </span>
         )}
       </div>

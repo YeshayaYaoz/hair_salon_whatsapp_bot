@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
+import { useLanguage } from "../../lib/LanguageContext";
 
 interface Staff {
   id: string;
@@ -9,6 +10,7 @@ interface Staff {
 }
 
 export default function StaffPage() {
+  const { t } = useLanguage();
   const [staff, setStaff] = useState<Staff[]>([]);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -45,13 +47,13 @@ export default function StaffPage() {
   return (
     <div className="max-w-2xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Staff</h1>
-        <p className="text-zinc-400 text-sm mt-1">Add the people who work at your salon. Customers can be matched to a specific staff member when booking.</p>
+        <h1 className="text-2xl font-bold text-white">{t.staffTitle}</h1>
+        <p className="text-zinc-400 text-sm mt-1">{t.staffSubtitle}</p>
       </div>
 
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mb-6">
         {staff.length === 0 ? (
-          <div className="px-6 py-10 text-center text-zinc-500 text-sm">No staff members yet. Add one below.</div>
+          <div className="px-6 py-10 text-center text-zinc-500 text-sm">{t.noStaff}</div>
         ) : (
           <ul>
             {staff.map((s, i) => (
@@ -69,7 +71,7 @@ export default function StaffPage() {
                   onClick={() => remove(s.id)}
                   className="text-xs text-zinc-500 hover:text-red-400 transition px-2 py-1 rounded hover:bg-red-950/30"
                 >
-                  Remove
+                  {t.remove}
                 </button>
               </li>
             ))}
@@ -78,10 +80,10 @@ export default function StaffPage() {
       </div>
 
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-        <h2 className="text-sm font-semibold text-zinc-300 mb-4">Add a staff member</h2>
+        <h2 className="text-sm font-semibold text-zinc-300 mb-4">{t.addStaffMember}</h2>
         <form onSubmit={addStaff} className="flex gap-3">
           <input
-            placeholder="Staff name"
+            placeholder={t.staffName}
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
@@ -92,7 +94,7 @@ export default function StaffPage() {
             disabled={adding}
             className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
           >
-            {adding ? "Adding..." : "Add"}
+            {adding ? "…" : t.add}
           </button>
         </form>
         {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
