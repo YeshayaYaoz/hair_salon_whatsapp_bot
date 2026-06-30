@@ -47,8 +47,8 @@ export default function WaitlistPage() {
   const notified = entries.filter((e) => e.notified);
 
   return (
-    <div>
-      <div className="mb-6">
+    <div className="animate-fade-in">
+      <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-white">{t.waitlistTitle}</h1>
         <p className="text-zinc-400 text-sm mt-1">{t.waitlistSubtitle}</p>
       </div>

@@ -34,7 +34,7 @@ export default function LoginPage() {
     <main className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         {/* Logo / brand */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-8 animate-fade-up">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-violet-700 mb-4 shadow-xl shadow-violet-900/50">
             {/* Scissors + chat bubble mark */}
             <svg className="w-9 h-9 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -46,7 +46,7 @@ export default function LoginPage() {
         </div>
 
         {/* Card */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl animate-fade-up stagger-2">
           <h2 className="text-lg font-semibold mb-5 text-white">
             {mode === "login" ? "כניסה לחשבון" : "יצירת חשבון"}
           </h2>

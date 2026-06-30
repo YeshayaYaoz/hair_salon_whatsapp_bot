@@ -45,13 +45,13 @@ export default function StaffPage() {
   }
 
   return (
-    <div className="max-w-2xl">
-      <div className="mb-6">
+    <div className="max-w-2xl animate-fade-in">
+      <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-white">{t.staffTitle}</h1>
         <p className="text-zinc-400 text-sm mt-1">{t.staffSubtitle}</p>
       </div>
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mb-6">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mb-6 animate-fade-up stagger-2">
         {staff.length === 0 ? (
           <div className="px-6 py-10 text-center text-zinc-500 text-sm">{t.noStaff}</div>
         ) : (
@@ -79,7 +79,7 @@ export default function StaffPage() {
         )}
       </div>
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 animate-fade-up stagger-3">
         <h2 className="text-sm font-semibold text-zinc-300 mb-4">{t.addStaffMember}</h2>
         <form onSubmit={addStaff} className="flex gap-3">
           <input

@@ -27,8 +27,8 @@ export default function CustomersPage() {
   );
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
+    <div className="animate-fade-in">
+      <div className="mb-6 flex items-center justify-between flex-wrap gap-3 animate-fade-up">
         <div>
           <h1 className="text-2xl font-bold text-white">{t.customersTitle}</h1>
           <p className="text-zinc-400 text-sm mt-1">{customers.length} {t.totalCustomers}</p>
@@ -41,7 +41,7 @@ export default function CustomersPage() {
         />
       </div>
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden animate-fade-up stagger-2">
         {filtered.length === 0 ? (
           <div className="px-6 py-12 text-center text-zinc-500 text-sm">
             {t.noCustomers}

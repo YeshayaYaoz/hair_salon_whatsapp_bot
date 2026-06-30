@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
+import { useCountUp } from "../../lib/useCountUp";
 import Link from "next/link";
 
 interface Analytics {
@@ -27,9 +28,12 @@ interface SetupState {
   subscriptionActive: boolean;
 }
 
-function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function StatCard({ label, value, sub, delay = 0 }: { label: string; value: string; sub?: string; delay?: number }) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+    <div
+      className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 animate-fade-up"
+      style={{ animationDelay: `${delay}ms` }}
+    >
       <p className="text-xs text-zinc-500 mb-1">{label}</p>
       <p className="text-2xl font-bold text-white">{value}</p>
       {sub && <p className="text-xs text-zinc-500 mt-1">{sub}</p>}
@@ -37,8 +41,15 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
   );
 }
 
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const DAYS_HE = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+function AnimatedRevenue({ cents }: { cents: number }) {
+  const val = useCountUp(Math.round(cents / 100));
+  return <>{`₪${val.toLocaleString()}`}</>;
+}
+
+function AnimatedCount({ n }: { n: number }) {
+  const val = useCountUp(n);
+  return <>{val}</>;
+}
 
 export default function AnalyticsPage() {
   const { t, lang } = useLanguage();
@@ -73,7 +84,7 @@ export default function AnalyticsPage() {
 
   if (!data) {
     return (
-      <div>
+      <div className="animate-fade-in">
         <h1 className="text-2xl font-bold text-white mb-6">{t.analyticsTitle}</h1>
         <p className="text-zinc-500 text-sm">{t.loading}</p>
       </div>
@@ -82,23 +93,28 @@ export default function AnalyticsPage() {
 
   const maxDaily = Math.max(...data.dailyThisWeek.map((d) => d.count), 1);
   const maxService = Math.max(...data.topServices.map((s) => s.count), 1);
-  const dayNames = lang === "he" ? DAYS_HE : DAYS;
+  const dayNames = lang === "he" ? t.daysShort : ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
   return (
-    <div>
-      <div className="mb-6">
+    <div className="animate-fade-in">
+      <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-white">{t.analyticsTitle}</h1>
         <p className="text-zinc-400 text-sm mt-1">{t.analyticsSubtitle}</p>
       </div>
 
-      {/* Onboarding checklist — only when not all complete */}
+      {/* Onboarding checklist */}
       {setup && !allComplete && (
-        <div className="bg-zinc-900 border border-violet-800/50 rounded-xl p-5 mb-6">
+        <div className="bg-zinc-900 border border-violet-800/50 rounded-xl p-5 mb-6 animate-fade-up stagger-2">
           <h2 className="text-sm font-semibold text-white mb-0.5">{t.setupChecklist}</h2>
           <p className="text-xs text-zinc-500 mb-4">{t.setupSubtitle}</p>
           <div className="flex flex-col gap-2">
-            {setupSteps.map((step) => (
-              <Link key={step.href} href={step.href} className="flex items-center gap-3 group">
+            {setupSteps.map((step, i) => (
+              <Link
+                key={step.href}
+                href={step.href}
+                className="flex items-center gap-3 group animate-fade-up"
+                style={{ animationDelay: `${(i + 3) * 60}ms` }}
+              >
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition ${step.done ? "bg-green-500 border-green-500" : "border-zinc-600 group-hover:border-violet-500"}`}>
                   {step.done && (
                     <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -118,27 +134,33 @@ export default function AnalyticsPage() {
         </div>
       )}
 
-      {/* Stat cards */}
+      {/* Stat cards with count-up */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatCard label={t.thisMonth} value={String(data.confirmedThisMonth)} sub={`${data.cancelledThisMonth} cancelled`} />
-        <StatCard label={t.revenue} value={`₪${(data.revenueThisMonth / 100).toLocaleString()}`} sub="from confirmed bookings" />
-        <StatCard label={t.newCustomers} value={String(data.newCustomersThisMonth)} sub="booked this month" />
-        <StatCard label={t.allTime} value={String(data.allTimeConfirmed)} sub="confirmed total" />
+        <StatCard delay={60}  label={t.thisMonth}    value={String(data.confirmedThisMonth)}    sub={`${data.cancelledThisMonth} cancelled`} />
+        <StatCard delay={120} label={t.revenue}       value={`₪${(data.revenueThisMonth / 100).toLocaleString()}`} sub="from confirmed bookings" />
+        <StatCard delay={180} label={t.newCustomers}  value={String(data.newCustomersThisMonth)} sub="booked this month" />
+        <StatCard delay={240} label={t.allTime}       value={String(data.allTimeConfirmed)}      sub="confirmed total" />
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Daily bar chart */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 animate-fade-up stagger-5">
           <h2 className="text-sm font-semibold text-white mb-4">{t.last7Days}</h2>
           <div className="flex items-end gap-2 h-32">
-            {data.dailyThisWeek.map(({ date, count }) => {
+            {data.dailyThisWeek.map(({ date, count }, i) => {
               const heightPct = maxDaily > 0 ? (count / maxDaily) * 100 : 0;
               const d = new Date(date + "T00:00:00");
               return (
                 <div key={date} className="flex flex-col items-center flex-1 gap-1">
                   <span className="text-xs text-zinc-400">{count > 0 ? count : ""}</span>
                   <div className="w-full flex items-end" style={{ height: "96px" }}>
-                    <div className="w-full rounded-t-md bg-violet-600 transition-all" style={{ height: `${Math.max(heightPct, count > 0 ? 8 : 3)}%` }} />
+                    <div
+                      className="w-full rounded-t-md bg-violet-600 transition-all duration-700"
+                      style={{
+                        height: `${Math.max(heightPct, count > 0 ? 8 : 3)}%`,
+                        animationDelay: `${i * 60 + 300}ms`,
+                      }}
+                    />
                   </div>
                   <span className="text-xs text-zinc-500">{dayNames[d.getDay()]}</span>
                 </div>
@@ -148,20 +170,23 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Top services */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 animate-fade-up stagger-6">
           <h2 className="text-sm font-semibold text-white mb-4">{t.topServices}</h2>
           {data.topServices.length === 0 ? (
             <p className="text-zinc-500 text-sm">{t.noBookings}</p>
           ) : (
             <div className="flex flex-col gap-3">
-              {data.topServices.map(({ name, count }) => (
-                <div key={name}>
+              {data.topServices.map(({ name, count }, i) => (
+                <div key={name} className="animate-fade-up" style={{ animationDelay: `${i * 60 + 400}ms` }}>
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-zinc-300 truncate max-w-[70%]">{name}</span>
                     <span className="text-zinc-500">{count}</span>
                   </div>
                   <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${(count / maxService) * 100}%` }} />
+                    <div
+                      className="h-full bg-violet-500 rounded-full transition-all duration-700"
+                      style={{ width: `${(count / maxService) * 100}%` }}
+                    />
                   </div>
                 </div>
               ))}

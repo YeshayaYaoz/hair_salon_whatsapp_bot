@@ -129,8 +129,8 @@ export default function ServicesPage() {
   }
 
   return (
-    <div className="max-w-2xl">
-      <div className="mb-6">
+    <div className="max-w-2xl animate-fade-in">
+      <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-white">{t.servicesTitle}</h1>
         <p className="text-zinc-400 text-sm mt-1">
           {services.length === 0 ? "Add the services your salon offers." : `${services.length} service${services.length !== 1 ? "s" : ""}`}
@@ -138,7 +138,7 @@ export default function ServicesPage() {
       </div>
 
       {/* Services list */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mb-6">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mb-6 animate-fade-up stagger-2">
         {services.length === 0 ? (
           <div className="px-6 py-12 text-center">
             <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center mx-auto mb-3">
@@ -188,7 +188,7 @@ export default function ServicesPage() {
       </div>
 
       {/* Add form */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 animate-fade-up stagger-3">
         <h2 className="text-sm font-semibold text-zinc-300 mb-4">{t.addService}</h2>
         <form onSubmit={addService} className="flex flex-col gap-2">
           <div className="flex gap-2 flex-wrap">

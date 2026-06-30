@@ -102,8 +102,8 @@ export default function AppointmentsPage() {
   ];
 
   return (
-    <div>
-      <div className="mb-5 flex items-start justify-between flex-wrap gap-3">
+    <div className="animate-fade-in">
+      <div className="mb-5 flex items-start justify-between flex-wrap gap-3 animate-fade-up">
         <div>
           <h1 className="text-2xl font-bold text-white">{t.appointmentsTitle}</h1>
           <p className="text-zinc-400 text-sm mt-1">{t.appointmentsSubtitle}</p>
@@ -119,7 +119,7 @@ export default function AppointmentsPage() {
         </button>
       </div>
 
-      <div className="flex items-center gap-3 mb-4 flex-wrap">
+      <div className="flex items-center gap-3 mb-4 flex-wrap animate-fade-up stagger-2">
         <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-lg p-1">
           {FILTERS.map((f) => (
             <button
@@ -139,7 +139,7 @@ export default function AppointmentsPage() {
         />
       </div>
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden animate-fade-up stagger-3">
         {filtered.length === 0 ? (
           <div className="px-6 py-12 text-center text-zinc-500 text-sm">{t.noAppointments}</div>
         ) : (

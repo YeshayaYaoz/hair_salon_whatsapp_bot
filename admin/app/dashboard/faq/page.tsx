@@ -48,8 +48,8 @@ export default function FaqPage() {
   }
 
   return (
-    <div className="max-w-2xl">
-      <div className="mb-6">
+    <div className="max-w-2xl animate-fade-in">
+      <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-white">{t.faqTitle}</h1>
         <p className="text-zinc-400 text-sm mt-1">{t.faqSubtitle}</p>
       </div>

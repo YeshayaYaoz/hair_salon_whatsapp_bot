@@ -63,8 +63,8 @@ export default function BillingPage() {
   const color = status ? STATUS_COLORS[status] : "";
 
   return (
-    <div className="max-w-md">
-      <div className="mb-6">
+    <div className="max-w-md animate-fade-in">
+      <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-white">{t.billingTitle}</h1>
         <p className="text-zinc-400 text-sm mt-1">{t.billingSubtitle}</p>
       </div>

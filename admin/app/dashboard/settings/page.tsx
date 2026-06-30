@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
+import { SavedBadge } from "../../lib/SavedBadge";
 
 interface BusinessProfile {
   name: string;
@@ -99,8 +100,8 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-lg">
-      <div className="mb-6">
+    <div className="max-w-lg animate-fade-in">
+      <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-white">{t.settingsTitle}</h1>
         <p className="text-zinc-400 text-sm mt-1">{t.settingsSubtitle}</p>
       </div>
@@ -161,14 +162,7 @@ export default function SettingsPage() {
           >
             {saving ? t.saving : t.save}
           </button>
-          {saved && (
-            <span className="text-green-400 text-sm flex items-center gap-1">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              {t.saved}
-            </span>
-          )}
+          {saved && <SavedBadge text={t.saved} />}
           {error && <p className="text-red-400 text-sm">{error}</p>}
         </div>
       </form>

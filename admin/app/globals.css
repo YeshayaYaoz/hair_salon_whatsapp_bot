@@ -18,4 +18,23 @@
   input[type="time"] {
     @apply bg-zinc-800 border border-zinc-700 text-zinc-100 rounded-lg px-3 py-2 text-sm;
   }
+
+  /* Press feedback on all interactive buttons */
+  button:not(:disabled) {
+    @apply active:scale-95;
+    transition-property: color, background-color, border-color, opacity, box-shadow, transform;
+    transition-duration: 150ms;
+  }
+}
+
+@layer utilities {
+  /* Stagger delay helpers */
+  .stagger-1 { animation-delay: 60ms; }
+  .stagger-2 { animation-delay: 120ms; }
+  .stagger-3 { animation-delay: 180ms; }
+  .stagger-4 { animation-delay: 240ms; }
+  .stagger-5 { animation-delay: 300ms; }
+  .stagger-6 { animation-delay: 360ms; }
+  .stagger-7 { animation-delay: 420ms; }
+  .stagger-8 { animation-delay: 480ms; }
 }
