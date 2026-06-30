@@ -8,7 +8,10 @@ import { billingRouter, stripeWebhookRouter } from "./billing/billingRoutes.js";
 import { publicRouter } from "./api/publicRoutes.js";
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL ?? "*",
+  credentials: true,
+}));
 
 // Stripe webhook needs the raw, unparsed body to verify its signature, so this must be mounted
 // before the global express.json() middleware below would otherwise consume the stream.
