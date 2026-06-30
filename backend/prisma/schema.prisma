@@ -41,6 +41,7 @@ model Service {
   description String?
   priceCents  Int
   durationMin Int
+  color       String  @default("#8b5cf6")
   appointments    Appointment[]
   waitlistEntries WaitlistEntry[]
 

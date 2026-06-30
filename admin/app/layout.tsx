@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Heebo, Karantina } from "next/font/google";
+import { LanguageProvider } from "./lib/LanguageContext";
 import "./globals.css";
 
 const heebo = Heebo({
@@ -17,9 +18,9 @@ const karantina = Karantina({
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="he" className={`dark ${heebo.variable} ${karantina.variable}`}>
+    <html lang="he" suppressHydrationWarning className={`dark ${heebo.variable} ${karantina.variable}`}>
       <body className="bg-zinc-950 text-zinc-100 min-h-screen font-[family-name:var(--font-heebo)]">
-        {children}
+        <LanguageProvider>{children}</LanguageProvider>
       </body>
     </html>
   );

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
+import { useLanguage } from "../../lib/LanguageContext";
+import Link from "next/link";
 
 interface Analytics {
   confirmedThisMonth: number;
@@ -11,6 +13,18 @@ interface Analytics {
   allTimeConfirmed: number;
   dailyThisWeek: { date: string; count: number }[];
   topServices: { name: string; count: number }[];
+}
+
+interface Me {
+  subscriptionStatus: string;
+  whatsappConnected: boolean;
+}
+
+interface SetupState {
+  hasServices: boolean;
+  hasHours: boolean;
+  whatsappConnected: boolean;
+  subscriptionActive: boolean;
 }
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -23,77 +37,110 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
   );
 }
 
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAYS_HE = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+
 export default function AnalyticsPage() {
+  const { t, lang } = useLanguage();
   const [data, setData] = useState<Analytics | null>(null);
+  const [setup, setSetup] = useState<SetupState | null>(null);
 
   useEffect(() => {
-    apiFetch<Analytics>("/api/business/analytics").then(setData);
+    Promise.all([
+      apiFetch<Analytics>("/api/business/analytics"),
+      apiFetch<Me>("/api/business/me"),
+      apiFetch<{ id: string }[]>("/api/business/services"),
+      apiFetch<{ id: string }[]>("/api/business/hours"),
+    ]).then(([analytics, me, services, hours]) => {
+      setData(analytics);
+      setSetup({
+        hasServices: services.length > 0,
+        hasHours: hours.length > 0,
+        whatsappConnected: me.whatsappConnected,
+        subscriptionActive: me.subscriptionStatus === "active",
+      });
+    });
   }, []);
+
+  const allComplete = setup && setup.hasServices && setup.hasHours && setup.whatsappConnected && setup.subscriptionActive;
+
+  const setupSteps = setup ? [
+    { done: setup.hasServices,        label: t.stepServices, href: "/dashboard/services" },
+    { done: setup.hasHours,           label: t.stepHours,    href: "/dashboard/hours" },
+    { done: setup.whatsappConnected,  label: t.stepWhatsapp, href: "/dashboard/whatsapp" },
+    { done: setup.subscriptionActive, label: t.stepBilling,  href: "/dashboard/billing" },
+  ] : [];
 
   if (!data) {
     return (
       <div>
-        <h1 className="text-2xl font-bold text-white mb-6">Analytics</h1>
-        <p className="text-zinc-500 text-sm">Loading...</p>
+        <h1 className="text-2xl font-bold text-white mb-6">{t.analyticsTitle}</h1>
+        <p className="text-zinc-500 text-sm">{t.loading}</p>
       </div>
     );
   }
 
   const maxDaily = Math.max(...data.dailyThisWeek.map((d) => d.count), 1);
   const maxService = Math.max(...data.topServices.map((s) => s.count), 1);
-
-  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const dayNames = lang === "he" ? DAYS_HE : DAYS;
 
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Analytics</h1>
-        <p className="text-zinc-400 text-sm mt-1">Overview of your salon's performance</p>
+        <h1 className="text-2xl font-bold text-white">{t.analyticsTitle}</h1>
+        <p className="text-zinc-400 text-sm mt-1">{t.analyticsSubtitle}</p>
       </div>
+
+      {/* Onboarding checklist — only when not all complete */}
+      {setup && !allComplete && (
+        <div className="bg-zinc-900 border border-violet-800/50 rounded-xl p-5 mb-6">
+          <h2 className="text-sm font-semibold text-white mb-0.5">{t.setupChecklist}</h2>
+          <p className="text-xs text-zinc-500 mb-4">{t.setupSubtitle}</p>
+          <div className="flex flex-col gap-2">
+            {setupSteps.map((step) => (
+              <Link key={step.href} href={step.href} className="flex items-center gap-3 group">
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition ${step.done ? "bg-green-500 border-green-500" : "border-zinc-600 group-hover:border-violet-500"}`}>
+                  {step.done && (
+                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+                <span className={`text-sm transition ${step.done ? "text-zinc-500 line-through" : "text-zinc-200 group-hover:text-violet-400"}`}>{step.label}</span>
+                {!step.done && (
+                  <svg className="w-3.5 h-3.5 text-zinc-600 group-hover:text-violet-400 ms-auto transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                )}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatCard
-          label="Appointments this month"
-          value={String(data.confirmedThisMonth)}
-          sub={`${data.cancelledThisMonth} cancelled`}
-        />
-        <StatCard
-          label="Revenue this month"
-          value={`₪${(data.revenueThisMonth / 100).toLocaleString()}`}
-          sub="from confirmed bookings"
-        />
-        <StatCard
-          label="New customers"
-          value={String(data.newCustomersThisMonth)}
-          sub="booked this month"
-        />
-        <StatCard
-          label="All-time bookings"
-          value={String(data.allTimeConfirmed)}
-          sub="confirmed total"
-        />
+        <StatCard label={t.thisMonth} value={String(data.confirmedThisMonth)} sub={`${data.cancelledThisMonth} cancelled`} />
+        <StatCard label={t.revenue} value={`₪${(data.revenueThisMonth / 100).toLocaleString()}`} sub="from confirmed bookings" />
+        <StatCard label={t.newCustomers} value={String(data.newCustomersThisMonth)} sub="booked this month" />
+        <StatCard label={t.allTime} value={String(data.allTimeConfirmed)} sub="confirmed total" />
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Daily bar chart */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-white mb-4">Appointments — last 7 days</h2>
+          <h2 className="text-sm font-semibold text-white mb-4">{t.last7Days}</h2>
           <div className="flex items-end gap-2 h-32">
             {data.dailyThisWeek.map(({ date, count }) => {
               const heightPct = maxDaily > 0 ? (count / maxDaily) * 100 : 0;
               const d = new Date(date + "T00:00:00");
-              const label = days[d.getDay()];
               return (
                 <div key={date} className="flex flex-col items-center flex-1 gap-1">
                   <span className="text-xs text-zinc-400">{count > 0 ? count : ""}</span>
                   <div className="w-full flex items-end" style={{ height: "96px" }}>
-                    <div
-                      className="w-full rounded-t-md bg-violet-600 transition-all"
-                      style={{ height: `${Math.max(heightPct, count > 0 ? 8 : 3)}%` }}
-                    />
+                    <div className="w-full rounded-t-md bg-violet-600 transition-all" style={{ height: `${Math.max(heightPct, count > 0 ? 8 : 3)}%` }} />
                   </div>
-                  <span className="text-xs text-zinc-500">{label}</span>
+                  <span className="text-xs text-zinc-500">{dayNames[d.getDay()]}</span>
                 </div>
               );
             })}
@@ -102,28 +149,22 @@ export default function AnalyticsPage() {
 
         {/* Top services */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-white mb-4">Top services</h2>
+          <h2 className="text-sm font-semibold text-white mb-4">{t.topServices}</h2>
           {data.topServices.length === 0 ? (
-            <p className="text-zinc-500 text-sm">No bookings yet.</p>
+            <p className="text-zinc-500 text-sm">{t.noBookings}</p>
           ) : (
             <div className="flex flex-col gap-3">
-              {data.topServices.map(({ name, count }) => {
-                const pct = (count / maxService) * 100;
-                return (
-                  <div key={name}>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-zinc-300 truncate max-w-[70%]">{name}</span>
-                      <span className="text-zinc-500">{count} bookings</span>
-                    </div>
-                    <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-violet-500 rounded-full transition-all"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
+              {data.topServices.map(({ name, count }) => (
+                <div key={name}>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-zinc-300 truncate max-w-[70%]">{name}</span>
+                    <span className="text-zinc-500">{count}</span>
                   </div>
-                );
-              })}
+                  <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${(count / maxService) * 100}%` }} />
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

@@ -65,6 +65,7 @@ const serviceSchema = z.object({
   description: z.string().optional(),
   priceCents: z.number().int().nonnegative(),
   durationMin: z.number().int().positive(),
+  color: z.string().optional(),
 });
 
 businessRouter.get("/services", async (req: AuthedRequest, res) => {
