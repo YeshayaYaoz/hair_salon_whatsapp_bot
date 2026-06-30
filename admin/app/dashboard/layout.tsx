@@ -33,14 +33,15 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
     <>
       <div className="px-3 mb-6">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center shadow-lg shadow-violet-900/40 shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center shadow-lg shadow-violet-900/40 shrink-0 relative overflow-hidden">
+            {/* Scissors icon inspired by the logo */}
             <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 9l6 6M6 15l6-6m3.5-3.5a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zm0 9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
             </svg>
           </div>
           <div>
-            <div className="font-[family-name:var(--font-karantina)] text-lg font-bold text-white leading-none tracking-wide">סאלון בוט</div>
-            <div className="text-[10px] text-zinc-500 leading-none mt-0.5">Salon Bot</div>
+            <div className="font-[family-name:var(--font-karantina)] text-xl font-bold text-white leading-none tracking-wide">תורי</div>
+            <div className="text-[10px] text-zinc-500 leading-none mt-0.5">הזמנת תורים בוואטסאפ</div>
           </div>
         </div>
       </div>
@@ -113,7 +114,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       {/* Mobile top bar */}
       <div className="md:hidden fixed top-0 start-0 end-0 z-30 bg-zinc-900 border-b border-zinc-800 flex items-center justify-between px-4 py-3">
         <span className="font-[family-name:var(--font-karantina)] text-lg font-bold text-white tracking-wide">
-          {activeItem ? t.nav[activeItem.key] : "סאלון בוט"}
+          {activeItem ? t.nav[activeItem.key] : "תורי"}
         </span>
         <button onClick={() => setMobileOpen(true)} className="text-zinc-300 p-1">
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

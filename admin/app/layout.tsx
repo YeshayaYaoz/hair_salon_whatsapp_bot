@@ -1,7 +1,13 @@
 import type { ReactNode } from "react";
+import type { Metadata } from "next";
 import { Heebo, Karantina } from "next/font/google";
 import { LanguageProvider } from "./lib/LanguageContext";
 import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "תורי — הזמנת תורים בוואטסאפ",
+  description: "מערכת הזמנת תורים חכמה לסלונים דרך וואטסאפ",
+};
 
 const heebo = Heebo({
   subsets: ["hebrew", "latin"],
