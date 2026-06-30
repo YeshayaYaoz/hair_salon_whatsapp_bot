@@ -28,6 +28,19 @@ const whatsappSchema = z.object({
   accessToken: z.string().min(1),
 });
 
+const profileSchema = z.object({
+  name: z.string().min(1).optional(),
+  address: z.string().optional(),
+  timezone: z.string().optional(),
+});
+
+businessRouter.put("/me", async (req: AuthedRequest, res) => {
+  const parsed = profileSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  await prisma.business.update({ where: { id: req.businessId! }, data: parsed.data });
+  res.json({ ok: true });
+});
+
 businessRouter.put("/me/whatsapp", async (req: AuthedRequest, res) => {
   const parsed = whatsappSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
@@ -133,6 +146,15 @@ businessRouter.get("/appointments", async (req: AuthedRequest, res) => {
     orderBy: { startTime: "asc" },
   });
   res.json(appointments);
+});
+
+businessRouter.patch("/appointments/:id/cancel", async (req: AuthedRequest, res) => {
+  const result = await prisma.appointment.updateMany({
+    where: { id: req.params.id, businessId: req.businessId! },
+    data: { status: "cancelled" },
+  });
+  if (result.count === 0) return res.status(404).json({ error: "Not found" });
+  res.json({ ok: true });
 });
 
 // --- FAQ entries ---

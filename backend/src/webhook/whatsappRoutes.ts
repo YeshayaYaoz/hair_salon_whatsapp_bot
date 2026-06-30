@@ -45,10 +45,14 @@ whatsappRouter.post("/", async (req, res) => {
   // Acknowledge immediately; Meta retries aggressively if it doesn't get a fast 200.
   res.sendStatus(200);
 
+  let phoneNumberId: string | undefined;
+  let accessToken: string | undefined;
+  let customerPhone: string | undefined;
+
   try {
     const entry = req.body?.entry?.[0];
     const change = entry?.changes?.[0]?.value;
-    const phoneNumberId = change?.metadata?.phone_number_id;
+    phoneNumberId = change?.metadata?.phone_number_id;
     const message = change?.messages?.[0];
     if (!phoneNumberId || !message) return;
 
@@ -65,8 +69,8 @@ whatsappRouter.post("/", async (req, res) => {
       return;
     }
 
-    const customerPhone = message.from as string;
-    const accessToken = decryptSecret(business.whatsappAccessToken);
+    customerPhone = message.from as string;
+    accessToken = decryptSecret(business.whatsappAccessToken);
 
     const { text: reply, offeredSlots } = await handleIncomingMessage(business.id, customerPhone, text);
 
@@ -84,5 +88,14 @@ whatsappRouter.post("/", async (req, res) => {
     }
   } catch (err) {
     console.error("Error handling WhatsApp webhook event:", err);
+    // Let the customer know something went wrong instead of leaving them hanging on silence.
+    if (phoneNumberId && accessToken && customerPhone) {
+      await sendWhatsAppMessage({
+        phoneNumberId,
+        accessToken,
+        to: customerPhone,
+        text: "Sorry, something went wrong on our end. Please try again in a moment.",
+      }).catch((sendErr) => console.error("Failed to send error fallback message:", sendErr));
+    }
   }
 });
