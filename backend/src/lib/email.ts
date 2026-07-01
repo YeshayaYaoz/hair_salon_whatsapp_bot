@@ -1,11 +1,25 @@
-import { Resend } from "resend";
-
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export const APP_URL = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
+async function resendSend(payload: { from: string; to: string; subject: string; html: string }) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) { console.error("RESEND_API_KEY not set"); return; }
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const body = await res.json() as any;
+  if (!res.ok) {
+    console.error("Resend error:", body);
+    throw new Error(body.message ?? "Resend failed");
+  }
+  console.log("Email sent, id:", body.id);
+}
+
 export async function sendPasswordResetEmail(to: string, resetUrl: string) {
-  const result = await resend.emails.send({
+  await resendSend({
     from: "תורי <onboarding@resend.dev>",
     to,
     subject: "איפוס סיסמה — תורי",
@@ -18,15 +32,10 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
       </div>
     `,
   });
-  if (result.error) {
-    console.error("Resend error (forgot-password):", result.error);
-    throw new Error(result.error.message);
-  }
-  console.log("Reset email sent to", to, "id:", result.data?.id);
 }
 
 export async function sendWelcomeEmail(to: string, name: string) {
-  const result = await resend.emails.send({
+  await resendSend({
     from: "תורי <onboarding@resend.dev>",
     to,
     subject: "ברוך הבא לתורי!",
@@ -44,5 +53,4 @@ export async function sendWelcomeEmail(to: string, name: string) {
       </div>
     `,
   });
-  if (result.error) console.error("Resend error (welcome):", result.error);
 }
