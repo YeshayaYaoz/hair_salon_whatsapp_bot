@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, setToken } from "./lib/api";
 
@@ -14,6 +14,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [splashDone, setSplashDone] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const onEnd = () => setSplashDone(true);
+    v.addEventListener("ended", onEnd);
+    // Fallback: if video fails to load or takes too long, skip after 4s
+    const fallback = setTimeout(() => setSplashDone(true), 4000);
+    return () => { v.removeEventListener("ended", onEnd); clearTimeout(fallback); };
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -34,7 +46,25 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen flex items-center justify-center px-4 py-8 bg-zinc-950">
-      <div className="w-full max-w-sm">
+
+      {/* Splash screen */}
+      <div
+        className={`fixed inset-0 z-50 bg-zinc-950 flex items-center justify-center transition-opacity duration-700 ${
+          splashDone ? "opacity-0 pointer-events-none" : "opacity-100"
+        }`}
+      >
+        <video
+          ref={videoRef}
+          src="/logo_animation.mp4"
+          autoPlay
+          muted
+          playsInline
+          className="w-64 h-64 object-contain"
+        />
+      </div>
+
+      {/* Login form — fades in after splash */}
+      <div className={`w-full max-w-sm transition-opacity duration-700 ${splashDone ? "opacity-100" : "opacity-0"}`}>
         {/* Logo */}
         <div className="flex flex-col items-center mb-8 animate-fade-up">
           <Image
