@@ -137,7 +137,7 @@ export default function SettingsPage() {
           <Field label={t.greeting}>
             <textarea
               rows={2}
-              placeholder="e.g. שלום! ברוכים הבאים לסלון שיר 💇‍♀️ במה אוכל לעזור?"
+              placeholder={t.greetingPlaceholder}
               value={fields.botGreeting}
               onChange={(e) => set("botGreeting", e.target.value)}
               className="w-full"
@@ -146,7 +146,7 @@ export default function SettingsPage() {
           <Field label={t.personality}>
             <textarea
               rows={3}
-              placeholder="e.g. Be friendly and use emojis occasionally. Always respond in Hebrew."
+              placeholder={t.personalityPlaceholder}
               value={fields.botPersonality}
               onChange={(e) => set("botPersonality", e.target.value)}
               className="w-full"

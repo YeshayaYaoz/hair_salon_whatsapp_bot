@@ -136,10 +136,10 @@ export default function AnalyticsPage() {
 
       {/* Stat cards with count-up */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatCard delay={60}  label={t.thisMonth}    value={String(data.confirmedThisMonth)}    sub={`${data.cancelledThisMonth} cancelled`} />
-        <StatCard delay={120} label={t.revenue}       value={`₪${(data.revenueThisMonth / 100).toLocaleString()}`} sub="from confirmed bookings" />
-        <StatCard delay={180} label={t.newCustomers}  value={String(data.newCustomersThisMonth)} sub="booked this month" />
-        <StatCard delay={240} label={t.allTime}       value={String(data.allTimeConfirmed)}      sub="confirmed total" />
+        <StatCard delay={60}  label={t.thisMonth}    value={String(data.confirmedThisMonth)}    sub={`${data.cancelledThisMonth} ${t.subCancelled}`} />
+        <StatCard delay={120} label={t.revenue}       value={`₪${(data.revenueThisMonth / 100).toLocaleString()}`} sub={t.subRevenue} />
+        <StatCard delay={180} label={t.newCustomers}  value={String(data.newCustomersThisMonth)} sub={t.subNewCustomers} />
+        <StatCard delay={240} label={t.allTime}       value={String(data.allTimeConfirmed)}      sub={t.subAllTime} />
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">

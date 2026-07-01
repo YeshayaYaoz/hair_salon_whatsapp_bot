@@ -158,7 +158,7 @@ export default function ServicesPage() {
                     <input value={editState.price} onChange={(e) => setEditState((p) => ({ ...p, price: e.target.value }))} placeholder={t.price} type="number" className="w-24 text-sm" />
                     <input value={editState.duration} onChange={(e) => setEditState((p) => ({ ...p, duration: e.target.value }))} placeholder={t.duration} type="number" className="w-28 text-sm" />
                   </div>
-                  <input value={editState.description} onChange={(e) => setEditState((p) => ({ ...p, description: e.target.value }))} placeholder="Description (optional)" className="w-full text-sm mb-2" />
+                  <input value={editState.description} onChange={(e) => setEditState((p) => ({ ...p, description: e.target.value }))} placeholder={t.descriptionOptional} className="w-full text-sm mb-2" />
                   <div className="flex items-center justify-between">
                     <ColorPicker value={editState.color} onChange={(hex) => setEditState((p) => ({ ...p, color: hex }))} />
                     <div className="flex gap-2">
@@ -196,7 +196,7 @@ export default function ServicesPage() {
             <input placeholder={t.price} type="number" step="1" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} required className="w-28" />
             <input placeholder={t.duration} type="number" value={newDuration} onChange={(e) => setNewDuration(e.target.value)} required className="w-32" />
           </div>
-          <input placeholder="Description (optional)" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} className="w-full" />
+          <input placeholder={t.descriptionOptional} value={newDescription} onChange={(e) => setNewDescription(e.target.value)} className="w-full" />
           <div className="flex items-center justify-between mt-1">
             <ColorPicker value={newColor} onChange={setNewColor} />
             <button type="submit" disabled={adding} className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">

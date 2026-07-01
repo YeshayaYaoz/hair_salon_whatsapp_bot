@@ -26,9 +26,14 @@ const translations = {
     noAppointments: "No appointments found.", searchPlaceholder: "Search by name or phone…",
     exportCsv: "Export CSV",
 
+    // Analytics stat subtitles
+    subCancelled: "cancelled", subRevenue: "from confirmed bookings",
+    subNewCustomers: "booked this month", subAllTime: "confirmed total",
+
     // Services
     servicesTitle: "Services", addService: "Add a service",
     serviceName: "Service name", price: "Price (₪)", duration: "Duration (min)",
+    descriptionOptional: "Description (optional)",
     noServices: "No services yet. Add one below.",
 
     // Staff
@@ -45,6 +50,8 @@ const translations = {
     whatsappTitle: "WhatsApp", whatsappSubtitle: "Connect your Meta WhatsApp Business number",
     connected: "Connected", notConnected: "Not connected",
     phoneNumberId: "Phone Number ID", accessToken: "Access Token",
+    phoneNumberIdPlaceholder: "e.g. 123456789012345",
+    accessTokenPlaceholder: "Permanent access token from Meta",
     whatsappHint: "Find these in your Meta Business app under WhatsApp › API Setup. Use a permanent token.",
 
     // FAQ
@@ -73,6 +80,8 @@ const translations = {
     salonName: "Salon name", address: "Address", timezone: "Timezone", loginEmail: "Login email",
     notifPhone: "Your WhatsApp number", notifPhoneHint: "Include country code, e.g. 972501234567.",
     greeting: "Opening greeting", personality: "Personality & tone",
+    greetingPlaceholder: "e.g. Hello! Welcome to Shir's salon 💇‍♀️ How can I help?",
+    personalityPlaceholder: "e.g. Be friendly and use emojis occasionally. Always respond in Hebrew.",
 
     // Billing
     billingTitle: "Billing", billingSubtitle: "Manage your subscription",
@@ -119,9 +128,14 @@ const translations = {
     noAppointments: "לא נמצאו תורים.", searchPlaceholder: "חיפוש לפי שם או טלפון…",
     exportCsv: "ייצוא CSV",
 
+    // Analytics stat subtitles
+    subCancelled: "בוטלו", subRevenue: "מהזמנות מאושרות",
+    subNewCustomers: "הזמינו החודש", subAllTime: "סה\"כ מאושרות",
+
     // Services
     servicesTitle: "שירותים", addService: "הוסף שירות",
     serviceName: "שם השירות", price: "מחיר (₪)", duration: "משך (דקות)",
+    descriptionOptional: "תיאור (אופציונלי)",
     noServices: "אין שירותים עדיין. הוסף אחד למטה.",
 
     // Staff
@@ -138,6 +152,8 @@ const translations = {
     whatsappTitle: "וואטסאפ", whatsappSubtitle: "חבר את מספר הוואטסאפ העסקי שלך",
     connected: "מחובר", notConnected: "לא מחובר",
     phoneNumberId: "מזהה מספר הטלפון", accessToken: "טוקן גישה",
+    phoneNumberIdPlaceholder: "לדוג׳ 123456789012345",
+    accessTokenPlaceholder: "טוקן גישה קבוע ממטא",
     whatsappHint: "ניתן למצוא את הפרטים בממשק מטא תחת WhatsApp › API Setup. השתמש בטוקן קבוע.",
 
     // FAQ
@@ -166,6 +182,8 @@ const translations = {
     salonName: "שם הסלון", address: "כתובת", timezone: "אזור זמן", loginEmail: "אימייל כניסה",
     notifPhone: "מספר הוואטסאפ שלך", notifPhoneHint: "כולל קידומת מדינה, לדוג׳ 972501234567.",
     greeting: "ברכת פתיחה", personality: "אישיות וטון",
+    greetingPlaceholder: "לדוג׳ שלום! ברוכים הבאים לסלון שיר 💇‍♀️ במה אוכל לעזור?",
+    personalityPlaceholder: "לדוג׳ היה ידידותי ותשתמש באמוג׳ים מדי פעם. תמיד ענה בעברית.",
 
     // Billing
     billingTitle: "תשלום", billingSubtitle: "נהל את המנוי שלך",

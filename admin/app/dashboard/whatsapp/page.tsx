@@ -45,7 +45,7 @@ export default function WhatsAppPage() {
           <div>
             <label className="block text-xs font-medium text-zinc-400 mb-1.5">{t.phoneNumberId}</label>
             <input
-              placeholder="e.g. 123456789012345"
+              placeholder={t.phoneNumberIdPlaceholder}
               value={phoneNumberId}
               onChange={(e) => setPhoneNumberId(e.target.value)}
               required
@@ -55,7 +55,7 @@ export default function WhatsAppPage() {
           <div>
             <label className="block text-xs font-medium text-zinc-400 mb-1.5">{t.accessToken}</label>
             <input
-              placeholder="Permanent access token from Meta"
+              placeholder={t.accessTokenPlaceholder}
               value={accessToken}
               onChange={(e) => setAccessToken(e.target.value)}
               required
