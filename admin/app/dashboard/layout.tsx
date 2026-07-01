@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { clearToken } from "../lib/api";
 import { useLanguage } from "../lib/LanguageContext";
 
@@ -20,7 +21,10 @@ const NAV_ITEMS = [
   { href: "/dashboard/billing",      key: "billing"      as const, icon: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" },
 ];
 
-function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+// First 5 items shown in mobile bottom tab bar
+const BOTTOM_TAB_ITEMS = NAV_ITEMS.slice(0, 5);
+
+function SidebarContent({ pathname }: { pathname: string }) {
   const router = useRouter();
   const { lang, setLang, t } = useLanguage();
 
@@ -31,37 +35,40 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
 
   return (
     <>
-      <div className="px-3 mb-6">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center shadow-lg shadow-violet-900/40 shrink-0 relative overflow-hidden">
-            {/* Scissors icon inspired by the logo */}
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 9l6 6M6 15l6-6m3.5-3.5a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zm0 9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-            </svg>
-          </div>
+      {/* Brand */}
+      <div className="px-4 mb-6">
+        <div className="flex items-center gap-3">
+          <Image
+            src="/tori-logo.png"
+            alt="תורי"
+            width={44}
+            height={44}
+            className="rounded-xl shrink-0 drop-shadow-lg"
+          />
           <div>
-            <div className="font-[family-name:var(--font-karantina)] text-xl font-bold text-white leading-none tracking-wide">תורי</div>
-            <div className="text-[10px] text-zinc-500 leading-none mt-0.5">הזמנת תורים בוואטסאפ</div>
+            <div className="font-bold text-lg text-white leading-tight">תורי</div>
+            <div className="text-[11px] text-zinc-500 leading-none mt-0.5">הזמנת תורים בוואטסאפ</div>
           </div>
         </div>
       </div>
 
-      <nav className="flex flex-col gap-0.5 flex-1">
+      <nav className="flex flex-col gap-0.5 flex-1 overflow-y-auto">
         {NAV_ITEMS.map((item) => {
           const active = pathname === item.href;
           return (
             <Link
               key={item.href}
               href={item.href}
-              onClick={onNavigate}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition ${
-                active ? "bg-violet-600/20 text-violet-400" : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition ${
+                active
+                  ? "bg-violet-600/20 text-violet-400"
+                  : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
               }`}
             >
               <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
               </svg>
-              {t.nav[item.key]}
+              <span className="truncate">{t.nav[item.key]}</span>
             </Link>
           );
         })}
@@ -86,9 +93,9 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
 
         <button
           onClick={logout}
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
           {t.nav.logout}
@@ -100,43 +107,71 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = useState(false);
   const { t } = useLanguage();
   const activeItem = NAV_ITEMS.find((item) => item.href === pathname);
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-zinc-950">
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex w-56 bg-zinc-900 border-e border-zinc-800 flex-col py-6 px-3 shrink-0">
+      <aside className="hidden md:flex w-60 bg-zinc-900 border-e border-zinc-800 flex-col py-6 px-2 shrink-0 fixed top-0 bottom-0 start-0 z-20">
         <SidebarContent pathname={pathname} />
       </aside>
 
       {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 start-0 end-0 z-30 bg-zinc-900 border-b border-zinc-800 flex items-center justify-between px-4 py-3">
-        <span className="font-[family-name:var(--font-karantina)] text-lg font-bold text-white tracking-wide">
-          {activeItem ? t.nav[activeItem.key] : "תורי"}
-        </span>
-        <button onClick={() => setMobileOpen(true)} className="text-zinc-300 p-1">
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
+      <div className="md:hidden fixed top-0 start-0 end-0 z-30 bg-zinc-900/95 backdrop-blur border-b border-zinc-800 flex items-center px-4 h-14">
+        <div className="flex items-center gap-2.5">
+          <Image src="/tori-logo.png" alt="תורי" width={32} height={32} className="rounded-lg" />
+          <span className="font-semibold text-white text-base">
+            {activeItem ? t.nav[activeItem.key] : "תורי"}
+          </span>
+        </div>
       </div>
 
-      {/* Mobile drawer */}
-      {mobileOpen && (
-        <div className="md:hidden fixed inset-0 z-40 flex">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setMobileOpen(false)} />
-          <aside className="relative w-64 bg-zinc-900 border-e border-zinc-800 flex flex-col py-6 px-3">
-            <SidebarContent pathname={pathname} onNavigate={() => setMobileOpen(false)} />
-          </aside>
-        </div>
-      )}
-
       {/* Main content */}
-      <main className="flex-1 p-4 pt-20 md:p-8 md:pt-8 overflow-auto">
+      <main className="flex-1 md:ms-60 p-4 pt-[4.5rem] pb-24 md:p-8 md:pt-8 md:pb-8 overflow-auto">
         {children}
       </main>
+
+      {/* Mobile bottom tab bar */}
+      <nav className="md:hidden fixed bottom-0 start-0 end-0 z-30 bg-zinc-900/95 backdrop-blur border-t border-zinc-800 flex items-stretch h-16 safe-area-pb">
+        {BOTTOM_TAB_ITEMS.map((item) => {
+          const active = pathname === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition ${
+                active ? "text-violet-400" : "text-zinc-500"
+              }`}
+            >
+              <svg
+                className={`w-5 h-5 transition ${active ? "text-violet-400" : "text-zinc-500"}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.5 : 2} d={item.icon} />
+              </svg>
+              <span className="truncate max-w-[56px] text-center leading-tight">
+                {t.nav[item.key]}
+              </span>
+            </Link>
+          );
+        })}
+
+        {/* More button linking to first non-tab item */}
+        <Link
+          href="/dashboard/staff"
+          className={`flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition ${
+            !BOTTOM_TAB_ITEMS.find(i => i.href === pathname) && pathname !== "/" ? "text-violet-400" : "text-zinc-500"
+          }`}
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+          <span>עוד</span>
+        </Link>
+      </nav>
     </div>
   );
 }
