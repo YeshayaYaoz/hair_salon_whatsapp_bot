@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode } from "react";
 import { clearToken } from "../lib/api";
 import { useLanguage } from "../lib/LanguageContext";
+import { AuthGuard } from "../lib/AuthGuard";
 
 const NAV_ITEMS = [
   { href: "/dashboard/analytics",    key: "analytics"    as const, icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" },
@@ -111,6 +112,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const activeItem = NAV_ITEMS.find((item) => item.href === pathname);
 
   return (
+    <AuthGuard>
     <div className="flex min-h-screen bg-zinc-950">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex w-60 bg-zinc-900 border-e border-zinc-800 flex-col py-6 px-2 shrink-0 fixed top-0 bottom-0 start-0 z-20">
@@ -173,5 +175,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </Link>
       </nav>
     </div>
+    </AuthGuard>
   );
 }
