@@ -39,7 +39,7 @@ function SidebarContent({ pathname }: { pathname: string }) {
       <div className="px-4 mb-6">
         <div className="flex items-center gap-3">
           <Image
-            src="/tori-logo.png"
+            src="/tori-logo-black.png"
             alt="תורי"
             width={44}
             height={44}
@@ -120,7 +120,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       {/* Mobile top bar */}
       <div className="md:hidden fixed top-0 start-0 end-0 z-30 bg-zinc-900/95 backdrop-blur border-b border-zinc-800 flex items-center px-4 h-14">
         <div className="flex items-center gap-2.5">
-          <Image src="/tori-logo.png" alt="תורי" width={32} height={32} className="rounded-lg" />
+          <Image src="/tori-logo-black.png" alt="תורי" width={32} height={32} className="rounded-lg" />
           <span className="font-semibold text-white text-base">
             {activeItem ? t.nav[activeItem.key] : "תורי"}
           </span>

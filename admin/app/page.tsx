@@ -37,7 +37,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="flex flex-col items-center mb-8 animate-fade-up">
           <Image
-            src="/tori-logo.png"
+            src="/tori-logo-black.png"
             alt="תורי"
             width={120}
             height={120}
