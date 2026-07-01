@@ -4,7 +4,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   await resend.emails.send({
-    from: "תורי <noreply@tori.co.il>",
+    from: "תורי <onboarding@resend.dev>",
     to,
     subject: "איפוס סיסמה — תורי",
     html: `
