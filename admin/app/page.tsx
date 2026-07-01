@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, setToken } from "./lib/api";
@@ -81,6 +82,14 @@ export default function LoginPage() {
               required
               className="w-full"
             />
+
+            {mode === "login" && (
+              <div className="text-end">
+                <Link href="/forgot-password" className="text-xs text-zinc-500 hover:text-violet-400 transition">
+                  שכחת סיסמה?
+                </Link>
+              </div>
+            )}
 
             {error && (
               <p className="text-red-400 text-sm bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">{error}</p>

@@ -133,7 +133,7 @@ export default function ServicesPage() {
       <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-white">{t.servicesTitle}</h1>
         <p className="text-zinc-400 text-sm mt-1">
-          {services.length === 0 ? "Add the services your salon offers." : `${services.length} service${services.length !== 1 ? "s" : ""}`}
+          {services.length === 0 ? t.servicesSubtitle : `${services.length} ${t.nav.services}`}
         </p>
       </div>
 
@@ -146,7 +146,7 @@ export default function ServicesPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </div>
-            <p className="text-zinc-500 text-sm">No services yet. Add one below.</p>
+            <p className="text-zinc-500 text-sm">{t.noServices}</p>
           </div>
         ) : (
           <div className="divide-y divide-zinc-800/50">

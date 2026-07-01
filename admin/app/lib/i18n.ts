@@ -35,6 +35,7 @@ const translations = {
     serviceName: "Service name", price: "Price (₪)", duration: "Duration (min)",
     descriptionOptional: "Description (optional)",
     noServices: "No services yet. Add one below.",
+    servicesSubtitle: "Add the services your salon offers.",
 
     // Staff
     staffTitle: "Staff",
@@ -137,6 +138,7 @@ const translations = {
     serviceName: "שם השירות", price: "מחיר (₪)", duration: "משך (דקות)",
     descriptionOptional: "תיאור (אופציונלי)",
     noServices: "אין שירותים עדיין. הוסף אחד למטה.",
+    servicesSubtitle: "הוסף את השירותים שהסלון שלך מציע.",
 
     // Staff
     staffTitle: "צוות",

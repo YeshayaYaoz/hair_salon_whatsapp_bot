@@ -32,6 +32,7 @@ model Business {
   appointments   Appointment[]
   faqEntries     FaqEntry[]
   waitlistEntries WaitlistEntry[]
+  passwordResetTokens PasswordResetToken[]
 }
 
 model Service {
@@ -122,6 +123,17 @@ model FaqEntry {
   businessId String
   question   String
   answer     String
+
+  @@index([businessId])
+}
+
+model PasswordResetToken {
+  id         String   @id @default(cuid())
+  business   Business @relation(fields: [businessId], references: [id])
+  businessId String
+  token      String   @unique
+  expiresAt  DateTime
+  used       Boolean  @default(false)
 
   @@index([businessId])
 }
