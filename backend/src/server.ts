@@ -8,8 +8,9 @@ import { billingRouter, stripeWebhookRouter } from "./billing/billingRoutes.js";
 import { publicRouter } from "./api/publicRoutes.js";
 
 const app = express();
+const allowedOrigins = (process.env.FRONTEND_URL ?? "*").split(",").map(o => o.trim());
 app.use(cors({
-  origin: process.env.FRONTEND_URL ?? "*",
+  origin: allowedOrigins.length === 1 && allowedOrigins[0] === "*" ? "*" : allowedOrigins,
   credentials: true,
 }));
 
