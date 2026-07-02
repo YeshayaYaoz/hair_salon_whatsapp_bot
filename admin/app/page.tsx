@@ -59,7 +59,7 @@ export default function LoginPage() {
           autoPlay
           muted
           playsInline
-          className="w-64 h-64 object-contain"
+          className="w-full h-full object-cover"
         />
       </div>
 
