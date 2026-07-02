@@ -58,21 +58,20 @@ authRouter.post("/login", authLimiter, async (req, res) => {
   res.json({ token: signBusinessToken(business.id) });
 });
 
-// Forgot password — always responds 200 to prevent email enumeration
 authRouter.post("/forgot-password", authLimiter, async (req, res) => {
   try {
     const { email } = z.object({ email: z.string().email() }).parse(req.body);
     const business = await prisma.business.findUnique({ where: { email } });
-    if (business) {
-      const token = crypto.randomBytes(32).toString("hex");
-      const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
-      await prisma.passwordResetToken.create({ data: { businessId: business.id, token, expiresAt } });
-      await sendPasswordResetEmail(email, `${APP_URL}/reset-password?token=${token}`);
-    }
+    if (!business) return res.status(404).json({ error: "כתובת האימייל לא נמצאה במערכת" });
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+    await prisma.passwordResetToken.create({ data: { businessId: business.id, token, expiresAt } });
+    await sendPasswordResetEmail(email, `${APP_URL}/reset-password?token=${token}`);
+    res.json({ ok: true });
   } catch (err) {
     console.error("forgot-password error:", err);
+    res.status(500).json({ error: "שגיאה בשרת" });
   }
-  res.json({ ok: true });
 });
 
 authRouter.post("/reset-password", authLimiter, async (req, res) => {

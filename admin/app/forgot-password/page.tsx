@@ -9,16 +9,20 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     try {
       await apiFetch("/api/auth/forgot-password", {
         method: "POST",
         body: JSON.stringify({ email }),
       });
       setSent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "שגיאה");
     } finally {
       setLoading(false);
     }
@@ -51,6 +55,9 @@ export default function ForgotPasswordPage() {
               <h2 className="text-lg font-semibold mb-1 text-white">שכחת סיסמה?</h2>
               <p className="text-zinc-400 text-sm mb-5">נשלח לך קישור לאיפוס לכתובת המייל שלך.</p>
               <form onSubmit={submit} className="flex flex-col gap-3">
+                {error && (
+                  <p className="text-red-400 text-sm bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">{error}</p>
+                )}
                 <input
                   placeholder="כתובת אימייל"
                   type="email"
