@@ -20,7 +20,7 @@ async function resendSend(payload: { from: string; to: string; subject: string; 
 
 export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   await resendSend({
-    from: "תורי <onboarding@resend.dev>",
+    from: "תורי <noreply@torionline.com>",
     to,
     subject: "איפוס סיסמה — תורי",
     html: `
@@ -36,7 +36,7 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
 
 export async function sendWelcomeEmail(to: string, name: string) {
   await resendSend({
-    from: "תורי <onboarding@resend.dev>",
+    from: "תורי <noreply@torionline.com>",
     to,
     subject: "ברוך הבא לתורי!",
     html: `
