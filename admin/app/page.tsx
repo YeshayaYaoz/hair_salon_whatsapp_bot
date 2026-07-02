@@ -55,7 +55,7 @@ export default function LoginPage() {
       >
         <video
           ref={videoRef}
-          src="/logo_animation.mp4"
+          src="/logo_animation_black.mp4"
           autoPlay
           muted
           playsInline
