@@ -367,8 +367,12 @@ export default function LandingPage() {
         .btn-outline { background: transparent; color: #444; font-size: 15px; font-weight: 500; padding: 13px 22px; border-radius: 10px; border: 1px solid #DDD; text-decoration: none; transition: border-color 0.15s, background 0.15s, transform 0.15s; display: inline-block; }
         .btn-outline:hover { border-color: #aaa; background: #FAFAFA; transform: translateY(-1px); }
 
+        /* WAVE DIVIDERS */
+        .wave { line-height: 0; display: block; }
+        .wave svg { display: block; width: 100%; }
+
         /* MARQUEE */
-        .lp-marquee { background: #0A0A0A; padding: 16px 0; overflow: hidden; border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .lp-marquee { background: #0A0A0A; padding: 16px 0; overflow: hidden; }
         .marquee-track { display: flex; gap: 0; animation: marquee-scroll 28s linear infinite; white-space: nowrap; width: max-content; }
         .marquee-track:hover { animation-play-state: paused; }
         @keyframes marquee-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
@@ -414,7 +418,7 @@ export default function LandingPage() {
         .mock-appt-badge.pending { background: rgba(245,158,11,0.1); color: #F59E0B; border: 1px solid rgba(245,158,11,0.2); }
 
         /* TRUST BAR */
-        .lp-trust { background: #fff; border-top: 1px solid #EBEBEB; border-bottom: 1px solid #EBEBEB; padding: 20px 40px; display: flex; align-items: center; justify-content: center; gap: 32px; flex-wrap: wrap; overflow-x: auto; }
+        .lp-trust { background: #fff; padding: 28px 40px; display: flex; align-items: center; justify-content: center; gap: 32px; flex-wrap: wrap; overflow-x: auto; }
         .lp-trust-label { font-size: 11px; color: #999; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; }
         .lp-trust-items { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         .lp-trust-item { display: flex; align-items: center; gap: 9px; font-size: 13px; color: #222; font-weight: 600; background: #F7F7F7; border: 1px solid #E8E8E8; border-radius: 10px; padding: 8px 16px; transition: border-color 0.15s, box-shadow 0.15s; }
@@ -465,7 +469,7 @@ export default function LandingPage() {
         .lp-step-desc { font-size: 15px; color: #666; line-height: 1.7; }
 
         /* FEATURES */
-        .lp-features { background: #F8F8F8; border-top: 1px solid #EBEBEB; border-bottom: 1px solid #EBEBEB; padding: 100px 40px; }
+        .lp-features { background: #F8F8F8; padding: 100px 40px; }
         .lp-features-inner { max-width: 1080px; margin: 0 auto; }
         .lp-feats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 52px; }
         .lp-feat { background: #fff; border: 1px solid #E8E8E8; border-radius: 12px; padding: 28px 24px; transition: transform 0.18s ease, box-shadow 0.18s ease; cursor: default; transform-style: preserve-3d; }
@@ -489,7 +493,7 @@ export default function LandingPage() {
         .lp-testi-role { font-size: 12px; color: #888; }
 
         /* BEFORE/AFTER */
-        .lp-ba { background: #0A0A0A; border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 100px 40px; }
+        .lp-ba { background: #0A0A0A; padding: 100px 40px; }
         .lp-ba-inner { max-width: 1080px; margin: 0 auto; }
         .lp-ba .lp-label { color: #F59E0B; }
         .lp-ba .lp-title { color: #fff; }
@@ -548,7 +552,7 @@ export default function LandingPage() {
         .vline.ai-l { color: #fff; font-weight: 500; }
 
         /* PRICING */
-        .lp-pricing { padding: 100px 40px; background: #fff; border-top: 1px solid #EBEBEB; }
+        .lp-pricing { padding: 100px 40px; background: #fff; }
         .lp-pricing-inner { max-width: 860px; margin: 0 auto; }
         .lp-pricing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 52px; }
         .lp-plan { border-radius: 16px; padding: 36px; border: 1px solid #E8E8E8; position: relative; transition: box-shadow 0.2s; }
@@ -591,7 +595,7 @@ export default function LandingPage() {
         .lp-roi-note strong { color: #fff; }
 
         /* FAQ */
-        .lp-faq { padding: 100px 40px; background: #F8F8F8; border-top: 1px solid #EBEBEB; border-bottom: 1px solid #EBEBEB; }
+        .lp-faq { padding: 100px 40px; background: #F8F8F8; }
         .lp-faq-inner { max-width: 720px; margin: 0 auto; }
         .lp-faq-list { display: flex; flex-direction: column; gap: 0; margin-top: 52px; border: 1px solid #E8E8E8; border-radius: 14px; overflow: hidden; }
         .faq-item { background: #fff; border-bottom: 1px solid #EBEBEB; }
@@ -604,7 +608,7 @@ export default function LandingPage() {
         .faq-a-inner { padding: 0 24px 20px; font-size: 15px; color: #555; line-height: 1.75; }
 
         /* CTA */
-        .lp-cta { background: #fff; padding: 100px 40px; text-align: center; border-top: 1px solid #EBEBEB; }
+        .lp-cta { background: #fff; padding: 120px 40px; text-align: center; }
         .lp-cta-title { font-size: clamp(28px, 4.5vw, 56px); font-weight: 800; letter-spacing: -2.5px; color: #0A0A0A; margin-bottom: 12px; line-height: 1.05; }
         .lp-cta-sub { font-size: 16px; color: #888; margin-bottom: 36px; }
         .lp-cta-row { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
@@ -806,7 +810,7 @@ export default function LandingPage() {
         </div>
 
         {/* HERO — split layout */}
-        <section style={{ background: "#fff", borderBottom: "1px solid #EBEBEB", position: "relative" }}>
+        <section style={{ background: "#fff", position: "relative" }}>
           {/* Live notification toast */}
           <div id="hero-toast">
             <div className="ht-icon-wrap"><span className="ht-icon">📅</span></div>
@@ -992,6 +996,13 @@ export default function LandingPage() {
           </div>
         </div>
 
+        {/* WAVE: white → dark */}
+        <div className="wave" style={{ background: "#fff" }}>
+          <svg viewBox="0 0 1440 64" preserveAspectRatio="none" style={{ height: 64 }}>
+            <path d="M0,32 C360,64 1080,0 1440,32 L1440,64 L0,64 Z" fill="#0A0A0A"/>
+          </svg>
+        </div>
+
         {/* MARQUEE */}
         <div className="lp-marquee">
           <div className="marquee-track">
@@ -1037,6 +1048,13 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* WAVE: dark → light */}
+        <div className="wave" style={{ background: "#0A0A0A" }}>
+          <svg viewBox="0 0 1440 64" preserveAspectRatio="none" style={{ height: 64 }}>
+            <path d="M0,32 C360,0 1080,64 1440,32 L1440,64 L0,64 Z" fill="#F8F8F8"/>
+          </svg>
         </div>
 
         {/* 3D PRODUCT PREVIEW */}
@@ -1194,6 +1212,13 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* WAVE: light gray → dark */}
+        <div className="wave" style={{ background: "#F8F8F8" }}>
+          <svg viewBox="0 0 1440 64" preserveAspectRatio="none" style={{ height: 64 }}>
+            <path d="M0,32 C360,64 1080,0 1440,32 L1440,64 L0,64 Z" fill="#0A0A0A"/>
+          </svg>
+        </div>
+
         {/* BEFORE / AFTER */}
         <section className="lp-ba">
           <div className="lp-ba-inner">
@@ -1244,6 +1269,13 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* WAVE: dark → white */}
+        <div className="wave" style={{ background: "#0A0A0A" }}>
+          <svg viewBox="0 0 1440 64" preserveAspectRatio="none" style={{ height: 64 }}>
+            <path d="M0,32 C360,0 1080,64 1440,32 L1440,64 L0,64 Z" fill="#fff"/>
+          </svg>
+        </div>
+
         {/* TESTIMONIALS */}
         <section className="lp-testi">
           <div className="lp-testi-inner">
@@ -1270,6 +1302,13 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
+
+        {/* WAVE: white → dark */}
+        <div className="wave" style={{ background: "#fff" }}>
+          <svg viewBox="0 0 1440 64" preserveAspectRatio="none" style={{ height: 64 }}>
+            <path d="M0,32 C480,64 960,0 1440,32 L1440,64 L0,64 Z" fill="#0A0A0A"/>
+          </svg>
+        </div>
 
         {/* PREMIUM VOICE */}
         <section className="lp-premium" id="premium">
@@ -1370,6 +1409,13 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* WAVE: dark → white */}
+        <div className="wave" style={{ background: "#0A0A0A" }}>
+          <svg viewBox="0 0 1440 64" preserveAspectRatio="none" style={{ height: 64 }}>
+            <path d="M0,32 C480,0 960,64 1440,32 L1440,64 L0,64 Z" fill="#fff"/>
+          </svg>
+        </div>
+
         {/* PRICING */}
         <section className="lp-pricing" id="pricing">
           <div className="lp-pricing-inner">
@@ -1406,51 +1452,12 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* COMPARISON TABLE */}
-        <section className="lp-compare">
-          <div className="lp-compare-inner">
-            <div className="lp-label reveal" style={{ textAlign: "center" }}>השוואה</div>
-            <div className="lp-title reveal" style={{ textAlign: "center" }}>למה תורי ולא משהו אחר?</div>
-            <div className="reveal" style={{ overflowX: "auto" }}>
-              <table className="compare-table">
-                <thead>
-                  <tr>
-                    <th>יכולת</th>
-                    <th className="col-tori"><span className="col-badge">✓</span>תורי</th>
-                    <th>ניהול ידני</th>
-                    <th>מתחרים</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    { feat: "זמין 24/7 — גם בשעה 2 בלילה", tori: "✓", manual: "✗", other: "✓" },
-                    { feat: "עברית טבעית מלאה", tori: "✓", manual: "✓", other: "⚠ חלקית" },
-                    { feat: "תזכורות WhatsApp אוטומטיות", tori: "✓", manual: "✗", other: "⚠ SMS בתשלום" },
-                    { feat: "סנכרון גוגל קלנדר", tori: "✓", manual: "ידנית", other: "⚠ אפליקציה נפרדת" },
-                    { feat: "הקמה תוך 10 דקות", tori: "✓", manual: "✓", other: "✗ ימים" },
-                    { feat: "ללא הכשרת צוות", tori: "✓", manual: "✓", other: "✗" },
-                    { feat: "מענה שיחות טלפון AI", tori: "✓ פרמיום", manual: "✗", other: "✗" },
-                    { feat: "דשבורד ניהול מלא", tori: "✓", manual: "✗", other: "✓" },
-                    { feat: "ביטול בכל עת", tori: "✓", manual: "—", other: "✗ חוזה" },
-                  ].map((r) => (
-                    <tr key={r.feat}>
-                      <td>{r.feat}</td>
-                      <td className="col-tori-cell">
-                        <span className={r.tori.startsWith("✓") ? "cmp-yes" : "cmp-partial"} style={{ color: r.tori.startsWith("✓") ? "#1D4ED8" : undefined }}>{r.tori}</span>
-                      </td>
-                      <td>
-                        <span className={r.manual === "✓" ? "cmp-yes" : r.manual === "✗" ? "cmp-no" : "cmp-partial"}>{r.manual}</span>
-                      </td>
-                      <td>
-                        <span className={r.other === "✓" ? "cmp-yes" : r.other === "✗" ? "cmp-no" : "cmp-partial"}>{r.other}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
+        {/* WAVE: white → light gray */}
+        <div className="wave" style={{ background: "#fff" }}>
+          <svg viewBox="0 0 1440 64" preserveAspectRatio="none" style={{ height: 64 }}>
+            <path d="M0,32 C360,64 1080,0 1440,32 L1440,64 L0,64 Z" fill="#F8F8F8"/>
+          </svg>
+        </div>
 
         {/* FAQ */}
         <section className="lp-faq" id="faq">
@@ -1480,6 +1487,13 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* WAVE: light gray → white */}
+        <div className="wave" style={{ background: "#F8F8F8" }}>
+          <svg viewBox="0 0 1440 64" preserveAspectRatio="none" style={{ height: 64 }}>
+            <path d="M0,32 C360,0 1080,64 1440,32 L1440,64 L0,64 Z" fill="#fff"/>
+          </svg>
+        </div>
+
         {/* CTA */}
         <section className="lp-cta reveal">
           <div className="lp-cta-title">תפסיק לענות לכולם בעצמך.</div>
@@ -1495,6 +1509,13 @@ export default function LandingPage() {
             <span className="lp-cta-trust-item">✓ תמיכה בוואטסאפ</span>
           </div>
         </section>
+
+        {/* WAVE: white → dark footer */}
+        <div className="wave" style={{ background: "#fff" }}>
+          <svg viewBox="0 0 1440 64" preserveAspectRatio="none" style={{ height: 64 }}>
+            <path d="M0,32 C480,64 960,0 1440,32 L1440,64 L0,64 Z" fill="#0A0A0A"/>
+          </svg>
+        </div>
 
         {/* FOOTER */}
         <footer className="lp-footer">
