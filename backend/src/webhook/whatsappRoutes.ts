@@ -16,6 +16,12 @@ const webhookLimiter = rateLimit({
   keyPrefix: "wa",
 });
 
+// Temporary debug endpoint — remove after webhook is verified
+whatsappRouter.get("/debug-token", (_req, res) => {
+  const val = process.env.WHATSAPP_VERIFY_TOKEN;
+  res.json({ set: !!val, length: val?.length ?? 0, first4: val?.slice(0, 4) ?? "" });
+});
+
 // Meta calls this once to verify the webhook URL when you configure it in the Meta dashboard.
 whatsappRouter.get("/", (req, res) => {
   const mode = req.query["hub.mode"];
