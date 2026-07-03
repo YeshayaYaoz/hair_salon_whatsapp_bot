@@ -6,7 +6,6 @@ import type { AnimationItem } from "lottie-web";
 export default function LandingPage() {
   const tiltEl = useRef<HTMLDivElement>(null);
   const logoRef = useRef<HTMLDivElement>(null);
-  const dashboardLottieRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [appts, setAppts] = useState(40);
 
@@ -26,21 +25,6 @@ export default function LandingPage() {
     return () => anim?.destroy();
   }, []);
 
-  // Lottie dashboard splash
-  useEffect(() => {
-    if (!dashboardLottieRef.current) return;
-    let anim: AnimationItem | null = null;
-    import("lottie-web").then((lottie) => {
-      anim = lottie.default.loadAnimation({
-        container: dashboardLottieRef.current!,
-        renderer: "svg",
-        loop: true,
-        autoplay: true,
-        path: "/logo_animation_black.json",
-      });
-    });
-    return () => anim?.destroy();
-  }, []);
 
   // 3D scroll tilt on product mock
   useEffect(() => {
@@ -161,21 +145,26 @@ export default function LandingPage() {
     return () => document.removeEventListener("click", handler);
   }, []);
 
-  // Phone chat sequential reveal
+  // Phone chat sequential reveal with auto-scroll
   useEffect(() => {
     function runSequence() {
+      const container = document.querySelector<HTMLElement>(".phone-chat");
       const items = Array.from(document.querySelectorAll<HTMLElement>(".phone-chat > *"));
       items.forEach(el => { el.style.display = "none"; el.classList.remove("show"); });
+      if (container) container.scrollTop = 0;
       const delays = [300, 1600, 3000, 3500, 5000, 6400, 6900, 8300];
       const timers: ReturnType<typeof setTimeout>[] = [];
       items.forEach((el, i) => {
         const t = setTimeout(() => {
           el.style.display = "";
-          requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add("show")));
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            el.classList.add("show");
+            if (container) container.scrollTop = container.scrollHeight;
+          }));
         }, delays[i] ?? i * 1200);
         timers.push(t);
       });
-      const loop = setTimeout(runSequence, 11000);
+      const loop = setTimeout(runSequence, 11500);
       timers.push(loop);
       return timers;
     }
@@ -266,7 +255,7 @@ export default function LandingPage() {
         .lp-type-pill { display: flex; align-items: center; gap: 5px; background: #F5F5F5; border: 1px solid #E8E8E8; border-radius: 20px; padding: 5px 12px; font-size: 11.5px; color: #555; font-weight: 500; }
 
         /* PHONE MOCKUP */
-        .lp-hero-phone { animation: fadeUp 0.8s ease 0.4s both; display: flex; justify-content: center; align-items: center; }
+        .lp-hero-phone { animation: fadeUp 0.8s ease 0.4s both; display: flex; justify-content: center; align-items: center; position: relative; z-index: 1; }
         .phone-wrap { position: relative; width: 280px; }
         .phone-frame {
           width: 280px; background: #18181B; border-radius: 40px;
@@ -281,7 +270,7 @@ export default function LandingPage() {
         .phone-wa-info { flex: 1; }
         .phone-wa-name { font-size: 12px; font-weight: 600; color: #fff; line-height: 1.2; }
         .phone-wa-online { font-size: 10px; color: rgba(255,255,255,0.55); }
-        .phone-chat { background: #ECE5DD url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Ccircle cx='30' cy='30' r='1' fill='%23C9B99A' opacity='0.3'/%3E%3C/svg%3E"); padding: 12px 10px; display: flex; flex-direction: column; gap: 6px; height: 320px; overflow: hidden; }
+        .phone-chat { background: #ECE5DD url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Ccircle cx='30' cy='30' r='1' fill='%23C9B99A' opacity='0.3'/%3E%3C/svg%3E"); padding: 12px 10px; display: flex; flex-direction: column; gap: 6px; height: 420px; overflow-y: auto; scroll-behavior: smooth; }
         .chat-bubble { max-width: 82%; padding: 7px 10px; border-radius: 8px; font-size: 12px; line-height: 1.5; position: relative; }
         .chat-bubble.incoming { background: #fff; align-self: flex-end; border-radius: 8px 0 8px 8px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); color: #111; }
         .chat-bubble.outgoing { background: #DCF8C6; align-self: flex-start; border-radius: 0 8px 8px 8px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); color: #111; }
@@ -641,7 +630,7 @@ export default function LandingPage() {
 
         /* HERO NOTIFICATION TOAST */
         #hero-toast {
-          position: absolute; bottom: 40px; left: 40px;
+          position: absolute; bottom: 40px; left: 40px; z-index: 20;
           background: #fff; border: 1px solid #E8E8E8; border-radius: 14px;
           padding: 12px 16px; display: flex; align-items: center; gap: 12px;
           box-shadow: 0 8px 30px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.06);
@@ -784,7 +773,9 @@ export default function LandingPage() {
                   </div>
                   <div className="phone-wa-bar">
                     <div className="phone-wa-back">‹</div>
-                    <div className="phone-wa-avatar">ת</div>
+                    <div className="phone-wa-avatar">
+                      <img src="/tori-logo-transparent.png" alt="תורי" style={{ width: 22, height: 22, objectFit: "contain" }} />
+                    </div>
                     <div className="phone-wa-info">
                       <div className="phone-wa-name">תורי — סלון דנה</div>
                       <div className="phone-wa-online">online</div>
@@ -952,17 +943,55 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* 3D PRODUCT PREVIEW — Lottie animation */}
+        {/* 3D PRODUCT PREVIEW */}
         <div className="lp-3d-wrap">
           <div className="lp-3d-inner" ref={tiltEl}>
-            <div style={{ background: "#18181B", borderRadius: 16, overflow: "hidden", border: "1px solid rgba(255,255,255,0.06)", boxShadow: "0 40px 100px rgba(0,0,0,0.25)" }}>
-              <div style={{ background: "#111", padding: "12px 20px", display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#FF5F57", display: "inline-block" }} />
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#FEBC2E", display: "inline-block" }} />
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#28C840", display: "inline-block" }} />
-                <span style={{ margin: "0 auto", background: "#222", borderRadius: 5, padding: "4px 16px", fontSize: 11, color: "#555", fontFamily: "monospace" }}>תורי — דשבורד</span>
+            <div className="mock">
+              <div className="mock-titlebar">
+                <span className="mock-dot r" /><span className="mock-dot y" /><span className="mock-dot g" />
+                <span className="mock-url">torionline.com/dashboard</span>
               </div>
-              <div ref={dashboardLottieRef} style={{ width: "100%", aspectRatio: "16/7", background: "#18181B" }} />
+              <div className="mock-body">
+                <div className="mock-sidebar">
+                  <div className="mock-nav-item active"><span className="mock-nav-dot" />תורים</div>
+                  <div className="mock-nav-item"><span className="mock-nav-dot" />לקוחות</div>
+                  <div className="mock-nav-item"><span className="mock-nav-dot" />שירותים</div>
+                  <div className="mock-nav-item"><span className="mock-nav-dot" />אנליטיקה</div>
+                  <div className="mock-nav-item"><span className="mock-nav-dot" />הגדרות</div>
+                </div>
+                <div className="mock-main">
+                  <div className="mock-stats-row">
+                    <div className="mock-stat">
+                      <div className="mock-stat-n">47</div>
+                      <div className="mock-stat-l">תורים החודש</div>
+                    </div>
+                    <div className="mock-stat">
+                      <div className="mock-stat-n"><span className="g">₪</span>8,240</div>
+                      <div className="mock-stat-l">הכנסה</div>
+                    </div>
+                    <div className="mock-stat">
+                      <div className="mock-stat-n">23</div>
+                      <div className="mock-stat-l">לקוחות חדשים</div>
+                    </div>
+                  </div>
+                  <div className="mock-section-title">תורים קרובים</div>
+                  <div className="mock-appt-list">
+                    {[
+                      { time: "09:30", name: "דנה כהן", svc: "תספורת", status: "confirmed", label: "מאושר" },
+                      { time: "11:00", name: "מיכל לוי", svc: "צבע", status: "confirmed", label: "מאושר" },
+                      { time: "14:30", name: "יוסי אברהם", svc: "תספורת + זקן", status: "pending", label: "ממתין" },
+                      { time: "16:00", name: "שרה גולדברג", svc: "טיפול פנים", status: "confirmed", label: "מאושר" },
+                    ].map((a) => (
+                      <div key={a.time} className="mock-appt">
+                        <span className="mock-appt-time">{a.time}</span>
+                        <span className="mock-appt-name">{a.name}</span>
+                        <span className="mock-appt-service">{a.svc}</span>
+                        <span className={`mock-appt-badge ${a.status}`}>{a.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1074,7 +1103,7 @@ export default function LandingPage() {
                 </div>
                 <div className="lp-ba-items">
                   {[
-                    "לקוח שולח ב-1 בלילה — אתה עונה בבוקר, הוא כבר קבע אצל המתחרה",
+                    "לקוח שולח הודעה ואתה לא זמין — הוא כבר קבע אצל המתחרה",
                     "שעתיים ביום הולכות על תיאום תורים בטלפון ובוואטסאפ",
                     "no-shows שחוזרים כי אין מי שישלח תזכורות",
                     "גוגל קלנדר מתעדכן ידנית — או שוכחים ואז נוצרות התנגשויות",
