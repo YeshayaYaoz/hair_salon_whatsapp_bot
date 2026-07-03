@@ -61,23 +61,22 @@ export default function WhatsAppPage() {
     setError(null);
     console.log("Launching FB.login with config_id:", META_CONFIG_ID, "app:", META_APP_ID);
     window.FB.login(
-      async (response: any) => {
+      (response: any) => {
         console.log("FB.login response:", JSON.stringify(response));
         if (response.authResponse?.code) {
           setLoading(true);
-          try {
-            const result = await apiFetch<{ ok: boolean; phoneNumber: string }>(
-              "/api/business/me/whatsapp/embedded-signup",
-              { method: "POST", body: JSON.stringify({ code: response.authResponse.code }) }
-            );
+          apiFetch<{ ok: boolean; phoneNumber: string }>(
+            "/api/business/me/whatsapp/embedded-signup",
+            { method: "POST", body: JSON.stringify({ code: response.authResponse.code }) }
+          ).then((result) => {
             setConnected(true);
             setPhoneNumber(result.phoneNumber);
             setSaved(true);
-          } catch (err: any) {
+          }).catch((err: any) => {
             setError(err?.message ?? "Connection failed. Please try again.");
-          } finally {
+          }).finally(() => {
             setLoading(false);
-          }
+          });
         } else {
           setError("WhatsApp connection was cancelled.");
         }
