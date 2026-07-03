@@ -8,7 +8,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (!token) router.replace("/");
+    if (!token) router.replace("/login");
   }, [router]);
 
   return <>{children}</>;

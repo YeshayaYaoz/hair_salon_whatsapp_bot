@@ -31,7 +31,7 @@ function SidebarContent({ pathname }: { pathname: string }) {
 
   function logout() {
     clearToken();
-    router.push("/");
+    router.push("/login");
   }
 
   return (
