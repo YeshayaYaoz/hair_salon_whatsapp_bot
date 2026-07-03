@@ -715,6 +715,7 @@ export default function LandingPage() {
             <a className="lp-nav-link" href="#pricing">מחירים</a>
             <a className="lp-nav-link" href="#faq">FAQ</a>
           </div>
+          <a className="lp-nav-link" href="/en" style={{ fontSize: 12, padding: "6px 10px", border: "1px solid rgba(0,0,0,0.12)", borderRadius: 7 }}>🌐 EN</a>
           <a className="lp-nav-cta" href="/login">כניסה לדשבורד ←</a>
           <button id="hamburger-btn" className={`hamburger-btn${menuOpen ? " open" : ""}`} onClick={() => setMenuOpen(o => !o)} aria-label="תפריט">
             <span /><span /><span />
