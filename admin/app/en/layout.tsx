@@ -1,0 +1,57 @@
+import type { ReactNode } from "react";
+import type { Metadata } from "next";
+
+const SITE_URL = "https://torionline.com";
+const OG_IMAGE = `${SITE_URL}/og-image-en.png`;
+
+export const metadata: Metadata = {
+  title: "Tori | AI WhatsApp Bot for Automatic Appointment Booking",
+  description:
+    "AI-powered WhatsApp bot that books appointments automatically, sends reminders and syncs to Google Calendar. Perfect for hair salons, clinics, barbers and more. 10-minute setup. Free trial.",
+  keywords: [
+    "whatsapp appointment bot",
+    "automatic appointment booking",
+    "AI booking bot",
+    "hair salon booking software",
+    "WhatsApp Business bot",
+    "appointment scheduling automation",
+    "Israel appointment booking",
+    "small business automation",
+  ],
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    alternateLocale: ["he_IL"],
+    url: `${SITE_URL}/en`,
+    siteName: "Tori",
+    title: "Tori — AI WhatsApp Bot for Automatic Appointment Booking",
+    description:
+      "Your AI receptionist that answers clients on WhatsApp 24/7, books appointments and syncs to Google Calendar. No training needed. Free 14-day trial.",
+    images: [
+      {
+        url: OG_IMAGE,
+        width: 1200,
+        height: 630,
+        alt: "Tori — Automatic appointment booking via WhatsApp AI",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Tori — AI WhatsApp Appointment Bot",
+    description:
+      "AI bot that answers clients on WhatsApp, books appointments, and syncs to Google Calendar — 24/7.",
+    images: [OG_IMAGE],
+  },
+  alternates: {
+    canonical: `${SITE_URL}/en`,
+    languages: {
+      "en-US": `${SITE_URL}/en`,
+      "he-IL": SITE_URL,
+    },
+  },
+};
+
+export default function EnLayout({ children }: { children: ReactNode }) {
+  return <>{children}</>;
+}

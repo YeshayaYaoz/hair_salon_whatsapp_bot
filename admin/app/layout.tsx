@@ -4,9 +4,83 @@ import { Heebo, Karantina } from "next/font/google";
 import { LanguageProvider } from "./lib/LanguageContext";
 import "./globals.css";
 
+const SITE_URL = "https://torionline.com";
+const SITE_NAME = "תורי";
+const OG_IMAGE = `${SITE_URL}/og-image.png`;
+
 export const metadata: Metadata = {
-  title: "תורי — הזמנת תורים בוואטסאפ",
-  description: "מערכת הזמנת תורים חכמה לסלונים דרך וואטסאפ",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "תורי | בוט WhatsApp AI לקביעת תורים אוטומטית",
+    template: "%s | תורי",
+  },
+  description:
+    "בוט WhatsApp חכם שקובע תורים אוטומטית, שולח תזכורות ומסנכרן לגוגל קלנדר. מתאים לסלוני שיער, קליניקות, ספרים ועוד. הקמה ב-10 דקות. נסה חינם.",
+  keywords: [
+    "הזמנת תורים אוטומטית",
+    "בוט וואטסאפ",
+    "קביעת תורים WhatsApp",
+    "ניהול תורים סלון שיער",
+    "WhatsApp Business בוט",
+    "בוט תורים AI",
+    "אוטומציה לסלון יופי",
+    "קביעת תורים אינטרנט",
+    "WhatsApp appointment bot",
+    "appointment booking bot Israel",
+  ],
+  authors: [{ name: "תורי", url: SITE_URL }],
+  creator: "תורי",
+  publisher: "תורי",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-snippet": -1,
+      "max-image-preview": "large",
+      "max-video-preview": -1,
+    },
+  },
+  openGraph: {
+    type: "website",
+    locale: "he_IL",
+    alternateLocale: ["en_US"],
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    title: "תורי — בוט WhatsApp AI שקובע תורים אוטומטית",
+    description:
+      "הגדל הכנסות עם בוט AI שעונה ללקוחות 24/7 בוואטסאפ, קובע תורים ומסנכרן לגוגל קלנדר. ללא הכשרה, ללא כרטיס אשראי.",
+    images: [
+      {
+        url: OG_IMAGE,
+        width: 1200,
+        height: 630,
+        alt: "תורי — קביעת תורים אוטומטית דרך WhatsApp",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "תורי — בוט WhatsApp AI לקביעת תורים",
+    description:
+      "בוט AI שעונה ללקוחות בוואטסאפ, קובע תורים ומסנכרן לגוגל קלנדר — 24/7.",
+    images: [OG_IMAGE],
+    creator: "@torionline",
+  },
+  alternates: {
+    canonical: SITE_URL,
+    languages: {
+      "he-IL": SITE_URL,
+      "en-US": `${SITE_URL}/en`,
+    },
+  },
+  category: "technology",
+  classification: "Business Software",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 const heebo = Heebo({
@@ -22,9 +96,114 @@ const karantina = Karantina({
   display: "swap",
 });
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: "תורי",
+      url: SITE_URL,
+      logo: {
+        "@type": "ImageObject",
+        url: `${SITE_URL}/tori-logo-black.png`,
+      },
+      description:
+        "בוט WhatsApp AI לקביעת תורים אוטומטית לעסקים קטנים — סלוני שיער, קליניקות, ספרים ועוד.",
+      areaServed: "IL",
+      availableLanguage: ["Hebrew", "English"],
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": `${SITE_URL}/#software`,
+      name: "תורי",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: SITE_URL,
+      description:
+        "מערכת הזמנת תורים אוטומטית דרך WhatsApp עם סנכרון גוגל קלנדר ובינה מלאכותית.",
+      offers: [
+        {
+          "@type": "Offer",
+          name: "Standard",
+          price: "149",
+          priceCurrency: "ILS",
+          priceSpecification: {
+            "@type": "UnitPriceSpecification",
+            price: "149",
+            priceCurrency: "ILS",
+            billingDuration: "P1M",
+          },
+        },
+        {
+          "@type": "Offer",
+          name: "Premium",
+          price: "299",
+          priceCurrency: "ILS",
+          priceSpecification: {
+            "@type": "UnitPriceSpecification",
+            price: "299",
+            priceCurrency: "ILS",
+            billingDuration: "P1M",
+          },
+        },
+      ],
+      aggregateRating: {
+        "@type": "AggregateRating",
+        ratingValue: "4.9",
+        reviewCount: "47",
+        bestRating: "5",
+      },
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      url: SITE_URL,
+      name: "תורי",
+      publisher: { "@id": `${SITE_URL}/#organization` },
+      inLanguage: ["he-IL", "en-US"],
+    },
+    {
+      "@type": "FAQPage",
+      mainEntity: [
+        {
+          "@type": "Question",
+          name: "האם הבוט מבין עברית טבעית?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "כן. הבוט מבוסס על Claude AI ומבין עברית טבעית לחלוטין — כולל ניבים, קיצורים ואיות לא מדויק.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "כמה זמן לוקחת ההקמה?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "בממוצע 3–10 דקות. מתחברים לוואטסאפ Business, מוסיפים שירותים ושעות, מחברים גוגל קלנדר — והבוט חי.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "האם ניתן לבטל בכל עת?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "כן. אין חוזים ואין דמי ביטול. מבטלים בלחיצה אחת מהדשבורד.",
+          },
+        },
+      ],
+    },
+  ],
+};
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="he" suppressHydrationWarning className={`dark ${heebo.variable} ${karantina.variable}`}>
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body className="bg-zinc-950 text-zinc-100 min-h-screen font-[family-name:var(--font-heebo)]">
         <LanguageProvider>{children}</LanguageProvider>
       </body>

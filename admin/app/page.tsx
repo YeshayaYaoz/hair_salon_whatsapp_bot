@@ -616,18 +616,19 @@ export default function LandingPage() {
         .lp-cta-trust-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #AAA; }
 
         /* FOOTER */
-        .lp-footer { background: #0A0A0A; border-top: 1px solid rgba(255,255,255,0.06); padding: 40px 44px; }
-        .lp-footer-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 32px; gap: 40px; flex-wrap: wrap; }
-        .lp-footer-brand-block { max-width: 240px; }
-        .lp-footer-logo-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-        .lp-footer-logo-row img { width: 26px; height: 26px; border-radius: 6px; opacity: 0.75; }
-        .lp-footer-brand { font-size: 14px; font-weight: 700; color: rgba(255,255,255,0.8); }
-        .lp-footer-tagline { font-size: 13px; color: rgba(255,255,255,0.45); line-height: 1.65; }
-        .lp-footer-col h4 { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.55); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 12px; }
-        .lp-footer-col a { display: block; font-size: 13px; color: rgba(255,255,255,0.45); text-decoration: none; margin-bottom: 8px; transition: color 0.15s; }
-        .lp-footer-col a:hover { color: rgba(255,255,255,0.85); }
+        .lp-footer { background: #0A0A0A; padding: 56px 44px 36px; }
+        .lp-footer-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 40px; gap: 48px; flex-wrap: wrap; }
+        .lp-footer-brand-block { max-width: 260px; }
+        .lp-footer-logo-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+        .lp-footer-logo-row img { width: 28px; height: 28px; border-radius: 7px; opacity: 0.9; }
+        .lp-footer-brand { font-size: 15px; font-weight: 700; color: #fff; }
+        .lp-footer-tagline { font-size: 13.5px; color: rgba(255,255,255,0.62); line-height: 1.7; }
+        .lp-footer-cols { display: flex; gap: 56px; flex-wrap: wrap; }
+        .lp-footer-col h4 { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.4); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 14px; }
+        .lp-footer-col a { display: block; font-size: 13.5px; color: rgba(255,255,255,0.65); text-decoration: none; margin-bottom: 10px; transition: color 0.15s; }
+        .lp-footer-col a:hover { color: #fff; }
         .lp-footer-bottom { display: flex; align-items: center; justify-content: space-between; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08); flex-wrap: wrap; gap: 12px; }
-        .lp-footer-copy { font-size: 12px; color: rgba(255,255,255,0.38); }
+        .lp-footer-copy { font-size: 12.5px; color: rgba(255,255,255,0.45); }
 
         /* ANIMATIONS */
         @keyframes fadeUp { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
@@ -1525,19 +1526,29 @@ export default function LandingPage() {
                 <img src="/tori-logo-black.png" alt="תורי" />
                 <span className="lp-footer-brand">תורי</span>
               </div>
-              <div className="lp-footer-tagline">קביעת תורים אוטומטית לעסקים קטנים — WhatsApp + AI.</div>
+              <div className="lp-footer-tagline">בוט WhatsApp AI שקובע תורים אוטומטית לסלונים ועסקים קטנים — 24/7, ללא מגע יד אדם.</div>
             </div>
-            <div className="lp-footer-col">
-              <h4>מוצר</h4>
-              <a href="#how">איך זה עובד</a>
-              <a href="#features">תכונות</a>
-              <a href="#premium">פרמיום</a>
-              <a href="#pricing">מחירים</a>
-            </div>
-            <div className="lp-footer-col">
-              <h4>עזרה</h4>
-              <a href="#faq">שאלות נפוצות</a>
-              <a href="/login">כניסה לדשבורד</a>
+            <div className="lp-footer-cols">
+              <div className="lp-footer-col">
+                <h4>מוצר</h4>
+                <a href="#how">איך זה עובד</a>
+                <a href="#features">תכונות</a>
+                <a href="#premium">פרמיום</a>
+                <a href="#pricing">מחירים</a>
+              </div>
+              <div className="lp-footer-col">
+                <h4>עזרה</h4>
+                <a href="#faq">שאלות נפוצות</a>
+                <a href="/login">כניסה לדשבורד</a>
+                <a href="/en">English</a>
+              </div>
+              <div className="lp-footer-col">
+                <h4>מתאים ל</h4>
+                <a href="#">סלוני שיער</a>
+                <a href="#">קליניקות</a>
+                <a href="#">ספרים</a>
+                <a href="#">סטודיו כושר</a>
+              </div>
             </div>
           </div>
           <div className="lp-footer-bottom">
