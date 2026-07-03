@@ -198,6 +198,7 @@ export default function LandingPage() {
 
   return (
     <>
+      <noscript><style>{`.phone-chat > * { display: flex !important; }`}</style></noscript>
       <style>{`
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         .lp {
@@ -1523,7 +1524,7 @@ export default function LandingPage() {
           <div className="lp-footer-top">
             <div className="lp-footer-brand-block">
               <div className="lp-footer-logo-row">
-                <img src="/tori-logo-black.png" alt="תורי" />
+                <img src="/tori-logo-black.png" alt="תורי" loading="lazy" />
                 <span className="lp-footer-brand">תורי</span>
               </div>
               <div className="lp-footer-tagline">בוט WhatsApp AI שקובע תורים אוטומטית לסלונים ועסקים קטנים — 24/7, ללא מגע יד אדם.</div>

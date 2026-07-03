@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import Anthropic, { APIError } from "@anthropic-ai/sdk";
 import { prisma } from "../lib/prisma.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { appendTurn, getHistory } from "./conversationStore.js";
@@ -184,6 +184,10 @@ async function runTool(
   return JSON.stringify({ error: "Unknown tool" });
 }
 
+/** Hebrew fallback message when the AI service is temporarily unavailable. */
+const AI_UNAVAILABLE_HE =
+  "מצטערים, הבוט אינו זמין כרגע. אנא נסו שוב בעוד כמה דקות, או צרו קשר ישיר עם העסק.";
+
 export async function handleIncomingMessage(businessId: string, customerPhone: string, messageText: string): Promise<BotResult> {
   const system = await buildSystemPrompt(businessId, new Date().toISOString().slice(0, 10));
   const history = getHistory(businessId, customerPhone);
@@ -195,13 +199,23 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
 
   const lastOfferedSlots: { value?: AvailableSlot[] } = {};
 
-  let response = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 1024,
-    system,
-    tools,
-    messages,
-  });
+  let response: Anthropic.Message;
+  try {
+    response = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 1024,
+      system,
+      tools,
+      messages,
+    });
+  } catch (err) {
+    if (err instanceof APIError) {
+      console.error(`Anthropic API error ${err.status}:`, err.message);
+    } else {
+      console.error("Unexpected error calling Anthropic:", err);
+    }
+    return { text: AI_UNAVAILABLE_HE };
+  }
 
   while (response.stop_reason === "tool_use") {
     const toolResults: Anthropic.ToolResultBlockParam[] = [];
@@ -214,13 +228,22 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     messages.push({ role: "assistant", content: response.content });
     messages.push({ role: "user", content: toolResults });
 
-    response = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 1024,
-      system,
-      tools,
-      messages,
-    });
+    try {
+      response = await anthropic.messages.create({
+        model: MODEL,
+        max_tokens: 1024,
+        system,
+        tools,
+        messages,
+      });
+    } catch (err) {
+      if (err instanceof APIError) {
+        console.error(`Anthropic API error ${err.status} (tool loop):`, err.message);
+      } else {
+        console.error("Unexpected error calling Anthropic (tool loop):", err);
+      }
+      return { text: AI_UNAVAILABLE_HE };
+    }
   }
 
   const replyText = response.content

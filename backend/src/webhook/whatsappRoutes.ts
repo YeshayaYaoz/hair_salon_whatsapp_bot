@@ -1,4 +1,6 @@
 import { Router } from "express";
+import express from "express";
+import crypto from "crypto";
 import { resolveBusinessByPhoneNumberId } from "../tenants/resolve.js";
 import { sendWhatsAppMessage, sendWhatsAppList, type ListRow } from "./whatsappClient.js";
 import { handleIncomingMessage } from "../bot/claudeBot.js";
@@ -27,6 +29,17 @@ whatsappRouter.get("/", (req, res) => {
   }
 });
 
+/** Verify Meta's X-Hub-Signature-256 header against the raw request body. */
+function verifyMetaSignature(rawBody: Buffer, signature: string | undefined): boolean {
+  const appSecret = process.env.WHATSAPP_APP_SECRET;
+  if (!appSecret) return true; // Skip verification if not configured (dev mode)
+  if (!signature?.startsWith("sha256=")) return false;
+  const expected = "sha256=" + crypto.createHmac("sha256", appSecret).update(rawBody).digest("hex");
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+}
+
+const rawBodyMiddleware = express.raw({ type: "application/json" });
+
 /** Extracts the customer's text from either a typed message or a tapped interactive list row. */
 function extractMessageText(message: any): string | null {
   if (message.type === "text") return message.text.body as string;
@@ -48,7 +61,17 @@ function buildSlotRows(slots: { startTime: string }[]): ListRow[] {
   });
 }
 
-whatsappRouter.post("/", webhookLimiter, async (req, res) => {
+whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => {
+  // Verify Meta's HMAC signature before processing.
+  const signature = req.headers["x-hub-signature-256"] as string | undefined;
+  if (!verifyMetaSignature(req.body as Buffer, signature)) {
+    console.warn("WhatsApp webhook: invalid signature, rejecting request");
+    return res.sendStatus(403);
+  }
+
+  // Parse body now that signature is verified (raw middleware gives us a Buffer).
+  const payload = JSON.parse((req.body as Buffer).toString("utf8"));
+
   // Acknowledge immediately; Meta retries aggressively if it doesn't get a fast 200.
   res.sendStatus(200);
 
@@ -57,7 +80,7 @@ whatsappRouter.post("/", webhookLimiter, async (req, res) => {
   let customerPhone: string | undefined;
 
   try {
-    const entry = req.body?.entry?.[0];
+    const entry = payload?.entry?.[0];
     const change = entry?.changes?.[0]?.value;
     phoneNumberId = change?.metadata?.phone_number_id;
     const message = change?.messages?.[0];
@@ -101,7 +124,7 @@ whatsappRouter.post("/", webhookLimiter, async (req, res) => {
         phoneNumberId,
         accessToken,
         to: customerPhone,
-        text: "Sorry, something went wrong on our end. Please try again in a moment.",
+        text: "מצטערים, אירעה שגיאה. אנא נסו שוב בעוד כמה דקות.",
       }).catch((sendErr) => console.error("Failed to send error fallback message:", sendErr));
     }
   }

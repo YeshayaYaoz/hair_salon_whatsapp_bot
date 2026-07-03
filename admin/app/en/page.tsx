@@ -1148,7 +1148,7 @@ export default function LandingPageEN() {
           <div className="lp-footer-top">
             <div className="lp-footer-brand-block">
               <div className="lp-footer-logo-row">
-                <img src="/tori-logo-black.png" alt="Tori" />
+                <img src="/tori-logo-black.png" alt="Tori" loading="lazy" />
                 <span className="lp-footer-brand">Tori</span>
               </div>
               <div className="lp-footer-tagline">Automated appointment booking for small businesses — WhatsApp + AI.</div>
