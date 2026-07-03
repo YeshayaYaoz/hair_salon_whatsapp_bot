@@ -12,7 +12,8 @@ declare global {
   }
 }
 
-const META_APP_ID = process.env.NEXT_PUBLIC_META_APP_ID ?? "";
+const META_APP_ID = process.env.NEXT_PUBLIC_META_APP_ID || "1556761279502082";
+const META_CONFIG_ID = process.env.NEXT_PUBLIC_META_CONFIG_ID || "1011752745059826";
 
 export default function WhatsAppPage() {
   const { t, lang } = useLanguage();
@@ -76,7 +77,7 @@ export default function WhatsAppPage() {
         }
       },
       {
-        config_id: process.env.NEXT_PUBLIC_META_CONFIG_ID ?? "",
+        config_id: META_CONFIG_ID,
         response_type: "code",
         override_default_response_type: true,
         extras: { setup: {}, featureType: "", sessionInfoVersion: "3" },
