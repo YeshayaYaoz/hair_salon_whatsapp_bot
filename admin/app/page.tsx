@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function LandingPage() {
   const tiltEl = useRef<HTMLDivElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [appts, setAppts] = useState(40);
 
   // 3D scroll tilt on product mock
   useEffect(() => {
@@ -76,6 +78,52 @@ export default function LandingPage() {
         icon.style.transform = open ? "rotate(45deg)" : "rotate(0deg)";
       });
     });
+  }, []);
+
+  // Live booking notification toast
+  useEffect(() => {
+    const toasts = [
+      { icon: "📅", msg: "תור חדש נקבע", sub: "דנה כ. · ✂️ תספורת ב-11:00 מחר" },
+      { icon: "🔔", msg: "תזכורת נשלחה אוטומטית", sub: "מיכל ל. · טיפול פנים ב-14:30" },
+      { icon: "⚡", msg: "הבוט ענה תוך 0.8 שניות", sub: "לקוח חדש פנה בוואטסאפ" },
+      { icon: "✅", msg: "ביטול אוטומטי טופל", sub: "יוסי ה. · חריץ פנוי נוסף ביומן" },
+      { icon: "📅", msg: "תור חדש נקבע", sub: "שרה מ. · 💅 ציפורניים ב-16:00" },
+    ];
+    let i = 0;
+    const toast = document.getElementById("hero-toast");
+    if (!toast) return;
+    let timer: ReturnType<typeof setTimeout>;
+    function show() {
+      const t = toasts[i % toasts.length];
+      const iconEl = toast!.querySelector<HTMLElement>(".ht-icon");
+      const msgEl = toast!.querySelector<HTMLElement>(".ht-msg");
+      const subEl = toast!.querySelector<HTMLElement>(".ht-sub");
+      if (iconEl) iconEl.textContent = t.icon;
+      if (msgEl) msgEl.textContent = t.msg;
+      if (subEl) subEl.textContent = t.sub;
+      toast!.classList.remove("ht-out");
+      toast!.classList.add("ht-in");
+      timer = setTimeout(() => {
+        toast!.classList.remove("ht-in");
+        toast!.classList.add("ht-out");
+        timer = setTimeout(() => { i++; show(); }, 500);
+      }, 3200);
+    }
+    timer = setTimeout(show, 1800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Close hamburger on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const nav = document.getElementById("mobile-nav");
+      const btn = document.getElementById("hamburger-btn");
+      if (nav && btn && !nav.contains(e.target as Node) && !btn.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
   }, []);
 
   // Animated counters
@@ -468,6 +516,9 @@ export default function LandingPage() {
         @media (max-width: 900px) {
           .lp-nav { padding: 0 20px; }
           .lp-nav-links { display: none; }
+          .hamburger-btn { display: flex; }
+          .lp-nav-cta { display: none; }
+          #hero-toast { display: none; }
           .mock-body { grid-template-columns: 1fr; }
           .mock-sidebar { display: none; }
           .lp-steps { padding: 72px 20px; }
@@ -507,6 +558,81 @@ export default function LandingPage() {
           .lp-3d-inner { transform: none !important; opacity: 1 !important; }
           .chat-bubble, .chat-typing { opacity: 1 !important; transform: none !important; }
         }
+
+        /* HAMBURGER NAV */
+        .hamburger-btn { display: none; flex-direction: column; justify-content: center; gap: 5px; width: 36px; height: 36px; background: none; border: none; cursor: pointer; padding: 6px; border-radius: 8px; transition: background 0.15s; }
+        .hamburger-btn:hover { background: #F5F5F5; }
+        .hamburger-btn span { display: block; width: 18px; height: 2px; background: #111; border-radius: 2px; transition: transform 0.25s ease, opacity 0.2s; }
+        .hamburger-btn.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+        .hamburger-btn.open span:nth-child(2) { opacity: 0; }
+        .hamburger-btn.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+        #mobile-nav {
+          position: fixed; top: 62px; left: 0; right: 0; z-index: 190;
+          background: rgba(255,255,255,0.98); backdrop-filter: blur(20px);
+          border-bottom: 1px solid #EBEBEB;
+          display: flex; flex-direction: column; gap: 2px; padding: 12px 16px 16px;
+          transform: translateY(-8px); opacity: 0; pointer-events: none;
+          transition: transform 0.22s ease, opacity 0.22s ease;
+        }
+        #mobile-nav.open { transform: none; opacity: 1; pointer-events: auto; }
+        .mobile-nav-link { font-size: 15px; font-weight: 500; color: #333; text-decoration: none; padding: 11px 14px; border-radius: 10px; transition: background 0.12s, color 0.12s; }
+        .mobile-nav-link:hover { background: #F5F5F5; color: #111; }
+        .mobile-nav-divider { height: 1px; background: #EBEBEB; margin: 6px 0; }
+        .mobile-nav-cta { display: block; text-align: center; background: #111; color: #fff; font-size: 14px; font-weight: 700; padding: 13px; border-radius: 10px; text-decoration: none; margin-top: 4px; }
+
+        /* HERO NOTIFICATION TOAST */
+        #hero-toast {
+          position: absolute; bottom: 40px; left: 40px;
+          background: #fff; border: 1px solid #E8E8E8; border-radius: 14px;
+          padding: 12px 16px; display: flex; align-items: center; gap: 12px;
+          box-shadow: 0 8px 30px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.06);
+          min-width: 240px; max-width: 300px;
+          opacity: 0; transform: translateY(10px);
+          transition: opacity 0.4s ease, transform 0.4s ease;
+          pointer-events: none;
+        }
+        #hero-toast.ht-in { opacity: 1; transform: none; }
+        #hero-toast.ht-out { opacity: 0; transform: translateY(-6px); }
+        .ht-icon-wrap { width: 36px; height: 36px; border-radius: 10px; background: #F0FFF4; border: 1px solid #BBF7D0; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
+        .ht-icon { font-size: 17px; }
+        .ht-msg { font-size: 12.5px; font-weight: 700; color: #111; line-height: 1.3; }
+        .ht-sub { font-size: 11px; color: #777; margin-top: 1px; line-height: 1.3; }
+        .ht-live { display: flex; align-items: center; gap: 4px; margin-right: auto; }
+        .ht-dot { width: 6px; height: 6px; border-radius: 50%; background: #25D366; animation: pulse-green 2s infinite; flex-shrink: 0; }
+        .ht-live-label { font-size: 9px; font-weight: 700; color: #25D366; letter-spacing: 0.06em; text-transform: uppercase; }
+
+        /* COMPARISON TABLE */
+        .lp-compare { padding: 100px 40px; background: #fff; border-top: 1px solid #EBEBEB; }
+        .lp-compare-inner { max-width: 860px; margin: 0 auto; }
+        .compare-table { width: 100%; border-collapse: collapse; margin-top: 52px; border: 1px solid #E8E8E8; border-radius: 14px; overflow: hidden; }
+        .compare-table th { padding: 16px 20px; font-size: 13px; font-weight: 700; text-align: center; background: #F8F8F8; border-bottom: 1px solid #EBEBEB; }
+        .compare-table th:first-child { text-align: right; width: 44%; }
+        .compare-table th.col-tori { background: #0A0A0A; color: #fff; }
+        .compare-table th.col-tori .col-badge { display: inline-block; background: #25D366; color: #fff; font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 20px; margin-right: 6px; letter-spacing: 0.04em; vertical-align: middle; }
+        .compare-table td { padding: 14px 20px; font-size: 13.5px; color: #444; border-bottom: 1px solid #F0F0F0; vertical-align: middle; }
+        .compare-table tr:last-child td { border-bottom: none; }
+        .compare-table td:first-child { font-weight: 500; color: #222; }
+        .compare-table td { text-align: center; }
+        .compare-table td:first-child { text-align: right; }
+        .compare-table tbody tr:hover td { background: #FAFAFA; }
+        .compare-table tbody tr:hover td.col-tori-cell { background: #141414; }
+        .col-tori-cell { background: #0F0F0F; }
+        .cmp-yes { color: #16A34A; font-size: 16px; font-weight: 700; }
+        .cmp-no { color: #DC2626; font-size: 16px; }
+        .cmp-partial { color: #D97706; font-size: 14px; font-weight: 600; }
+
+        /* INTERACTIVE ROI SLIDER */
+        .lp-roi-slider-wrap { margin: 40px 0 36px; }
+        .roi-slider-label { font-size: 14px; color: rgba(255,255,255,0.7); margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+        .roi-slider-val { font-size: 22px; font-weight: 800; color: #25D366; letter-spacing: -1px; }
+        .roi-slider {
+          -webkit-appearance: none; appearance: none; width: 100%; height: 5px;
+          border-radius: 4px; outline: none; cursor: pointer;
+          background: linear-gradient(to left, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.12) 100%);
+        }
+        .roi-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #25D366; box-shadow: 0 2px 8px rgba(37,211,102,0.4); cursor: pointer; transition: transform 0.15s; }
+        .roi-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+        .roi-slider::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: #25D366; border: none; cursor: pointer; }
       `}</style>
 
       {/* WhatsApp chat animation */}
@@ -553,10 +679,35 @@ export default function LandingPage() {
             <a className="lp-nav-link" href="#faq">FAQ</a>
           </div>
           <a className="lp-nav-cta" href="/login">כניסה לדשבורד ←</a>
+          <button id="hamburger-btn" className={`hamburger-btn${menuOpen ? " open" : ""}`} onClick={() => setMenuOpen(o => !o)} aria-label="תפריט">
+            <span /><span /><span />
+          </button>
         </nav>
+        {/* Mobile nav drawer */}
+        <div id="mobile-nav" className={menuOpen ? "open" : ""}>
+          <a className="mobile-nav-link" href="#how" onClick={() => setMenuOpen(false)}>איך זה עובד</a>
+          <a className="mobile-nav-link" href="#features" onClick={() => setMenuOpen(false)}>תכונות</a>
+          <a className="mobile-nav-link" href="#premium" onClick={() => setMenuOpen(false)}>פרמיום</a>
+          <a className="mobile-nav-link" href="#pricing" onClick={() => setMenuOpen(false)}>מחירים</a>
+          <a className="mobile-nav-link" href="#faq" onClick={() => setMenuOpen(false)}>שאלות נפוצות</a>
+          <div className="mobile-nav-divider" />
+          <a className="mobile-nav-cta" href="/login">כניסה לדשבורד ←</a>
+        </div>
 
         {/* HERO — split layout */}
-        <section style={{ background: "#fff", borderBottom: "1px solid #EBEBEB" }}>
+        <section style={{ background: "#fff", borderBottom: "1px solid #EBEBEB", position: "relative" }}>
+          {/* Live notification toast */}
+          <div id="hero-toast">
+            <div className="ht-icon-wrap"><span className="ht-icon">📅</span></div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="ht-msg">תור חדש נקבע</div>
+              <div className="ht-sub">דנה כ. · ✂️ תספורת ב-11:00 מחר</div>
+            </div>
+            <div className="ht-live">
+              <div className="ht-dot" />
+              <span className="ht-live-label">חי</span>
+            </div>
+          </div>
           <div className="lp-hero">
             {/* Left: text */}
             <div className="lp-hero-text">
@@ -1000,27 +1151,57 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ROI / SAVINGS CALCULATOR */}
+        {/* INTERACTIVE ROI CALCULATOR */}
         <section className="lp-roi">
           <div className="lp-roi-inner">
-            <div className="lp-label reveal" style={{ textAlign: "center" }}>חיסכון</div>
-            <div className="lp-title reveal" style={{ color: "#fff", textAlign: "center" }}>כמה שעות ביום תורי חוסך לך?</div>
-            <div className="lp-roi-sub reveal">בסלון ממוצע עם 40 תורים בשבוע</div>
-            <div className="lp-roi-grid reveal">
-              <div className="lp-roi-cell">
-                <div className="lp-roi-n"><span className="count-up accent" data-target={2}>0</span><span className="accent"> שע׳</span></div>
-                <div className="lp-roi-l">ביום חסוכות על תיאום תורים</div>
+            <div className="lp-label reveal" style={{ textAlign: "center" }}>מחשבון חיסכון</div>
+            <div className="lp-title reveal" style={{ color: "#fff", textAlign: "center" }}>כמה תורי שווה לך?</div>
+            <div className="lp-roi-sub reveal">גרור את הסליידר לפי מספר התורים השבועי שלך</div>
+
+            <div className="lp-roi-slider-wrap reveal">
+              <div className="roi-slider-label">
+                <span>תורים בשבוע</span>
+                <span className="roi-slider-val">{appts}</span>
               </div>
-              <div className="lp-roi-cell">
-                <div className="lp-roi-n"><span className="count-up" data-target={80}>0</span><span className="accent">%</span></div>
-                <div className="lp-roi-l">ירידה ב-no-shows עם תזכורות אוטומטיות</div>
-              </div>
-              <div className="lp-roi-cell">
-                <div className="lp-roi-n"><span className="amber">₪</span><span className="count-up" data-target={1200}>0</span></div>
-                <div className="lp-roi-l">הכנסה נוספת ממוצעת בחודש מתורים שלא היו מתקבעים</div>
+              <input
+                type="range" min={5} max={150} step={5} value={appts}
+                className="roi-slider"
+                style={{ background: `linear-gradient(to right, #25D366 0%, #25D366 ${((appts - 5) / 145) * 100}%, rgba(255,255,255,0.15) ${((appts - 5) / 145) * 100}%, rgba(255,255,255,0.15) 100%)` }}
+                onChange={e => setAppts(Number(e.target.value))}
+              />
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 6 }}>
+                <span>5</span><span>150</span>
               </div>
             </div>
-            <div className="lp-roi-note reveal">המחיר: <strong>₪149/חודש</strong>. ה-ROI: מיידי.</div>
+
+            <div className="lp-roi-grid reveal">
+              <div className="lp-roi-cell">
+                <div className="lp-roi-n">
+                  <span className="accent">{(Math.round(appts * 4 / 60 * 10) / 10).toFixed(1)}</span>
+                  <span style={{ fontSize: 20, color: "#25D366", paddingBottom: 4 }}> שע׳</span>
+                </div>
+                <div className="lp-roi-l">שעות חסוכות בשבוע על תיאום ידני</div>
+              </div>
+              <div className="lp-roi-cell">
+                <div className="lp-roi-n">
+                  <span className="accent">{Math.round(appts * 0.15 * 0.8)}</span>
+                  <span style={{ fontSize: 20, color: "#25D366", paddingBottom: 4 }}> ביטולים</span>
+                </div>
+                <div className="lp-roi-l">no-shows פחות בחודש עם תזכורות אוטומטיות</div>
+              </div>
+              <div className="lp-roi-cell">
+                <div className="lp-roi-n">
+                  <span className="amber">₪</span>
+                  <span style={{ color: "#fff" }}>{(Math.round(appts * 0.15 * 0.8) * 180).toLocaleString("he-IL")}</span>
+                </div>
+                <div className="lp-roi-l">הכנסה נוספת ממוצעת בחודש מתורים שנשמרו</div>
+              </div>
+            </div>
+            <div className="lp-roi-note reveal">
+              המחיר: <strong>₪149/חודש</strong> · ROI: כ-<strong>
+                {appts > 10 ? `${Math.round((Math.round(appts * 0.15 * 0.8) * 180) / 149)}x` : "1x"}
+              </strong> תוך החודש הראשון.
+            </div>
           </div>
         </section>
 
@@ -1056,6 +1237,52 @@ export default function LandingPage() {
                 </div>
                 <a className="lp-plan-btn amber" href="/login">התחל ניסיון חינם</a>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* COMPARISON TABLE */}
+        <section className="lp-compare">
+          <div className="lp-compare-inner">
+            <div className="lp-label reveal" style={{ textAlign: "center" }}>השוואה</div>
+            <div className="lp-title reveal" style={{ textAlign: "center" }}>למה תורי ולא משהו אחר?</div>
+            <div className="reveal" style={{ overflowX: "auto" }}>
+              <table className="compare-table">
+                <thead>
+                  <tr>
+                    <th>יכולת</th>
+                    <th className="col-tori"><span className="col-badge">✓</span>תורי</th>
+                    <th>ניהול ידני</th>
+                    <th>מתחרים</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { feat: "זמין 24/7 — גם בשבת", tori: "✓", manual: "✗", other: "✓" },
+                    { feat: "עברית טבעית מלאה", tori: "✓", manual: "✓", other: "⚠ חלקית" },
+                    { feat: "תזכורות WhatsApp אוטומטיות", tori: "✓", manual: "✗", other: "⚠ SMS בתשלום" },
+                    { feat: "סנכרון גוגל קלנדר", tori: "✓", manual: "ידנית", other: "⚠ אפליקציה נפרדת" },
+                    { feat: "הקמה תוך 10 דקות", tori: "✓", manual: "✓", other: "✗ ימים" },
+                    { feat: "ללא הכשרת צוות", tori: "✓", manual: "✓", other: "✗" },
+                    { feat: "מענה שיחות טלפון AI", tori: "✓ פרמיום", manual: "✗", other: "✗" },
+                    { feat: "דשבורד ניהול מלא", tori: "✓", manual: "✗", other: "✓" },
+                    { feat: "ביטול בכל עת", tori: "✓", manual: "—", other: "✗ חוזה" },
+                  ].map((r) => (
+                    <tr key={r.feat}>
+                      <td>{r.feat}</td>
+                      <td className="col-tori-cell">
+                        <span className={r.tori.startsWith("✓") ? "cmp-yes" : "cmp-partial"}>{r.tori}</span>
+                      </td>
+                      <td>
+                        <span className={r.manual === "✓" ? "cmp-yes" : r.manual === "✗" ? "cmp-no" : "cmp-partial"}>{r.manual}</span>
+                      </td>
+                      <td>
+                        <span className={r.other === "✓" ? "cmp-yes" : r.other === "✗" ? "cmp-no" : "cmp-partial"}>{r.other}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </section>
