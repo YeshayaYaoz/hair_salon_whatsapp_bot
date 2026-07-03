@@ -1,11 +1,29 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { AnimationItem } from "lottie-web";
 
 export default function LandingPage() {
   const tiltEl = useRef<HTMLDivElement>(null);
+  const logoRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [appts, setAppts] = useState(40);
+
+  // Lottie logo animation
+  useEffect(() => {
+    if (!logoRef.current) return;
+    let anim: AnimationItem | null = null;
+    import("lottie-web").then((lottie) => {
+      anim = lottie.default.loadAnimation({
+        container: logoRef.current!,
+        renderer: "svg",
+        loop: true,
+        autoplay: true,
+        path: "/logo_animation_black.json",
+      });
+    });
+    return () => anim?.destroy();
+  }, []);
 
   // 3D scroll tilt on product mock
   useEffect(() => {
@@ -280,7 +298,7 @@ export default function LandingPage() {
         .marquee-item strong { color: rgba(255,255,255,0.9); }
 
         /* 3D PRODUCT */
-        .lp-3d-wrap { background: #F8F8F8; padding: 0 24px 100px; overflow: hidden; }
+        .lp-3d-wrap { background: #F8F8F8; padding: 60px 24px 100px; overflow: hidden; position: relative; z-index: 1; }
         .lp-3d-inner { max-width: 1000px; margin: 0 auto; will-change: transform, opacity; transform-origin: center top; transform: perspective(1500px) rotateX(28deg) scale(0.88); opacity: 0.55; }
         .mock { background: #18181B; border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 40px 100px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.04); }
         .mock-titlebar { background: #111; padding: 12px 20px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
@@ -309,7 +327,7 @@ export default function LandingPage() {
         .mock-appt-badge.pending { background: rgba(251,191,36,0.12); color: #FBBF24; }
 
         /* TRUST BAR */
-        .lp-trust { background: #fff; border-top: 1px solid #EBEBEB; border-bottom: 1px solid #EBEBEB; padding: 24px 40px; display: flex; align-items: center; justify-content: center; gap: 44px; flex-wrap: wrap; }
+        .lp-trust { background: #fff; border-top: 1px solid #EBEBEB; border-bottom: 1px solid #EBEBEB; padding: 20px 40px; display: flex; align-items: center; justify-content: center; gap: 32px; flex-wrap: wrap; overflow-x: auto; }
         .lp-trust-label { font-size: 11px; color: #999; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; }
         .lp-trust-items { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         .lp-trust-item { display: flex; align-items: center; gap: 9px; font-size: 13px; color: #222; font-weight: 600; background: #F7F7F7; border: 1px solid #E8E8E8; border-radius: 10px; padding: 8px 16px; transition: border-color 0.15s, box-shadow 0.15s; }
@@ -629,16 +647,16 @@ export default function LandingPage() {
         .compare-table { width: 100%; border-collapse: collapse; margin-top: 52px; border: 1px solid #E8E8E8; border-radius: 14px; overflow: hidden; }
         .compare-table th { padding: 16px 20px; font-size: 13px; font-weight: 700; text-align: center; background: #F8F8F8; border-bottom: 1px solid #EBEBEB; }
         .compare-table th:first-child { text-align: right; width: 44%; }
-        .compare-table th.col-tori { background: #0A0A0A; color: #fff; }
-        .compare-table th.col-tori .col-badge { display: inline-block; background: #25D366; color: #fff; font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 20px; margin-right: 6px; letter-spacing: 0.04em; vertical-align: middle; }
+        .compare-table th.col-tori { background: #1D4ED8; color: #fff; }
+        .compare-table th.col-tori .col-badge { display: inline-block; background: #fff; color: #1D4ED8; font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 20px; margin-right: 6px; letter-spacing: 0.04em; vertical-align: middle; }
         .compare-table td { padding: 14px 20px; font-size: 13.5px; color: #444; border-bottom: 1px solid #F0F0F0; vertical-align: middle; }
         .compare-table tr:last-child td { border-bottom: none; }
         .compare-table td:first-child { font-weight: 500; color: #222; }
         .compare-table td { text-align: center; }
         .compare-table td:first-child { text-align: right; }
         .compare-table tbody tr:hover td { background: #FAFAFA; }
-        .compare-table tbody tr:hover td.col-tori-cell { background: #141414; }
-        .col-tori-cell { background: #0F0F0F; }
+        .compare-table tbody tr:hover td.col-tori-cell { background: #DBEAFE; }
+        .col-tori-cell { background: #EFF6FF; }
         .cmp-yes { color: #16A34A; font-size: 16px; font-weight: 700; }
         .cmp-no { color: #DC2626; font-size: 16px; }
         .cmp-partial { color: #D97706; font-size: 14px; font-weight: 600; }
@@ -671,7 +689,7 @@ export default function LandingPage() {
         {/* NAV */}
         <nav className="lp-nav">
           <a className="lp-nav-logo" href="#">
-            <img src="/tori-logo-black.png" alt="תורי" />
+            <div ref={logoRef} style={{ width: 32, height: 32 }} />
             <span>תורי</span>
           </a>
           <div className="lp-nav-links">
@@ -719,7 +737,7 @@ export default function LandingPage() {
                 WhatsApp · Google Calendar · AI
               </div>
               <h1 className="lp-h1">
-                הסלון שלך קובע תורים<br />
+                העסק שלך קובע תורים<br />
                 <span className="green">גם כשאתה ישן.</span>
               </h1>
               <p className="lp-hero-sub">
@@ -754,33 +772,33 @@ export default function LandingPage() {
                     </div>
                   </div>
                   <div className="phone-chat">
-                    <div className="chat-bubble incoming">
+                    <div className="chat-bubble incoming" style={{ display: "none" }}>
                       שלום, רוצה לקבוע תספורת ביום חמישי
                       <div className="chat-time">21:03 ✓✓</div>
                     </div>
-                    <div className="chat-bubble outgoing">
+                    <div className="chat-bubble outgoing" style={{ display: "none" }}>
                       היי! 😊 ביום חמישי יש לי פנוי ב-9:30, 11:00 ו-14:30. מה מתאים?
                       <div className="chat-time">21:03</div>
                     </div>
-                    <div className="chat-bubble incoming">
+                    <div className="chat-bubble incoming" style={{ display: "none" }}>
                       11:00 בסדר גמור
                       <div className="chat-time">21:04 ✓✓</div>
                     </div>
-                    <div className="chat-typing">
+                    <div className="chat-typing" style={{ display: "none" }}>
                       <div className="typing-dot" /><div className="typing-dot" /><div className="typing-dot" />
                     </div>
-                    <div className="chat-bubble outgoing">
+                    <div className="chat-bubble outgoing" style={{ display: "none" }}>
                       מעולה! קבעתי תספורת ביום חמישי ב-11:00 ✅
                       <div className="chat-time">21:04</div>
                     </div>
-                    <div className="chat-bubble incoming">
+                    <div className="chat-bubble incoming" style={{ display: "none" }}>
                       תודה רבה! 🙏
                       <div className="chat-time">21:04 ✓✓</div>
                     </div>
-                    <div className="chat-typing">
+                    <div className="chat-typing" style={{ display: "none" }}>
                       <div className="typing-dot" /><div className="typing-dot" /><div className="typing-dot" />
                     </div>
-                    <div className="chat-bubble outgoing">
+                    <div className="chat-bubble outgoing" style={{ display: "none" }}>
                       אשלח תזכורת יום לפני. להתראות! 👋
                       <div className="chat-time">21:04</div>
                     </div>
@@ -844,6 +862,26 @@ export default function LandingPage() {
                 <path d="M5 18l3-12h3l-3 12H5zm6 0l3-12h3l-3 12h-3z" fill="white" opacity="0.9"/>
               </svg>
               Railway Cloud
+            </div>
+            {/* OpenAI */}
+            <div className="lp-trust-item">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <rect width="24" height="24" rx="6" fill="#10A37F"/>
+                <path d="M12 4.5a4.5 4.5 0 00-4.5 4.5v1H6a1.5 1.5 0 000 3h.5v3a4.5 4.5 0 009 0v-3H16a1.5 1.5 0 000-3h-1.5V9A4.5 4.5 0 0012 4.5zm0 2a2.5 2.5 0 012.5 2.5v1h-5V9A2.5 2.5 0 0112 6.5zm0 11a2.5 2.5 0 01-2.5-2.5v-3h5v3A2.5 2.5 0 0112 17.5z" fill="white"/>
+              </svg>
+              OpenAI
+            </div>
+            {/* Twilio */}
+            <div className="lp-trust-item">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <rect width="24" height="24" rx="6" fill="#F22F46"/>
+                <circle cx="12" cy="12" r="4" stroke="white" strokeWidth="2" fill="none"/>
+                <circle cx="10" cy="10" r="1.2" fill="white"/>
+                <circle cx="14" cy="10" r="1.2" fill="white"/>
+                <circle cx="10" cy="14" r="1.2" fill="white"/>
+                <circle cx="14" cy="14" r="1.2" fill="white"/>
+              </svg>
+              Twilio SMS
             </div>
           </div>
         </div>
@@ -1022,7 +1060,7 @@ export default function LandingPage() {
         <section className="lp-features" id="features">
           <div className="lp-features-inner">
             <div className="lp-label reveal">מה כלול</div>
-            <div className="lp-title reveal">כל מה שצריך. כלום שלא.</div>
+            <div className="lp-title reveal">כל הכלים שהעסק שלך צריך — ואפס כלים שלא.</div>
             <div className="lp-feats-grid">
               {[
                 { icon: "💬", title: "בוט WhatsApp בעברית", desc: "מבין שפה טבעית, עונה ב-24/7, ומנהל שיחה מתחילה ועד אישור התור.", d: "d1" },
@@ -1046,7 +1084,7 @@ export default function LandingPage() {
         <section className="lp-ba">
           <div className="lp-ba-inner">
             <div className="lp-label reveal">לפני ואחרי</div>
-            <div className="lp-title reveal">מה השתנה לבעלי הסלונים שעברו לתורי.</div>
+            <div className="lp-title reveal">מה השתנה לבעלי העסקים שעברו לתורי.</div>
             <div className="lp-ba-grid">
               <div className="lp-ba-card before reveal d1">
                 <div className="lp-ba-header">
@@ -1096,7 +1134,7 @@ export default function LandingPage() {
         <section className="lp-testi">
           <div className="lp-testi-inner">
             <div className="lp-label reveal">מה אומרים לקוחותינו</div>
-            <div className="lp-title reveal">בעלי עסקים שכבר עובדים עם תורי.</div>
+            <div className="lp-title reveal">בעלי עסקים שכבר עושים את זה עם תורי.</div>
             <div className="lp-testi-grid">
               {[
                 { quote: "לפני תורי הייתי מפספסת הודעות כל הזמן. עכשיו הבוט עונה מיידית ואני מקבלת התראה רק על תורים שנקבעו. חסכתי שעתיים ביום.", name: "דנה כ.", role: "סלון שיער, תל אביב", color: "#8B5CF6", initial: "ד" },
@@ -1201,13 +1239,13 @@ export default function LandingPage() {
                 </div>
                 <div className="lp-roi-l">הכנסה נוספת ממוצעת בחודש מתורים שנשמרו</div>
               </div>
-              <div className="lp-roi-cell" style={{ position: "relative", overflow: "hidden" }}>
-                <div style={{ position: "absolute", top: 8, left: 10, background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 6, padding: "2px 7px", fontSize: 9, color: "#F59E0B", fontWeight: 700, letterSpacing: "0.06em" }}>פרמיום</div>
+              <div className="lp-roi-cell" style={{ position: "relative", overflow: "hidden", border: "1px solid rgba(245,158,11,0.3)", background: "rgba(245,158,11,0.06)" }}>
+                <div style={{ position: "absolute", top: 8, left: 10, background: "rgba(245,158,11,0.2)", border: "1px solid rgba(245,158,11,0.4)", borderRadius: 6, padding: "2px 7px", fontSize: 9, color: "#F59E0B", fontWeight: 700, letterSpacing: "0.06em" }}>פרמיום</div>
                 <div className="lp-roi-n">
                   <span style={{ color: "#F59E0B" }}>₪</span>
-                  <span style={{ color: "#fff" }}>{Math.round(appts * 5 / 60 * 4.3 * 38).toLocaleString("he-IL")}</span>
+                  <span style={{ color: "#fff" }}>{(Math.round(appts * 0.15 * 0.8) * 180 + Math.round(appts * 5 / 60 * 4.3 * 38)).toLocaleString("he-IL")}</span>
                 </div>
-                <div className="lp-roi-l">חיסכון חודשי בעלות עובד שמקבל שיחות — פרמיום</div>
+                <div className="lp-roi-l">סה"כ חיסכון + הכנסה בפרמיום (כולל עובד טלפון)</div>
               </div>
             </div>
             <div className="lp-roi-note reveal">
@@ -1284,7 +1322,7 @@ export default function LandingPage() {
                     <tr key={r.feat}>
                       <td>{r.feat}</td>
                       <td className="col-tori-cell">
-                        <span className={r.tori.startsWith("✓") ? "cmp-yes" : "cmp-partial"}>{r.tori}</span>
+                        <span className={r.tori.startsWith("✓") ? "cmp-yes" : "cmp-partial"} style={{ color: r.tori.startsWith("✓") ? "#1D4ED8" : undefined }}>{r.tori}</span>
                       </td>
                       <td>
                         <span className={r.manual === "✓" ? "cmp-yes" : r.manual === "✗" ? "cmp-no" : "cmp-partial"}>{r.manual}</span>
@@ -1352,7 +1390,7 @@ export default function LandingPage() {
                 <img src="/tori-logo-black.png" alt="תורי" />
                 <span className="lp-footer-brand">תורי</span>
               </div>
-              <div className="lp-footer-tagline">הזמנת תורים חכמה לעסקים קטנים דרך WhatsApp ו-AI.</div>
+              <div className="lp-footer-tagline">קביעת תורים אוטומטית לעסקים קטנים — WhatsApp + AI.</div>
             </div>
             <div className="lp-footer-col">
               <h4>מוצר</h4>
