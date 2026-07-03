@@ -255,23 +255,23 @@ export default function LandingPage() {
         .lp-type-pill { display: flex; align-items: center; gap: 5px; background: #F5F5F5; border: 1px solid #E8E8E8; border-radius: 20px; padding: 5px 12px; font-size: 11.5px; color: #555; font-weight: 500; }
 
         /* PHONE MOCKUP */
-        .lp-hero-phone { animation: fadeUp 0.8s ease 0.4s both; display: flex; justify-content: center; align-items: center; position: relative; z-index: 1; }
-        .phone-wrap { position: relative; width: 295px; filter: drop-shadow(0 32px 64px rgba(0,0,0,0.22)) drop-shadow(0 8px 24px rgba(0,0,0,0.14)); }
+        .lp-hero-phone { animation: fadeUp 0.8s ease 0.4s both; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 0; position: relative; z-index: 1; }
+        .phone-wrap { position: relative; width: 250px; filter: drop-shadow(0 32px 64px rgba(0,0,0,0.22)) drop-shadow(0 8px 24px rgba(0,0,0,0.14)); }
         .phone-frame {
-          width: 295px; background: #111;
-          border-radius: 44px;
-          border: 8px solid #1C1C1E;
+          width: 250px; background: #111;
+          border-radius: 40px;
+          border: 5px solid #1C1C1E;
           outline: 1px solid rgba(255,255,255,0.08);
           overflow: hidden; position: relative;
         }
         /* Side buttons */
         .phone-wrap::before {
-          content: ''; position: absolute; left: -10px; top: 88px;
-          width: 3px; height: 32px; background: #1C1C1E; border-radius: 2px 0 0 2px;
+          content: ''; position: absolute; left: -7px; top: 76px;
+          width: 2px; height: 28px; background: #1C1C1E; border-radius: 2px 0 0 2px;
         }
         .phone-wrap::after {
-          content: ''; position: absolute; right: -10px; top: 104px;
-          width: 3px; height: 52px; background: #1C1C1E; border-radius: 0 2px 2px 0;
+          content: ''; position: absolute; right: -7px; top: 90px;
+          width: 2px; height: 44px; background: #1C1C1E; border-radius: 0 2px 2px 0;
         }
         /* Dynamic island */
         .phone-island { width: 100px; height: 28px; background: #000; border-radius: 0 0 18px 18px; margin: 0 auto; position: relative; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 6px; }
@@ -296,7 +296,7 @@ export default function LandingPage() {
           background-color: #E5DDD5;
           background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cpath d='M10 10 Q30 5 50 10 Q70 15 90 10 Q110 5 120 10' fill='none' stroke='%23C8B9A8' stroke-width='0.5' opacity='0.4'/%3E%3Cpath d='M0 40 Q20 35 40 40 Q60 45 80 40 Q100 35 120 40' fill='none' stroke='%23C8B9A8' stroke-width='0.5' opacity='0.4'/%3E%3Cpath d='M0 70 Q30 65 60 70 Q90 75 120 70' fill='none' stroke='%23C8B9A8' stroke-width='0.5' opacity='0.4'/%3E%3Cpath d='M0 100 Q25 95 50 100 Q75 105 100 100' fill='none' stroke='%23C8B9A8' stroke-width='0.5' opacity='0.4'/%3E%3C/svg%3E");
           padding: 10px 10px 6px; display: flex; flex-direction: column; gap: 3px;
-          height: 380px; overflow-y: auto; scroll-behavior: smooth;
+          height: 322px; overflow-y: auto; scroll-behavior: smooth;
         }
         .phone-chat::-webkit-scrollbar { display: none; }
         .phone-chat { scrollbar-width: none; }
@@ -716,7 +716,7 @@ export default function LandingPage() {
 
         /* HERO NOTIFICATION TOAST */
         #hero-toast {
-          position: absolute; bottom: 40px; left: 40px; z-index: 20;
+          margin-top: 20px;
           background: #fff; border: 1px solid #E8E8E8; border-radius: 14px;
           padding: 12px 16px; display: flex; align-items: center; gap: 12px;
           box-shadow: 0 8px 30px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.06);
@@ -812,18 +812,6 @@ export default function LandingPage() {
 
         {/* HERO — split layout */}
         <section style={{ background: "#fff", position: "relative" }}>
-          {/* Live notification toast */}
-          <div id="hero-toast">
-            <div className="ht-icon-wrap"><span className="ht-icon">📅</span></div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="ht-msg">תור חדש נקבע</div>
-              <div className="ht-sub">דנה כ. · ✂️ תספורת ב-11:00 מחר</div>
-            </div>
-            <div className="ht-live">
-              <div className="ht-dot" />
-              <span className="ht-live-label">חי</span>
-            </div>
-          </div>
           <div className="lp-hero">
             {/* Left: text */}
             <div className="lp-hero-text">
@@ -920,6 +908,18 @@ export default function LandingPage() {
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
                     </div>
                   </div>
+                </div>
+              </div>
+              {/* Live notification toast — below phone */}
+              <div id="hero-toast">
+                <div className="ht-icon-wrap"><span className="ht-icon">📅</span></div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="ht-msg">תור חדש נקבע</div>
+                  <div className="ht-sub">דנה כ. · ✂️ תספורת ב-11:00 מחר</div>
+                </div>
+                <div className="ht-live">
+                  <div className="ht-dot" />
+                  <span className="ht-live-label">חי</span>
                 </div>
               </div>
             </div>
