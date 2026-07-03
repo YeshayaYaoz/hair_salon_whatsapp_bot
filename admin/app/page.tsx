@@ -1,831 +1,564 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 export default function LandingPage() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    // Intersection observer for step/feature reveals
+    const els = document.querySelectorAll(".reveal");
+    const obs = new IntersectionObserver(
+      (entries) => entries.forEach((e) => { if (e.isIntersecting) { (e.target as HTMLElement).style.opacity = "1"; (e.target as HTMLElement).style.transform = "none"; } }),
+      { threshold: 0.12 }
+    );
+    els.forEach((el) => obs.observe(el));
+    return () => obs.disconnect();
+  }, []);
+
   return (
     <>
       <style>{`
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        :root {
-          --ivory:      #EEEAE4;
-          --ivory-dark: #E4E0D8;
-          --ink:        #141410;
-          --ink-mid:    #58584E;
-          --ink-dim:    #9A9A8C;
-          --forest:     #0C2018;
-          --forest-mid: #142E1E;
-          --green:      #25D366;
-          --green-dim:  #1A9448;
-          --border:     #D8D4CC;
-        }
-        html { scroll-behavior: smooth; }
-        .lp-root {
-          background: var(--ivory);
-          color: var(--ink);
-          font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
-          font-size: 16px;
-          line-height: 1.5;
+
+        .lp {
+          background: #fff;
+          color: #111;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
           direction: rtl;
           -webkit-font-smoothing: antialiased;
-          min-height: 100vh;
         }
+
+        /* NAV */
         .lp-nav {
           position: fixed;
-          inset-block-start: 0;
-          inset-inline: 0;
-          z-index: 200;
-          height: 60px;
+          top: 0; left: 0; right: 0;
+          z-index: 100;
+          height: 64px;
+          background: rgba(255,255,255,0.92);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border-bottom: 1px solid #EBEBEB;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 0 48px;
-          background: var(--ivory);
-          border-bottom: 1px solid var(--border);
+          padding: 0 40px;
         }
-        .lp-logo {
-          font-family: Georgia, 'Times New Roman', serif;
-          font-size: 22px;
-          font-style: italic;
-          font-weight: bold;
-          color: var(--ink);
-          letter-spacing: -0.5px;
-          text-decoration: none;
-        }
-        .lp-nav-right {
-          display: flex;
-          align-items: center;
-          gap: 20px;
-        }
-        .lp-nav-link {
-          font-size: 13px;
-          color: var(--ink-mid);
-          text-decoration: none;
-          transition: color 0.15s;
-        }
-        .lp-nav-link:hover { color: var(--ink); }
-        .btn-sharp {
-          background: var(--forest);
-          color: #fff;
-          border: none;
-          padding: 10px 22px;
-          font-size: 13px;
-          font-weight: 700;
-          cursor: pointer;
-          letter-spacing: 0.03em;
-          border-radius: 0;
-          transition: background 0.15s;
-          text-decoration: none;
-          display: inline-block;
-        }
-        .btn-sharp:hover { background: var(--forest-mid); }
-        .lp-hero {
-          min-height: 100vh;
-          padding-top: 60px;
-          display: grid;
-          grid-template-columns: 55fr 45fr;
-          max-width: 1300px;
-          margin: 0 auto;
-        }
-        .lp-hero-copy {
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          padding: 80px 60px 80px 80px;
-        }
-        .eyebrow {
-          font-family: 'Courier New', Courier, monospace;
-          font-size: 11px;
-          letter-spacing: 0.14em;
-          color: var(--green-dim);
-          text-transform: uppercase;
-          margin-bottom: 28px;
+        .lp-nav-logo {
           display: flex;
           align-items: center;
           gap: 10px;
+          text-decoration: none;
         }
-        .eyebrow::before {
-          content: '';
-          width: 24px;
-          height: 1px;
-          background: var(--green-dim);
-          display: inline-block;
-          flex-shrink: 0;
+        .lp-nav-logo img {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
         }
-        .lp-h1 {
-          font-family: Georgia, 'Times New Roman', serif;
-          font-style: italic;
-          font-weight: bold;
-          font-size: clamp(48px, 5.5vw, 80px);
-          line-height: 1.02;
-          letter-spacing: -2.5px;
-          color: var(--ink);
-          text-wrap: balance;
-          margin-bottom: 24px;
-        }
-        .lp-h1 em {
-          font-style: normal;
-          color: var(--forest);
-        }
-        .hero-sub {
+        .lp-nav-logo-text {
           font-size: 17px;
-          line-height: 1.75;
-          color: var(--ink-mid);
-          max-width: 420px;
-          margin-bottom: 44px;
+          font-weight: 700;
+          color: #111;
+          letter-spacing: -0.3px;
         }
-        .hero-actions {
+        .lp-nav-actions {
           display: flex;
           align-items: center;
-          gap: 28px;
-          flex-wrap: wrap;
+          gap: 12px;
         }
-        .btn-green {
-          background: var(--green);
-          color: var(--forest);
-          border: none;
-          padding: 14px 30px;
+        .lp-btn-ghost {
           font-size: 14px;
-          font-weight: 800;
-          cursor: pointer;
-          border-radius: 0;
-          letter-spacing: 0.02em;
-          transition: opacity 0.15s;
+          font-weight: 500;
+          color: #444;
           text-decoration: none;
-          display: inline-block;
+          padding: 8px 16px;
+          border-radius: 8px;
+          transition: background 0.15s;
         }
-        .btn-green:hover { opacity: 0.88; }
-        .ghost-link {
+        .lp-btn-ghost:hover { background: #F5F5F5; }
+        .lp-btn-primary {
           font-size: 14px;
-          color: var(--ink-mid);
-          text-decoration: none;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          transition: color 0.15s;
-        }
-        .ghost-link:hover { color: var(--ink); }
-        .ghost-link::after { content: '←'; font-size: 13px; }
-        .lp-hero-visual {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 80px 60px;
-          border-right: 1px solid var(--border);
-        }
-        .phone {
-          width: 268px;
-          border: 2px solid var(--ink);
-          border-radius: 36px;
-          overflow: hidden;
-          box-shadow: 9px 9px 0 var(--ink);
-          position: relative;
-          z-index: 1;
-        }
-        .phone-notch {
-          position: absolute;
-          top: 0; left: 50%; transform: translateX(-50%);
-          width: 80px; height: 26px;
-          background: var(--ink);
-          border-radius: 0 0 16px 16px;
-          z-index: 2;
-        }
-        .phone-header {
-          background: #075E54;
-          padding: 30px 14px 12px;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-        .phone-avatar {
-          width: 34px; height: 34px;
-          border-radius: 50%;
-          background: var(--green);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-family: Georgia, serif;
-          font-style: italic;
-          font-weight: bold;
-          font-size: 14px;
+          font-weight: 600;
           color: #fff;
-          flex-shrink: 0;
+          background: #111;
+          text-decoration: none;
+          padding: 9px 20px;
+          border-radius: 8px;
+          transition: opacity 0.15s;
         }
-        .phone-info { flex: 1; }
-        .phone-name { font-size: 13px; font-weight: 600; color: #fff; }
-        .phone-online { font-size: 10px; color: rgba(255,255,255,0.6); }
-        .phone-body {
-          background: #E5DDD5;
-          min-height: 340px;
-          padding: 14px 10px;
+        .lp-btn-primary:hover { opacity: 0.82; }
+
+        /* HERO */
+        .lp-hero {
+          padding-top: 64px;
+          min-height: 100vh;
           display: flex;
           flex-direction: column;
-          gap: 6px;
-        }
-        .bbl {
-          max-width: 80%;
-          padding: 7px 11px;
-          font-size: 12.5px;
-          line-height: 1.5;
-          border-radius: 7px;
-          opacity: 0;
-          transform: translateY(5px);
-          transition: opacity 0.28s ease, transform 0.28s ease;
-          direction: rtl;
-        }
-        .bbl.show { opacity: 1; transform: none; }
-        .bbl.recv { background: #fff; align-self: flex-end; border-bottom-right-radius: 2px; color: #111; }
-        .bbl.sent { background: #DCF8C6; align-self: flex-start; border-bottom-left-radius: 2px; color: #111; }
-        .bbl-ts { font-size: 9px; color: #aaa; margin-top: 2px; direction: ltr; }
-        .stats-row {
-          display: flex;
-          border-top: 1px solid var(--border);
-          border-bottom: 1px solid var(--border);
-        }
-        .stat-cell {
-          flex: 1;
-          padding: 36px 52px;
-          border-left: 1px solid var(--border);
-        }
-        .stat-cell:last-child { border-left: none; }
-        .stat-n {
-          font-family: Georgia, serif;
-          font-style: italic;
-          font-size: 48px;
-          font-weight: bold;
-          letter-spacing: -3px;
-          line-height: 1;
-          color: var(--ink);
-          font-variant-numeric: tabular-nums;
-          margin-bottom: 4px;
-        }
-        .stat-n span { font-size: 24px; letter-spacing: -1px; }
-        .stat-l { font-size: 13px; color: var(--ink-mid); }
-        .lp-dark {
-          background: var(--forest);
-          color: #fff;
-        }
-        .dark-inner {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 96px 80px;
-          display: grid;
-          grid-template-columns: 5fr 7fr;
-          gap: 96px;
-          align-items: start;
-        }
-        .dark-label {
-          font-family: 'Courier New', monospace;
-          font-size: 11px;
-          letter-spacing: 0.14em;
-          color: var(--green);
-          text-transform: uppercase;
-          margin-bottom: 24px;
-          display: flex;
           align-items: center;
-          gap: 10px;
+          justify-content: center;
+          text-align: center;
+          padding-left: 24px;
+          padding-right: 24px;
+          background: #fff;
         }
-        .dark-label::before {
-          content: '';
-          width: 24px; height: 1px;
-          background: var(--green);
-          flex-shrink: 0;
+        .lp-hero-kicker {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: #F0FFF4;
+          border: 1px solid #C6F6D5;
+          color: #276749;
+          font-size: 12px;
+          font-weight: 600;
+          padding: 5px 12px;
+          border-radius: 20px;
+          margin-bottom: 28px;
+          letter-spacing: 0.02em;
         }
-        .dark-title {
-          font-family: Georgia, serif;
-          font-style: italic;
-          font-weight: bold;
-          font-size: clamp(34px, 3.5vw, 52px);
-          line-height: 1.08;
-          letter-spacing: -1.5px;
-          color: #fff;
-          text-wrap: balance;
-        }
-        .feat-list { display: flex; flex-direction: column; }
-        .feat {
-          padding: 22px 0;
-          border-bottom: 1px solid rgba(255,255,255,0.07);
-          display: grid;
-          grid-template-columns: 6px 1fr;
-          gap: 16px;
-          align-items: start;
-          opacity: 0;
-          transform: translateY(10px);
-          transition: opacity 0.4s ease, transform 0.4s ease;
-        }
-        .feat:first-child { border-top: 1px solid rgba(255,255,255,0.07); }
-        .feat.show { opacity: 1; transform: none; }
-        .feat-dot {
+        .lp-hero-kicker-dot {
           width: 6px; height: 6px;
           border-radius: 50%;
-          background: var(--green);
-          margin-top: 8px;
-          flex-shrink: 0;
+          background: #25D366;
         }
-        .feat-title { font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 3px; }
-        .feat-desc { font-size: 13px; color: rgba(255,255,255,0.45); line-height: 1.6; }
-        .lp-voice {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 96px 80px;
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 80px;
-          align-items: center;
+        .lp-h1 {
+          font-size: clamp(40px, 6vw, 72px);
+          font-weight: 800;
+          line-height: 1.05;
+          letter-spacing: -2.5px;
+          color: #0A0A0A;
+          max-width: 800px;
+          margin: 0 auto 20px;
         }
-        .section-label {
-          font-family: 'Courier New', monospace;
-          font-size: 11px;
-          letter-spacing: 0.14em;
-          color: var(--ink-dim);
-          text-transform: uppercase;
-          margin-bottom: 20px;
+        .lp-h1 .accent { color: #25D366; }
+        .lp-hero-sub {
+          font-size: clamp(16px, 2vw, 19px);
+          color: #555;
+          line-height: 1.7;
+          max-width: 520px;
+          margin: 0 auto 40px;
+          font-weight: 400;
+        }
+        .lp-hero-ctas {
           display: flex;
           align-items: center;
-          gap: 10px;
-        }
-        .section-label::before {
-          content: '';
-          width: 24px; height: 1px;
-          background: var(--ink-dim);
-          flex-shrink: 0;
-        }
-        .lp-h2 {
-          font-family: Georgia, serif;
-          font-style: italic;
-          font-weight: bold;
-          font-size: clamp(30px, 3vw, 46px);
-          line-height: 1.08;
-          letter-spacing: -1.5px;
-          color: var(--ink);
-          text-wrap: balance;
-          margin-bottom: 18px;
-        }
-        .body-text { font-size: 16px; color: var(--ink-mid); line-height: 1.75; margin-bottom: 32px; }
-        .transcript-card {
-          background: var(--ivory-dark);
-          border: 1px solid var(--border);
-          border-top: 3px solid var(--ink);
-          padding: 28px;
-        }
-        .tc-header {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding-bottom: 18px;
-          border-bottom: 1px solid var(--border);
-          margin-bottom: 20px;
-        }
-        .live-dot {
-          width: 8px; height: 8px;
-          border-radius: 50%;
-          background: var(--green);
-          animation: blink 2s infinite;
-          flex-shrink: 0;
-        }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-        .tc-title { font-size: 12px; font-weight: 600; color: var(--ink); }
-        .tc-duration { font-size: 11px; color: var(--ink-dim); font-family: 'Courier New', monospace; margin-right: auto; }
-        .tc-lines { display: flex; flex-direction: column; gap: 14px; }
-        .tc-line { font-size: 13px; line-height: 1.55; }
-        .tc-speaker {
-          font-family: 'Courier New', monospace;
-          font-size: 9.5px;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          margin-bottom: 2px;
-        }
-        .tc-speaker.caller { color: var(--ink-dim); }
-        .tc-speaker.ai { color: var(--green-dim); }
-        .tc-line.caller-line { color: var(--ink-mid); }
-        .tc-line.ai-line { color: var(--ink); font-weight: 500; }
-        .tc-line {
-          opacity: 0;
-          transform: translateX(6px);
-          transition: opacity 0.35s, transform 0.35s;
-        }
-        .tc-line.show { opacity: 1; transform: none; }
-        .cal-strip {
-          background: var(--forest);
-          color: #fff;
-          padding: 64px 80px;
-          display: flex;
-          align-items: center;
-          gap: 64px;
+          gap: 12px;
           justify-content: center;
+          flex-wrap: wrap;
+          margin-bottom: 64px;
         }
-        .cal-copy { max-width: 380px; }
-        .cal-label {
-          font-family: 'Courier New', monospace;
-          font-size: 11px;
-          letter-spacing: 0.14em;
-          color: var(--green);
-          text-transform: uppercase;
-          margin-bottom: 16px;
-        }
-        .cal-title {
-          font-family: Georgia, serif;
-          font-style: italic;
-          font-size: 28px;
-          font-weight: bold;
-          letter-spacing: -1px;
-          line-height: 1.1;
+        .lp-cta-green {
+          background: #25D366;
           color: #fff;
+          font-size: 15px;
+          font-weight: 700;
+          padding: 13px 28px;
+          border-radius: 10px;
+          text-decoration: none;
+          transition: opacity 0.15s, transform 0.15s;
+          display: inline-block;
+          letter-spacing: -0.1px;
+        }
+        .lp-cta-green:hover { opacity: 0.88; transform: translateY(-1px); }
+        .lp-cta-outline {
+          background: transparent;
+          color: #333;
+          font-size: 15px;
+          font-weight: 500;
+          padding: 13px 24px;
+          border-radius: 10px;
+          border: 1px solid #DDD;
+          text-decoration: none;
+          transition: border-color 0.15s, background 0.15s;
+          display: inline-block;
+        }
+        .lp-cta-outline:hover { border-color: #999; background: #FAFAFA; }
+
+        /* VIDEO FRAME */
+        .lp-video-frame {
+          width: 100%;
+          max-width: 420px;
+          margin: 0 auto;
+          border-radius: 20px;
+          overflow: hidden;
+          border: 1px solid #E8E8E8;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.05);
+          background: #000;
+        }
+        .lp-video-frame video {
+          width: 100%;
+          display: block;
+        }
+
+        /* LOGOS / TRUST */
+        .lp-trust {
+          background: #FAFAFA;
+          border-top: 1px solid #EBEBEB;
+          border-bottom: 1px solid #EBEBEB;
+          padding: 22px 40px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 48px;
+          flex-wrap: wrap;
+        }
+        .lp-trust-label {
+          font-size: 12px;
+          color: #999;
+          font-weight: 500;
+          white-space: nowrap;
+        }
+        .lp-trust-items {
+          display: flex;
+          align-items: center;
+          gap: 32px;
+          flex-wrap: wrap;
+        }
+        .lp-trust-item {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          font-size: 13px;
+          color: #555;
+          font-weight: 500;
+        }
+        .lp-trust-icon {
+          width: 18px;
+          height: 18px;
+          flex-shrink: 0;
+        }
+
+        /* STEPS */
+        .lp-steps {
+          padding: 100px 40px;
+          max-width: 1080px;
+          margin: 0 auto;
+        }
+        .lp-section-label {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: #25D366;
           margin-bottom: 12px;
         }
-        .cal-desc { font-size: 14px; color: rgba(255,255,255,0.5); line-height: 1.65; }
-        .cal-mock {
-          background: #fff;
-          border: 2px solid rgba(255,255,255,0.15);
-          width: 260px;
-          flex-shrink: 0;
-          box-shadow: 6px 6px 0 rgba(255,255,255,0.1);
+        .lp-section-title {
+          font-size: clamp(28px, 3.5vw, 44px);
+          font-weight: 800;
+          letter-spacing: -1.5px;
+          color: #0A0A0A;
+          margin-bottom: 56px;
+          line-height: 1.1;
         }
-        .cal-hdr {
-          background: #1A73E8;
-          padding: 10px 14px;
+        .lp-steps-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 2px;
+          border: 1px solid #EBEBEB;
+          border-radius: 14px;
+          overflow: hidden;
+        }
+        .lp-step {
+          padding: 40px 36px;
+          background: #fff;
+          border-left: 1px solid #EBEBEB;
+          opacity: 0;
+          transform: translateY(16px);
+          transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+        .lp-step:last-child { border-left: none; }
+        .lp-step-num {
+          font-size: 13px;
+          font-weight: 700;
+          color: #25D366;
+          font-variant-numeric: tabular-nums;
+          margin-bottom: 20px;
+          letter-spacing: 0.05em;
+        }
+        .lp-step-title {
+          font-size: 17px;
+          font-weight: 700;
+          color: #111;
+          margin-bottom: 10px;
+          letter-spacing: -0.3px;
+          line-height: 1.3;
+        }
+        .lp-step-desc {
+          font-size: 14px;
+          color: #666;
+          line-height: 1.7;
+        }
+
+        /* FEATURES */
+        .lp-features {
+          background: #F8F8F8;
+          border-top: 1px solid #EBEBEB;
+          border-bottom: 1px solid #EBEBEB;
+          padding: 100px 40px;
+        }
+        .lp-features-inner {
+          max-width: 1080px;
+          margin: 0 auto;
+        }
+        .lp-features-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 24px;
+          margin-top: 56px;
+        }
+        .lp-feat {
+          background: #fff;
+          border: 1px solid #E8E8E8;
+          border-radius: 12px;
+          padding: 28px 26px;
+          opacity: 0;
+          transform: translateY(16px);
+          transition: opacity 0.45s ease, transform 0.45s ease;
+        }
+        .lp-feat-icon {
+          width: 40px;
+          height: 40px;
+          border-radius: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 16px;
+          font-size: 18px;
+          background: #F0FFF4;
+        }
+        .lp-feat-title {
+          font-size: 15px;
+          font-weight: 700;
+          color: #111;
+          margin-bottom: 6px;
+          letter-spacing: -0.2px;
+        }
+        .lp-feat-desc {
+          font-size: 13px;
+          color: #666;
+          line-height: 1.65;
+        }
+
+        /* CTA STRIP */
+        .lp-cta-strip {
+          background: #0A0A0A;
+          padding: 96px 40px;
+          text-align: center;
+        }
+        .lp-cta-strip-title {
+          font-size: clamp(28px, 4vw, 52px);
+          font-weight: 800;
+          color: #fff;
+          letter-spacing: -2px;
+          margin-bottom: 12px;
+          line-height: 1.1;
+        }
+        .lp-cta-strip-sub {
+          font-size: 16px;
+          color: rgba(255,255,255,0.45);
+          margin-bottom: 36px;
+          font-weight: 400;
+        }
+
+        /* FOOTER */
+        .lp-footer {
+          background: #0A0A0A;
+          border-top: 1px solid rgba(255,255,255,0.07);
+          padding: 24px 40px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+        .lp-footer-left {
           display: flex;
           align-items: center;
           gap: 8px;
         }
-        .cal-hdr-dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; opacity: 0.9; }
-        .cal-hdr-text { font-size: 11px; font-weight: 600; color: #fff; }
-        .cal-body { padding: 12px; direction: rtl; }
-        .cal-days-hdr {
-          display: grid;
-          grid-template-columns: repeat(7, 1fr);
-          gap: 2px;
-          margin-bottom: 4px;
-        }
-        .cal-dh { text-align: center; font-size: 9px; font-weight: 600; color: #70757A; padding: 2px; }
-        .cal-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-        .cal-d {
-          aspect-ratio: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 11px;
-          color: #3C4043;
-          border-radius: 50%;
-          position: relative;
-        }
-        .cal-d.today { background: #1A73E8; color: #fff; font-weight: 700; }
-        .cal-d.has::after {
-          content: '';
-          position: absolute;
-          bottom: 1px;
-          width: 3px; height: 3px;
-          background: #34A853;
-          border-radius: 50%;
-        }
-        .cal-event {
-          margin: 2px 8px 3px;
-          padding: 4px 7px;
-          border-radius: 3px;
-          font-size: 10px;
-          font-weight: 600;
-          direction: rtl;
-        }
-        .cal-event.green { background: #E6F4EA; color: #1E8E3E; }
-        .cal-event.blue { background: #E8F0FE; color: #1A73E8; }
-        .cal-event-new {
-          margin: 4px 8px 10px;
-          padding: 6px 7px;
-          border: 1px dashed #1A73E8;
-          border-radius: 3px;
-          font-size: 10px;
-          color: #1A73E8;
-          direction: rtl;
-          display: flex;
-          align-items: center;
-          gap: 5px;
-          animation: slideIn 0.5s ease 2s both;
-        }
-        @keyframes slideIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-        .new-dot { width: 5px; height: 5px; border-radius: 50%; background: #1A73E8; flex-shrink: 0; animation: blink 2s infinite; }
-        .lp-cta {
-          background: var(--ink);
-          padding: 100px 80px;
-          text-align: center;
-        }
-        .lp-cta .lp-h2 {
-          font-family: Georgia, serif;
-          font-style: italic;
-          font-size: clamp(36px, 5vw, 64px);
-          font-weight: bold;
-          letter-spacing: -2.5px;
-          color: #fff;
-          text-wrap: balance;
-          margin-bottom: 14px;
-        }
-        .cta-sub { font-size: 16px; color: rgba(255,255,255,0.45); margin-bottom: 40px; }
-        .btn-cta-green {
-          background: var(--green);
-          color: var(--forest);
-          border: none;
-          padding: 16px 38px;
-          font-size: 15px;
-          font-weight: 800;
-          cursor: pointer;
-          border-radius: 0;
-          letter-spacing: 0.02em;
-          transition: opacity 0.15s;
-          display: inline-block;
-          text-decoration: none;
-        }
-        .btn-cta-green:hover { opacity: 0.88; }
-        .lp-footer {
-          background: var(--ink);
-          border-top: 1px solid rgba(255,255,255,0.07);
-          padding: 22px 80px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        .footer-logo { font-family: Georgia, serif; font-style: italic; font-weight: bold; font-size: 18px; color: #fff; letter-spacing: -0.5px; }
-        .footer-copy { font-size: 12px; color: rgba(255,255,255,0.3); }
-        @media (max-width: 900px) {
+        .lp-footer-left img { width: 24px; height: 24px; border-radius: 6px; opacity: 0.7; }
+        .lp-footer-brand { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.5); }
+        .lp-footer-copy { font-size: 12px; color: rgba(255,255,255,0.25); }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
           .lp-nav { padding: 0 20px; }
-          .lp-hero { grid-template-columns: 1fr; min-height: auto; }
-          .lp-hero-copy { padding: 56px 20px 40px; }
-          .lp-hero-visual { display: none; }
-          .stats-row { flex-direction: column; }
-          .stat-cell { border-left: none; border-bottom: 1px solid var(--border); padding: 24px 20px; }
-          .dark-inner { grid-template-columns: 1fr; padding: 60px 20px; gap: 48px; }
-          .lp-voice { grid-template-columns: 1fr; padding: 60px 20px; gap: 48px; }
-          .cal-strip { flex-direction: column; padding: 60px 20px; gap: 40px; }
-          .cal-mock { width: 100%; max-width: 300px; }
-          .lp-cta { padding: 72px 20px; }
-          .lp-footer { padding: 20px; flex-direction: column; gap: 8px; text-align: center; }
+          .lp-nav-logo-text { display: none; }
+          .lp-steps-grid { grid-template-columns: 1fr; border-radius: 12px; }
+          .lp-step { border-left: none; border-bottom: 1px solid #EBEBEB; }
+          .lp-step:last-child { border-bottom: none; }
+          .lp-features-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+          .lp-steps { padding: 72px 20px; }
+          .lp-features { padding: 72px 20px; }
+          .lp-cta-strip { padding: 72px 20px; }
+          .lp-footer { padding: 20px; flex-direction: column; gap: 8px; }
+          .lp-trust { padding: 20px; gap: 16px; }
+        }
+        @media (max-width: 480px) {
+          .lp-features-grid { grid-template-columns: 1fr; }
         }
         @media (prefers-reduced-motion: reduce) {
-          *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+          .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
         }
       `}</style>
 
-      <div className="lp-root">
-      {/* NAV */}
-      <nav className="lp-nav">
-        <a className="lp-logo" href="#">תורי</a>
-        <div className="lp-nav-right">
-          <a className="lp-nav-link" href="#features">תכונות</a>
-          <a className="btn-sharp" href="/login">כניסה לדשבורד</a>
-        </div>
-      </nav>
+      <div className="lp">
+        {/* NAV */}
+        <nav className="lp-nav">
+          <a className="lp-nav-logo" href="#">
+            <img src="/tori-logo-black.png" alt="תורי" />
+            <span className="lp-nav-logo-text">תורי</span>
+          </a>
+          <div className="lp-nav-actions">
+            <a className="lp-btn-ghost" href="#how">איך זה עובד</a>
+            <a className="lp-btn-primary" href="/login">כניסה לדשבורד ←</a>
+          </div>
+        </nav>
 
-      {/* HERO */}
-      <section className="lp-hero">
-        <div className="lp-hero-copy">
-          <div className="eyebrow">בוט הזמנות חכם לסלונים וקליניקות</div>
+        {/* HERO */}
+        <section className="lp-hero">
+          <div className="lp-hero-kicker">
+            <span className="lp-hero-kicker-dot" />
+            מחובר ל-WhatsApp ול-Google Calendar
+          </div>
           <h1 className="lp-h1">
-            הסלון שלך<br />
-            <em>עונה לבד.</em>
+            הסלון שלך מקבל תורים<br />
+            <span className="accent">בזמן שאתה עובד.</span>
           </h1>
-          <p className="hero-sub">
-            לקוח שולח הודעה בוואטסאפ — הבוט עונה, מציע זמנים, קובע תור.
-            גוגל קלנדר מתעדכן. הכל קורה בלי שנגעת בטלפון.
+          <p className="lp-hero-sub">
+            בוט AI מנהל את ההזמנות דרך WhatsApp — עונה, מציע זמנים, קובע, שולח תזכורות.
+            כל תור מסתנכרן ישירות לגוגל קלנדר שלך.
           </p>
-          <div className="hero-actions">
-            <a className="btn-green" href="/login">התחל בחינם</a>
-            <a className="ghost-link" href="#features">ראה איך זה עובד</a>
+          <div className="lp-hero-ctas">
+            <a className="lp-cta-green" href="/login">התחל בחינם</a>
+            <a className="lp-cta-outline" href="#how">ראה איך זה עובד</a>
           </div>
-        </div>
 
-        <div className="lp-hero-visual">
-          <div className="phone-wrap" style={{ position: 'relative' }}>
-            <div className="phone">
-              <div className="phone-notch"></div>
-              <div className="phone-header">
-                <div className="phone-avatar">ת</div>
-                <div className="phone-info">
-                  <div className="phone-name">תורי — עוזר חכם</div>
-                  <div className="phone-online">מחובר</div>
-                </div>
-              </div>
-              <div className="phone-body" id="phoneBody"></div>
+          {/* Logo / Brand video */}
+          <div className="lp-video-frame">
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              loop
+              playsInline
+              style={{ background: "#000" }}
+            >
+              <source src="/logo_animation_black.mp4" type="video/mp4" />
+            </video>
+          </div>
+        </section>
+
+        {/* TRUST BAR */}
+        <div className="lp-trust">
+          <span className="lp-trust-label">עובד עם הכלים שאתה כבר משתמש בהם</span>
+          <div className="lp-trust-items">
+            <div className="lp-trust-item">
+              <svg className="lp-trust-icon" viewBox="0 0 24 24" fill="none">
+                <path d="M17.6 6.31a7.97 7.97 0 00-5.6-2.31A8 8 0 004 12a8 8 0 008 8 7.97 7.97 0 006.63-3.54l-1.58-1.11A5.97 5.97 0 0112 18a6 6 0 010-12c1.53 0 2.93.58 3.98 1.52L13 10.5h6V4.5l-1.4 1.81z" fill="#25D366"/>
+              </svg>
+              WhatsApp Business
+            </div>
+            <div className="lp-trust-item">
+              <svg className="lp-trust-icon" viewBox="0 0 24 24">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+              </svg>
+              Google Calendar
+            </div>
+            <div className="lp-trust-item">
+              <svg className="lp-trust-icon" viewBox="0 0 24 24" fill="none" stroke="#6366F1" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              דשבורד ניהול
+            </div>
+            <div className="lp-trust-item">
+              <svg className="lp-trust-icon" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+              </svg>
+              תזכורות אוטומטיות
             </div>
           </div>
         </div>
-      </section>
 
-      {/* STATS */}
-      <div className="stats-row">
-        <div className="stat-cell">
-          <div className="stat-n">24<span>/7</span></div>
-          <div className="stat-l">זמין לקבלת תורים</div>
+        {/* HOW IT WORKS */}
+        <section className="lp-steps" id="how">
+          <div className="lp-section-label">תהליך</div>
+          <div className="lp-section-title">שלושה צעדים. הכל קורה לבד.</div>
+          <div className="lp-steps-grid">
+            <div className="lp-step reveal">
+              <div className="lp-step-num">01</div>
+              <div className="lp-step-title">לקוח שולח הודעה ב-WhatsApp</div>
+              <div className="lp-step-desc">הלקוח כותב לסלון בשפה רגילה — "רוצה תספורת ביום חמישי". הבוט מבין ועונה תוך שנייה.</div>
+            </div>
+            <div className="lp-step reveal">
+              <div className="lp-step-num">02</div>
+              <div className="lp-step-title">הבוט מציע זמנים ומאשר</div>
+              <div className="lp-step-desc">הבוט בודק את היומן הפנוי, מציע מועדים, מקבל אישור — וקובע את התור. בלי שנגעת בטלפון.</div>
+            </div>
+            <div className="lp-step reveal">
+              <div className="lp-step-num">03</div>
+              <div className="lp-step-title">גוגל קלנדר מתעדכן אוטומטית</div>
+              <div className="lp-step-desc">כל תור שנקבע מופיע מיידית בגוגל קלנדר שלך עם שם הלקוח, השירות, ושעת הסיום.</div>
+            </div>
+          </div>
+        </section>
+
+        {/* FEATURES */}
+        <section className="lp-features">
+          <div className="lp-features-inner">
+            <div className="lp-section-label">מה כלול</div>
+            <div className="lp-section-title">כל מה שסלון או קליניקה צריכים.</div>
+            <div className="lp-features-grid">
+              <div className="lp-feat reveal">
+                <div className="lp-feat-icon">💬</div>
+                <div className="lp-feat-title">בוט WhatsApp בעברית</div>
+                <div className="lp-feat-desc">מבין שפה טבעית, עונה ב-24/7, ומנהל שיחה אמיתית עם הלקוח מתחילה ועד אישור התור.</div>
+              </div>
+              <div className="lp-feat reveal">
+                <div className="lp-feat-icon">📅</div>
+                <div className="lp-feat-title">סנכרון גוגל קלנדר</div>
+                <div className="lp-feat-desc">חיבור חד-פעמי בלחיצה. כל תור שנקבע — בין אם בוואטסאפ ובין אם בטלפון — נכנס ליומן אוטומטית.</div>
+              </div>
+              <div className="lp-feat reveal">
+                <div className="lp-feat-icon">🔔</div>
+                <div className="lp-feat-title">תזכורות לפני התור</div>
+                <div className="lp-feat-desc">הבוט שולח הודעת תזכורת ללקוח לפני כל תור. פחות no-shows, פחות טלפונים אליך.</div>
+              </div>
+              <div className="lp-feat reveal">
+                <div className="lp-feat-icon">📊</div>
+                <div className="lp-feat-title">דשבורד ניהול</div>
+                <div className="lp-feat-desc">הכנסות חודשיות, תורים קרובים, לקוחות, שירותים פופולריים — הכל במסך אחד.</div>
+              </div>
+              <div className="lp-feat reveal">
+                <div className="lp-feat-icon">⏰</div>
+                <div className="lp-feat-title">שעות פתיחה גמישות</div>
+                <div className="lp-feat-desc">הגדר ימים ושעות לכל צוות ושירות. הבוט לא יציע זמנים שלא מתאימים לך.</div>
+              </div>
+              <div className="lp-feat reveal">
+                <div className="lp-feat-icon">📋</div>
+                <div className="lp-feat-title">רשימת המתנה</div>
+                <div className="lp-feat-desc">אין זמינות? הבוט מוסיף את הלקוח לרשימת המתנה ומיידע אותך כשמשהו מתפנה.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* CTA */}
+        <div className="lp-cta-strip">
+          <div className="lp-cta-strip-title">מוכן? זה לוקח 3 דקות.</div>
+          <div className="lp-cta-strip-sub">ניסיון חינם. אין צורך בכרטיס אשראי.</div>
+          <a className="lp-cta-green" href="/login">התחל עכשיו</a>
         </div>
-        <div className="stat-cell">
-          <div className="stat-n">3<span>min</span></div>
-          <div className="stat-l">זמן הקמה ממוצע</div>
-        </div>
-        <div className="stat-cell">
-          <div className="stat-n">0<span>₪</span></div>
-          <div className="stat-l">עלות הכשרה לצוות</div>
-        </div>
+
+        {/* FOOTER */}
+        <footer className="lp-footer">
+          <div className="lp-footer-left">
+            <img src="/tori-logo-black.png" alt="תורי" />
+            <span className="lp-footer-brand">תורי</span>
+          </div>
+          <span className="lp-footer-copy">© 2026 torionline.com</span>
+        </footer>
       </div>
-
-      {/* DARK FEATURES */}
-      <div className="lp-dark" id="features">
-        <div className="dark-inner">
-          <div>
-            <div className="dark-label">מה כלול</div>
-            <div className="dark-title">כל כלי שסלון<br />מצליח צריך.</div>
-          </div>
-          <div className="feat-list" id="featList">
-            <div className="feat">
-              <div className="feat-dot"></div>
-              <div>
-                <div className="feat-title">הזמנות דרך WhatsApp</div>
-                <div className="feat-desc">הבוט מבין עברית טבעית, מציע זמנים פנויים ומאשר תורים — אוטומטי לחלוטין.</div>
-              </div>
-            </div>
-            <div className="feat">
-              <div className="feat-dot"></div>
-              <div>
-                <div className="feat-title">סנכרון גוגל קלנדר</div>
-                <div className="feat-desc">כל תור שנקבע מופיע מיידית בגוגל קלנדר שלך עם שם הלקוח והשירות.</div>
-              </div>
-            </div>
-            <div className="feat">
-              <div className="feat-dot"></div>
-              <div>
-                <div className="feat-title">עונה גם לטלפון</div>
-                <div className="feat-desc">סוכן AI מנהל שיחה טבעית עם הלקוח וקובע תור — בלי שתרים אצבע.</div>
-              </div>
-            </div>
-            <div className="feat">
-              <div className="feat-dot"></div>
-              <div>
-                <div className="feat-title">תזכורות אוטומטיות</div>
-                <div className="feat-desc">הבוט שולח תזכורות לפני התור — פחות no-shows, יותר הכנסה.</div>
-              </div>
-            </div>
-            <div className="feat">
-              <div className="feat-dot"></div>
-              <div>
-                <div className="feat-title">דשבורד ניהול</div>
-                <div className="feat-desc">הכנסות, תורים, לקוחות ושירותים פופולריים — הכל במקום אחד.</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* VOICE SECTION */}
-      <section className="lp-voice">
-        <div>
-          <div className="section-label">חדש</div>
-          <h2 className="lp-h2">גם שיחות טלפון —<br />הבוט עונה.</h2>
-          <p className="body-text">
-            לקוח מתקשר לסלון. הבוט AI עונה בקול טבעי, מנהל שיחה, קובע תור — ומסנכרן לגוגל קלנדר.
-            אתה לא צריך לענות לאף שיחה.
-          </p>
-          <a className="btn-sharp" href="/login">נסה בחינם</a>
-        </div>
-
-        <div className="transcript-card">
-          <div className="tc-header">
-            <div className="live-dot"></div>
-            <div>
-              <div className="tc-title">שיחה נכנסת</div>
-              <div className="tc-duration">00:42</div>
-            </div>
-          </div>
-          <div className="tc-lines" id="tcLines">
-            <div className="tc-line caller-line">
-              <div className="tc-speaker caller">לקוח</div>
-              שלום, רציתי לקבוע תספורת ליום חמישי בבוקר
-            </div>
-            <div className="tc-line ai-line">
-              <div className="tc-speaker ai">תורי AI</div>
-              שלום! ביום חמישי יש לי פנוי ב-9:30 וב-11:00. מה מתאים?
-            </div>
-            <div className="tc-line caller-line">
-              <div className="tc-speaker caller">לקוח</div>
-              9:30 בסדר גמור
-            </div>
-            <div className="tc-line ai-line">
-              <div className="tc-speaker ai">תורי AI</div>
-              מעולה. קבעתי תספורת ביום חמישי ב-9:30. תקבל אישור בוואטסאפ.
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CALENDAR STRIP */}
-      <div className="cal-strip">
-        <div className="cal-copy">
-          <div className="cal-label">אינטגרציה</div>
-          <div className="cal-title">גוגל קלנדר מתעדכן לבד</div>
-          <div className="cal-desc">כל תור שנקבע — בין אם דרך וואטסאפ ובין אם בטלפון — מופיע אוטומטית בגוגל קלנדר שלך. חיבור חד-פעמי, סנכרון לנצח.</div>
-        </div>
-
-        <div className="cal-mock">
-          <div className="cal-hdr">
-            <div className="cal-hdr-dot"></div>
-            <div className="cal-hdr-text">Google Calendar — יולי 2026</div>
-          </div>
-          <div className="cal-body">
-            <div className="cal-days-hdr">
-              <div className="cal-dh">א</div><div className="cal-dh">ב</div><div className="cal-dh">ג</div>
-              <div className="cal-dh">ד</div><div className="cal-dh">ה</div><div className="cal-dh">ו</div><div className="cal-dh">ש</div>
-            </div>
-            <div className="cal-days">
-              <div className="cal-d" style={{color:'#ccc'}}></div>
-              <div className="cal-d" style={{color:'#ccc'}}></div>
-              <div className="cal-d">1</div>
-              <div className="cal-d has">2</div>
-              <div className="cal-d has">3</div>
-              <div className="cal-d">4</div>
-              <div className="cal-d" style={{color:'#bbb'}}>5</div>
-              <div className="cal-d">6</div>
-              <div className="cal-d has">7</div>
-              <div className="cal-d has">8</div>
-              <div className="cal-d today">9</div>
-              <div className="cal-d has">10</div>
-              <div className="cal-d">11</div>
-              <div className="cal-d" style={{color:'#bbb'}}>12</div>
-              <div className="cal-d">13</div>
-              <div className="cal-d has">14</div>
-              <div className="cal-d">15</div>
-              <div className="cal-d has">16</div>
-              <div className="cal-d has">17</div>
-              <div className="cal-d">18</div>
-              <div className="cal-d" style={{color:'#bbb'}}>19</div>
-            </div>
-            <div className="cal-event green">דנה כהן — תספורת 09:30</div>
-            <div className="cal-event blue">מיכל לוי — צבע 11:00</div>
-            <div className="cal-event-new">
-              <div className="new-dot"></div>
-              נוסף אוטו׳ — יוסי 14:30
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* CTA */}
-      <div className="lp-cta">
-        <h2 className="lp-h2">מוכן להפסיק לענות לכולם?</h2>
-        <p className="cta-sub">ניסיון חינם. אין צורך בכרטיס אשראי. הקמה תוך 3 דקות.</p>
-        <a className="btn-cta-green" href="/login">התחל עכשיו</a>
-      </div>
-
-      {/* FOOTER */}
-      <footer className="lp-footer">
-        <div className="footer-logo">תורי</div>
-        <div className="footer-copy">© 2026 תורי · torionline.com</div>
-      </footer>
-
-      </div>
-      <script dangerouslySetInnerHTML={{ __html: `
-        (function() {
-          var msgs = [
-            { t: 'recv', text: 'היי, אני רוצה תור לתספורת' },
-            { t: 'sent', text: 'שלום! 😊 לאיזה יום מתאים?' },
-            { t: 'recv', text: 'ראשון אחה"צ אם אפשר' },
-            { t: 'sent', text: 'יש פנוי ב-15:00 וב-16:30.\\nמה עדיף?' },
-            { t: 'recv', text: '15:00 מושלם' },
-            { t: 'sent', text: '✅ נקבע!\\nתספורת — ראשון 15:00\\nאישור בדרך אליך.' },
-          ];
-          var tss = ['10:21','10:21','10:22','10:22','10:23','10:23'];
-          var i = 0;
-          function nextBubble() {
-            var body = document.getElementById('phoneBody');
-            if (!body) return;
-            if (i >= msgs.length) {
-              setTimeout(function() { body.innerHTML = ''; i = 0; setTimeout(nextBubble, 600); }, 3500);
-              return;
-            }
-            var m = msgs[i];
-            var el = document.createElement('div');
-            el.className = 'bbl ' + m.t;
-            el.innerHTML = m.text.replace(/\\n/g,'<br>') + '<div class="bbl-ts">' + tss[i] + '</div>';
-            body.appendChild(el);
-            requestAnimationFrame(function() { requestAnimationFrame(function() { el.classList.add('show'); }); });
-            i++;
-            setTimeout(nextBubble, m.t === 'sent' ? 1500 : 1100);
-          }
-          setTimeout(nextBubble, 500);
-
-          var featObs = new IntersectionObserver(function(entries) {
-            if (!entries[0].isIntersecting) return;
-            document.querySelectorAll('.feat').forEach(function(el, idx) {
-              setTimeout(function() { el.classList.add('show'); }, idx * 120);
-            });
-            featObs.disconnect();
-          }, { threshold: 0.2 });
-          var featList = document.getElementById('featList');
-          if (featList) featObs.observe(featList);
-
-          var tcObs = new IntersectionObserver(function(entries) {
-            if (!entries[0].isIntersecting) return;
-            document.querySelectorAll('.tc-line').forEach(function(el, idx) {
-              setTimeout(function() { el.classList.add('show'); }, idx * 550 + 200);
-            });
-            tcObs.disconnect();
-          }, { threshold: 0.3 });
-          var tcLines = document.getElementById('tcLines');
-          if (tcLines) tcObs.observe(tcLines);
-        })();
-      ` }} />
     </>
   );
 }
