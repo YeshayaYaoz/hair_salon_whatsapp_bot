@@ -33,6 +33,7 @@ model Business {
   faqEntries     FaqEntry[]
   waitlistEntries WaitlistEntry[]
   passwordResetTokens PasswordResetToken[]
+  googleCalendar      GoogleCalendarToken?
 }
 
 model Service {
@@ -125,6 +126,17 @@ model FaqEntry {
   answer     String
 
   @@index([businessId])
+}
+
+model GoogleCalendarToken {
+  id            String   @id @default(cuid())
+  business      Business @relation(fields: [businessId], references: [id])
+  businessId    String   @unique
+  accessToken   String   // encrypted
+  refreshToken  String   // encrypted
+  expiresAt     DateTime
+  calendarId    String   @default("primary")
+  updatedAt     DateTime @updatedAt
 }
 
 model PasswordResetToken {

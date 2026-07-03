@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth, type AuthedRequest } from "../lib/auth.js";
 import { encryptSecret } from "../lib/crypto.js";
 import { requireActiveSubscription } from "../lib/subscriptionGate.js";
+import { getAuthUrl, saveGoogleTokens, disconnectGoogleCalendar } from "../lib/googleCalendar.js";
 
 export const businessRouter = Router();
 businessRouter.use(requireAuth);
@@ -267,6 +268,29 @@ businessRouter.get("/analytics", async (req: AuthedRequest, res) => {
     dailyThisWeek,
     topServices: topServicesList,
   });
+});
+
+// --- Google Calendar ---
+
+businessRouter.get("/google-calendar/status", async (req: AuthedRequest, res) => {
+  const record = await prisma.googleCalendarToken.findUnique({ where: { businessId: req.businessId! } });
+  res.json({ connected: Boolean(record) });
+});
+
+businessRouter.get("/google-calendar/auth-url", async (req: AuthedRequest, res) => {
+  const url = getAuthUrl(req.businessId!);
+  res.json({ url });
+});
+
+businessRouter.post("/google-calendar/callback", async (req: AuthedRequest, res) => {
+  const { code } = z.object({ code: z.string() }).parse(req.body);
+  await saveGoogleTokens(req.businessId!, code);
+  res.json({ ok: true });
+});
+
+businessRouter.delete("/google-calendar", async (req: AuthedRequest, res) => {
+  await disconnectGoogleCalendar(req.businessId!);
+  res.json({ ok: true });
 });
 
 // --- FAQ entries ---

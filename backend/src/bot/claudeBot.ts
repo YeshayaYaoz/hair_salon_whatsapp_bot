@@ -5,6 +5,7 @@ import { appendTurn, getHistory } from "./conversationStore.js";
 import { findAvailableSlots, createAppointment, type AvailableSlot } from "../booking/availability.js";
 import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
 import { decryptSecret } from "../lib/crypto.js";
+import { syncAppointmentToCalendar } from "../lib/googleCalendar.js";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = "claude-sonnet-4-6";
@@ -127,6 +128,15 @@ async function runTool(
     });
     const customerLabel = input.customerName ? `${input.customerName} (${customerPhone})` : customerPhone;
     notifyOwner(businessId, `📅 הזמנה חדשה!\nלקוח: ${customerLabel}\nשירות: ${service.name}\nמועד: ${when}`);
+
+    // Sync to Google Calendar (non-fatal)
+    syncAppointmentToCalendar(businessId, {
+      startTime: appointment.startTime,
+      endTime: appointment.endTime,
+      serviceName: service.name,
+      customerName: input.customerName as string | undefined,
+      customerPhone,
+    }).catch((err) => console.error("Calendar sync failed:", err));
 
     return JSON.stringify({ booked: true, startTime: appointment.startTime, endTime: appointment.endTime });
   }
