@@ -5,7 +5,12 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        brand: "#a78bfa",
+        brand: "#F59E0B",
+        "brand-dim": "#D97706",
+        slate950: "#0B0F1A",
+        slate900: "#0F1420",
+        slate800: "#161C2D",
+        slate700: "#1E2640",
       },
       keyframes: {
         "fade-up": {

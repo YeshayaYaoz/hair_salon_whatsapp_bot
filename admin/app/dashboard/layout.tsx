@@ -22,7 +22,6 @@ const NAV_ITEMS = [
   { href: "/dashboard/billing",      key: "billing"      as const, icon: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" },
 ];
 
-// First 5 items shown in mobile bottom tab bar
 const BOTTOM_TAB_ITEMS = NAV_ITEMS.slice(0, 5);
 
 function SidebarContent({ pathname }: { pathname: string }) {
@@ -37,20 +36,26 @@ function SidebarContent({ pathname }: { pathname: string }) {
   return (
     <>
       {/* Brand */}
-      <div className="px-4 mb-6">
+      <div className="px-4 mb-8">
         <div className="flex items-center gap-3">
           <Image
             src="/tori-logo-black.png"
             alt="תורי"
-            width={44}
-            height={44}
-            className="rounded-xl shrink-0 drop-shadow-lg"
+            width={40}
+            height={40}
+            className="rounded-xl shrink-0"
+            style={{ filter: "drop-shadow(0 0 8px rgba(245,158,11,0.3))" }}
           />
           <div>
-            <div className="font-bold text-lg text-white leading-tight">תורי</div>
-            <div className="text-[11px] text-zinc-500 leading-none mt-0.5">הזמנת תורים בוואטסאפ</div>
+            <div className="font-bold text-base text-white leading-tight tracking-tight">תורי</div>
+            <div className="text-[11px] leading-none mt-0.5" style={{ color: "rgba(255,255,255,0.3)" }}>הזמנת תורים בוואטסאפ</div>
           </div>
         </div>
+      </div>
+
+      {/* Section label */}
+      <div className="px-4 mb-2">
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "rgba(255,255,255,0.2)", textTransform: "uppercase" }}>ניהול</span>
       </div>
 
       <nav className="flex flex-col gap-0.5 flex-1 overflow-y-auto">
@@ -60,14 +65,19 @@ function SidebarContent({ pathname }: { pathname: string }) {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition ${
-                active
-                  ? "bg-violet-600/20 text-violet-400"
-                  : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
-              }`}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
+              style={active ? {
+                background: "rgba(245,158,11,0.12)",
+                color: "#F59E0B",
+                boxShadow: "inset 2px 0 0 #F59E0B",
+              } : {
+                color: "rgba(255,255,255,0.45)",
+              }}
+              onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"; (e.currentTarget as HTMLElement).style.color = "#fff"; } }}
+              onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = ""; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.45)"; } }}
             >
               <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.5 : 1.75} d={item.icon} />
               </svg>
               <span className="truncate">{t.nav[item.key]}</span>
             </Link>
@@ -75,17 +85,16 @@ function SidebarContent({ pathname }: { pathname: string }) {
         })}
       </nav>
 
-      <div className="mt-4 pt-4 border-t border-zinc-800 flex flex-col gap-1">
+      <div className="mt-4 pt-4 flex flex-col gap-1" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
         {/* Language toggle */}
         <div className="flex items-center gap-1 px-3 py-1.5">
-          <span className="text-xs text-zinc-600 me-1">🌐</span>
+          <span className="text-xs me-1" style={{ color: "rgba(255,255,255,0.25)" }}>🌐</span>
           {(["en", "he"] as const).map((l) => (
             <button
               key={l}
               onClick={() => setLang(l)}
-              className={`text-xs px-2 py-0.5 rounded-md font-medium transition ${
-                lang === l ? "bg-violet-600/20 text-violet-400" : "text-zinc-500 hover:text-zinc-300"
-              }`}
+              className="text-xs px-2 py-0.5 rounded-md font-medium transition"
+              style={lang === l ? { background: "rgba(245,158,11,0.15)", color: "#F59E0B" } : { color: "rgba(255,255,255,0.3)" }}
             >
               {l === "en" ? "EN" : "עב"}
             </button>
@@ -94,10 +103,13 @@ function SidebarContent({ pathname }: { pathname: string }) {
 
         <button
           onClick={logout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition"
+          style={{ color: "rgba(255,255,255,0.3)" }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"; (e.currentTarget as HTMLElement).style.color = "#fff"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = ""; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.3)"; }}
         >
           <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
           {t.nav.logout}
         </button>
@@ -113,16 +125,22 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   return (
     <AuthGuard>
-    <div className="flex min-h-screen bg-zinc-950">
+    <div className="flex min-h-screen" style={{ background: "#0B0F1A" }}>
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex w-60 bg-zinc-900 border-e border-zinc-800 flex-col py-6 px-2 shrink-0 fixed top-0 bottom-0 start-0 z-20">
+      <aside
+        className="hidden md:flex w-60 flex-col py-6 px-2 shrink-0 fixed top-0 bottom-0 start-0 z-20"
+        style={{ background: "#0F1420", borderInlineEnd: "1px solid rgba(255,255,255,0.06)" }}
+      >
         <SidebarContent pathname={pathname} />
       </aside>
 
       {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 start-0 end-0 z-30 bg-zinc-900/95 backdrop-blur border-b border-zinc-800 flex items-center px-4 h-14">
+      <div
+        className="md:hidden fixed top-0 start-0 end-0 z-30 flex items-center px-4 h-14"
+        style={{ background: "rgba(15,20,32,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+      >
         <div className="flex items-center gap-2.5">
-          <Image src="/tori-logo-black.png" alt="תורי" width={32} height={32} className="rounded-lg" />
+          <Image src="/tori-logo-black.png" alt="תורי" width={30} height={30} className="rounded-lg" />
           <span className="font-semibold text-white text-base">
             {activeItem ? t.nav[activeItem.key] : "תורי"}
           </span>
@@ -135,24 +153,27 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       </main>
 
       {/* Mobile bottom tab bar */}
-      <nav className="md:hidden fixed bottom-0 start-0 end-0 z-30 bg-zinc-900/95 backdrop-blur border-t border-zinc-800 flex items-stretch h-16 safe-area-pb">
+      <nav
+        className="md:hidden fixed bottom-0 start-0 end-0 z-30 flex items-stretch h-16"
+        style={{ background: "rgba(15,20,32,0.97)", backdropFilter: "blur(12px)", borderTop: "1px solid rgba(255,255,255,0.06)" }}
+      >
         {BOTTOM_TAB_ITEMS.map((item) => {
           const active = pathname === item.href;
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition ${
-                active ? "text-violet-400" : "text-zinc-500"
-              }`}
+              className="flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition"
+              style={{ color: active ? "#F59E0B" : "rgba(255,255,255,0.35)" }}
             >
               <svg
-                className={`w-5 h-5 transition ${active ? "text-violet-400" : "text-zinc-500"}`}
+                className="w-5 h-5 transition"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
+                style={{ color: active ? "#F59E0B" : "rgba(255,255,255,0.35)" }}
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.5 : 2} d={item.icon} />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.5 : 1.75} d={item.icon} />
               </svg>
               <span className="truncate max-w-[56px] text-center leading-tight">
                 {t.nav[item.key]}
@@ -161,15 +182,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           );
         })}
 
-        {/* More button linking to first non-tab item */}
         <Link
           href="/dashboard/staff"
-          className={`flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition ${
-            !BOTTOM_TAB_ITEMS.find(i => i.href === pathname) && pathname !== "/" ? "text-violet-400" : "text-zinc-500"
-          }`}
+          className="flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition"
+          style={{ color: !BOTTOM_TAB_ITEMS.find(i => i.href === pathname) && pathname !== "/" ? "#F59E0B" : "rgba(255,255,255,0.35)" }}
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
           <span>עוד</span>
         </Link>
