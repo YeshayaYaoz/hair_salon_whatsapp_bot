@@ -126,6 +126,28 @@ export default function LandingPage() {
     return () => document.removeEventListener("click", handler);
   }, []);
 
+  // Phone chat sequential reveal
+  useEffect(() => {
+    function runSequence() {
+      const items = Array.from(document.querySelectorAll<HTMLElement>(".phone-chat > *"));
+      items.forEach(el => { el.style.display = "none"; el.classList.remove("show"); });
+      const delays = [300, 1600, 3000, 3500, 5000, 6400, 6900, 8300];
+      const timers: ReturnType<typeof setTimeout>[] = [];
+      items.forEach((el, i) => {
+        const t = setTimeout(() => {
+          el.style.display = "";
+          requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add("show")));
+        }, delays[i] ?? i * 1200);
+        timers.push(t);
+      });
+      const loop = setTimeout(runSequence, 11000);
+      timers.push(loop);
+      return timers;
+    }
+    const timers = runSequence();
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
   // Animated counters
   useEffect(() => {
     const counters = document.querySelectorAll<HTMLElement>(".count-up");
@@ -298,9 +320,9 @@ export default function LandingPage() {
         .lp-title { font-size: clamp(28px, 3.5vw, 44px); font-weight: 800; letter-spacing: -1.5px; color: #0A0A0A; margin-bottom: 56px; line-height: 1.1; }
 
         /* STATS BAND */
-        .lp-stats-band { background: #0A0A0A; padding: 60px 40px; }
-        .lp-stats-band-inner { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.06); }
-        .lp-stat-cell { padding: 36px 32px; background: #0A0A0A; }
+        .lp-stats-band { background: #0A0A0A; padding: 72px 40px; }
+        .lp-stats-band-inner { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+        .lp-stat-cell { padding: 48px 36px; background: #141414; border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; }
         .lp-stat-n { font-size: 52px; font-weight: 800; letter-spacing: -3px; line-height: 1; color: #fff; margin-bottom: 6px; font-variant-numeric: tabular-nums; display: flex; align-items: flex-end; gap: 2px; }
         .lp-stat-n .accent { color: #25D366; font-size: 32px; padding-bottom: 6px; }
         .lp-stat-n .count-up { display: inline-block; }
@@ -452,8 +474,8 @@ export default function LandingPage() {
         .lp-roi .lp-label { color: #F59E0B; }
         .lp-roi .lp-title { color: #fff; margin-bottom: 16px; }
         .lp-roi-sub { font-size: 15px; color: rgba(255,255,255,0.65); margin-bottom: 48px; }
-        .lp-roi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; overflow: hidden; margin-bottom: 36px; }
-        .lp-roi-cell { padding: 28px 20px; background: #111; text-align: center; }
+        .lp-roi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 36px; }
+        .lp-roi-cell { padding: 28px 20px; background: #141414; border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; text-align: center; }
         .lp-roi-n { font-size: 36px; font-weight: 800; letter-spacing: -2px; color: #fff; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
         .lp-roi-n .accent { color: #25D366; }
         .lp-roi-n .amber { color: #F59E0B; }
@@ -628,32 +650,13 @@ export default function LandingPage() {
         .roi-slider {
           -webkit-appearance: none; appearance: none; width: 100%; height: 5px;
           border-radius: 4px; outline: none; cursor: pointer;
-          background: linear-gradient(to left, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.12) 100%);
+          background: rgba(255,255,255,0.12);
         }
         .roi-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #25D366; box-shadow: 0 2px 8px rgba(37,211,102,0.4); cursor: pointer; transition: transform 0.15s; }
         .roi-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
         .roi-slider::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: #25D366; border: none; cursor: pointer; }
       `}</style>
 
-      {/* WhatsApp chat animation */}
-      <style>{`
-        @keyframes chat1 { 0%,10% { opacity:0; transform:translateY(6px); } 12%,100% { opacity:1; transform:none; } }
-        @keyframes chat2 { 0%,22% { opacity:0; transform:translateY(6px); } 24%,100% { opacity:1; transform:none; } }
-        @keyframes chat3 { 0%,34% { opacity:0; transform:translateY(6px); } 36%,100% { opacity:1; transform:none; } }
-        @keyframes chattype { 0%,34% { opacity:0; } 36%,54% { opacity:1; } 55%,100% { opacity:0; } }
-        @keyframes chat4 { 0%,56% { opacity:0; transform:translateY(6px); } 58%,100% { opacity:1; transform:none; } }
-        @keyframes chat5 { 0%,70% { opacity:0; transform:translateY(6px); } 72%,100% { opacity:1; transform:none; } }
-        @keyframes chattype2 { 0%,70% { opacity:0; } 72%,88% { opacity:1; } 89%,100% { opacity:0; } }
-        @keyframes chat6 { 0%,90% { opacity:0; transform:translateY(6px); } 92%,100% { opacity:1; transform:none; } }
-        .ca1 { animation: chat1 8s ease infinite; opacity:0; }
-        .ca2 { animation: chat2 8s ease infinite; opacity:0; }
-        .ca3 { animation: chat3 8s ease infinite; opacity:0; }
-        .catype { animation: chattype 8s ease infinite; opacity:0; }
-        .ca4 { animation: chat4 8s ease infinite; opacity:0; }
-        .ca5 { animation: chat5 8s ease infinite; opacity:0; }
-        .catype2 { animation: chattype2 8s ease infinite; opacity:0; }
-        .ca6 { animation: chat6 8s ease infinite; opacity:0; }
-      `}</style>
 
       <div id="scroll-bar" />
 
@@ -716,15 +719,15 @@ export default function LandingPage() {
                 WhatsApp · Google Calendar · AI
               </div>
               <h1 className="lp-h1">
-                הסלון שלך מקבל תורים<br />
-                <span className="green">בזמן שאתה עובד.</span>
+                הסלון שלך קובע תורים<br />
+                <span className="green">גם כשאתה ישן.</span>
               </h1>
               <p className="lp-hero-sub">
-                בוט AI עונה ללקוחות בוואטסאפ, קובע תורים, ומסנכרן הכל לגוגל קלנדר — אוטומטי לחלוטין, בלי להרים אצבע.
+                בוט AI עונה ללקוחות בוואטסאפ, קובע תורים ומסנכרן הכל לגוגל קלנדר — בלי שנגעת בטלפון. בכלל.
               </p>
               <div className="lp-hero-ctas">
-                <a className="btn-green" href="/login">התחל בחינם — 14 יום</a>
-                <a className="btn-outline" href="#how">ראה איך זה עובד</a>
+                <a className="btn-green" href="/login">נסה חינם — 14 יום</a>
+                <a className="btn-outline" href="#how">איך זה עובד?</a>
               </div>
               <div className="lp-hero-types">
                 {["💇 סלוני שיער","💅 ציפורניים","🏥 קליניקות","💆 עיסוי","🦷 שיניים","🐕 גרוומינג","🧖 אסתטיקה","🥊 כושר"].map((t) => (
@@ -751,33 +754,33 @@ export default function LandingPage() {
                     </div>
                   </div>
                   <div className="phone-chat">
-                    <div className="chat-bubble incoming ca1">
+                    <div className="chat-bubble incoming">
                       שלום, רוצה לקבוע תספורת ביום חמישי
                       <div className="chat-time">21:03 ✓✓</div>
                     </div>
-                    <div className="chat-bubble outgoing ca2">
+                    <div className="chat-bubble outgoing">
                       היי! 😊 ביום חמישי יש לי פנוי ב-9:30, 11:00 ו-14:30. מה מתאים?
                       <div className="chat-time">21:03</div>
                     </div>
-                    <div className="chat-bubble incoming ca3">
+                    <div className="chat-bubble incoming">
                       11:00 בסדר גמור
                       <div className="chat-time">21:04 ✓✓</div>
                     </div>
-                    <div className="chat-typing catype">
+                    <div className="chat-typing">
                       <div className="typing-dot" /><div className="typing-dot" /><div className="typing-dot" />
                     </div>
-                    <div className="chat-bubble outgoing ca4">
+                    <div className="chat-bubble outgoing">
                       מעולה! קבעתי תספורת ביום חמישי ב-11:00 ✅
                       <div className="chat-time">21:04</div>
                     </div>
-                    <div className="chat-bubble incoming ca5">
+                    <div className="chat-bubble incoming">
                       תודה רבה! 🙏
                       <div className="chat-time">21:04 ✓✓</div>
                     </div>
-                    <div className="chat-typing catype2">
+                    <div className="chat-typing">
                       <div className="typing-dot" /><div className="typing-dot" /><div className="typing-dot" />
                     </div>
-                    <div className="chat-bubble outgoing ca6">
+                    <div className="chat-bubble outgoing">
                       אשלח תזכורת יום לפני. להתראות! 👋
                       <div className="chat-time">21:04</div>
                     </div>
@@ -850,14 +853,14 @@ export default function LandingPage() {
           <div className="marquee-track">
             {[
               { q: "\"חסכתי שעתיים ביום על ניהול תורים\"", name: "דנה כ., תל אביב" },
-              { q: "\"הלקוחות מתפעלים שהבוט עונה בשבת בלילה\"", name: "מיכל ל., ירושלים" },
+              { q: "\"הלקוחות מתפעלים שהבוט עונה ב-2 בלילה\"", name: "מיכל ל., ירושלים" },
               { q: "\"10 דקות הקמה, הגוגל קלנדר מתעדכן לבד\"", name: "יוסי ה., חיפה" },
               { q: "\"no-shows ירדו ב-80% מאז שהתחלנו\"", name: "שרה מ., רמת גן" },
               { q: "\"הבוט עונה יותר מהר ממני\"", name: "אמיר כ., באר שבע" },
               { q: "\"הכי טוב שעשיתי לסלון שלי\"", name: "רחל ב., נתניה" },
             ].concat([
               { q: "\"חסכתי שעתיים ביום על ניהול תורים\"", name: "דנה כ., תל אביב" },
-              { q: "\"הלקוחות מתפעלים שהבוט עונה בשבת בלילה\"", name: "מיכל ל., ירושלים" },
+              { q: "\"הלקוחות מתפעלים שהבוט עונה ב-2 בלילה\"", name: "מיכל ל., ירושלים" },
               { q: "\"10 דקות הקמה, הגוגל קלנדר מתעדכן לבד\"", name: "יוסי ה., חיפה" },
               { q: "\"no-shows ירדו ב-80% מאז שהתחלנו\"", name: "שרה מ., רמת גן" },
               { q: "\"הבוט עונה יותר מהר ממני\"", name: "אמיר כ., באר שבע" },
@@ -876,7 +879,7 @@ export default function LandingPage() {
         <div className="lp-stats-band">
           <div className="lp-stats-band-inner">
             {[
-              { n: 24, sup: "/7", l: "זמין לקבלת תורים, כולל שבת וחגים" },
+              { n: 24, sup: "/7", l: "זמין גם כשאתה ישן — גם באמצע הלילה" },
               { n: 3,  sup: " דק׳", l: "זמן הקמה ממוצע עד שהבוט חי" },
               { n: 0,  sup: "₪", l: "עלות הכשרה לצוות — הכל אוטומטי" },
               { n: 100, sup: "%", l: "ממסרי הוואטסאפ נענים תוך שנייה" },
@@ -949,7 +952,7 @@ export default function LandingPage() {
         <section className="lp-flow" id="how">
           <div className="lp-flow-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>אינטגרציות</div>
-            <div className="lp-title reveal" style={{ textAlign: "center" }}>הכל מחובר. הכל אוטומטי.</div>
+            <div className="lp-title reveal" style={{ textAlign: "center" }}>הכל מחובר. אתה לא צריך לעשות כלום.</div>
             <div className="lp-flow-steps reveal">
               <div className="lp-flow-node">
                 <div className="lp-flow-icon wa">
@@ -994,12 +997,12 @@ export default function LandingPage() {
         <div style={{ background: "#F8F8F8", borderTop: "1px solid #EBEBEB", borderBottom: "1px solid #EBEBEB", padding: "100px 40px" }}>
           <div style={{ maxWidth: 1080, margin: "0 auto" }}>
             <div className="lp-label reveal">תהליך</div>
-            <div className="lp-title reveal">שלושה צעדים. הכל קורה לבד.</div>
+            <div className="lp-title reveal">שלושה צעדים, ואחרי זה הכל קורה לבד.</div>
             <div className="lp-steps-grid">
               <div className="lp-step reveal d1">
                 <div className="lp-step-num">01</div>
                 <div className="lp-step-title">לקוח שולח הודעה ב-WhatsApp</div>
-                <div className="lp-step-desc">הלקוח כותב בשפה רגילה — "רוצה תספורת ביום חמישי". הבוט מבין ועונה תוך שנייה, בעברית טבעית.</div>
+                <div className="lp-step-desc">הלקוח כותב כמו שהוא כותב — "רוצה תספורת ביום חמישי". הבוט מבין ועונה תוך שנייה, בעברית רגילה.</div>
               </div>
               <div className="lp-step reveal d2">
                 <div className="lp-step-num">02</div>
@@ -1019,7 +1022,7 @@ export default function LandingPage() {
         <section className="lp-features" id="features">
           <div className="lp-features-inner">
             <div className="lp-label reveal">מה כלול</div>
-            <div className="lp-title reveal">כל מה שסלון או קליניקה צריכים.</div>
+            <div className="lp-title reveal">כל מה שצריך. כלום שלא.</div>
             <div className="lp-feats-grid">
               {[
                 { icon: "💬", title: "בוט WhatsApp בעברית", desc: "מבין שפה טבעית, עונה ב-24/7, ומנהל שיחה מתחילה ועד אישור התור.", d: "d1" },
@@ -1043,7 +1046,7 @@ export default function LandingPage() {
         <section className="lp-ba">
           <div className="lp-ba-inner">
             <div className="lp-label reveal">לפני ואחרי</div>
-            <div className="lp-title reveal">מה השתנה עבור בעלי הסלונים שלנו.</div>
+            <div className="lp-title reveal">מה השתנה לבעלי הסלונים שעברו לתורי.</div>
             <div className="lp-ba-grid">
               <div className="lp-ba-card before reveal d1">
                 <div className="lp-ba-header">
@@ -1052,11 +1055,11 @@ export default function LandingPage() {
                 </div>
                 <div className="lp-ba-items">
                   {[
-                    "לקוחות שולחים הודעות בלילה — ואתה עונה בבוקר, והם כבר הלכו למתחרה",
-                    "שעתיים ביום מבוזבזות על ניהול תורים ידני",
+                    "לקוח שולח ב-1 בלילה — אתה עונה בבוקר, הוא כבר קבע אצל המתחרה",
+                    "שעתיים ביום הולכות על תיאום תורים בטלפון ובוואטסאפ",
                     "no-shows שחוזרים כי אין מי שישלח תזכורות",
-                    "גוגל קלנדר מתעדכן ידנית — או לא מתעדכן בכלל",
-                    "שיחות טלפון שמפריעות באמצע עבודה",
+                    "גוגל קלנדר מתעדכן ידנית — או שוכחים ואז נוצרות התנגשויות",
+                    "טלפון שמצלצל באמצע לקוח",
                   ].map((t) => (
                     <div key={t} className="lp-ba-item">
                       <span className="lp-ba-bullet">✕</span>
@@ -1072,7 +1075,7 @@ export default function LandingPage() {
                 </div>
                 <div className="lp-ba-items">
                   {[
-                    "הבוט עונה מיידית, 24/7 — גם בשבת בשעה 2 בלילה",
+                    "הבוט עונה מיידית, 24/7 — גם כשאתה ישן בשעה 2 בלילה",
                     "תורים נקבעים אוטומטית ללא מגע יד אדם",
                     "תזכורות נשלחות אוטומטית לפני כל תור",
                     "גוגל קלנדר מתעדכן ברגע שתור נקבע",
@@ -1097,7 +1100,7 @@ export default function LandingPage() {
             <div className="lp-testi-grid">
               {[
                 { quote: "לפני תורי הייתי מפספסת הודעות כל הזמן. עכשיו הבוט עונה מיידית ואני מקבלת התראה רק על תורים שנקבעו. חסכתי שעתיים ביום.", name: "דנה כ.", role: "סלון שיער, תל אביב", color: "#8B5CF6", initial: "ד" },
-                { quote: "הלקוחות שלי מתפעלים שהבוט עונה גם בשבת בלילה. כמה מהם אמרו שזה גרם להם לבחור בי על פני סלון אחר.", name: "מיכל ל.", role: "קליניקת יופי, ירושלים", color: "#EC4899", initial: "מ" },
+                { quote: "הלקוחות שלי מתפעלים שהבוט עונה ב-2 בלילה. כמה מהם אמרו שזה גרם להם לבחור בי על פני סלון אחר.", name: "מיכל ל.", role: "קליניקת יופי, ירושלים", color: "#EC4899", initial: "מ" },
                 { quote: "ניסיתי כמה מערכות לניהול תורים — זו הכי פשוטה להתקנה. 10 דקות ואני חי. הגוגל קלנדר מתעדכן לבד, זה שינה לי את החיים.", name: "יוסי ה.", role: "ברבר, חיפה", color: "#F59E0B", initial: "י" },
               ].map((t) => (
                 <div key={t.name} className="lp-testi-card reveal">
@@ -1163,13 +1166,15 @@ export default function LandingPage() {
                 <span>תורים בשבוע</span>
                 <span className="roi-slider-val">{appts}</span>
               </div>
-              <input
-                type="range" min={5} max={150} step={5} value={appts}
-                className="roi-slider"
-                style={{ background: `linear-gradient(to right, #25D366 0%, #25D366 ${((appts - 5) / 145) * 100}%, rgba(255,255,255,0.15) ${((appts - 5) / 145) * 100}%, rgba(255,255,255,0.15) 100%)` }}
-                onChange={e => setAppts(Number(e.target.value))}
-              />
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 6 }}>
+              <div style={{ direction: "ltr" }}>
+                <input
+                  type="range" min={5} max={150} step={5} value={appts}
+                  className="roi-slider"
+                  style={{ background: `linear-gradient(to right, #25D366 0%, #25D366 ${((appts - 5) / 145) * 100}%, rgba(255,255,255,0.15) ${((appts - 5) / 145) * 100}%, rgba(255,255,255,0.15) 100%)` }}
+                  onChange={e => setAppts(Number(e.target.value))}
+                />
+              </div>
+              <div style={{ direction: "ltr", display: "flex", justifyContent: "space-between", fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 6 }}>
                 <span>5</span><span>150</span>
               </div>
             </div>
@@ -1195,6 +1200,14 @@ export default function LandingPage() {
                   <span style={{ color: "#fff" }}>{(Math.round(appts * 0.15 * 0.8) * 180).toLocaleString("he-IL")}</span>
                 </div>
                 <div className="lp-roi-l">הכנסה נוספת ממוצעת בחודש מתורים שנשמרו</div>
+              </div>
+              <div className="lp-roi-cell" style={{ position: "relative", overflow: "hidden" }}>
+                <div style={{ position: "absolute", top: 8, left: 10, background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 6, padding: "2px 7px", fontSize: 9, color: "#F59E0B", fontWeight: 700, letterSpacing: "0.06em" }}>פרמיום</div>
+                <div className="lp-roi-n">
+                  <span style={{ color: "#F59E0B" }}>₪</span>
+                  <span style={{ color: "#fff" }}>{Math.round(appts * 5 / 60 * 4.3 * 38).toLocaleString("he-IL")}</span>
+                </div>
+                <div className="lp-roi-l">חיסכון חודשי בעלות עובד שמקבל שיחות — פרמיום</div>
               </div>
             </div>
             <div className="lp-roi-note reveal">
@@ -1258,7 +1271,7 @@ export default function LandingPage() {
                 </thead>
                 <tbody>
                   {[
-                    { feat: "זמין 24/7 — גם בשבת", tori: "✓", manual: "✗", other: "✓" },
+                    { feat: "זמין 24/7 — גם בשעה 2 בלילה", tori: "✓", manual: "✗", other: "✓" },
                     { feat: "עברית טבעית מלאה", tori: "✓", manual: "✓", other: "⚠ חלקית" },
                     { feat: "תזכורות WhatsApp אוטומטיות", tori: "✓", manual: "✗", other: "⚠ SMS בתשלום" },
                     { feat: "סנכרון גוגל קלנדר", tori: "✓", manual: "ידנית", other: "⚠ אפליקציה נפרדת" },
@@ -1291,7 +1304,7 @@ export default function LandingPage() {
         <section className="lp-faq" id="faq">
           <div className="lp-faq-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>שאלות נפוצות</div>
-            <div className="lp-title reveal" style={{ textAlign: "center" }}>יש לך שאלה? כנראה יש לנו תשובה.</div>
+            <div className="lp-title reveal" style={{ textAlign: "center" }}>שאלות? יש לנו תשובות.</div>
             <div className="lp-faq-list reveal">
               {[
                 { q: "האם הבוט מבין עברית טבעית?", a: "כן. הבוט מבוסס על Claude AI של Anthropic ומבין עברית טבעית לחלוטין — כולל ניבים, קיצורים ואיות לא מדויק. לא צריך ללמד את הלקוחות להקליד בצורה מיוחדת." },
@@ -1317,8 +1330,8 @@ export default function LandingPage() {
 
         {/* CTA */}
         <section className="lp-cta reveal">
-          <div className="lp-cta-title">מוכן להפסיק לענות לכולם?</div>
-          <div className="lp-cta-sub">ניסיון חינם 14 יום. אין צורך בכרטיס אשראי.</div>
+          <div className="lp-cta-title">תפסיק לענות לכולם בעצמך.</div>
+          <div className="lp-cta-sub">נסה 14 יום בחינם — ללא כרטיס אשראי, ללא סיכון.</div>
           <div className="lp-cta-row">
             <a className="btn-green" href="/login">התחל עכשיו בחינם</a>
             <a className="btn-outline" href="#pricing">ראה מחירים</a>
