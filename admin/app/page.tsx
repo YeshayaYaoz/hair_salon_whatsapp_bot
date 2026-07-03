@@ -205,9 +205,9 @@ export default function LandingPage() {
         .marquee-track { display: flex; gap: 0; animation: marquee-scroll 28s linear infinite; white-space: nowrap; width: max-content; }
         .marquee-track:hover { animation-play-state: paused; }
         @keyframes marquee-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-        .marquee-item { display: inline-flex; align-items: center; gap: 10px; padding: 0 36px; font-size: 13px; color: rgba(255,255,255,0.4); font-weight: 500; border-right: 1px solid rgba(255,255,255,0.08); }
+        .marquee-item { display: inline-flex; align-items: center; gap: 10px; padding: 0 36px; font-size: 13px; color: rgba(255,255,255,0.65); font-weight: 500; border-right: 1px solid rgba(255,255,255,0.1); }
         .marquee-item .star { color: #F59E0B; font-size: 11px; }
-        .marquee-item strong { color: rgba(255,255,255,0.7); }
+        .marquee-item strong { color: rgba(255,255,255,0.9); }
 
         /* 3D PRODUCT */
         .lp-3d-wrap { background: #F8F8F8; padding: 0 24px 100px; overflow: hidden; }
@@ -219,7 +219,7 @@ export default function LandingPage() {
         .mock-url { margin-right: auto; margin-left: auto; background: #222; border-radius: 5px; padding: 4px 16px; font-size: 11px; color: #555; font-family: 'Courier New', monospace; }
         .mock-body { display: grid; grid-template-columns: 240px 1fr; }
         .mock-sidebar { background: #111; border-left: 1px solid rgba(255,255,255,0.05); padding: 20px 12px; display: flex; flex-direction: column; gap: 2px; }
-        .mock-nav-item { padding: 8px 12px; border-radius: 7px; font-size: 12px; color: #666; cursor: default; display: flex; align-items: center; gap: 8px; }
+        .mock-nav-item { padding: 8px 12px; border-radius: 7px; font-size: 12px; color: #888; cursor: default; display: flex; align-items: center; gap: 8px; }
         .mock-nav-item.active { background: rgba(139,92,246,0.15); color: #A78BFA; }
         .mock-nav-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
         .mock-main { padding: 24px; }
@@ -227,22 +227,23 @@ export default function LandingPage() {
         .mock-stat { background: #222; border-radius: 10px; padding: 16px; border: 1px solid rgba(255,255,255,0.05); }
         .mock-stat-n { font-size: 22px; font-weight: 700; color: #fff; letter-spacing: -1px; margin-bottom: 3px; }
         .mock-stat-n .g { color: #25D366; }
-        .mock-stat-l { font-size: 11px; color: #555; }
-        .mock-section-title { font-size: 11px; font-weight: 600; color: #555; margin-bottom: 10px; letter-spacing: 0.05em; text-transform: uppercase; }
+        .mock-stat-l { font-size: 11px; color: #888; }
+        .mock-section-title { font-size: 11px; font-weight: 600; color: #888; margin-bottom: 10px; letter-spacing: 0.05em; text-transform: uppercase; }
         .mock-appt-list { display: flex; flex-direction: column; gap: 6px; }
         .mock-appt { background: #222; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; border: 1px solid rgba(255,255,255,0.04); }
-        .mock-appt-time { font-size: 11px; color: #555; font-family: 'Courier New', monospace; flex-shrink: 0; }
-        .mock-appt-name { font-size: 12px; color: #ccc; flex: 1; }
-        .mock-appt-service { font-size: 11px; color: #555; }
+        .mock-appt-time { font-size: 11px; color: #888; font-family: 'Courier New', monospace; flex-shrink: 0; }
+        .mock-appt-name { font-size: 12px; color: #ddd; flex: 1; }
+        .mock-appt-service { font-size: 11px; color: #888; }
         .mock-appt-badge { font-size: 9px; font-weight: 600; padding: 2px 8px; border-radius: 4px; flex-shrink: 0; }
         .mock-appt-badge.confirmed { background: rgba(37,211,102,0.12); color: #25D366; }
         .mock-appt-badge.pending { background: rgba(251,191,36,0.12); color: #FBBF24; }
 
         /* TRUST BAR */
-        .lp-trust { background: #fff; border-top: 1px solid #EBEBEB; border-bottom: 1px solid #EBEBEB; padding: 20px 40px; display: flex; align-items: center; justify-content: center; gap: 44px; flex-wrap: wrap; }
-        .lp-trust-label { font-size: 11px; color: #BBB; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
-        .lp-trust-items { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
-        .lp-trust-item { display: flex; align-items: center; gap: 7px; font-size: 13px; color: #666; font-weight: 500; }
+        .lp-trust { background: #fff; border-top: 1px solid #EBEBEB; border-bottom: 1px solid #EBEBEB; padding: 24px 40px; display: flex; align-items: center; justify-content: center; gap: 44px; flex-wrap: wrap; }
+        .lp-trust-label { font-size: 11px; color: #999; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; }
+        .lp-trust-items { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .lp-trust-item { display: flex; align-items: center; gap: 9px; font-size: 13px; color: #222; font-weight: 600; background: #F7F7F7; border: 1px solid #E8E8E8; border-radius: 10px; padding: 8px 16px; transition: border-color 0.15s, box-shadow 0.15s; }
+        .lp-trust-item:hover { border-color: #D0D0D0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
 
         /* SECTION LABELS */
         .lp-label { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #25D366; margin-bottom: 12px; }
@@ -255,22 +256,22 @@ export default function LandingPage() {
         .lp-stat-n { font-size: 52px; font-weight: 800; letter-spacing: -3px; line-height: 1; color: #fff; margin-bottom: 6px; font-variant-numeric: tabular-nums; display: flex; align-items: flex-end; gap: 2px; }
         .lp-stat-n .accent { color: #25D366; font-size: 32px; padding-bottom: 6px; }
         .lp-stat-n .count-up { display: inline-block; }
-        .lp-stat-l { font-size: 13px; color: rgba(255,255,255,0.35); line-height: 1.5; }
+        .lp-stat-l { font-size: 13px; color: rgba(255,255,255,0.62); line-height: 1.5; }
 
         /* INTEGRATION FLOW */
         .lp-flow { padding: 100px 40px; background: #fff; }
         .lp-flow-inner { max-width: 900px; margin: 0 auto; }
         .lp-flow-steps { display: flex; align-items: center; justify-content: center; gap: 0; margin-top: 52px; flex-wrap: nowrap; }
         .lp-flow-node { display: flex; flex-direction: column; align-items: center; gap: 14px; flex: 1; }
-        .lp-flow-icon { width: 72px; height: 72px; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 28px; position: relative; transition: transform 0.2s; }
-        .lp-flow-node:hover .lp-flow-icon { transform: scale(1.06) translateY(-3px); }
-        .lp-flow-icon.wa { background: #E8FFF0; border: 2px solid #BBF7D0; }
-        .lp-flow-icon.ai { background: #F0F0FF; border: 2px solid #C7D2FE; }
-        .lp-flow-icon.cal { background: #FFF8E8; border: 2px solid #FDE68A; }
-        .lp-flow-icon.phone { background: #FFF0F0; border: 2px solid #FECACA; }
-        .lp-flow-label { font-size: 13px; font-weight: 700; color: #111; text-align: center; }
-        .lp-flow-sub { font-size: 11.5px; color: #888; text-align: center; max-width: 100px; line-height: 1.4; }
-        .lp-flow-arrow { flex-shrink: 0; width: 40px; color: #DDD; font-size: 22px; text-align: center; padding-bottom: 36px; }
+        .lp-flow-icon { width: 80px; height: 80px; border-radius: 22px; display: flex; align-items: center; justify-content: center; font-size: 32px; position: relative; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+        .lp-flow-node:hover .lp-flow-icon { transform: scale(1.08) translateY(-4px); box-shadow: 0 10px 28px rgba(0,0,0,0.12); }
+        .lp-flow-icon.wa { background: linear-gradient(135deg, #E8FFF0, #C8F7D8); border: 2px solid #86EFAC; }
+        .lp-flow-icon.ai { background: linear-gradient(135deg, #F0F0FF, #DDD6FE); border: 2px solid #A5B4FC; }
+        .lp-flow-icon.cal { background: linear-gradient(135deg, #FFF8E8, #FEF3C7); border: 2px solid #FCD34D; }
+        .lp-flow-icon.phone { background: linear-gradient(135deg, #FFF0F0, #FEE2E2); border: 2px solid #FCA5A5; }
+        .lp-flow-label { font-size: 14px; font-weight: 700; color: #111; text-align: center; }
+        .lp-flow-sub { font-size: 12px; color: #666; text-align: center; max-width: 110px; line-height: 1.45; }
+        .lp-flow-arrow { flex-shrink: 0; width: 40px; color: #BBB; font-size: 24px; text-align: center; padding-bottom: 40px; }
         .lp-flow-ping { position: absolute; top: -4px; right: -4px; width: 12px; height: 12px; border-radius: 50%; }
         .lp-flow-ping.green { background: #25D366; animation: ping 2s ease infinite; }
         .lp-flow-ping.blue { background: #6366F1; animation: ping 2s ease 0.5s infinite; }
@@ -339,8 +340,8 @@ export default function LandingPage() {
         .lp-premium-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.25); color: #F59E0B; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 20px; margin-bottom: 18px; letter-spacing: 0.08em; text-transform: uppercase; }
         .lp-premium-title { font-size: clamp(28px, 3vw, 42px); font-weight: 800; color: #fff; letter-spacing: -1.5px; line-height: 1.1; margin-bottom: 16px; }
         .lp-premium-title .amber { color: #F59E0B; }
-        .lp-premium-desc { font-size: 15px; color: rgba(255,255,255,0.45); line-height: 1.75; margin-bottom: 28px; }
-        .lp-premium-note { display: inline-flex; align-items: center; gap: 8px; background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.15); border-radius: 8px; padding: 10px 16px; font-size: 13px; color: rgba(255,255,255,0.5); margin-bottom: 32px; }
+        .lp-premium-desc { font-size: 15px; color: rgba(255,255,255,0.72); line-height: 1.75; margin-bottom: 28px; }
+        .lp-premium-note { display: inline-flex; align-items: center; gap: 8px; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); border-radius: 8px; padding: 10px 16px; font-size: 13px; color: rgba(255,255,255,0.72); margin-bottom: 32px; }
         .lp-premium-note strong { color: #F59E0B; }
         .btn-amber { display: inline-flex; align-items: center; gap: 8px; background: #F59E0B; color: #000; font-size: 14px; font-weight: 700; padding: 12px 24px; border-radius: 9px; text-decoration: none; transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s; box-shadow: 0 4px 16px rgba(245,158,11,0.3); }
         .btn-amber:hover { opacity: 0.88; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(245,158,11,0.4); }
@@ -348,8 +349,8 @@ export default function LandingPage() {
         .voice-card-header { padding: 14px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 10px; }
         .voice-live-dot { width: 8px; height: 8px; border-radius: 50%; background: #F59E0B; flex-shrink: 0; animation: pulse-amber 2s infinite; }
         @keyframes pulse-amber { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(245,158,11,0.4); } 50% { opacity: 0.7; box-shadow: 0 0 0 4px rgba(245,158,11,0); } }
-        .voice-card-title { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.6); }
-        .voice-card-duration { font-size: 11px; color: rgba(255,255,255,0.25); font-family: 'Courier New', monospace; margin-right: auto; }
+        .voice-card-title { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.88); }
+        .voice-card-duration { font-size: 11px; color: rgba(255,255,255,0.5); font-family: 'Courier New', monospace; margin-right: auto; }
         .voice-waveform { padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 3px; height: 56px; }
         .vbar { width: 3px; border-radius: 2px; background: #F59E0B; flex-shrink: 0; animation: vwave 1.4s ease-in-out infinite; transform-origin: bottom; }
         .vbar:nth-child(1)  { height: 10px; animation-delay: 0s; }    .vbar:nth-child(2)  { height: 22px; animation-delay: 0.08s; }
@@ -364,10 +365,10 @@ export default function LandingPage() {
         .voice-transcript { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
         .vline { font-size: 12px; line-height: 1.5; }
         .vspeaker { font-family: 'Courier New', monospace; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 2px; }
-        .vspeaker.caller { color: rgba(255,255,255,0.25); }
+        .vspeaker.caller { color: rgba(255,255,255,0.5); }
         .vspeaker.ai { color: #F59E0B; }
-        .vline.caller-l { color: rgba(255,255,255,0.4); }
-        .vline.ai-l { color: rgba(255,255,255,0.8); font-weight: 500; }
+        .vline.caller-l { color: rgba(255,255,255,0.72); }
+        .vline.ai-l { color: #fff; font-weight: 500; }
 
         /* PRICING */
         .lp-pricing { padding: 100px 40px; background: #fff; border-top: 1px solid #EBEBEB; }
@@ -383,12 +384,12 @@ export default function LandingPage() {
         .lp-plan-price { font-size: 52px; font-weight: 800; letter-spacing: -2.5px; color: #111; line-height: 1; margin-bottom: 4px; }
         .lp-plan.featured .lp-plan-price { color: #fff; }
         .lp-plan-per { font-size: 13px; color: #888; margin-bottom: 28px; }
-        .lp-plan.featured .lp-plan-per { color: rgba(255,255,255,0.35); }
+        .lp-plan.featured .lp-plan-per { color: rgba(255,255,255,0.6); }
         .lp-plan-divider { height: 1px; background: #EBEBEB; margin-bottom: 24px; }
         .lp-plan.featured .lp-plan-divider { background: rgba(255,255,255,0.08); }
         .lp-plan-features { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
         .lp-plan-feat { display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px; color: #444; line-height: 1.5; }
-        .lp-plan.featured .lp-plan-feat { color: rgba(255,255,255,0.65); }
+        .lp-plan.featured .lp-plan-feat { color: rgba(255,255,255,0.82); }
         .lp-plan-feat .check { color: #25D366; font-size: 13px; flex-shrink: 0; margin-top: 1px; }
         .lp-plan.featured .lp-plan-feat .check { color: #F59E0B; }
         .lp-plan-btn { display: block; text-align: center; padding: 13px; border-radius: 10px; font-size: 14px; font-weight: 700; text-decoration: none; transition: opacity 0.15s, transform 0.15s; }
@@ -402,15 +403,15 @@ export default function LandingPage() {
         .lp-roi-inner { max-width: 700px; margin: 0 auto; text-align: center; }
         .lp-roi .lp-label { color: #F59E0B; }
         .lp-roi .lp-title { color: #fff; margin-bottom: 16px; }
-        .lp-roi-sub { font-size: 15px; color: rgba(255,255,255,0.4); margin-bottom: 48px; }
+        .lp-roi-sub { font-size: 15px; color: rgba(255,255,255,0.65); margin-bottom: 48px; }
         .lp-roi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; overflow: hidden; margin-bottom: 36px; }
         .lp-roi-cell { padding: 28px 20px; background: #111; text-align: center; }
         .lp-roi-n { font-size: 36px; font-weight: 800; letter-spacing: -2px; color: #fff; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
         .lp-roi-n .accent { color: #25D366; }
         .lp-roi-n .amber { color: #F59E0B; }
-        .lp-roi-l { font-size: 12px; color: rgba(255,255,255,0.35); line-height: 1.5; }
-        .lp-roi-note { font-size: 13px; color: rgba(255,255,255,0.25); }
-        .lp-roi-note strong { color: rgba(255,255,255,0.55); }
+        .lp-roi-l { font-size: 12px; color: rgba(255,255,255,0.65); line-height: 1.5; }
+        .lp-roi-note { font-size: 14px; color: rgba(255,255,255,0.6); }
+        .lp-roi-note strong { color: #fff; }
 
         /* FAQ */
         .lp-faq { padding: 100px 40px; background: #F8F8F8; border-top: 1px solid #EBEBEB; border-bottom: 1px solid #EBEBEB; }
@@ -438,14 +439,14 @@ export default function LandingPage() {
         .lp-footer-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 32px; gap: 40px; flex-wrap: wrap; }
         .lp-footer-brand-block { max-width: 240px; }
         .lp-footer-logo-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-        .lp-footer-logo-row img { width: 26px; height: 26px; border-radius: 6px; opacity: 0.5; }
-        .lp-footer-brand { font-size: 14px; font-weight: 700; color: rgba(255,255,255,0.5); }
-        .lp-footer-tagline { font-size: 12px; color: rgba(255,255,255,0.2); line-height: 1.6; }
-        .lp-footer-col h4 { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.3); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 12px; }
-        .lp-footer-col a { display: block; font-size: 13px; color: rgba(255,255,255,0.2); text-decoration: none; margin-bottom: 8px; transition: color 0.15s; }
-        .lp-footer-col a:hover { color: rgba(255,255,255,0.55); }
-        .lp-footer-bottom { display: flex; align-items: center; justify-content: space-between; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.06); flex-wrap: wrap; gap: 12px; }
-        .lp-footer-copy { font-size: 12px; color: rgba(255,255,255,0.18); }
+        .lp-footer-logo-row img { width: 26px; height: 26px; border-radius: 6px; opacity: 0.75; }
+        .lp-footer-brand { font-size: 14px; font-weight: 700; color: rgba(255,255,255,0.8); }
+        .lp-footer-tagline { font-size: 13px; color: rgba(255,255,255,0.45); line-height: 1.65; }
+        .lp-footer-col h4 { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.55); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 12px; }
+        .lp-footer-col a { display: block; font-size: 13px; color: rgba(255,255,255,0.45); text-decoration: none; margin-bottom: 8px; transition: color 0.15s; }
+        .lp-footer-col a:hover { color: rgba(255,255,255,0.85); }
+        .lp-footer-bottom { display: flex; align-items: center; justify-content: space-between; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08); flex-wrap: wrap; gap: 12px; }
+        .lp-footer-copy { font-size: 12px; color: rgba(255,255,255,0.38); }
 
         /* ANIMATIONS */
         @keyframes fadeUp { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
@@ -646,21 +647,49 @@ export default function LandingPage() {
         <div className="lp-trust">
           <span className="lp-trust-label">עובד עם</span>
           <div className="lp-trust-items">
+            {/* WhatsApp */}
             <div className="lp-trust-item">
-              <svg width="16" height="16" viewBox="0 0 24 24"><path d="M17.6 6.31a8 8 0 10-3.07 13.56l1.5-2.6A5.97 5.97 0 0112 18a6 6 0 010-12c1.53 0 2.93.58 3.98 1.52L13 10.5h6V4.5l-1.4 1.81z" fill="#25D366"/></svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <rect width="24" height="24" rx="6" fill="#25D366"/>
+                <path d="M12 4a8 8 0 00-6.93 11.99L4 20l4.13-1.08A8 8 0 1012 4zm4.14 10.9c-.18.5-.88.96-1.47 1.08-.4.08-.92.14-2.68-.57-2.25-.9-3.7-3.17-3.81-3.32-.1-.14-.84-1.12-.84-2.14 0-1.01.53-1.51.72-1.72.18-.2.4-.25.53-.25h.38c.12 0 .28-.04.44.34l.62 1.5c.06.14.1.3.02.44l-.23.37-.3.35c-.1.1-.2.22-.09.43.12.2.53.87 1.14 1.41.78.7 1.45.91 1.65 1.01.2.1.31.08.43-.05l.49-.58c.12-.14.24-.1.4-.04l1.43.67c.2.1.34.14.39.23.05.1.05.55-.13 1.03z" fill="white"/>
+              </svg>
               WhatsApp Business API
             </div>
+            {/* Google */}
             <div className="lp-trust-item">
-              <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+              <svg width="20" height="20" viewBox="0 0 24 24">
+                <rect width="24" height="24" rx="6" fill="#fff" stroke="#E8E8E8"/>
+                <path d="M21.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 22c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 19.53 7.7 22 12 22z" fill="#34A853"/>
+                <path d="M5.84 13.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V6.07H2.18C1.43 7.55 1 9.22 1 11s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                <path d="M12 4.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 1.09 14.97 0 12 0 7.7 0 3.99 2.47 2.18 6.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+              </svg>
               Google Calendar
             </div>
+            {/* Claude / Anthropic */}
             <div className="lp-trust-item">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r=".5" fill="#7C3AED"/></svg>
-              Claude AI (Anthropic)
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <rect width="24" height="24" rx="6" fill="#7C3AED"/>
+                <path d="M12 5l5 14H7L12 5z" fill="none" stroke="white" strokeWidth="1.5" strokeLinejoin="round"/>
+                <path d="M8.5 14h7" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              Claude AI
             </div>
+            {/* ElevenLabs */}
             <div className="lp-trust-item">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-              ElevenLabs Voice AI
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <rect width="24" height="24" rx="6" fill="#111"/>
+                <path d="M8 7v10M12 4v16M16 7v10" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+              ElevenLabs Voice
+            </div>
+            {/* Railway */}
+            <div className="lp-trust-item">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <rect width="24" height="24" rx="6" fill="#0B0D0E"/>
+                <path d="M5 18l3-12h3l-3 12H5zm6 0l3-12h3l-3 12h-3z" fill="white" opacity="0.9"/>
+              </svg>
+              Railway Cloud
             </div>
           </div>
         </div>
