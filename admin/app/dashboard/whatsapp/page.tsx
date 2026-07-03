@@ -41,6 +41,7 @@ export default function WhatsAppPage() {
     if (!META_APP_ID) return;
     window.fbAsyncInit = () => {
       window.FB.init({ appId: META_APP_ID, autoLogAppEvents: true, xfbml: true, version: "v19.0" });
+      console.log("FB SDK initialized, appId:", META_APP_ID);
       setSdkReady(true);
     };
     if (document.getElementById("facebook-jssdk")) { setSdkReady(true); return; }
@@ -53,10 +54,15 @@ export default function WhatsAppPage() {
   }, []);
 
   function launchEmbeddedSignup() {
-    if (!window.FB) return;
+    if (!window.FB) {
+      setError("Facebook SDK not loaded yet. Please wait a moment and try again.");
+      return;
+    }
     setError(null);
+    console.log("Launching FB.login with config_id:", META_CONFIG_ID, "app:", META_APP_ID);
     window.FB.login(
       async (response: any) => {
+        console.log("FB.login response:", JSON.stringify(response));
         if (response.authResponse?.code) {
           setLoading(true);
           try {
