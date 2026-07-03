@@ -6,16 +6,33 @@ import type { AnimationItem } from "lottie-web";
 export default function LandingPage() {
   const tiltEl = useRef<HTMLDivElement>(null);
   const logoRef = useRef<HTMLDivElement>(null);
+  const dashboardLottieRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [appts, setAppts] = useState(40);
 
-  // Lottie logo animation
+  // Lottie logo animation (nav)
   useEffect(() => {
     if (!logoRef.current) return;
     let anim: AnimationItem | null = null;
     import("lottie-web").then((lottie) => {
       anim = lottie.default.loadAnimation({
         container: logoRef.current!,
+        renderer: "svg",
+        loop: true,
+        autoplay: true,
+        path: "/logo_animation_black.json",
+      });
+    });
+    return () => anim?.destroy();
+  }, []);
+
+  // Lottie dashboard splash
+  useEffect(() => {
+    if (!dashboardLottieRef.current) return;
+    let anim: AnimationItem | null = null;
+    import("lottie-web").then((lottie) => {
+      anim = lottie.default.loadAnimation({
+        container: dashboardLottieRef.current!,
         renderer: "svg",
         loop: true,
         autoplay: true,
@@ -264,7 +281,7 @@ export default function LandingPage() {
         .phone-wa-info { flex: 1; }
         .phone-wa-name { font-size: 12px; font-weight: 600; color: #fff; line-height: 1.2; }
         .phone-wa-online { font-size: 10px; color: rgba(255,255,255,0.55); }
-        .phone-chat { background: #ECE5DD url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Ccircle cx='30' cy='30' r='1' fill='%23C9B99A' opacity='0.3'/%3E%3C/svg%3E"); padding: 12px 10px; display: flex; flex-direction: column; gap: 6px; min-height: 320px; }
+        .phone-chat { background: #ECE5DD url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Ccircle cx='30' cy='30' r='1' fill='%23C9B99A' opacity='0.3'/%3E%3C/svg%3E"); padding: 12px 10px; display: flex; flex-direction: column; gap: 6px; height: 320px; overflow: hidden; }
         .chat-bubble { max-width: 82%; padding: 7px 10px; border-radius: 8px; font-size: 12px; line-height: 1.5; position: relative; }
         .chat-bubble.incoming { background: #fff; align-self: flex-end; border-radius: 8px 0 8px 8px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); color: #111; }
         .chat-bubble.outgoing { background: #DCF8C6; align-self: flex-start; border-radius: 0 8px 8px 8px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); color: #111; }
@@ -293,12 +310,12 @@ export default function LandingPage() {
         .marquee-track { display: flex; gap: 0; animation: marquee-scroll 28s linear infinite; white-space: nowrap; width: max-content; }
         .marquee-track:hover { animation-play-state: paused; }
         @keyframes marquee-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-        .marquee-item { display: inline-flex; align-items: center; gap: 10px; padding: 0 36px; font-size: 13px; color: rgba(255,255,255,0.65); font-weight: 500; border-right: 1px solid rgba(255,255,255,0.1); }
+        .marquee-item { display: inline-flex; align-items: center; gap: 10px; padding: 0 36px; font-size: 14px; color: rgba(255,255,255,0.72); font-weight: 500; border-right: 1px solid rgba(255,255,255,0.1); }
         .marquee-item .star { color: #F59E0B; font-size: 11px; }
         .marquee-item strong { color: rgba(255,255,255,0.9); }
 
         /* 3D PRODUCT */
-        .lp-3d-wrap { background: #F8F8F8; padding: 60px 24px 100px; overflow: hidden; position: relative; z-index: 1; }
+        .lp-3d-wrap { background: #F8F8F8; padding: 0 24px 100px; overflow: hidden; }
         .lp-3d-inner { max-width: 1000px; margin: 0 auto; will-change: transform, opacity; transform-origin: center top; transform: perspective(1500px) rotateX(28deg) scale(0.88); opacity: 0.55; }
         .mock { background: #18181B; border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 40px 100px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.04); }
         .mock-titlebar { background: #111; padding: 12px 20px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
@@ -344,7 +361,7 @@ export default function LandingPage() {
         .lp-stat-n { font-size: 52px; font-weight: 800; letter-spacing: -3px; line-height: 1; color: #fff; margin-bottom: 6px; font-variant-numeric: tabular-nums; display: flex; align-items: flex-end; gap: 2px; }
         .lp-stat-n .accent { color: #25D366; font-size: 32px; padding-bottom: 6px; }
         .lp-stat-n .count-up { display: inline-block; }
-        .lp-stat-l { font-size: 13px; color: rgba(255,255,255,0.62); line-height: 1.5; }
+        .lp-stat-l { font-size: 14px; color: rgba(255,255,255,0.72); line-height: 1.5; }
 
         /* INTEGRATION FLOW */
         .lp-flow { padding: 100px 40px; background: #fff; }
@@ -375,7 +392,7 @@ export default function LandingPage() {
         .lp-step:last-child { border-left: none; }
         .lp-step-num { font-size: 12px; font-weight: 700; color: #25D366; margin-bottom: 20px; letter-spacing: 0.06em; }
         .lp-step-title { font-size: 16px; font-weight: 700; color: #111; margin-bottom: 10px; letter-spacing: -0.3px; line-height: 1.35; }
-        .lp-step-desc { font-size: 13.5px; color: #777; line-height: 1.7; }
+        .lp-step-desc { font-size: 15px; color: #666; line-height: 1.7; }
 
         /* FEATURES */
         .lp-features { background: #F8F8F8; border-top: 1px solid #EBEBEB; border-bottom: 1px solid #EBEBEB; padding: 100px 40px; }
@@ -385,7 +402,7 @@ export default function LandingPage() {
         .lp-feat:hover { box-shadow: 0 16px 40px rgba(0,0,0,0.08); }
         .lp-feat-icon { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; font-size: 20px; background: #F0FFF4; }
         .lp-feat-title { font-size: 15px; font-weight: 700; color: #111; margin-bottom: 7px; letter-spacing: -0.2px; }
-        .lp-feat-desc { font-size: 13px; color: #777; line-height: 1.65; }
+        .lp-feat-desc { font-size: 14.5px; color: #666; line-height: 1.65; }
 
         /* TESTIMONIALS */
         .lp-testi { padding: 100px 40px; background: #fff; }
@@ -402,24 +419,26 @@ export default function LandingPage() {
         .lp-testi-role { font-size: 12px; color: #888; }
 
         /* BEFORE/AFTER */
-        .lp-ba { background: #F8F8F8; border-top: 1px solid #EBEBEB; border-bottom: 1px solid #EBEBEB; padding: 100px 40px; }
+        .lp-ba { background: #0A0A0A; border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 100px 40px; }
         .lp-ba-inner { max-width: 1080px; margin: 0 auto; }
+        .lp-ba .lp-label { color: #F59E0B; }
+        .lp-ba .lp-title { color: #fff; }
         .lp-ba-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 52px; }
-        .lp-ba-card { border-radius: 14px; padding: 32px; border: 1px solid transparent; }
-        .lp-ba-card.before { background: #fff; border-color: #F3D5D5; }
-        .lp-ba-card.after { background: #F0FFF4; border-color: #BBF7D0; }
-        .lp-ba-header { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
-        .lp-ba-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
-        .before .lp-ba-icon { background: #FEE2E2; }
-        .after .lp-ba-icon { background: #DCFCE7; }
-        .lp-ba-tag { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
-        .before .lp-ba-tag { color: #EF4444; }
-        .after .lp-ba-tag { color: #16A34A; }
-        .lp-ba-items { display: flex; flex-direction: column; gap: 12px; }
-        .lp-ba-item { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 1.5; color: #444; }
-        .lp-ba-bullet { font-size: 12px; margin-top: 2px; flex-shrink: 0; }
-        .before .lp-ba-bullet { color: #EF4444; }
-        .after .lp-ba-bullet { color: #16A34A; }
+        .lp-ba-card { border-radius: 16px; padding: 36px; border: 1px solid transparent; }
+        .lp-ba-card.before { background: rgba(239,68,68,0.06); border-color: rgba(239,68,68,0.2); }
+        .lp-ba-card.after { background: rgba(37,211,102,0.06); border-color: rgba(37,211,102,0.25); }
+        .lp-ba-header { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+        .lp-ba-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+        .before .lp-ba-icon { background: rgba(239,68,68,0.12); }
+        .after .lp-ba-icon { background: rgba(37,211,102,0.12); }
+        .lp-ba-tag { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+        .before .lp-ba-tag { color: #F87171; }
+        .after .lp-ba-tag { color: #4ADE80; }
+        .lp-ba-items { display: flex; flex-direction: column; gap: 16px; }
+        .lp-ba-item { display: flex; align-items: flex-start; gap: 12px; font-size: 15px; line-height: 1.6; color: rgba(255,255,255,0.75); }
+        .lp-ba-bullet { font-size: 14px; margin-top: 1px; flex-shrink: 0; font-weight: 700; }
+        .before .lp-ba-bullet { color: #F87171; }
+        .after .lp-ba-bullet { color: #4ADE80; }
 
         /* PREMIUM */
         .lp-premium { background: #0A0A0A; padding: 100px 40px; position: relative; overflow: hidden; }
@@ -476,7 +495,7 @@ export default function LandingPage() {
         .lp-plan-divider { height: 1px; background: #EBEBEB; margin-bottom: 24px; }
         .lp-plan.featured .lp-plan-divider { background: rgba(255,255,255,0.08); }
         .lp-plan-features { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
-        .lp-plan-feat { display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px; color: #444; line-height: 1.5; }
+        .lp-plan-feat { display: flex; align-items: flex-start; gap: 10px; font-size: 15px; color: #444; line-height: 1.5; }
         .lp-plan.featured .lp-plan-feat { color: rgba(255,255,255,0.82); }
         .lp-plan-feat .check { color: #25D366; font-size: 13px; flex-shrink: 0; margin-top: 1px; }
         .lp-plan.featured .lp-plan-feat .check { color: #F59E0B; }
@@ -497,7 +516,7 @@ export default function LandingPage() {
         .lp-roi-n { font-size: 36px; font-weight: 800; letter-spacing: -2px; color: #fff; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
         .lp-roi-n .accent { color: #25D366; }
         .lp-roi-n .amber { color: #F59E0B; }
-        .lp-roi-l { font-size: 12px; color: rgba(255,255,255,0.65); line-height: 1.5; }
+        .lp-roi-l { font-size: 13.5px; color: rgba(255,255,255,0.72); line-height: 1.5; }
         .lp-roi-note { font-size: 14px; color: rgba(255,255,255,0.6); }
         .lp-roi-note strong { color: #fff; }
 
@@ -512,7 +531,7 @@ export default function LandingPage() {
         .faq-icon { width: 20px; height: 20px; border-radius: 50%; background: #F0F0F0; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #555; flex-shrink: 0; transition: transform 0.25s ease, background 0.15s; font-style: normal; }
         .faq-item.open .faq-icon { background: #25D366; color: #fff; }
         .faq-a { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
-        .faq-a-inner { padding: 0 24px 20px; font-size: 14px; color: #666; line-height: 1.75; }
+        .faq-a-inner { padding: 0 24px 20px; font-size: 15px; color: #555; line-height: 1.75; }
 
         /* CTA */
         .lp-cta { background: #fff; padding: 100px 40px; text-align: center; border-top: 1px solid #EBEBEB; }
@@ -649,7 +668,7 @@ export default function LandingPage() {
         .compare-table th:first-child { text-align: right; width: 44%; }
         .compare-table th.col-tori { background: #1D4ED8; color: #fff; }
         .compare-table th.col-tori .col-badge { display: inline-block; background: #fff; color: #1D4ED8; font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 20px; margin-right: 6px; letter-spacing: 0.04em; vertical-align: middle; }
-        .compare-table td { padding: 14px 20px; font-size: 13.5px; color: #444; border-bottom: 1px solid #F0F0F0; vertical-align: middle; }
+        .compare-table td { padding: 14px 20px; font-size: 15px; color: #444; border-bottom: 1px solid #F0F0F0; vertical-align: middle; }
         .compare-table tr:last-child td { border-bottom: none; }
         .compare-table td:first-child { font-weight: 500; color: #222; }
         .compare-table td { text-align: center; }
@@ -933,55 +952,17 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* 3D PRODUCT PREVIEW */}
+        {/* 3D PRODUCT PREVIEW — Lottie animation */}
         <div className="lp-3d-wrap">
           <div className="lp-3d-inner" ref={tiltEl}>
-            <div className="mock">
-              <div className="mock-titlebar">
-                <span className="mock-dot r" /><span className="mock-dot y" /><span className="mock-dot g" />
-                <span className="mock-url">torionline.com/dashboard</span>
+            <div style={{ background: "#18181B", borderRadius: 16, overflow: "hidden", border: "1px solid rgba(255,255,255,0.06)", boxShadow: "0 40px 100px rgba(0,0,0,0.25)" }}>
+              <div style={{ background: "#111", padding: "12px 20px", display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#FF5F57", display: "inline-block" }} />
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#FEBC2E", display: "inline-block" }} />
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#28C840", display: "inline-block" }} />
+                <span style={{ margin: "0 auto", background: "#222", borderRadius: 5, padding: "4px 16px", fontSize: 11, color: "#555", fontFamily: "monospace" }}>תורי — דשבורד</span>
               </div>
-              <div className="mock-body">
-                <div className="mock-sidebar">
-                  <div className="mock-nav-item active"><span className="mock-nav-dot" />תורים</div>
-                  <div className="mock-nav-item"><span className="mock-nav-dot" />לקוחות</div>
-                  <div className="mock-nav-item"><span className="mock-nav-dot" />שירותים</div>
-                  <div className="mock-nav-item"><span className="mock-nav-dot" />אנליטיקה</div>
-                  <div className="mock-nav-item"><span className="mock-nav-dot" />הגדרות</div>
-                </div>
-                <div className="mock-main">
-                  <div className="mock-stats-row">
-                    <div className="mock-stat">
-                      <div className="mock-stat-n">47</div>
-                      <div className="mock-stat-l">תורים החודש</div>
-                    </div>
-                    <div className="mock-stat">
-                      <div className="mock-stat-n"><span className="g">₪</span>8,240</div>
-                      <div className="mock-stat-l">הכנסה</div>
-                    </div>
-                    <div className="mock-stat">
-                      <div className="mock-stat-n">23</div>
-                      <div className="mock-stat-l">לקוחות חדשים</div>
-                    </div>
-                  </div>
-                  <div className="mock-section-title">תורים קרובים</div>
-                  <div className="mock-appt-list">
-                    {[
-                      { time: "09:30", name: "דנה כהן", svc: "תספורת", status: "confirmed", label: "מאושר" },
-                      { time: "11:00", name: "מיכל לוי", svc: "צבע", status: "confirmed", label: "מאושר" },
-                      { time: "14:30", name: "יוסי אברהם", svc: "תספורת + זקן", status: "pending", label: "ממתין" },
-                      { time: "16:00", name: "שרה גולדברג", svc: "טיפול פנים", status: "confirmed", label: "מאושר" },
-                    ].map((a) => (
-                      <div key={a.time} className="mock-appt">
-                        <span className="mock-appt-time">{a.time}</span>
-                        <span className="mock-appt-name">{a.name}</span>
-                        <span className="mock-appt-service">{a.svc}</span>
-                        <span className={`mock-appt-badge ${a.status}`}>{a.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              <div ref={dashboardLottieRef} style={{ width: "100%", aspectRatio: "16/7", background: "#18181B" }} />
             </div>
           </div>
         </div>
