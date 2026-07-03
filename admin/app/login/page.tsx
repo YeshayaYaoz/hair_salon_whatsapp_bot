@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, setToken } from "../lib/api";
 
@@ -14,17 +14,28 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [splashDone, setSplashDone] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [mounted, setMounted] = useState(false);
+  const logoRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    const onEnd = () => setSplashDone(true);
-    v.addEventListener("ended", onEnd);
-    // Fallback: if video fails to load or takes too long, skip after 4s
-    const fallback = setTimeout(() => setSplashDone(true), 4000);
-    return () => { v.removeEventListener("ended", onEnd); clearTimeout(fallback); };
+    const t = setTimeout(() => setMounted(true), 60);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (!logoRef.current) return;
+    let anim: { destroy: () => void } | null = null;
+    import("lottie-web").then((lottie) => {
+      if (!logoRef.current) return;
+      anim = lottie.default.loadAnimation({
+        container: logoRef.current!,
+        renderer: "svg",
+        loop: true,
+        autoplay: true,
+        path: "/logo_animation_black.json",
+      });
+    });
+    return () => anim?.destroy();
   }, []);
 
   async function submit(e: React.FormEvent) {
@@ -45,106 +56,509 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-4 py-8 bg-zinc-950">
+    <>
+      <style>{`
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
-      {/* Splash screen */}
-      <div
-        className={`fixed inset-0 z-50 bg-zinc-950 flex items-center justify-center transition-opacity duration-700 ${
-          splashDone ? "opacity-0 pointer-events-none" : "opacity-100"
-        }`}
-      >
-        <video
-          ref={videoRef}
-          src="/logo_animation_black.mp4"
-          autoPlay
-          muted
-          playsInline
-          className="w-full h-full object-cover"
-        />
-      </div>
+        .login-root {
+          min-height: 100vh;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          background: #09090B;
+          direction: rtl;
+          font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        @media (max-width: 820px) {
+          .login-root { grid-template-columns: 1fr; }
+          .login-left { display: none; }
+        }
 
-      {/* Login form — fades in after splash */}
-      <div className={`w-full max-w-sm transition-opacity duration-700 ${splashDone ? "opacity-100" : "opacity-0"}`}>
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-8 animate-fade-up">
-          <Image
-            src="/tori-logo-black.png"
-            alt="תורי"
-            width={120}
-            height={120}
-            className="mb-2 drop-shadow-2xl"
-            priority
-          />
-          <p className="text-zinc-400 text-sm">הזמנת תורים בוואטסאפ</p>
-        </div>
+        /* ── LEFT PANEL ── */
+        .login-left {
+          position: relative;
+          background: linear-gradient(135deg, #0F172A 0%, #1E1B4B 50%, #0F172A 100%);
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          padding: 56px 60px;
+          overflow: hidden;
+        }
+        .login-left::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background:
+            radial-gradient(ellipse 600px 500px at 20% 80%, rgba(245,158,11,0.08) 0%, transparent 60%),
+            radial-gradient(ellipse 400px 400px at 80% 20%, rgba(99,102,241,0.12) 0%, transparent 60%);
+          pointer-events: none;
+        }
+        .login-left-grid {
+          position: absolute;
+          inset: 0;
+          background-image:
+            linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+          background-size: 48px 48px;
+          pointer-events: none;
+        }
 
-        {/* Card */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-2xl animate-fade-up stagger-2">
-          <h2 className="text-lg font-semibold mb-5 text-white">
-            {mode === "login" ? "כניסה לחשבון" : "יצירת חשבון"}
-          </h2>
+        .login-left-brand {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          position: relative;
+          z-index: 1;
+        }
+        .login-left-brand-name {
+          font-size: 22px;
+          font-weight: 700;
+          color: #fff;
+          letter-spacing: -0.5px;
+        }
 
-          <form onSubmit={submit} className="flex flex-col gap-3">
-            {mode === "signup" && (
-              <input
-                placeholder="שם הסלון"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                className="w-full"
-              />
-            )}
-            <input
-              placeholder="כתובת אימייל"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full"
-            />
-            <input
-              placeholder="סיסמה"
-              type="password"
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full"
-            />
+        .login-left-content {
+          position: relative;
+          z-index: 1;
+        }
+        .login-left-tag {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          background: rgba(245,158,11,0.12);
+          border: 1px solid rgba(245,158,11,0.25);
+          border-radius: 20px;
+          padding: 5px 14px;
+          font-size: 12px;
+          font-weight: 600;
+          color: #F59E0B;
+          letter-spacing: 0.04em;
+          margin-bottom: 32px;
+        }
+        .login-left-tag-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: #F59E0B;
+          box-shadow: 0 0 6px #F59E0B;
+          animation: pulse-dot 2s ease-in-out infinite;
+        }
+        @keyframes pulse-dot {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(0.8); }
+        }
 
-            {mode === "login" && (
-              <div className="text-end">
-                <Link href="/forgot-password" className="text-xs text-zinc-500 hover:text-violet-400 transition">
-                  שכחת סיסמה?
-                </Link>
+        .login-left-headline {
+          font-size: clamp(28px, 3vw, 40px);
+          font-weight: 800;
+          color: #fff;
+          line-height: 1.2;
+          letter-spacing: -1.5px;
+          margin-bottom: 20px;
+          text-wrap: balance;
+        }
+        .login-left-headline em {
+          font-style: normal;
+          color: #F59E0B;
+        }
+        .login-left-sub {
+          font-size: 15px;
+          color: rgba(255,255,255,0.55);
+          line-height: 1.7;
+          max-width: 360px;
+          margin-bottom: 44px;
+        }
+
+        .login-left-stats {
+          display: flex;
+          gap: 32px;
+        }
+        .login-left-stat {}
+        .login-left-stat-n {
+          font-size: 26px;
+          font-weight: 800;
+          color: #fff;
+          letter-spacing: -1px;
+          line-height: 1;
+          margin-bottom: 4px;
+        }
+        .login-left-stat-n span { color: #F59E0B; }
+        .login-left-stat-l {
+          font-size: 11px;
+          color: rgba(255,255,255,0.4);
+          letter-spacing: 0.04em;
+        }
+
+        .login-left-testimonial {
+          position: relative;
+          z-index: 1;
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 16px;
+          padding: 22px 26px;
+        }
+        .login-left-quote {
+          font-size: 14px;
+          color: rgba(255,255,255,0.75);
+          line-height: 1.7;
+          margin-bottom: 16px;
+        }
+        .login-left-author {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .login-left-avatar {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #F59E0B, #D97706);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 13px;
+          font-weight: 700;
+          color: #000;
+          flex-shrink: 0;
+        }
+        .login-left-author-name {
+          font-size: 13px;
+          font-weight: 600;
+          color: #fff;
+        }
+        .login-left-author-role {
+          font-size: 11px;
+          color: rgba(255,255,255,0.4);
+        }
+
+        /* ── RIGHT PANEL ── */
+        .login-right {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 40px 32px;
+          background: #09090B;
+        }
+
+        .login-form-wrap {
+          width: 100%;
+          max-width: 400px;
+          opacity: 0;
+          transform: translateY(16px);
+          transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+        .login-form-wrap.show {
+          opacity: 1;
+          transform: none;
+        }
+
+        .login-form-logo {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 36px;
+        }
+        .login-form-logo-name {
+          font-size: 18px;
+          font-weight: 700;
+          color: #fff;
+          letter-spacing: -0.4px;
+        }
+        .login-form-logo-sub {
+          font-size: 12px;
+          color: rgba(255,255,255,0.35);
+          margin-top: 1px;
+        }
+
+        .login-form-heading {
+          font-size: 22px;
+          font-weight: 800;
+          color: #fff;
+          letter-spacing: -0.8px;
+          margin-bottom: 6px;
+        }
+        .login-form-sub {
+          font-size: 13px;
+          color: rgba(255,255,255,0.4);
+          margin-bottom: 28px;
+        }
+
+        .login-field {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          margin-bottom: 14px;
+        }
+        .login-field label {
+          font-size: 12px;
+          font-weight: 600;
+          color: rgba(255,255,255,0.55);
+          letter-spacing: 0.03em;
+        }
+        .login-field input {
+          width: 100%;
+          background: #18181B;
+          border: 1px solid rgba(255,255,255,0.09);
+          border-radius: 10px;
+          padding: 12px 16px;
+          font-size: 14px;
+          color: #fff;
+          outline: none;
+          transition: border-color 0.15s, box-shadow 0.15s;
+          direction: ltr;
+          font-family: inherit;
+        }
+        .login-field input::placeholder {
+          color: rgba(255,255,255,0.22);
+          direction: ltr;
+        }
+        .login-field input:focus {
+          border-color: #F59E0B;
+          box-shadow: 0 0 0 3px rgba(245,158,11,0.12);
+        }
+
+        .login-forgot {
+          display: block;
+          text-align: left;
+          font-size: 12px;
+          color: rgba(255,255,255,0.35);
+          text-decoration: none;
+          margin-top: -6px;
+          margin-bottom: 8px;
+          transition: color 0.15s;
+        }
+        .login-forgot:hover { color: #F59E0B; }
+
+        .login-error {
+          background: rgba(239,68,68,0.08);
+          border: 1px solid rgba(239,68,68,0.25);
+          border-radius: 10px;
+          padding: 11px 14px;
+          font-size: 13px;
+          color: #FCA5A5;
+          margin-bottom: 14px;
+        }
+
+        .login-submit {
+          width: 100%;
+          background: #F59E0B;
+          color: #000;
+          font-size: 14px;
+          font-weight: 700;
+          border: none;
+          border-radius: 10px;
+          padding: 14px;
+          cursor: pointer;
+          transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+          font-family: inherit;
+          letter-spacing: -0.2px;
+          margin-top: 6px;
+        }
+        .login-submit:hover:not(:disabled) {
+          background: #FBBF24;
+          box-shadow: 0 4px 20px rgba(245,158,11,0.35);
+          transform: translateY(-1px);
+        }
+        .login-submit:active:not(:disabled) { transform: none; }
+        .login-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .login-divider {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin: 22px 0;
+        }
+        .login-divider-line {
+          flex: 1;
+          height: 1px;
+          background: rgba(255,255,255,0.07);
+        }
+        .login-divider-text {
+          font-size: 11px;
+          color: rgba(255,255,255,0.25);
+          white-space: nowrap;
+        }
+
+        .login-switch {
+          text-align: center;
+          font-size: 13px;
+          color: rgba(255,255,255,0.35);
+        }
+        .login-switch button {
+          background: none;
+          border: none;
+          color: #F59E0B;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          font-family: inherit;
+          transition: color 0.15s;
+        }
+        .login-switch button:hover { color: #FBBF24; }
+
+        .login-trust {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 16px;
+          margin-top: 28px;
+          flex-wrap: wrap;
+        }
+        .login-trust-item {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          font-size: 11px;
+          color: rgba(255,255,255,0.25);
+        }
+        .login-trust-icon {
+          font-size: 12px;
+          opacity: 0.5;
+        }
+      `}</style>
+
+      <main className="login-root">
+        {/* Left panel */}
+        <div className="login-left">
+          <div className="login-left-grid" />
+
+          <div className="login-left-brand">
+            <div ref={logoRef} style={{ width: 32, height: 32, flexShrink: 0 }} />
+            <span className="login-left-brand-name">תורי</span>
+          </div>
+
+          <div className="login-left-content">
+            <div className="login-left-tag">
+              <span className="login-left-tag-dot" />
+              בוט AI פעיל · 24/7
+            </div>
+            <div className="login-left-headline">
+              הדשבורד שמנהל<br />
+              את <em>כל התורים</em><br />
+              בשבילך
+            </div>
+            <p className="login-left-sub">
+              קבל תורים בוואטסאפ, ראה את לוח הזמנים שלך בזמן אמת,
+              ותן ל-AI לטפל בכל השאר.
+            </p>
+            <div className="login-left-stats">
+              <div className="login-left-stat">
+                <div className="login-left-stat-n"><span>+</span>2,400</div>
+                <div className="login-left-stat-l">עסקים פעילים</div>
               </div>
-            )}
+              <div className="login-left-stat">
+                <div className="login-left-stat-n"><span>98</span>%</div>
+                <div className="login-left-stat-l">שיעור מענה</div>
+              </div>
+              <div className="login-left-stat">
+                <div className="login-left-stat-n"><span>4.9</span>★</div>
+                <div className="login-left-stat-l">דירוג לקוחות</div>
+              </div>
+            </div>
+          </div>
 
-            {error && (
-              <p className="text-red-400 text-sm bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">{error}</p>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="mt-1 w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg py-3 text-sm transition"
-            >
-              {loading ? "רגע..." : mode === "login" ? "כניסה" : "יצירת חשבון"}
-            </button>
-          </form>
-
-          <p className="text-center text-sm text-zinc-500 mt-5">
-            {mode === "login" ? "אין לך חשבון?" : "כבר יש לך חשבון?"}{" "}
-            <button
-              onClick={() => setMode(mode === "login" ? "signup" : "login")}
-              className="text-violet-400 hover:text-violet-300 font-medium transition"
-            >
-              {mode === "login" ? "הרשמה" : "כניסה"}
-            </button>
-          </p>
+          <div className="login-left-testimonial">
+            <div className="login-left-quote">
+              &ldquo;מאז שהתחלתי להשתמש בתורי, הפסקתי לאבד לקוחות בגלל שלא עניתי לטלפונים. הבוט עובד גם ב-2 בלילה.&rdquo;
+            </div>
+            <div className="login-left-author">
+              <div className="login-left-avatar">ש</div>
+              <div>
+                <div className="login-left-author-name">שרה לוי</div>
+                <div className="login-left-author-role">מספרת שרה, תל אביב</div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-    </main>
+
+        {/* Right panel */}
+        <div className="login-right">
+          <div className={`login-form-wrap ${mounted ? "show" : ""}`}>
+
+            <div className="login-form-logo">
+              <Image src="/tori-logo-black.png" alt="תורי" width={36} height={36} priority />
+              <div>
+                <div className="login-form-logo-name">תורי</div>
+                <div className="login-form-logo-sub">הזמנת תורים בוואטסאפ</div>
+              </div>
+            </div>
+
+            <h1 className="login-form-heading">
+              {mode === "login" ? "ברוך הבא בחזרה" : "יצירת חשבון חדש"}
+            </h1>
+            <p className="login-form-sub">
+              {mode === "login"
+                ? "הכנס לחשבון שלך כדי לנהל את התורים"
+                : "הצטרף לאלפי עסקים שמשתמשים בתורי"}
+            </p>
+
+            <form onSubmit={submit}>
+              {mode === "signup" && (
+                <div className="login-field">
+                  <label>שם העסק</label>
+                  <input
+                    placeholder="מספרה / קליניקה / סטודיו..."
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+              <div className="login-field">
+                <label>כתובת אימייל</label>
+                <input
+                  placeholder="name@example.com"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="login-field">
+                <label>סיסמה</label>
+                <input
+                  placeholder="••••••••"
+                  type="password"
+                  autoComplete={mode === "login" ? "current-password" : "new-password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+
+              {mode === "login" && (
+                <Link href="/forgot-password" className="login-forgot">שכחת סיסמה?</Link>
+              )}
+
+              {error && <div className="login-error">{error}</div>}
+
+              <button type="submit" disabled={loading} className="login-submit">
+                {loading ? "רגע..." : mode === "login" ? "כניסה לחשבון" : "יצירת חשבון"}
+              </button>
+            </form>
+
+            <div className="login-divider">
+              <div className="login-divider-line" />
+              <span className="login-divider-text">
+                {mode === "login" ? "אין לך חשבון?" : "כבר יש לך חשבון?"}
+              </span>
+              <div className="login-divider-line" />
+            </div>
+
+            <div className="login-switch">
+              <button onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(null); }}>
+                {mode === "login" ? "הרשמה חינם →" : "כניסה לחשבון →"}
+              </button>
+            </div>
+
+            <div className="login-trust">
+              <div className="login-trust-item"><span className="login-trust-icon">🔒</span>SSL מאובטח</div>
+              <div className="login-trust-item"><span className="login-trust-icon">🛡️</span>ללא חוזה</div>
+              <div className="login-trust-item"><span className="login-trust-icon">⚡</span>פעיל תוך דקות</div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </>
   );
 }

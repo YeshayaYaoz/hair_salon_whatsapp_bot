@@ -306,31 +306,39 @@ export default function LandingPage() {
         /* 3D PRODUCT */
         .lp-3d-wrap { background: #F8F8F8; padding: 0 24px 100px; overflow: hidden; }
         .lp-3d-inner { max-width: 1000px; margin: 0 auto; will-change: transform, opacity; transform-origin: center top; transform: perspective(1500px) rotateX(28deg) scale(0.88); opacity: 0.55; }
-        .mock { background: #18181B; border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 40px 100px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.04); }
-        .mock-titlebar { background: #111; padding: 12px 20px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); }
-        .mock-dot { width: 10px; height: 10px; border-radius: 50%; }
+        .mock { background: #18181B; border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 40px 100px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.04); direction: ltr; }
+        .mock-titlebar { background: #111; padding: 14px 20px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.07); direction: ltr; }
+        .mock-dot { width: 11px; height: 11px; border-radius: 50%; }
         .mock-dot.r { background: #FF5F57; } .mock-dot.y { background: #FEBC2E; } .mock-dot.g { background: #28C840; }
-        .mock-url { margin-right: auto; margin-left: auto; background: #222; border-radius: 5px; padding: 4px 16px; font-size: 11px; color: #555; font-family: 'Courier New', monospace; }
-        .mock-body { display: grid; grid-template-columns: 240px 1fr; }
-        .mock-sidebar { background: #111; border-left: 1px solid rgba(255,255,255,0.05); padding: 20px 12px; display: flex; flex-direction: column; gap: 2px; }
-        .mock-nav-item { padding: 8px 12px; border-radius: 7px; font-size: 12px; color: #888; cursor: default; display: flex; align-items: center; gap: 8px; }
-        .mock-nav-item.active { background: rgba(139,92,246,0.15); color: #A78BFA; }
-        .mock-nav-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
-        .mock-main { padding: 24px; }
-        .mock-stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
-        .mock-stat { background: #222; border-radius: 10px; padding: 16px; border: 1px solid rgba(255,255,255,0.05); }
-        .mock-stat-n { font-size: 22px; font-weight: 700; color: #fff; letter-spacing: -1px; margin-bottom: 3px; }
-        .mock-stat-n .g { color: #25D366; }
-        .mock-stat-l { font-size: 11px; color: #888; }
-        .mock-section-title { font-size: 11px; font-weight: 600; color: #888; margin-bottom: 10px; letter-spacing: 0.05em; text-transform: uppercase; }
-        .mock-appt-list { display: flex; flex-direction: column; gap: 6px; }
-        .mock-appt { background: #222; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; border: 1px solid rgba(255,255,255,0.04); }
-        .mock-appt-time { font-size: 11px; color: #888; font-family: 'Courier New', monospace; flex-shrink: 0; }
-        .mock-appt-name { font-size: 12px; color: #ddd; flex: 1; }
-        .mock-appt-service { font-size: 11px; color: #888; }
-        .mock-appt-badge { font-size: 9px; font-weight: 600; padding: 2px 8px; border-radius: 4px; flex-shrink: 0; }
-        .mock-appt-badge.confirmed { background: rgba(37,211,102,0.12); color: #25D366; }
-        .mock-appt-badge.pending { background: rgba(251,191,36,0.12); color: #FBBF24; }
+        .mock-url { margin: 0 auto; background: #1E1E1E; border: 1px solid rgba(255,255,255,0.07); border-radius: 6px; padding: 5px 20px; font-size: 11px; color: #666; font-family: 'Courier New', monospace; }
+        .mock-body { display: grid; grid-template-columns: 220px 1fr; direction: ltr; }
+        .mock-sidebar { background: #111; border-right: 1px solid rgba(255,255,255,0.06); padding: 24px 14px; display: flex; flex-direction: column; gap: 3px; }
+        .mock-sidebar-header { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.25); letter-spacing: 0.12em; text-transform: uppercase; padding: 0 10px; margin-bottom: 12px; }
+        .mock-nav-item { padding: 9px 14px; border-radius: 8px; font-size: 12.5px; color: #666; cursor: default; display: flex; align-items: center; gap: 10px; transition: background 0.12s; }
+        .mock-nav-item.active { background: rgba(245,158,11,0.12); color: #F59E0B; font-weight: 600; }
+        .mock-nav-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+        .mock-main { padding: 32px; }
+        .mock-main-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+        .mock-main-title { font-size: 15px; font-weight: 700; color: #fff; }
+        .mock-main-badge { background: rgba(37,211,102,0.12); color: #25D366; border: 1px solid rgba(37,211,102,0.2); font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+        .mock-stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+        .mock-stat { background: #1E1E1E; border-radius: 12px; padding: 20px 22px; border: 1px solid rgba(255,255,255,0.07); position: relative; overflow: hidden; }
+        .mock-stat::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 28px; opacity: 0.15; }
+        .mock-stat-trend { font-size: 10px; color: #25D366; margin-top: 6px; }
+        .mock-stat-trend.up { color: #25D366; }
+        .mock-stat-trend.down { color: #EF4444; }
+        .mock-stat-n { font-size: 26px; font-weight: 800; color: #fff; letter-spacing: -1px; margin-bottom: 4px; line-height: 1; }
+        .mock-stat-n .g { color: #F59E0B; }
+        .mock-stat-l { font-size: 11.5px; color: rgba(255,255,255,0.45); }
+        .mock-section-title { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.35); margin-bottom: 12px; letter-spacing: 0.1em; text-transform: uppercase; }
+        .mock-appt-list { display: flex; flex-direction: column; gap: 8px; }
+        .mock-appt { background: #1E1E1E; border-radius: 10px; padding: 13px 18px; display: flex; align-items: center; gap: 14px; border: 1px solid rgba(255,255,255,0.06); }
+        .mock-appt-time { font-size: 12px; color: rgba(255,255,255,0.5); font-family: 'Courier New', monospace; flex-shrink: 0; font-weight: 600; min-width: 38px; }
+        .mock-appt-name { font-size: 13px; color: #e8e8e8; flex: 1; font-weight: 500; }
+        .mock-appt-service { font-size: 11px; color: rgba(255,255,255,0.38); }
+        .mock-appt-badge { font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 6px; flex-shrink: 0; }
+        .mock-appt-badge.confirmed { background: rgba(37,211,102,0.1); color: #25D366; border: 1px solid rgba(37,211,102,0.2); }
+        .mock-appt-badge.pending { background: rgba(245,158,11,0.1); color: #F59E0B; border: 1px solid rgba(245,158,11,0.2); }
 
         /* TRUST BAR */
         .lp-trust { background: #fff; border-top: 1px solid #EBEBEB; border-bottom: 1px solid #EBEBEB; padding: 20px 40px; display: flex; align-items: center; justify-content: center; gap: 32px; flex-wrap: wrap; overflow-x: auto; }
@@ -348,7 +356,7 @@ export default function LandingPage() {
         .lp-stats-band-inner { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
         .lp-stat-cell { padding: 48px 36px; background: #141414; border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; }
         .lp-stat-n { font-size: 52px; font-weight: 800; letter-spacing: -3px; line-height: 1; color: #fff; margin-bottom: 6px; font-variant-numeric: tabular-nums; display: flex; align-items: flex-end; gap: 2px; }
-        .lp-stat-n .accent { color: #25D366; font-size: 32px; padding-bottom: 6px; }
+        .lp-stat-n .accent { color: #F59E0B; font-size: 32px; padding-bottom: 6px; }
         .lp-stat-n .count-up { display: inline-block; }
         .lp-stat-l { font-size: 14px; color: rgba(255,255,255,0.72); line-height: 1.5; }
 
@@ -953,25 +961,33 @@ export default function LandingPage() {
               </div>
               <div className="mock-body">
                 <div className="mock-sidebar">
+                  <div className="mock-sidebar-header">ניהול</div>
                   <div className="mock-nav-item active"><span className="mock-nav-dot" />תורים</div>
                   <div className="mock-nav-item"><span className="mock-nav-dot" />לקוחות</div>
                   <div className="mock-nav-item"><span className="mock-nav-dot" />שירותים</div>
                   <div className="mock-nav-item"><span className="mock-nav-dot" />אנליטיקה</div>
-                  <div className="mock-nav-item"><span className="mock-nav-dot" />הגדרות</div>
+                  <div className="mock-nav-item" style={{ marginTop: "auto" }}><span className="mock-nav-dot" />הגדרות</div>
                 </div>
                 <div className="mock-main">
+                  <div className="mock-main-header">
+                    <div className="mock-main-title">סקירה · יולי 2025</div>
+                    <div className="mock-main-badge">● פעיל</div>
+                  </div>
                   <div className="mock-stats-row">
                     <div className="mock-stat">
+                      <div className="mock-stat-l" style={{ marginBottom: 6 }}>תורים החודש</div>
                       <div className="mock-stat-n">47</div>
-                      <div className="mock-stat-l">תורים החודש</div>
+                      <div className="mock-stat-trend up">↑ 18% מחודש שעבר</div>
                     </div>
                     <div className="mock-stat">
+                      <div className="mock-stat-l" style={{ marginBottom: 6 }}>הכנסה</div>
                       <div className="mock-stat-n"><span className="g">₪</span>8,240</div>
-                      <div className="mock-stat-l">הכנסה</div>
+                      <div className="mock-stat-trend up">↑ ₪1,120</div>
                     </div>
                     <div className="mock-stat">
+                      <div className="mock-stat-l" style={{ marginBottom: 6 }}>לקוחות חדשים</div>
                       <div className="mock-stat-n">23</div>
-                      <div className="mock-stat-l">לקוחות חדשים</div>
+                      <div className="mock-stat-trend up">↑ 5 החודש</div>
                     </div>
                   </div>
                   <div className="mock-section-title">תורים קרובים</div>
@@ -1206,7 +1222,7 @@ export default function LandingPage() {
         <section className="lp-roi">
           <div className="lp-roi-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>מחשבון חיסכון</div>
-            <div className="lp-title reveal" style={{ color: "#fff", textAlign: "center" }}>כמה תורי שווה לך?</div>
+            <div className="lp-title reveal" style={{ color: "#fff", textAlign: "center" }}>כמה תורי חוסך לך?</div>
             <div className="lp-roi-sub reveal">גרור את הסליידר לפי מספר התורים השבועי שלך</div>
 
             <div className="lp-roi-slider-wrap reveal">
@@ -1289,7 +1305,7 @@ export default function LandingPage() {
                 <div className="lp-plan-tag">פרמיום</div>
                 <div className="lp-plan-name">Premium</div>
                 <div className="lp-plan-price">₪299</div>
-                <div className="lp-plan-per">לחודש · ניסיון 14 יום חינם</div>
+                <div className="lp-plan-per">לחודש · ללא חוזה</div>
                 <div className="lp-plan-divider" />
                 <div className="lp-plan-features">
                   {["הכל שב-Standard","מענה לשיחות טלפון נכנסות","קול AI טבעי (ElevenLabs)","תמלול שיחות אוטומטי","סנכרון תורים משיחות לגוגל קלנדר","תמיכה מועדפת בוואטסאפ","SLA של 4 שעות"].map((f) => (
