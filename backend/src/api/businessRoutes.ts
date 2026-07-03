@@ -59,6 +59,62 @@ businessRouter.put("/me/whatsapp", async (req: AuthedRequest, res) => {
   res.json({ ok: true });
 });
 
+// Embedded Signup: exchange the short-lived code Meta returns for a long-lived system user token,
+// then fetch the phone number ID from the WABA and save everything.
+businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, res) => {
+  const parsed = z.object({ code: z.string().min(1) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Missing code" });
+
+  const appId = process.env.META_APP_ID;
+  const appSecret = process.env.WHATSAPP_APP_SECRET;
+  if (!appId || !appSecret) return res.status(500).json({ error: "Meta app credentials not configured" });
+
+  // Exchange auth code for a user access token
+  const tokenRes = await fetch(
+    `https://graph.facebook.com/v19.0/oauth/access_token?client_id=${appId}&client_secret=${appSecret}&code=${parsed.data.code}`
+  );
+  const tokenData = await tokenRes.json() as any;
+  if (!tokenData.access_token) {
+    console.error("Embedded signup token exchange failed:", tokenData);
+    return res.status(400).json({ error: "Failed to exchange code", detail: tokenData });
+  }
+
+  const userToken: string = tokenData.access_token;
+
+  // Get the WhatsApp Business Accounts the user just shared
+  const wabaRes = await fetch(
+    `https://graph.facebook.com/v19.0/me/businesses?fields=owned_whatsapp_business_accounts{phone_numbers{id,display_phone_number}}&access_token=${userToken}`
+  );
+  const wabaData = await wabaRes.json() as any;
+
+  // Pick the first phone number from the first WABA
+  const phoneNumbers = wabaData?.data?.[0]?.owned_whatsapp_business_accounts?.data?.[0]?.phone_numbers?.data;
+  const phone = phoneNumbers?.[0];
+  if (!phone?.id) {
+    console.error("Could not find phone number in embedded signup response:", JSON.stringify(wabaData));
+    return res.status(400).json({ error: "No phone number found in connected account" });
+  }
+
+  // Subscribe the phone number's webhook to this app
+  const wabaId = wabaData?.data?.[0]?.owned_whatsapp_business_accounts?.data?.[0]?.id;
+  if (wabaId) {
+    await fetch(`https://graph.facebook.com/v19.0/${wabaId}/subscribed_apps`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${userToken}` },
+    });
+  }
+
+  await prisma.business.update({
+    where: { id: req.businessId! },
+    data: {
+      whatsappPhoneNumberId: phone.id,
+      whatsappAccessToken: encryptSecret(userToken),
+    },
+  });
+
+  res.json({ ok: true, phoneNumber: phone.display_phone_number });
+});
+
 // --- Services ---
 
 const serviceSchema = z.object({
