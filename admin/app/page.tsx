@@ -149,7 +149,7 @@ export default function LandingPage() {
   useEffect(() => {
     function runSequence() {
       const container = document.querySelector<HTMLElement>(".phone-chat");
-      const items = Array.from(document.querySelectorAll<HTMLElement>(".phone-chat > *"));
+      const items = Array.from(document.querySelectorAll<HTMLElement>(".phone-chat > *")).filter(el => !el.classList.contains("chat-date"));
       items.forEach(el => { el.style.display = "none"; el.classList.remove("show"); });
       if (container) container.scrollTop = 0;
       const delays = [300, 1600, 3000, 3500, 5000, 6400, 6900, 8300];
@@ -256,36 +256,109 @@ export default function LandingPage() {
 
         /* PHONE MOCKUP */
         .lp-hero-phone { animation: fadeUp 0.8s ease 0.4s both; display: flex; justify-content: center; align-items: center; position: relative; z-index: 1; }
-        .phone-wrap { position: relative; width: 280px; }
+        .phone-wrap { position: relative; width: 295px; filter: drop-shadow(0 32px 64px rgba(0,0,0,0.22)) drop-shadow(0 8px 24px rgba(0,0,0,0.14)); }
         .phone-frame {
-          width: 280px; background: #18181B; border-radius: 40px;
-          border: 6px solid #2A2A2A; box-shadow: 0 40px 80px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.04), inset 0 0 0 1px rgba(255,255,255,0.04);
+          width: 295px; background: #111;
+          border-radius: 44px;
+          border: 8px solid #1C1C1E;
+          outline: 1px solid rgba(255,255,255,0.08);
           overflow: hidden; position: relative;
         }
-        .phone-notch { width: 90px; height: 24px; background: #18181B; border-radius: 0 0 14px 14px; margin: 0 auto; position: relative; z-index: 2; }
-        .phone-status { display: flex; align-items: center; justify-content: space-between; padding: 4px 20px 0; font-size: 10px; color: rgba(255,255,255,0.3); font-family: 'Courier New', monospace; }
-        .phone-wa-bar { background: #075E54; padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
-        .phone-wa-back { color: rgba(255,255,255,0.7); font-size: 16px; line-height: 1; }
-        .phone-wa-avatar { width: 34px; height: 34px; border-radius: 50%; background: #25D366; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0; }
-        .phone-wa-info { flex: 1; }
-        .phone-wa-name { font-size: 12px; font-weight: 600; color: #fff; line-height: 1.2; }
-        .phone-wa-online { font-size: 10px; color: rgba(255,255,255,0.55); }
-        .phone-chat { background: #ECE5DD url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Ccircle cx='30' cy='30' r='1' fill='%23C9B99A' opacity='0.3'/%3E%3C/svg%3E"); padding: 12px 10px; display: flex; flex-direction: column; gap: 6px; height: 420px; overflow-y: auto; scroll-behavior: smooth; }
-        .chat-bubble { max-width: 82%; padding: 7px 10px; border-radius: 8px; font-size: 12px; line-height: 1.5; position: relative; }
-        .chat-bubble.incoming { background: #fff; align-self: flex-end; border-radius: 8px 0 8px 8px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); color: #111; }
-        .chat-bubble.outgoing { background: #DCF8C6; align-self: flex-start; border-radius: 0 8px 8px 8px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); color: #111; }
-        .chat-time { font-size: 9px; color: #999; text-align: left; margin-top: 2px; }
-        .chat-typing { display: flex; align-items: center; gap: 4px; background: #fff; align-self: flex-end; padding: 10px 14px; border-radius: 8px 0 8px 8px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); }
-        .typing-dot { width: 6px; height: 6px; border-radius: 50%; background: #999; animation: typing-bounce 1.2s ease infinite; }
-        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
-        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes typing-bounce { 0%,80%,100% { transform: translateY(0); opacity: 0.4; } 40% { transform: translateY(-5px); opacity: 1; } }
-        .phone-wa-input { background: #F0F0F0; padding: 8px 12px; display: flex; align-items: center; gap: 8px; border-top: 1px solid #DDD; }
-        .phone-wa-input-box { flex: 1; background: #fff; border-radius: 20px; padding: 7px 12px; font-size: 11px; color: #666; }
-        .phone-wa-send { width: 30px; height: 30px; border-radius: 50%; background: #25D366; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        /* Side buttons */
+        .phone-wrap::before {
+          content: ''; position: absolute; left: -10px; top: 88px;
+          width: 3px; height: 32px; background: #1C1C1E; border-radius: 2px 0 0 2px;
+        }
+        .phone-wrap::after {
+          content: ''; position: absolute; right: -10px; top: 104px;
+          width: 3px; height: 52px; background: #1C1C1E; border-radius: 0 2px 2px 0;
+        }
+        /* Dynamic island */
+        .phone-island { width: 100px; height: 28px; background: #000; border-radius: 0 0 18px 18px; margin: 0 auto; position: relative; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .phone-island-cam { width: 9px; height: 9px; border-radius: 50%; background: #1A1A1A; border: 1px solid #222; }
+        .phone-island-cam-inner { width: 4px; height: 4px; border-radius: 50%; background: #0A0A0A; margin: auto; }
+        .phone-status-bar { display: flex; align-items: center; justify-content: space-between; padding: 2px 18px 6px; background: #fff; }
+        .phone-status-time { font-size: 11px; font-weight: 700; color: #111; letter-spacing: -0.3px; }
+        .phone-status-icons { display: flex; align-items: center; gap: 5px; }
+        .phone-status-icon { font-size: 10px; color: #111; font-weight: 600; }
+
+        /* WhatsApp header */
+        .phone-wa-bar { background: #fff; padding: 10px 14px 10px; display: flex; align-items: center; gap: 9px; border-bottom: 1px solid #F0F0F0; }
+        .phone-wa-back { color: #128C7E; font-size: 18px; font-weight: 300; line-height: 1; flex-shrink: 0; }
+        .phone-wa-avatar { width: 34px; height: 34px; border-radius: 50%; background: #25D366; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 0 0 2px rgba(37,211,102,0.2); }
+        .phone-wa-info { flex: 1; min-width: 0; }
+        .phone-wa-name { font-size: 12.5px; font-weight: 700; color: #111; line-height: 1.2; }
+        .phone-wa-online { font-size: 10px; color: #25D366; font-weight: 500; }
+        .phone-wa-actions { display: flex; align-items: center; gap: 14px; color: #128C7E; font-size: 13px; }
+
+        /* Chat area */
+        .phone-chat {
+          background-color: #E5DDD5;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cpath d='M10 10 Q30 5 50 10 Q70 15 90 10 Q110 5 120 10' fill='none' stroke='%23C8B9A8' stroke-width='0.5' opacity='0.4'/%3E%3Cpath d='M0 40 Q20 35 40 40 Q60 45 80 40 Q100 35 120 40' fill='none' stroke='%23C8B9A8' stroke-width='0.5' opacity='0.4'/%3E%3Cpath d='M0 70 Q30 65 60 70 Q90 75 120 70' fill='none' stroke='%23C8B9A8' stroke-width='0.5' opacity='0.4'/%3E%3Cpath d='M0 100 Q25 95 50 100 Q75 105 100 100' fill='none' stroke='%23C8B9A8' stroke-width='0.5' opacity='0.4'/%3E%3C/svg%3E");
+          padding: 10px 10px 6px; display: flex; flex-direction: column; gap: 3px;
+          height: 380px; overflow-y: auto; scroll-behavior: smooth;
+        }
+        .phone-chat::-webkit-scrollbar { display: none; }
+        .phone-chat { scrollbar-width: none; }
+
+        /* Chat date divider */
+        .chat-date { align-self: center; background: rgba(255,255,255,0.85); color: #888; font-size: 9.5px; font-weight: 600; padding: 3px 10px; border-radius: 10px; margin: 4px 0 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.08); letter-spacing: 0.02em; }
+
+        /* Bubbles */
+        .chat-bubble { max-width: 78%; padding: 6px 9px 4px; font-size: 12px; line-height: 1.5; position: relative; word-break: break-word; }
+        .chat-bubble.incoming {
+          background: #fff; align-self: flex-end;
+          border-radius: 0 10px 10px 10px;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+          color: #111;
+          margin-right: 2px;
+        }
+        .chat-bubble.incoming::before {
+          content: ''; position: absolute; top: 0; right: -7px;
+          border: 7px solid transparent; border-top-color: #fff; border-left-color: #fff;
+          border-radius: 2px 0 0 0;
+        }
+        .chat-bubble.outgoing {
+          background: #DCF8C6; align-self: flex-start;
+          border-radius: 10px 0 10px 10px;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+          color: #111;
+          margin-left: 2px;
+        }
+        .chat-bubble.outgoing::before {
+          content: ''; position: absolute; top: 0; left: -7px;
+          border: 7px solid transparent; border-top-color: #DCF8C6; border-right-color: #DCF8C6;
+          border-radius: 0 2px 0 0;
+        }
+        .chat-time { font-size: 9px; color: #aaa; text-align: left; margin-top: 1px; display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
+        .chat-ticks { color: #53BDEB; font-size: 9px; }
+
+        /* Typing indicator */
+        .chat-typing {
+          display: flex; align-items: center; gap: 3px;
+          background: #fff; align-self: flex-end;
+          padding: 10px 13px; border-radius: 0 10px 10px 10px;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+          margin-right: 2px;
+        }
+        .chat-typing::before {
+          content: ''; position: absolute; top: 0; right: -7px;
+          border: 7px solid transparent; border-top-color: #fff; border-left-color: #fff;
+          border-radius: 2px 0 0 0;
+        }
+        .typing-dot { width: 7px; height: 7px; border-radius: 50%; background: #B0B0B0; animation: typing-bounce 1.4s ease infinite; }
+        .typing-dot:nth-child(2) { animation-delay: 0.18s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.36s; }
+        @keyframes typing-bounce { 0%,60%,100% { transform: translateY(0) scale(0.85); opacity:0.5; } 30% { transform: translateY(-5px) scale(1); opacity:1; } }
+
+        /* Input bar */
+        .phone-wa-input { background: #F0F0F0; padding: 7px 10px; display: flex; align-items: center; gap: 7px; }
+        .phone-wa-input-box { flex: 1; background: #fff; border-radius: 22px; padding: 7px 12px; font-size: 11px; color: #999; display: flex; align-items: center; gap: 6px; }
+        .phone-wa-input-icon { color: #999; font-size: 13px; }
+        .phone-wa-send { width: 34px; height: 34px; border-radius: 50%; background: #128C7E; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 6px rgba(18,140,126,0.35); }
 
         /* Chat animation classes */
-        .chat-bubble, .chat-typing { opacity: 0; transform: translateY(6px); transition: opacity 0.3s ease, transform 0.3s ease; }
+        .chat-bubble, .chat-typing { opacity: 0; transform: translateY(6px); transition: opacity 0.28s ease, transform 0.28s ease; }
         .chat-bubble.show, .chat-typing.show { opacity: 1; transform: none; }
 
         /* BUTTONS */
@@ -775,10 +848,16 @@ export default function LandingPage() {
             <div className="lp-hero-phone">
               <div className="phone-wrap">
                 <div className="phone-frame">
-                  <div className="phone-notch" />
-                  <div className="phone-status">
-                    <span>9:41</span>
-                    <span>●●●</span>
+                  <div className="phone-island">
+                    <div className="phone-island-cam"><div className="phone-island-cam-inner" /></div>
+                  </div>
+                  <div className="phone-status-bar">
+                    <span className="phone-status-time">9:41</span>
+                    <div className="phone-status-icons">
+                      <span className="phone-status-icon">▲▲▲</span>
+                      <span className="phone-status-icon">WiFi</span>
+                      <span className="phone-status-icon">100%</span>
+                    </div>
                   </div>
                   <div className="phone-wa-bar">
                     <div className="phone-wa-back">‹</div>
@@ -787,13 +866,18 @@ export default function LandingPage() {
                     </div>
                     <div className="phone-wa-info">
                       <div className="phone-wa-name">תורי — סלון דנה</div>
-                      <div className="phone-wa-online">online</div>
+                      <div className="phone-wa-online">מחובר</div>
+                    </div>
+                    <div className="phone-wa-actions">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#128C7E" strokeWidth="2"><path d="M15.05 5A5 5 0 0 1 19 8.95M15.05 1A9 9 0 0 1 23 8.94m-1 7.98v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 10a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6 6l.9-.9a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.5 16.5z"/></svg>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#128C7E" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
                     </div>
                   </div>
                   <div className="phone-chat">
+                    <div className="chat-date">היום</div>
                     <div className="chat-bubble incoming" style={{ display: "none" }}>
                       שלום, רוצה לקבוע תספורת ביום חמישי
-                      <div className="chat-time">21:03 ✓✓</div>
+                      <div className="chat-time">21:03 <span className="chat-ticks">✓✓</span></div>
                     </div>
                     <div className="chat-bubble outgoing" style={{ display: "none" }}>
                       היי! 😊 ביום חמישי יש לי פנוי ב-9:30, 11:00 ו-14:30. מה מתאים?
@@ -801,7 +885,7 @@ export default function LandingPage() {
                     </div>
                     <div className="chat-bubble incoming" style={{ display: "none" }}>
                       11:00 בסדר גמור
-                      <div className="chat-time">21:04 ✓✓</div>
+                      <div className="chat-time">21:04 <span className="chat-ticks">✓✓</span></div>
                     </div>
                     <div className="chat-typing" style={{ display: "none" }}>
                       <div className="typing-dot" /><div className="typing-dot" /><div className="typing-dot" />
@@ -812,7 +896,7 @@ export default function LandingPage() {
                     </div>
                     <div className="chat-bubble incoming" style={{ display: "none" }}>
                       תודה רבה! 🙏
-                      <div className="chat-time">21:04 ✓✓</div>
+                      <div className="chat-time">21:04 <span className="chat-ticks">✓✓</span></div>
                     </div>
                     <div className="chat-typing" style={{ display: "none" }}>
                       <div className="typing-dot" /><div className="typing-dot" /><div className="typing-dot" />
@@ -823,7 +907,10 @@ export default function LandingPage() {
                     </div>
                   </div>
                   <div className="phone-wa-input">
-                    <div className="phone-wa-input-box">הודעה</div>
+                    <div className="phone-wa-input-box">
+                      <span className="phone-wa-input-icon">😊</span>
+                      הודעה
+                    </div>
                     <div className="phone-wa-send">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
                     </div>

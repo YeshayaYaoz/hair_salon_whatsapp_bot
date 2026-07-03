@@ -139,10 +139,10 @@ export default function LandingPageEN() {
   useEffect(() => {
     function runSequence() {
       const container = document.querySelector<HTMLElement>(".phone-chat");
-      const items = Array.from(document.querySelectorAll<HTMLElement>(".phone-chat > *"));
+      const items = Array.from(document.querySelectorAll<HTMLElement>(".phone-chat > *")).filter(el => !el.classList.contains("chat-date"));
       items.forEach(el => { el.style.display = "none"; el.classList.remove("show"); });
       if (container) container.scrollTop = 0;
-      const delays = [300, 1600, 3000, 3500, 5000, 6400, 6900, 8300];
+      const delays = [300, 1600, 3000, 3500, 5000, 6400, 7800];
       const timers: ReturnType<typeof setTimeout>[] = [];
       items.forEach((el, i) => {
         const t = setTimeout(() => {
@@ -255,27 +255,45 @@ export default function LandingPageEN() {
 
         /* Phone mock */
         .lp-hero-phone { position: relative; z-index: 1; animation: fadeUp 0.7s ease 0.3s both; }
-        .phone-outer { background: #1A1A1A; border-radius: 40px; padding: 14px; box-shadow: 0 40px 100px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.06); max-width: 290px; margin: 0 auto; position: relative; }
-        .phone-screen { background: #F0F2F5; border-radius: 28px; overflow: hidden; }
-        .phone-status { background: #075E54; padding: 10px 14px; display: flex; align-items: center; gap: 8px; }
-        .phone-wa-avatar { width: 32px; height: 32px; border-radius: 50%; background: #25D366; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; overflow: hidden; }
+        .phone-wrap { filter: drop-shadow(0 32px 64px rgba(0,0,0,0.28)) drop-shadow(0 0 1px rgba(0,0,0,0.4)); }
+        .phone-frame { background: #1C1C1E; border-radius: 44px; border: 8px solid #1C1C1E; max-width: 290px; margin: 0 auto; position: relative; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12); }
+        .phone-frame::before { content: ''; position: absolute; left: -12px; top: 80px; width: 4px; height: 32px; background: #2A2A2C; border-radius: 2px 0 0 2px; }
+        .phone-frame::after { content: ''; position: absolute; right: -12px; top: 100px; width: 4px; height: 48px; background: #2A2A2C; border-radius: 0 2px 2px 0; }
+        .phone-island { width: 100px; height: 28px; background: #000; border-radius: 0 0 18px 18px; margin: 0 auto; position: relative; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .phone-island-cam { width: 9px; height: 9px; border-radius: 50%; background: #1A1A1A; border: 1px solid #222; }
+        .phone-island-cam-inner { width: 4px; height: 4px; border-radius: 50%; background: #0A0A0A; margin: auto; }
+        .phone-status-bar { display: flex; align-items: center; justify-content: space-between; padding: 2px 18px 6px; background: #fff; }
+        .phone-status-time { font-size: 11px; font-weight: 700; color: #111; letter-spacing: -0.3px; }
+        .phone-status-icons { display: flex; align-items: center; gap: 5px; }
+        .phone-status-icon { font-size: 10px; color: #111; font-weight: 600; }
+        .phone-wa-avatar { width: 34px; height: 34px; border-radius: 50%; background: #25D366; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 0 0 2px rgba(37,211,102,0.2); }
         .phone-wa-info { flex: 1; }
-        .phone-wa-name { font-size: 12.5px; font-weight: 600; color: #fff; }
-        .phone-wa-status { font-size: 10px; color: rgba(255,255,255,0.65); }
-        .phone-chat { background: #ECE5DD url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3C/svg%3E"); padding: 12px 10px; display: flex; flex-direction: column; gap: 6px; height: 420px; overflow-y: auto; scroll-behavior: smooth; }
-        .chat-bubble { max-width: 80%; padding: 8px 12px; border-radius: 8px; font-size: 12.5px; line-height: 1.45; opacity: 0; transform: translateY(6px); transition: opacity 0.3s ease, transform 0.3s ease; }
+        .phone-wa-name { font-size: 12.5px; font-weight: 700; color: #111; }
+        .phone-wa-online { font-size: 10px; color: #128C7E; font-weight: 500; }
+        .phone-wa-actions { display: flex; gap: 12px; margin-left: auto; }
+        .phone-wa-bar { background: #fff; padding: 10px 14px; display: flex; align-items: center; gap: 9px; border-bottom: 1px solid #F0F0F0; }
+        .phone-wa-back { color: #128C7E; font-size: 18px; font-weight: 300; line-height: 1; flex-shrink: 0; }
+        .phone-chat { background-color: #E5DDD5; padding: 12px 10px; display: flex; flex-direction: column; gap: 6px; height: 330px; overflow-y: auto; scroll-behavior: smooth; scrollbar-width: none; }
+        .phone-chat::-webkit-scrollbar { display: none; }
+        .chat-date { align-self: center; font-size: 10px; background: rgba(255,255,255,0.75); color: #666; border-radius: 6px; padding: 2px 8px; margin: 2px 0 4px; font-weight: 500; }
+        .chat-bubble { max-width: 82%; padding: 7px 10px 4px; border-radius: 8px; font-size: 12.5px; line-height: 1.45; opacity: 0; transform: translateY(6px); transition: opacity 0.3s ease, transform 0.3s ease; position: relative; }
         .chat-bubble.show { opacity: 1; transform: none; }
         .chat-bubble.incoming { background: #fff; border-radius: 0 8px 8px 8px; align-self: flex-start; color: #111; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
-        .chat-bubble.outgoing { background: #DCF8C6; border-radius: 8px 0 8px 8px; align-self: flex-end; color: #111; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
-        .chat-time { font-size: 9.5px; color: #999; margin-top: 3px; text-align: right; }
-        .chat-typing { align-self: flex-start; background: #fff; padding: 8px 12px; border-radius: 0 8px 8px 8px; display: flex; gap: 4px; align-items: center; opacity: 0; transform: translateY(6px); transition: opacity 0.3s ease, transform 0.3s ease; }
+        .chat-bubble.outgoing { background: #D9FDD3; border-radius: 8px 8px 0 8px; align-self: flex-end; color: #111; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+        .chat-bubble.incoming::before { content: ''; position: absolute; top: 0; left: -7px; width: 0; height: 0; border-top: 0px solid transparent; border-right: 8px solid #fff; border-bottom: 8px solid transparent; }
+        .chat-bubble.outgoing::before { content: ''; position: absolute; top: 0; right: -7px; width: 0; height: 0; border-top: 0px solid transparent; border-left: 8px solid #D9FDD3; border-bottom: 8px solid transparent; }
+        .chat-time { font-size: 9.5px; color: #999; margin-top: 2px; text-align: right; display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
+        .chat-ticks { color: #53BDEB; font-size: 9px; }
+        .chat-typing { align-self: flex-start; background: #fff; padding: 9px 12px; border-radius: 0 8px 8px 8px; display: flex; gap: 4px; align-items: center; opacity: 0; transform: translateY(6px); transition: opacity 0.3s ease, transform 0.3s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
         .chat-typing.show { opacity: 1; transform: none; }
-        .chat-typing span { width: 6px; height: 6px; border-radius: 50%; background: #999; animation: typing 1.2s infinite; }
-        .chat-typing span:nth-child(2) { animation-delay: 0.2s; }
-        .chat-typing span:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes typing { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-4px); } }
-        .phone-wa-input { background: #F0F2F5; padding: 8px 10px; display: flex; align-items: center; gap: 8px; border-top: 1px solid rgba(0,0,0,0.06); }
-        .phone-wa-input-box { flex: 1; background: #fff; border-radius: 20px; padding: 6px 12px; font-size: 11px; color: #999; }
+        .typing-dot { width: 7px; height: 7px; border-radius: 50%; background: #C0C0C0; animation: typing 1.4s infinite ease-in-out; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typing { 0%,60%,100% { transform: translateY(0); opacity: 0.6; } 30% { transform: translateY(-5px); opacity: 1; } }
+        .phone-wa-input { background: #F0F0F0; padding: 7px 10px; display: flex; align-items: center; gap: 7px; }
+        .phone-wa-input-box { flex: 1; background: #fff; border-radius: 22px; padding: 7px 12px; font-size: 11px; color: #999; display: flex; align-items: center; gap: 6px; }
+        .phone-wa-input-icon { color: #999; font-size: 13px; }
+        .phone-wa-send { width: 34px; height: 34px; border-radius: 50%; background: #128C7E; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 6px rgba(18,140,126,0.35); }
 
         /* Toast */
         #hero-toast {
@@ -625,29 +643,70 @@ export default function LandingPageEN() {
               </div>
             </div>
             <div className="lp-hero-phone">
-              <div className="phone-outer">
-                <div className="phone-screen">
-                  <div className="phone-status">
+              <div className="phone-wrap">
+                <div className="phone-frame">
+                  <div className="phone-island">
+                    <div className="phone-island-cam"><div className="phone-island-cam-inner" /></div>
+                  </div>
+                  <div className="phone-status-bar">
+                    <span className="phone-status-time">9:41</span>
+                    <div className="phone-status-icons">
+                      <span className="phone-status-icon">▲▲▲</span>
+                      <span className="phone-status-icon">WiFi</span>
+                      <span className="phone-status-icon">100%</span>
+                    </div>
+                  </div>
+                  <div className="phone-wa-bar">
+                    <div className="phone-wa-back">‹</div>
                     <div className="phone-wa-avatar">
                       <img src="/tori-logo-transparent.png" alt="Tori" style={{ width: 22, height: 22, objectFit: "contain" }} />
                     </div>
                     <div className="phone-wa-info">
                       <div className="phone-wa-name">Tori — Dana's Salon</div>
-                      <div className="phone-wa-status">online</div>
+                      <div className="phone-wa-online">online</div>
+                    </div>
+                    <div className="phone-wa-actions">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#128C7E" strokeWidth="2"><path d="M15.05 5A5 5 0 0 1 19 8.95M15.05 1A9 9 0 0 1 23 8.94m-1 7.98v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 10a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6 6l.9-.9a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.5 16.5z"/></svg>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#128C7E" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
                     </div>
                   </div>
                   <div className="phone-chat">
-                    <div className="chat-bubble incoming" style={{ display: "none" }}>Hi! I'd like to book a haircut for Thursday 🙏<div className="chat-time">22:47</div></div>
-                    <div className="chat-typing" style={{ display: "none" }}><span /><span /><span /></div>
-                    <div className="chat-bubble outgoing" style={{ display: "none" }}>Hi! 😊 On Thursday I have openings at 9:30 and 11:00. Which works for you?<div className="chat-time">22:47</div></div>
-                    <div className="chat-bubble incoming" style={{ display: "none" }}>9:30 is perfect<div className="chat-time">22:48</div></div>
-                    <div className="chat-typing" style={{ display: "none" }}><span /><span /><span /></div>
-                    <div className="chat-bubble outgoing" style={{ display: "none" }}>Great! ✅ Booked a haircut for Thursday at 9:30. You'll get a reminder the day before. See you then!<div className="chat-time">22:48</div></div>
-                    <div className="chat-typing" style={{ display: "none" }}><span /><span /><span /></div>
-                    <div className="chat-bubble incoming" style={{ display: "none" }}>Perfect, thanks! 🙏<div className="chat-time">22:48</div></div>
+                    <div className="chat-date">Today</div>
+                    <div className="chat-bubble incoming" style={{ display: "none" }}>
+                      Hi! I'd like to book a haircut for Thursday 🙏
+                      <div className="chat-time">22:47 <span className="chat-ticks">✓✓</span></div>
+                    </div>
+                    <div className="chat-typing" style={{ display: "none" }}>
+                      <div className="typing-dot" /><div className="typing-dot" /><div className="typing-dot" />
+                    </div>
+                    <div className="chat-bubble outgoing" style={{ display: "none" }}>
+                      Hi! 😊 On Thursday I have openings at 9:30 and 11:00. Which works for you?
+                      <div className="chat-time">22:47</div>
+                    </div>
+                    <div className="chat-bubble incoming" style={{ display: "none" }}>
+                      9:30 is perfect
+                      <div className="chat-time">22:48 <span className="chat-ticks">✓✓</span></div>
+                    </div>
+                    <div className="chat-typing" style={{ display: "none" }}>
+                      <div className="typing-dot" /><div className="typing-dot" /><div className="typing-dot" />
+                    </div>
+                    <div className="chat-bubble outgoing" style={{ display: "none" }}>
+                      Great! ✅ Booked a haircut for Thursday at 9:30. See you then!
+                      <div className="chat-time">22:48</div>
+                    </div>
+                    <div className="chat-bubble incoming" style={{ display: "none" }}>
+                      Perfect, thanks! 🙏
+                      <div className="chat-time">22:48 <span className="chat-ticks">✓✓</span></div>
+                    </div>
                   </div>
                   <div className="phone-wa-input">
-                    <div className="phone-wa-input-box">Message</div>
+                    <div className="phone-wa-input-box">
+                      <span className="phone-wa-input-icon">😊</span>
+                      Message
+                    </div>
+                    <div className="phone-wa-send">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                    </div>
                   </div>
                 </div>
               </div>
