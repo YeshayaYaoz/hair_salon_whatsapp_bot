@@ -64,13 +64,16 @@ function buildSlotRows(slots: { startTime: string }[]): ListRow[] {
 whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => {
   // Verify Meta's HMAC signature before processing.
   const signature = req.headers["x-hub-signature-256"] as string | undefined;
-  if (!verifyMetaSignature(req.body as Buffer, signature)) {
+  const rawBody: Buffer = Buffer.isBuffer(req.body)
+    ? req.body
+    : Buffer.from(typeof req.body === "string" ? req.body : JSON.stringify(req.body));
+  if (!verifyMetaSignature(rawBody, signature)) {
     console.warn("WhatsApp webhook: invalid signature, rejecting request");
     return res.sendStatus(403);
   }
 
   // Parse body now that signature is verified (raw middleware gives us a Buffer).
-  const payload = JSON.parse((req.body as Buffer).toString("utf8"));
+  const payload = JSON.parse(rawBody.toString("utf8"));
 
   // Acknowledge immediately; Meta retries aggressively if it doesn't get a fast 200.
   res.sendStatus(200);
