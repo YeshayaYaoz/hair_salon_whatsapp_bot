@@ -16,9 +16,10 @@ app.use(cors({
   credentials: true,
 }));
 
-// Stripe webhook needs the raw, unparsed body to verify its signature, so this must be mounted
+// Routes that need the raw, unparsed body for signature verification must be mounted
 // before the global express.json() middleware below would otherwise consume the stream.
 app.use("/api/billing/webhook", stripeWebhookRouter);
+app.use("/webhook/whatsapp", whatsappRouter);
 
 app.use(express.json());
 
@@ -26,7 +27,6 @@ app.use("/api/auth", authRouter);
 app.use("/api/public", publicRouter);
 app.use("/api/business", businessRouter);
 app.use("/api/billing", billingRouter);
-app.use("/webhook/whatsapp", whatsappRouter);
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
