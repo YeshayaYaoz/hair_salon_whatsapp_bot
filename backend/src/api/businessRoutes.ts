@@ -74,16 +74,15 @@ businessRouter.delete("/me/whatsapp", async (req: AuthedRequest, res) => {
 // Embedded Signup: exchange the short-lived code Meta returns for a long-lived system user token,
 // then fetch the phone number ID from the WABA and save everything.
 businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, res) => {
-  const parsed = z.object({ code: z.string().min(1) }).safeParse(req.body);
+  const parsed = z.object({ code: z.string().min(1), redirectUri: z.string().optional() }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Missing code" });
 
   const appId = process.env.META_APP_ID;
   const appSecret = process.env.WHATSAPP_APP_SECRET;
   if (!appId || !appSecret) return res.status(500).json({ error: "Meta app credentials not configured" });
 
-  // Exchange auth code for a user access token.
-  // The FB JS SDK popup flow always uses this redirect_uri internally — it must match exactly.
-  const redirectUri = "https://www.facebook.com/connect/login_success.html";
+  // The redirect_uri must exactly match the return_url sent in the FB.login extras.
+  const redirectUri = parsed.data.redirectUri ?? "https://www.facebook.com/connect/login_success.html";
   const tokenRes = await fetch(
     `https://graph.facebook.com/v19.0/oauth/access_token?client_id=${appId}&client_secret=${appSecret}&code=${parsed.data.code}&redirect_uri=${encodeURIComponent(redirectUri)}`
   );

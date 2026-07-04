@@ -87,7 +87,7 @@ export default function WhatsAppPage() {
           setLoading(true);
           apiFetch<{ ok: boolean; phoneNumber: string }>(
             "/api/business/me/whatsapp/embedded-signup",
-            { method: "POST", body: JSON.stringify({ code: response.authResponse.code }) }
+            { method: "POST", body: JSON.stringify({ code: response.authResponse.code, redirectUri: window.location.href }) }
           ).then((result) => {
             setConnected(true);
             setPhoneNumber(result.phoneNumber);
