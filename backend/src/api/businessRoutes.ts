@@ -79,22 +79,37 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
 
   const userToken: string = parsed.data.accessToken;
 
-  // Get the WhatsApp Business Accounts the user just shared
-  const wabaRes = await fetch(
-    `https://graph.facebook.com/v19.0/me/businesses?fields=owned_whatsapp_business_accounts{phone_numbers{id,display_phone_number}}&access_token=${userToken}`
-  );
-  const wabaData = await wabaRes.json() as any;
+  // Try to find the phone number via two different Graph API paths
+  let phone: { id: string; display_phone_number: string } | undefined;
+  let wabaId: string | undefined;
 
-  // Pick the first phone number from the first WABA
-  const phoneNumbers = wabaData?.data?.[0]?.owned_whatsapp_business_accounts?.data?.[0]?.phone_numbers?.data;
-  const phone = phoneNumbers?.[0];
-  if (!phone?.id) {
-    console.error("Could not find phone number in embedded signup response:", JSON.stringify(wabaData));
-    return res.status(400).json({ error: "No phone number found in connected account", debug: wabaData });
+  // Path 1: me/businesses (requires business_management)
+  const bizRes = await fetch(
+    `https://graph.facebook.com/v19.0/me/businesses?fields=owned_whatsapp_business_accounts{id,phone_numbers{id,display_phone_number}}&access_token=${userToken}`
+  );
+  const bizData = await bizRes.json() as any;
+  const waba1 = bizData?.data?.[0]?.owned_whatsapp_business_accounts?.data?.[0];
+  if (waba1?.phone_numbers?.data?.[0]?.id) {
+    phone = waba1.phone_numbers.data[0];
+    wabaId = waba1.id;
   }
 
-  // Subscribe the phone number's webhook to this app
-  const wabaId = wabaData?.data?.[0]?.owned_whatsapp_business_accounts?.data?.[0]?.id;
+  // Path 2: me/whatsapp_business_accounts (whatsapp_business_management scope)
+  if (!phone) {
+    const wabaRes = await fetch(
+      `https://graph.facebook.com/v19.0/me/whatsapp_business_accounts?fields=id,phone_numbers{id,display_phone_number}&access_token=${userToken}`
+    );
+    const wabaData = await wabaRes.json() as any;
+    const waba2 = wabaData?.data?.[0];
+    if (waba2?.phone_numbers?.data?.[0]?.id) {
+      phone = waba2.phone_numbers.data[0];
+      wabaId = waba2.id;
+    }
+    if (!phone) {
+      console.error("Could not find phone number. Path1:", JSON.stringify(bizData), "Path2:", JSON.stringify(wabaData));
+      return res.status(400).json({ error: "No phone number found in connected account", debug: { bizData, wabaData } });
+    }
+  }
   if (wabaId) {
     await fetch(`https://graph.facebook.com/v19.0/${wabaId}/subscribed_apps`, {
       method: "POST",

@@ -105,6 +105,7 @@ export default function WhatsAppPage() {
         config_id: META_CONFIG_ID,
         response_type: "token",
         override_default_response_type: true,
+        scope: "business_management,whatsapp_business_management,whatsapp_business_messaging",
         extras: { setup: {}, featureType: "", sessionInfoVersion: "3" },
       }
     );
