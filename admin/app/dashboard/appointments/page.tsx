@@ -208,7 +208,7 @@ export default function AppointmentsPage() {
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`text-xs font-medium px-3 py-1.5 rounded-md transition ${view === v ? "bg-[#1B7FA0] text-gray-900" : "text-gray-500 hover:text-gray-800"}`}
+                className={`text-xs font-medium px-3 py-1.5 rounded-md transition ${view === v ? "bg-[#1B7FA0] text-white" : "text-gray-500 hover:text-gray-800"}`}
               >
                 {v === "list" ? t.listView : t.calendarView}
               </button>
@@ -270,7 +270,7 @@ export default function AppointmentsPage() {
                 <button
                   key={f.key}
                   onClick={() => setFilter(f.key)}
-                  className={`text-xs font-medium px-3 py-1.5 rounded-md transition ${filter === f.key ? "bg-[#1B7FA0] text-gray-900" : "text-gray-500 hover:text-gray-800"}`}
+                  className={`text-xs font-medium px-3 py-1.5 rounded-md transition ${filter === f.key ? "bg-[#1B7FA0] text-white" : "text-gray-500 hover:text-gray-800"}`}
                 >
                   {f.label}
                 </button>

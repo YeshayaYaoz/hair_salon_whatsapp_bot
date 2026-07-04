@@ -79,7 +79,7 @@ export default function WaitlistPage() {
                       <button
                         onClick={() => markNotified(e.id)}
                         disabled={loadingId === e.id}
-                        className="text-xs bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-gray-900 font-semibold px-3 py-1.5 rounded-lg transition"
+                        className="text-xs bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white font-semibold px-3 py-1.5 rounded-lg transition"
                       >
                         {loadingId === e.id ? "…" : t.markNotified}
                       </button>

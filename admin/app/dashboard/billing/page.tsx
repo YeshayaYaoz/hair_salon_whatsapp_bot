@@ -63,7 +63,7 @@ export default function BillingPage() {
   const color = status ? STATUS_COLORS[status] : "";
 
   return (
-    <div className="max-w-md animate-fade-in">
+    <div className="animate-fade-in">
       <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-gray-900">{t.billingTitle}</h1>
         <p className="text-gray-500 text-sm mt-1">{t.billingSubtitle}</p>
@@ -96,7 +96,7 @@ export default function BillingPage() {
                 <button
                   onClick={subscribe}
                   disabled={checkoutLoading}
-                  className="w-full bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-gray-900 text-sm font-semibold py-2.5 rounded-lg transition"
+                  className="w-full bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold py-2.5 rounded-lg transition"
                 >
                   {checkoutLoading ? t.redirecting : status === "trial" ? t.subscribeNow : t.reactivate}
                 </button>

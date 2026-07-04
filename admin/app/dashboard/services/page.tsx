@@ -129,7 +129,7 @@ export default function ServicesPage() {
   }
 
   return (
-    <div className="max-w-2xl animate-fade-in">
+    <div className="animate-fade-in">
       <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-gray-900">{t.servicesTitle}</h1>
         <p className="text-gray-500 text-sm mt-1">
@@ -163,7 +163,7 @@ export default function ServicesPage() {
                     <ColorPicker value={editState.color} onChange={(hex) => setEditState((p) => ({ ...p, color: hex }))} />
                     <div className="flex gap-2">
                       <button onClick={() => setEditingId(null)} className="text-xs text-gray-400 hover:text-gray-600 px-3 py-1.5 rounded-lg transition">{t.cancel}</button>
-                      <button onClick={() => saveEdit(s.id)} disabled={saving} className="text-xs bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-gray-900 font-semibold px-3 py-1.5 rounded-lg transition">{saving ? t.saving : t.save}</button>
+                      <button onClick={() => saveEdit(s.id)} disabled={saving} className="text-xs bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white font-semibold px-3 py-1.5 rounded-lg transition">{saving ? t.saving : t.save}</button>
                     </div>
                   </div>
                 </div>
@@ -199,7 +199,7 @@ export default function ServicesPage() {
           <input placeholder={t.descriptionOptional} value={newDescription} onChange={(e) => setNewDescription(e.target.value)} className="w-full" />
           <div className="flex items-center justify-between mt-1">
             <ColorPicker value={newColor} onChange={setNewColor} />
-            <button type="submit" disabled={adding} className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-gray-900 text-sm font-semibold px-4 py-2 rounded-lg transition">
+            <button type="submit" disabled={adding} className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
               {adding ? "…" : t.add}
             </button>
           </div>

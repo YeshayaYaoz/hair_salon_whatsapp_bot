@@ -127,7 +127,7 @@ export default function WhatsAppPage() {
   }
 
   return (
-    <div className="max-w-lg animate-fade-in">
+    <div className="animate-fade-in">
       <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-gray-900">{t.whatsappTitle}</h1>
         <p className="text-gray-500 text-sm mt-1">{t.whatsappSubtitle}</p>
@@ -236,7 +236,7 @@ export default function WhatsAppPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-gray-900 text-sm font-semibold px-5 py-2.5 rounded-lg transition"
+                className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition"
               >
                 {saving ? t.saving : t.save}
               </button>

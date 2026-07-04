@@ -45,7 +45,7 @@ export default function StaffPage() {
   }
 
   return (
-    <div className="max-w-2xl animate-fade-in">
+    <div className="animate-fade-in">
       <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-gray-900">{t.staffTitle}</h1>
         <p className="text-gray-500 text-sm mt-1">{t.staffSubtitle}</p>
@@ -92,7 +92,7 @@ export default function StaffPage() {
           <button
             type="submit"
             disabled={adding}
-            className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-gray-900 text-sm font-semibold px-4 py-2 rounded-lg transition"
+            className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
           >
             {adding ? "…" : t.add}
           </button>

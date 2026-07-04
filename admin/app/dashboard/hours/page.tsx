@@ -56,7 +56,7 @@ export default function HoursPage() {
   }
 
   return (
-    <div className="max-w-lg animate-fade-in">
+    <div className="animate-fade-in">
       <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-gray-900">{t.hoursTitle}</h1>
         <p className="text-gray-500 text-sm mt-1">{t.hoursSubtitle}</p>
@@ -98,7 +98,7 @@ export default function HoursPage() {
       <div className="flex items-center gap-3">
         <button
           onClick={save}
-          className="bg-[#1B7FA0] hover:bg-[#2A9BBF] text-gray-900 text-sm font-semibold px-5 py-2.5 rounded-lg transition"
+          className="bg-[#1B7FA0] hover:bg-[#2A9BBF] text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition"
         >
           {t.saveHours}
         </button>
