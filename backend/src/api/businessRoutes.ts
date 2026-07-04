@@ -90,7 +90,7 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
   const phone = phoneNumbers?.[0];
   if (!phone?.id) {
     console.error("Could not find phone number in embedded signup response:", JSON.stringify(wabaData));
-    return res.status(400).json({ error: "No phone number found in connected account" });
+    return res.status(400).json({ error: "No phone number found in connected account", debug: wabaData });
   }
 
   // Subscribe the phone number's webhook to this app
