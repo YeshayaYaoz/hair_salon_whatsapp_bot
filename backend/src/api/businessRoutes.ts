@@ -38,6 +38,8 @@ const profileSchema = z.object({
   botGreeting: z.string().optional(),
   botPersonality: z.string().optional(),
   googleMapsUrl: z.string().optional(),
+  remindersEnabled: z.boolean().optional(),
+  reviewsEnabled: z.boolean().optional(),
 });
 
 businessRouter.put("/me", async (req: AuthedRequest, res) => {
@@ -282,6 +284,33 @@ businessRouter.get("/customers", async (req: AuthedRequest, res) => {
     orderBy: { appointments: { _count: "desc" } },
   });
   res.json(customers);
+});
+
+businessRouter.post("/customers/:id/message", async (req: AuthedRequest, res) => {
+  const parsed = z.object({ text: z.string().min(1).max(1000) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const customer = await prisma.customer.findFirst({
+    where: { id: req.params.id, businessId: req.businessId! },
+  });
+  if (!customer) return res.status(404).json({ error: "Not found" });
+
+  const business = await prisma.business.findUnique({
+    where: { id: req.businessId! },
+    select: { whatsappPhoneNumberId: true, whatsappAccessToken: true },
+  });
+  if (!business?.whatsappPhoneNumberId || !business.whatsappAccessToken) {
+    return res.status(400).json({ error: "WhatsApp not connected" });
+  }
+
+  const accessToken = decryptSecret(business.whatsappAccessToken);
+  await sendWhatsAppMessage({
+    phoneNumberId: business.whatsappPhoneNumberId,
+    accessToken,
+    to: customer.phone,
+    text: parsed.data.text,
+  });
+  res.json({ ok: true });
 });
 
 // --- Waitlist ---

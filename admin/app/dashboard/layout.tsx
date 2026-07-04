@@ -3,10 +3,38 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { type ReactNode } from "react";
-import { clearToken } from "../lib/api";
+import { useEffect, useState, type ReactNode } from "react";
+import { clearToken, apiFetch } from "../lib/api";
 import { useLanguage } from "../lib/LanguageContext";
 import { AuthGuard } from "../lib/AuthGuard";
+
+function TrialBanner() {
+  const { t } = useLanguage();
+  const [daysLeft, setDaysLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    apiFetch<{ subscriptionStatus: string; createdAt: string }>("/api/business/me")
+      .then((me) => {
+        if (me.subscriptionStatus !== "trial") return;
+        const trialEnd = new Date(me.createdAt).getTime() + 14 * 24 * 60 * 60 * 1000;
+        const days = Math.ceil((trialEnd - Date.now()) / (24 * 60 * 60 * 1000));
+        setDaysLeft(days);
+      })
+      .catch(() => {});
+  }, []);
+
+  if (daysLeft === null) return null;
+
+  const expired = daysLeft <= 0;
+  if (!expired && daysLeft > 5) return null; // only show when close
+
+  return (
+    <div className={`fixed top-0 start-0 end-0 z-50 flex items-center justify-between gap-3 px-4 py-2 text-xs font-medium ${expired ? "bg-red-600 text-white" : "bg-amber-500 text-white"}`}>
+      <span>{expired ? t.trialBannerExpired : (t.trialBanner as (d: number) => string)(daysLeft)}</span>
+      <Link href="/dashboard/billing" className="shrink-0 underline underline-offset-2 hover:no-underline">{t.subscribeCta}</Link>
+    </div>
+  );
+}
 
 const NAV_ITEMS = [
   { href: "/dashboard/analytics",    key: "analytics"    as const, icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" },
@@ -125,6 +153,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   return (
     <AuthGuard>
+    <TrialBanner />
     <div className="flex min-h-screen" style={{ background: "#F5F5FF" }}>
       {/* Desktop sidebar */}
       <aside

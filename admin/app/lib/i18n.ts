@@ -87,6 +87,24 @@ const translations = {
     greetingPlaceholder: "e.g. Hello! Welcome to Shir's salon 💇‍♀️ How can I help?",
     personalityPlaceholder: "e.g. Be friendly and use emojis occasionally. Always respond in Hebrew.",
 
+    // Customers
+    sendMessage: "Send message", messagePlaceholder: "Type a message to send via WhatsApp…",
+    send: "Send", sending: "Sending…", messageSent: "Message sent",
+
+    // Appointments view toggle
+    listView: "List", calendarView: "Calendar",
+
+    // Trial banner
+    trialBanner: (days: number) => `Your free trial ends in ${days} day${days !== 1 ? "s" : ""}. Subscribe to keep the bot running.`,
+    trialBannerExpired: "Your free trial has ended. Subscribe now to keep the bot running.",
+    subscribeCta: "Subscribe →",
+
+    // Settings: reminders / reviews toggles + template warning
+    automatedMessages: "Automated messages", automatedMessagesDesc: "Control which WhatsApp messages the bot sends automatically.",
+    remindersLabel: "24-hour appointment reminders",
+    reviewsLabel: "Post-visit review requests",
+    templateWarning: "WhatsApp only allows proactive messages to customers who have messaged you in the last 24 hours. Reminders and review requests may be silently blocked for other customers.",
+
     // Billing
     billingTitle: "Billing", billingSubtitle: "Manage your subscription",
     subscriptionStatus: "Subscription status",
@@ -193,6 +211,24 @@ const translations = {
     greetingPlaceholder: "לדוג׳ שלום! ברוכים הבאים לסלון שיר 💇‍♀️ במה אוכל לעזור?",
     personalityPlaceholder: "לדוג׳ היה ידידותי ותשתמש באמוג׳ים מדי פעם. תמיד ענה בעברית.",
 
+    // Customers
+    sendMessage: "שלח הודעה", messagePlaceholder: "הקלד הודעה לשליחה בוואטסאפ…",
+    send: "שלח", sending: "שולח…", messageSent: "ההודעה נשלחה",
+
+    // Appointments view toggle
+    listView: "רשימה", calendarView: "לוח שנה",
+
+    // Trial banner
+    trialBanner: (days: number) => `תקופת הניסיון שלך מסתיימת בעוד ${days} יום${days !== 1 ? "ים" : ""}. הירשם כדי להמשיך.`,
+    trialBannerExpired: "תקופת הניסיון שלך הסתיימה. הירשם עכשיו כדי להמשיך.",
+    subscribeCta: "הרשמה ←",
+
+    // Settings: reminders / reviews toggles + template warning
+    automatedMessages: "הודעות אוטומטיות", automatedMessagesDesc: "שלוט אילו הודעות הבוט שולח אוטומטית.",
+    remindersLabel: "תזכורות 24 שעות לפני תור",
+    reviewsLabel: "בקשות ביקורת לאחר הביקור",
+    templateWarning: "וואטסאפ מאפשר הודעות יזומות רק ללקוחות שכתבו לכם ב-24 השעות האחרונות. תזכורות ובקשות ביקורת עלולות להיחסם בשקט עבור לקוחות אחרים.",
+
     // Billing
     billingTitle: "תשלום", billingSubtitle: "נהל את המנוי שלך",
     subscriptionStatus: "סטטוס מנוי",
@@ -216,6 +252,8 @@ const translations = {
 
 type DeepString<T> = T extends string
   ? string
+  : T extends ((...args: any[]) => string)
+  ? (...args: any[]) => string
   : T extends readonly string[]
   ? readonly string[]
   : { [K in keyof T]: DeepString<T[K]> };

@@ -24,6 +24,8 @@ model Business {
   botGreeting           String? // custom greeting override
   botPersonality        String? // tone/personality instructions for the bot
   googleMapsUrl         String? // linked in post-visit review requests
+  remindersEnabled      Boolean  @default(true)
+  reviewsEnabled        Boolean  @default(true)
   createdAt         DateTime @default(now())
 
   services       Service[]

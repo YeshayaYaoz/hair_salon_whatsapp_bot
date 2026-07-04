@@ -99,6 +99,22 @@ interface BusinessProfile {
   botGreeting?: string;
   botPersonality?: string;
   googleMapsUrl?: string;
+  remindersEnabled?: boolean;
+  reviewsEnabled?: boolean;
+}
+
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 transition-colors ${checked ? "bg-violet-600 border-violet-600" : "bg-gray-200 border-gray-200"}`}
+    >
+      <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-4" : "translate-x-0"}`} />
+    </button>
+  );
 }
 
 function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
@@ -126,6 +142,7 @@ export default function SettingsPage() {
   const [fields, setFields] = useState<BusinessProfile>({
     name: "", address: "", timezone: "Asia/Jerusalem", email: "",
     notificationPhone: "", botGreeting: "", botPersonality: "", googleMapsUrl: "",
+    remindersEnabled: true, reviewsEnabled: true,
   });
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -143,12 +160,14 @@ export default function SettingsPage() {
         botGreeting: me.botGreeting ?? "",
         botPersonality: me.botPersonality ?? "",
         googleMapsUrl: me.googleMapsUrl ?? "",
+        remindersEnabled: me.remindersEnabled ?? true,
+        reviewsEnabled: me.reviewsEnabled ?? true,
       });
       setLoaded(true);
     });
   }, []);
 
-  function set(key: keyof BusinessProfile, value: string) {
+  function set(key: keyof BusinessProfile, value: string | boolean) {
     setFields((f) => ({ ...f, [key]: value }));
   }
 
@@ -167,6 +186,8 @@ export default function SettingsPage() {
           botGreeting: fields.botGreeting,
           botPersonality: fields.botPersonality,
           googleMapsUrl: fields.googleMapsUrl,
+          remindersEnabled: fields.remindersEnabled,
+          reviewsEnabled: fields.reviewsEnabled,
         }),
       });
       setSaved(true);
@@ -229,6 +250,20 @@ export default function SettingsPage() {
               className="w-full"
             />
           </Field>
+        </Section>
+
+        <Section title={t.automatedMessages} description={t.automatedMessagesDesc}>
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2.5">
+            {t.templateWarning}
+          </div>
+          <label className="flex items-center justify-between gap-3">
+            <span className="text-xs text-gray-700">{t.remindersLabel}</span>
+            <Toggle checked={fields.remindersEnabled ?? true} onChange={(v) => set("remindersEnabled", v)} />
+          </label>
+          <label className="flex items-center justify-between gap-3">
+            <span className="text-xs text-gray-700">{t.reviewsLabel}</span>
+            <Toggle checked={fields.reviewsEnabled ?? true} onChange={(v) => set("reviewsEnabled", v)} />
+          </label>
         </Section>
 
         <Section title={t.botPersonalityTitle} description={t.botPersonalityDesc}>

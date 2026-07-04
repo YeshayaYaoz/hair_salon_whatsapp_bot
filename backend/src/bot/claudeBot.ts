@@ -64,6 +64,18 @@ const tools: Anthropic.Tool[] = [
       required: ["serviceName"],
     },
   },
+  {
+    name: "request_human_followup",
+    description: "Alert the salon owner to follow up with this customer directly. Use when the customer has a complex request, complaint, or asks for something outside the bot's capabilities.",
+    input_schema: {
+      type: "object",
+      properties: {
+        reason: { type: "string", description: "Brief reason why human follow-up is needed" },
+        customerName: { type: "string", description: "Customer's name, if known" },
+      },
+      required: ["reason"],
+    },
+  },
 ];
 
 export interface BotResult {
@@ -185,6 +197,12 @@ async function runTool(
     });
 
     return JSON.stringify({ addedToWaitlist: true, service: service.name });
+  }
+
+  if (name === "request_human_followup") {
+    const label = (input.customerName as string | undefined) ?? customerPhone;
+    notifyOwner(businessId, `🙋 לקוח ${label} ביקש המשך טיפול אנושי:\n${input.reason}`);
+    return JSON.stringify({ notified: true });
   }
 
   return JSON.stringify({ error: "Unknown tool" });

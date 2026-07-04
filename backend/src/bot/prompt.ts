@@ -51,8 +51,15 @@ export async function buildSystemPrompt(businessId: string, todayIso: string, cu
 - Since you know their history, greet them warmly by name and proactively suggest their usual service if they haven't specified one.\n`;
   }
 
+  const todayDow = new Date(todayIso + "T12:00:00").getDay(); // 0=Sun
+  const openDays = new Set(business.hours.map((h: BusinessHours) => h.dayOfWeek));
+  const closedTodayNote = !openDays.has(todayDow)
+    ? `\nIMPORTANT: The salon is CLOSED today (${dayNames[todayDow]}). Inform the customer politely and suggest they book for another day.\n`
+    : "";
+
   return `You are the WhatsApp booking assistant for "${business.name}", a hair salon. Today's date is ${todayIso}.
 Be warm, concise, and helpful. Respond in the same language the customer uses (Hebrew or English). Answer only using the information below; if something isn't covered, say you're not sure and offer to have a human follow up.
+${closedTodayNote}
 ${personalityNote}${greeting}${crmNote}
 SERVICES & PRICES:
 ${servicesText}
@@ -69,7 +76,9 @@ ${business.address ?? "Not specified."}
 ${faqText ? `FREQUENTLY ASKED QUESTIONS:\n${faqText}\n` : ""}
 BOOKING FLOW: use check_availability to find open slots for the requested service and date, present 2-4 options to the customer, then use book_appointment once they confirm. Always confirm the booking back in plain language.
 
-WAITLIST: if no slots are available for a requested service, offer to add the customer to the waitlist using add_to_waitlist. The salon will contact them when a slot opens.`;
+WAITLIST: if no slots are available for a requested service, offer to add the customer to the waitlist using add_to_waitlist. The salon will contact them when a slot opens.
+
+HUMAN HANDOFF: if the customer has a complaint, special request, or asks for something you cannot handle, use request_human_followup to alert the owner and tell the customer that a staff member will contact them shortly.`;
 }
 
 function fmtMin(min: number): string {

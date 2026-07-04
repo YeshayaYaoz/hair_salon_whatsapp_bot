@@ -17,11 +17,12 @@ export async function runReminderJob() {
     include: {
       customer: true,
       service: true,
-      business: { select: { name: true, address: true, whatsappPhoneNumberId: true, whatsappAccessToken: true } },
+      business: { select: { name: true, address: true, remindersEnabled: true, whatsappPhoneNumberId: true, whatsappAccessToken: true } },
     },
   });
 
   for (const appt of appointments) {
+    if (!appt.business.remindersEnabled) continue;
     if (!appt.business.whatsappPhoneNumberId || !appt.business.whatsappAccessToken) continue;
     const accessToken = decryptSecret(appt.business.whatsappAccessToken);
     const when = appt.startTime.toLocaleString("he-IL", {
@@ -40,8 +41,15 @@ export async function runReminderJob() {
       });
       await prisma.appointment.update({ where: { id: appt.id }, data: { reminderSentAt: new Date() } });
       console.log(`[reminders] Sent reminder for appt ${appt.id}`);
-    } catch (err) {
-      console.error(`[reminders] Failed for appt ${appt.id}:`, err);
+    } catch (err: any) {
+      const code = err?.response?.data?.error?.code ?? err?.code;
+      if (code === 131047) {
+        // Customer hasn't messaged within 24h — mark sent to avoid retry loops
+        await prisma.appointment.update({ where: { id: appt.id }, data: { reminderSentAt: new Date() } });
+        console.warn(`[reminders] Template window closed for appt ${appt.id} (131047)`);
+      } else {
+        console.error(`[reminders] Failed for appt ${appt.id}:`, err);
+      }
     }
     await new Promise((r) => setTimeout(r, 300));
   }
@@ -62,11 +70,12 @@ export async function runReviewJob() {
     include: {
       customer: true,
       service: true,
-      business: { select: { name: true, googleMapsUrl: true, whatsappPhoneNumberId: true, whatsappAccessToken: true } },
+      business: { select: { name: true, googleMapsUrl: true, reviewsEnabled: true, whatsappPhoneNumberId: true, whatsappAccessToken: true } },
     },
   });
 
   for (const appt of appointments) {
+    if (!appt.business.reviewsEnabled) continue;
     if (!appt.business.whatsappPhoneNumberId || !appt.business.whatsappAccessToken) continue;
     const accessToken = decryptSecret(appt.business.whatsappAccessToken);
     const name = appt.customer.name ? appt.customer.name.split(" ")[0] : "היי";
@@ -84,8 +93,14 @@ export async function runReviewJob() {
       });
       await prisma.appointment.update({ where: { id: appt.id }, data: { reviewSentAt: new Date() } });
       console.log(`[reviews] Sent review request for appt ${appt.id}`);
-    } catch (err) {
-      console.error(`[reviews] Failed for appt ${appt.id}:`, err);
+    } catch (err: any) {
+      const code = err?.response?.data?.error?.code ?? err?.code;
+      if (code === 131047) {
+        await prisma.appointment.update({ where: { id: appt.id }, data: { reviewSentAt: new Date() } });
+        console.warn(`[reviews] Template window closed for appt ${appt.id} (131047)`);
+      } else {
+        console.error(`[reviews] Failed for appt ${appt.id}:`, err);
+      }
     }
     await new Promise((r) => setTimeout(r, 300));
   }
