@@ -87,7 +87,7 @@ export default function WhatsAppPage() {
           setLoading(true);
           apiFetch<{ ok: boolean; phoneNumber: string }>(
             "/api/business/me/whatsapp/embedded-signup",
-            { method: "POST", body: JSON.stringify({ code: response.authResponse.code, redirectUri: window.location.href }) }
+            { method: "POST", body: JSON.stringify({ code: response.authResponse.code }) }
           ).then((result) => {
             setConnected(true);
             setPhoneNumber(result.phoneNumber);
@@ -105,7 +105,7 @@ export default function WhatsAppPage() {
         config_id: META_CONFIG_ID,
         response_type: "code",
         override_default_response_type: true,
-        extras: { setup: {}, featureType: "", sessionInfoVersion: "3", return_url: window.location.href },
+        extras: { setup: {}, featureType: "", sessionInfoVersion: "3" },
       }
     );
   }
