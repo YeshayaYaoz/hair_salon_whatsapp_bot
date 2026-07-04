@@ -98,6 +98,7 @@ interface BusinessProfile {
   notificationPhone?: string;
   botGreeting?: string;
   botPersonality?: string;
+  googleMapsUrl?: string;
 }
 
 function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
@@ -124,7 +125,7 @@ export default function SettingsPage() {
   const { t } = useLanguage();
   const [fields, setFields] = useState<BusinessProfile>({
     name: "", address: "", timezone: "Asia/Jerusalem", email: "",
-    notificationPhone: "", botGreeting: "", botPersonality: "",
+    notificationPhone: "", botGreeting: "", botPersonality: "", googleMapsUrl: "",
   });
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -141,6 +142,7 @@ export default function SettingsPage() {
         notificationPhone: me.notificationPhone ?? "",
         botGreeting: me.botGreeting ?? "",
         botPersonality: me.botPersonality ?? "",
+        googleMapsUrl: me.googleMapsUrl ?? "",
       });
       setLoaded(true);
     });
@@ -164,6 +166,7 @@ export default function SettingsPage() {
           notificationPhone: fields.notificationPhone,
           botGreeting: fields.botGreeting,
           botPersonality: fields.botPersonality,
+          googleMapsUrl: fields.googleMapsUrl,
         }),
       });
       setSaved(true);
@@ -215,6 +218,14 @@ export default function SettingsPage() {
               placeholder="972501234567"
               value={fields.notificationPhone}
               onChange={(e) => set("notificationPhone", e.target.value)}
+              className="w-full"
+            />
+          </Field>
+          <Field label={t.googleMapsUrl} hint={t.googleMapsUrlHint}>
+            <input
+              placeholder="https://g.page/r/..."
+              value={fields.googleMapsUrl}
+              onChange={(e) => set("googleMapsUrl", e.target.value)}
               className="w-full"
             />
           </Field>

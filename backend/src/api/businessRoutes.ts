@@ -37,6 +37,7 @@ const profileSchema = z.object({
   notificationPhone: z.string().optional(),
   botGreeting: z.string().optional(),
   botPersonality: z.string().optional(),
+  googleMapsUrl: z.string().optional(),
 });
 
 businessRouter.put("/me", async (req: AuthedRequest, res) => {

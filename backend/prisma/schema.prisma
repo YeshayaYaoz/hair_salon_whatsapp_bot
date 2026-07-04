@@ -23,6 +23,7 @@ model Business {
   notificationPhone     String? // owner's personal phone for booking alerts
   botGreeting           String? // custom greeting override
   botPersonality        String? // tone/personality instructions for the bot
+  googleMapsUrl         String? // linked in post-visit review requests
   createdAt         DateTime @default(now())
 
   services       Service[]
@@ -98,10 +99,12 @@ model Appointment {
   serviceId   String
   staff       StaffMember? @relation(fields: [staffId], references: [id])
   staffId     String?
-  startTime   DateTime
-  endTime     DateTime
-  status      String   @default("confirmed") // confirmed | cancelled
-  createdAt   DateTime @default(now())
+  startTime       DateTime
+  endTime         DateTime
+  status          String   @default("confirmed") // confirmed | cancelled
+  reminderSentAt  DateTime? // set when 24h reminder WhatsApp is sent
+  reviewSentAt    DateTime? // set when post-visit review request is sent
+  createdAt       DateTime @default(now())
 
   @@index([businessId, startTime])
 }

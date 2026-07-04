@@ -16,8 +16,10 @@ const translations = {
     newCustomers: "New customers", allTime: "All-time bookings",
     last7Days: "Last 7 days", topServices: "Top services",
     setupChecklist: "Get started", setupSubtitle: "Complete these steps to go live:",
-    stepServices: "Add your services", stepHours: "Set your opening hours",
-    stepWhatsapp: "Connect WhatsApp", stepBilling: "Activate subscription",
+    stepServices: "Add your services", stepServicesHint: "List what you offer with prices and durations",
+    stepHours: "Set your opening hours", stepHoursHint: "The bot won't book outside your hours",
+    stepWhatsapp: "Connect WhatsApp", stepWhatsappHint: "One-click setup via Meta — takes 2 minutes",
+    stepBilling: "Activate subscription", stepBillingHint: "Keep the bot live after your trial ends",
 
     // Appointments
     appointmentsTitle: "Appointments", appointmentsSubtitle: "Bookings made through WhatsApp",
@@ -80,6 +82,7 @@ const translations = {
     botPersonalityDesc: "Customize how the bot introduces itself and speaks to customers.",
     salonName: "Salon name", address: "Address", timezone: "Timezone", loginEmail: "Login email",
     notifPhone: "Your WhatsApp number", notifPhoneHint: "Include country code, e.g. 972501234567.",
+    googleMapsUrl: "Google Maps review link", googleMapsUrlHint: "Sent with post-visit thank-you messages. Find it in Google Business Profile → Share → Copy link.",
     greeting: "Opening greeting", personality: "Personality & tone",
     greetingPlaceholder: "e.g. Hello! Welcome to Shir's salon 💇‍♀️ How can I help?",
     personalityPlaceholder: "e.g. Be friendly and use emojis occasionally. Always respond in Hebrew.",
@@ -119,8 +122,10 @@ const translations = {
     newCustomers: "לקוחות חדשים", allTime: "סה\"כ הזמנות",
     last7Days: "7 הימים האחרונים", topServices: "שירותים מובילים",
     setupChecklist: "מתחילים להגדיר", setupSubtitle: "השלם את השלבים הבאים כדי להתחיל:",
-    stepServices: "הוסף שירותים", stepHours: "הגדר שעות פעילות",
-    stepWhatsapp: "חבר וואטסאפ", stepBilling: "הפעל מנוי",
+    stepServices: "הוסף שירותים", stepServicesHint: "הכנס את השירותים שלך עם מחירים ומשכים",
+    stepHours: "הגדר שעות פעילות", stepHoursHint: "הבוט לא יקבע תורים מחוץ לשעות הפעילות",
+    stepWhatsapp: "חבר וואטסאפ", stepWhatsappHint: "חיבור בלחיצה אחת דרך מטא — לוקח 2 דקות",
+    stepBilling: "הפעל מנוי", stepBillingHint: "שמור על הבוט פעיל לאחר תקופת הניסיון",
 
     // Appointments
     appointmentsTitle: "תורים", appointmentsSubtitle: "הזמנות שנקבעו דרך וואטסאפ",
@@ -183,6 +188,7 @@ const translations = {
     botPersonalityDesc: "התאם כיצד הבוט מציג את עצמו ומדבר עם לקוחות.",
     salonName: "שם הסלון", address: "כתובת", timezone: "אזור זמן", loginEmail: "אימייל כניסה",
     notifPhone: "מספר הוואטסאפ שלך", notifPhoneHint: "כולל קידומת מדינה, לדוג׳ 972501234567.",
+    googleMapsUrl: "קישור לביקורת Google Maps", googleMapsUrlHint: "יישלח עם הודעות תודה לאחר הביקור. מצא אותו בפרופיל העסק Google ← שתף ← העתק קישור.",
     greeting: "ברכת פתיחה", personality: "אישיות וטון",
     greetingPlaceholder: "לדוג׳ שלום! ברוכים הבאים לסלון שיר 💇‍♀️ במה אוכל לעזור?",
     personalityPlaceholder: "לדוג׳ היה ידידותי ותשתמש באמוג׳ים מדי פעם. תמיד ענה בעברית.",

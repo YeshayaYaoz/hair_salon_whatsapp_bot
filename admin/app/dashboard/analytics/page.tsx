@@ -104,10 +104,10 @@ export default function AnalyticsPage() {
   const allComplete = setup && setup.hasServices && setup.hasHours && setup.whatsappConnected && setup.subscriptionActive;
 
   const setupSteps = setup ? [
-    { done: setup.hasServices,        label: t.stepServices, href: "/dashboard/services" },
-    { done: setup.hasHours,           label: t.stepHours,    href: "/dashboard/hours" },
-    { done: setup.whatsappConnected,  label: t.stepWhatsapp, href: "/dashboard/whatsapp" },
-    { done: setup.subscriptionActive, label: t.stepBilling,  href: "/dashboard/billing" },
+    { done: setup.hasServices,        label: t.stepServices, hint: t.stepServicesHint, href: "/dashboard/services" },
+    { done: setup.hasHours,           label: t.stepHours,    hint: t.stepHoursHint,    href: "/dashboard/hours" },
+    { done: setup.whatsappConnected,  label: t.stepWhatsapp, hint: t.stepWhatsappHint, href: "/dashboard/whatsapp" },
+    { done: setup.subscriptionActive, label: t.stepBilling,  hint: t.stepBillingHint,  href: "/dashboard/billing" },
   ] : [];
 
   const doneCount = setupSteps.filter(s => s.done).length;
@@ -135,18 +135,25 @@ export default function AnalyticsPage() {
       {/* Onboarding checklist */}
       {setup && !allComplete && (
         <div
-          className="rounded-2xl p-5 mb-8 animate-fade-up stagger-2"
-          style={{ background: "#0F1420", border: "1px solid rgba(245,158,11,0.2)" }}
+          className="rounded-2xl p-6 mb-8 animate-fade-up stagger-2"
+          style={{ background: "#0F1420", border: "1px solid rgba(245,158,11,0.25)" }}
         >
-          <div className="flex items-center justify-between mb-1">
-            <h2 className="text-sm font-semibold text-white">{t.setupChecklist}</h2>
-            <span className="text-xs font-medium" style={{ color: "#F59E0B" }}>{doneCount}/{setupSteps.length}</span>
+          <div className="flex items-start justify-between gap-4 mb-1">
+            <div>
+              <h2 className="text-base font-bold text-white">{t.setupChecklist}</h2>
+              <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>{t.setupSubtitle}</p>
+            </div>
+            <span
+              className="text-xs font-bold px-2.5 py-1 rounded-full shrink-0"
+              style={{ background: "rgba(245,158,11,0.15)", color: "#F59E0B" }}
+            >
+              {doneCount}/{setupSteps.length}
+            </span>
           </div>
-          {/* Progress bar */}
-          <div className="h-1 rounded-full mb-4 overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
+          <div className="h-1.5 rounded-full my-4 overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
             <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${(doneCount / setupSteps.length) * 100}%`, background: "#F59E0B" }}
+              className="h-full rounded-full transition-all duration-700"
+              style={{ width: `${(doneCount / setupSteps.length) * 100}%`, background: "linear-gradient(to right, #D97706, #F59E0B)" }}
             />
           </div>
           <div className="flex flex-col gap-2">
@@ -154,33 +161,38 @@ export default function AnalyticsPage() {
               <Link
                 key={step.href}
                 href={step.href}
-                className="flex items-center gap-3 group animate-fade-up"
-                style={{ animationDelay: `${(i + 3) * 60}ms` }}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all animate-fade-up"
+                style={{
+                  animationDelay: `${(i + 3) * 60}ms`,
+                  background: step.done ? "transparent" : "rgba(245,158,11,0.04)",
+                  border: step.done ? "1px solid transparent" : "1px solid rgba(245,158,11,0.12)",
+                }}
               >
                 <div
-                  className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all"
+                  className="w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all"
                   style={step.done
                     ? { background: "#F59E0B", borderColor: "#F59E0B" }
-                    : { borderColor: "rgba(255,255,255,0.2)" }
+                    : { borderColor: "rgba(245,158,11,0.4)" }
                   }
                 >
-                  {step.done && (
-                    <svg className="w-3 h-3 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  {step.done ? (
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="#000">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
+                  ) : (
+                    <span className="text-xs font-bold" style={{ color: "#F59E0B" }}>{i + 1}</span>
                   )}
                 </div>
-                <span
-                  className="text-sm transition-all"
-                  style={step.done
-                    ? { color: "rgba(255,255,255,0.3)", textDecoration: "line-through" }
-                    : { color: "rgba(255,255,255,0.85)" }
-                  }
-                >
-                  {step.label}
-                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium" style={step.done ? { color: "rgba(255,255,255,0.3)", textDecoration: "line-through" } : { color: "#fff" }}>
+                    {step.label}
+                  </p>
+                  {!step.done && step.hint && (
+                    <p className="text-xs mt-0.5 truncate" style={{ color: "rgba(255,255,255,0.35)" }}>{step.hint}</p>
+                  )}
+                </div>
                 {!step.done && (
-                  <svg className="w-3.5 h-3.5 ms-auto transition" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: "rgba(255,255,255,0.2)" }}>
+                  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: "rgba(245,158,11,0.5)" }}>
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 )}
