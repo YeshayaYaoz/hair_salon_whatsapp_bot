@@ -21,6 +21,7 @@ export default function WhatsAppPage() {
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
   const [sdkReady, setSdkReady] = useState(false);
   const [loading, setLoading] = useState(false);
+  const codeUsedRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -75,11 +76,14 @@ export default function WhatsAppPage() {
       return;
     }
     setError(null);
+    codeUsedRef.current = false;
     console.log("Launching FB.login with config_id:", META_CONFIG_ID, "app:", META_APP_ID);
     window.FB.login(
       (response: any) => {
         console.log("FB.login response:", JSON.stringify(response));
         if (response.authResponse?.code) {
+          if (codeUsedRef.current) return; // StrictMode double-fire guard
+          codeUsedRef.current = true;
           setLoading(true);
           apiFetch<{ ok: boolean; phoneNumber: string }>(
             "/api/business/me/whatsapp/embedded-signup",

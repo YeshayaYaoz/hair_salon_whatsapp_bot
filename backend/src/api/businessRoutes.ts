@@ -87,8 +87,9 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
   );
   const tokenData = await tokenRes.json() as any;
   if (!tokenData.access_token) {
+    const metaMsg = tokenData?.error?.message ?? JSON.stringify(tokenData);
     console.error("Embedded signup token exchange failed:", tokenData);
-    return res.status(400).json({ error: "Failed to exchange code", detail: tokenData });
+    return res.status(400).json({ error: `Meta: ${metaMsg}` });
   }
 
   const userToken: string = tokenData.access_token;
