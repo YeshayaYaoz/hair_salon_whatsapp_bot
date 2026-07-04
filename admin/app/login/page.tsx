@@ -483,7 +483,7 @@ export default function LoginPage() {
             </div>
 
             <h1 className="login-form-heading">
-              {mode === "login" ? "ברוך הבא בחזרה" : "יצירת חשבון חדש"}
+              {mode === "login" ? "ברוך הבא" : "יצירת חשבון חדש"}
             </h1>
             <p className="login-form-sub">
               {mode === "login"
