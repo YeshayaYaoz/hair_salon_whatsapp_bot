@@ -70,7 +70,7 @@ export async function createAppointment(params: {
 
   const customer = await prisma.customer.upsert({
     where: { businessId_phone: { businessId: params.businessId, phone: params.customerPhone } },
-    update: { name: params.customerName },
+    update: params.customerName ? { name: params.customerName } : {},
     create: { businessId: params.businessId, phone: params.customerPhone, name: params.customerName },
   });
 

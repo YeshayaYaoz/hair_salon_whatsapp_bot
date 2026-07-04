@@ -222,6 +222,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   ];
 
   const lastOfferedSlots: { value?: AvailableSlot[] } = {};
+  console.log(`[bot] businessId=${businessId} customerPhone=${customerPhone} message="${messageText.slice(0, 80)}"`);
 
   let response: Anthropic.Message;
   try {
@@ -245,7 +246,15 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     const toolResults: Anthropic.ToolResultBlockParam[] = [];
     for (const block of response.content) {
       if (block.type === "tool_use") {
-        const result = await runTool(businessId, customerPhone, block.name, block.input as Record<string, unknown>, lastOfferedSlots);
+        console.log(`[bot] tool_call name=${block.name} input=${JSON.stringify(block.input)}`);
+        let result: string;
+        try {
+          result = await runTool(businessId, customerPhone, block.name, block.input as Record<string, unknown>, lastOfferedSlots);
+        } catch (toolErr) {
+          console.error(`[bot] tool ${block.name} threw:`, toolErr);
+          result = JSON.stringify({ error: String(toolErr) });
+        }
+        console.log(`[bot] tool_result name=${block.name} result=${result.slice(0, 200)}`);
         toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
       }
     }
