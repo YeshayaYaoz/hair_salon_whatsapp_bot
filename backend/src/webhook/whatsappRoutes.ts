@@ -10,6 +10,21 @@ import { rateLimit } from "../lib/rateLimit.js";
 
 export const whatsappRouter = Router();
 
+// Deduplicate Meta webhook deliveries — Meta guarantees at-least-once, so the same
+// message can arrive twice within seconds. We keep message IDs for 5 minutes.
+const processedMessageIds = new Map<string, number>();
+const MESSAGE_TTL_MS = 5 * 60 * 1000;
+function isDuplicate(messageId: string): boolean {
+  const now = Date.now();
+  // Evict stale entries periodically (on every call, cheap enough)
+  for (const [id, ts] of processedMessageIds) {
+    if (now - ts > MESSAGE_TTL_MS) processedMessageIds.delete(id);
+  }
+  if (processedMessageIds.has(messageId)) return true;
+  processedMessageIds.set(messageId, now);
+  return false;
+}
+
 const webhookLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
@@ -88,6 +103,11 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
     phoneNumberId = change?.metadata?.phone_number_id;
     const message = change?.messages?.[0];
     if (!phoneNumberId || !message) return;
+
+    if (message.id && isDuplicate(message.id as string)) {
+      console.log(`WhatsApp webhook: duplicate message ${message.id as string}, skipping`);
+      return;
+    }
 
     const text = extractMessageText(message);
     if (!text) return;
