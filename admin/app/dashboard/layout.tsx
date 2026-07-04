@@ -67,11 +67,11 @@ function SidebarContent({ pathname }: { pathname: string }) {
               href={item.href}
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
               style={active ? {
-                background: "rgba(245,158,11,0.12)",
-                color: "#F59E0B",
-                boxShadow: "inset 2px 0 0 #F59E0B",
+                background: "rgba(167,139,250,0.15)",
+                color: "#A78BFA",
+                boxShadow: "inset 2px 0 0 #A78BFA",
               } : {
-                color: "rgba(255,255,255,0.45)",
+                color: "rgba(255,255,255,0.5)",
               }}
               onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"; (e.currentTarget as HTMLElement).style.color = "#fff"; } }}
               onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = ""; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.45)"; } }}
@@ -94,7 +94,7 @@ function SidebarContent({ pathname }: { pathname: string }) {
               key={l}
               onClick={() => setLang(l)}
               className="text-xs px-2 py-0.5 rounded-md font-medium transition"
-              style={lang === l ? { background: "rgba(245,158,11,0.15)", color: "#F59E0B" } : { color: "rgba(255,255,255,0.3)" }}
+              style={lang === l ? { background: "rgba(167,139,250,0.2)", color: "#A78BFA" } : { color: "rgba(255,255,255,0.35)" }}
             >
               {l === "en" ? "EN" : "עב"}
             </button>
@@ -125,11 +125,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   return (
     <AuthGuard>
-    <div className="flex min-h-screen" style={{ background: "#0B0F1A" }}>
+    <div className="flex min-h-screen" style={{ background: "#F5F5FF" }}>
       {/* Desktop sidebar */}
       <aside
         className="hidden md:flex w-60 flex-col py-6 px-2 shrink-0 fixed top-0 bottom-0 start-0 z-20"
-        style={{ background: "#0F1420", borderInlineEnd: "1px solid rgba(255,255,255,0.06)" }}
+        style={{ background: "#1E1B4B", borderInlineEnd: "1px solid rgba(255,255,255,0.07)" }}
       >
         <SidebarContent pathname={pathname} />
       </aside>
@@ -137,11 +137,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       {/* Mobile top bar */}
       <div
         className="md:hidden fixed top-0 start-0 end-0 z-30 flex items-center px-4 h-14"
-        style={{ background: "rgba(15,20,32,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+        style={{ background: "rgba(245,245,255,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(124,58,237,0.1)" }}
       >
         <div className="flex items-center gap-2.5">
           <Image src="/tori-logo-black.png" alt="תורי" width={30} height={30} className="rounded-lg" />
-          <span className="font-semibold text-white text-base">
+          <span className="font-semibold text-gray-900 text-base">
             {activeItem ? t.nav[activeItem.key] : "תורי"}
           </span>
         </div>
@@ -155,7 +155,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       {/* Mobile bottom tab bar */}
       <nav
         className="md:hidden fixed bottom-0 start-0 end-0 z-30 flex items-stretch h-16"
-        style={{ background: "rgba(15,20,32,0.97)", backdropFilter: "blur(12px)", borderTop: "1px solid rgba(255,255,255,0.06)" }}
+        style={{ background: "rgba(245,245,255,0.97)", backdropFilter: "blur(12px)", borderTop: "1px solid rgba(124,58,237,0.1)" }}
       >
         {BOTTOM_TAB_ITEMS.map((item) => {
           const active = pathname === item.href;
@@ -164,14 +164,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               key={item.href}
               href={item.href}
               className="flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition"
-              style={{ color: active ? "#F59E0B" : "rgba(255,255,255,0.35)" }}
+              style={{ color: active ? "#7C3AED" : "#9CA3AF" }}
             >
               <svg
                 className="w-5 h-5 transition"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
-                style={{ color: active ? "#F59E0B" : "rgba(255,255,255,0.35)" }}
+                style={{ color: active ? "#7C3AED" : "#9CA3AF" }}
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.5 : 1.75} d={item.icon} />
               </svg>

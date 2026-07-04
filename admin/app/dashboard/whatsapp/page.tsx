@@ -124,23 +124,23 @@ export default function WhatsAppPage() {
   return (
     <div className="max-w-lg animate-fade-in">
       <div className="mb-6 animate-fade-up">
-        <h1 className="text-2xl font-bold text-white">{t.whatsappTitle}</h1>
-        <p className="text-zinc-400 text-sm mt-1">{t.whatsappSubtitle}</p>
+        <h1 className="text-2xl font-bold text-gray-900">{t.whatsappTitle}</h1>
+        <p className="text-gray-500 text-sm mt-1">{t.whatsappSubtitle}</p>
       </div>
 
       {/* Connection status */}
       <div className="flex items-center gap-2 mb-6">
-        <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${connected ? "bg-green-950/50 text-green-400 border border-green-800" : "bg-zinc-800 text-zinc-400 border border-zinc-700"}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-green-400" : "bg-zinc-500"}`} />
+        <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${connected ? "bg-green-50 text-green-700 border border-green-200" : "bg-gray-100 text-gray-500 border border-gray-200"}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-green-400" : "bg-gray-300"}`} />
           {connected ? t.connected : t.notConnected}
         </span>
-        {phoneNumber && <span className="text-xs text-zinc-400">{phoneNumber}</span>}
+        {phoneNumber && <span className="text-xs text-gray-500">{phoneNumber}</span>}
         {saved && <SavedBadge text={t.saved} />}
         {connected && (
           <button
             onClick={disconnect}
             disabled={disconnecting}
-            className="mr-auto text-xs text-red-500 hover:text-red-400 disabled:opacity-50 transition"
+            className="mr-auto text-xs text-red-500 hover:text-red-600 disabled:opacity-50 transition"
           >
             {disconnecting ? "..." : (lang === "he" ? "נתק" : "Disconnect")}
           </button>
@@ -149,7 +149,7 @@ export default function WhatsAppPage() {
 
       {/* Embedded Signup button */}
       {META_APP_ID && !showManual && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-4">
+        <div className="bg-white border border-gray-200 rounded-xl p-6 mb-4">
           <div className="flex items-start gap-4 mb-5">
             <div className="w-10 h-10 rounded-xl bg-[#25D366]/10 border border-[#25D366]/20 flex items-center justify-center flex-shrink-0">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -157,10 +157,10 @@ export default function WhatsAppPage() {
               </svg>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white mb-1">
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">
                 {lang === "he" ? "חיבור WhatsApp Business" : "Connect WhatsApp Business"}
               </h3>
-              <p className="text-xs text-zinc-400 leading-relaxed">
+              <p className="text-xs text-gray-500 leading-relaxed">
                 {lang === "he"
                   ? "לחץ על הכפתור ובצע את תהליך החיבור של מטא. ייקח כ-2 דקות."
                   : "Click the button below and complete Meta's setup flow. Takes about 2 minutes."}
@@ -188,7 +188,7 @@ export default function WhatsAppPage() {
 
       {/* Error */}
       {error && (
-        <div className="bg-red-950/40 border border-red-800 text-red-400 text-xs rounded-lg px-4 py-3 mb-4">
+        <div className="bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg px-4 py-3 mb-4">
           {error}
         </div>
       )}
@@ -196,7 +196,7 @@ export default function WhatsAppPage() {
       {/* Manual fallback toggle */}
       <button
         onClick={() => setShowManual((v) => !v)}
-        className="text-xs text-zinc-500 hover:text-zinc-300 transition underline underline-offset-2 mb-3"
+        className="text-xs text-gray-400 hover:text-gray-600 transition underline underline-offset-2 mb-3"
       >
         {showManual
           ? (lang === "he" ? "← חזור לחיבור אוטומטי" : "← Back to automatic setup")
@@ -205,10 +205,10 @@ export default function WhatsAppPage() {
 
       {/* Manual form */}
       {showManual && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-4">
+        <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
           <form onSubmit={saveManual} className="flex flex-col gap-3">
             <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1.5">{t.phoneNumberId}</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">{t.phoneNumberId}</label>
               <input
                 placeholder={t.phoneNumberIdPlaceholder}
                 value={phoneNumberId}
@@ -218,7 +218,7 @@ export default function WhatsAppPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1.5">{t.accessToken}</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">{t.accessToken}</label>
               <input
                 placeholder={t.accessTokenPlaceholder}
                 value={accessToken}
@@ -231,7 +231,7 @@ export default function WhatsAppPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition"
+                className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-gray-900 text-sm font-semibold px-5 py-2.5 rounded-lg transition"
               >
                 {saving ? t.saving : t.save}
               </button>
@@ -241,7 +241,7 @@ export default function WhatsAppPage() {
         </div>
       )}
 
-      <p className="text-xs text-zinc-500">{t.whatsappHint}</p>
+      <p className="text-xs text-gray-400">{t.whatsappHint}</p>
     </div>
   );
 }

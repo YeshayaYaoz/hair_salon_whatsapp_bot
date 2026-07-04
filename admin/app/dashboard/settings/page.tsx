@@ -46,13 +46,13 @@ function GoogleCalendarSection() {
   }
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-4">
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-sm font-semibold text-white mb-0.5 flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-gray-900 mb-0.5 flex items-center gap-2">
             <span className="text-base">📅</span> Google Calendar
           </h2>
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-gray-400">
             {connected
               ? "כל תור שנקבע מסתנכרן אוטומטית לגוגל קלנדר שלך."
               : "חבר את גוגל קלנדר כדי שתורים יופיעו שם אוטומטית."}
@@ -63,13 +63,13 @@ function GoogleCalendarSection() {
             <span className="text-xs text-zinc-600">טוען...</span>
           ) : connected ? (
             <>
-              <span className="flex items-center gap-1.5 text-xs text-green-400 font-medium">
+              <span className="flex items-center gap-1.5 text-xs text-green-700 font-medium">
                 <span className="w-2 h-2 rounded-full bg-green-400 inline-block"></span>
                 מחובר
               </span>
               <button
                 onClick={disconnect}
-                className="text-xs text-zinc-500 hover:text-red-400 transition border border-zinc-700 hover:border-red-800 px-3 py-1.5 rounded-lg"
+                className="text-xs text-gray-400 hover:text-red-600 transition border border-gray-200 hover:border-red-200 px-3 py-1.5 rounded-lg"
               >
                 נתק
               </button>
@@ -103,9 +103,9 @@ interface BusinessProfile {
 
 function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-4">
-      <h2 className="text-sm font-semibold text-white mb-0.5">{title}</h2>
-      {description && <p className="text-xs text-zinc-500 mb-4">{description}</p>}
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
+      <h2 className="text-sm font-semibold text-gray-900 mb-0.5">{title}</h2>
+      {description && <p className="text-xs text-gray-400 mb-4">{description}</p>}
       <div className="mt-4 flex flex-col gap-3">{children}</div>
     </div>
   );
@@ -114,7 +114,7 @@ function Section({ title, description, children }: { title: string; description?
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-zinc-400 mb-1.5">{label}</label>
+      <label className="block text-xs font-medium text-gray-500 mb-1.5">{label}</label>
       {children}
       {hint && <p className="text-xs text-zinc-600 mt-1">{hint}</p>}
     </div>
@@ -181,8 +181,8 @@ export default function SettingsPage() {
   if (!loaded) {
     return (
       <div>
-        <h1 className="text-2xl font-bold text-white mb-6">{t.settingsTitle}</h1>
-        <p className="text-zinc-500 text-sm">{t.loading}</p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">{t.settingsTitle}</h1>
+        <p className="text-gray-400 text-sm">{t.loading}</p>
       </div>
     );
   }
@@ -190,8 +190,8 @@ export default function SettingsPage() {
   return (
     <div className="max-w-lg animate-fade-in">
       <div className="mb-6 animate-fade-up">
-        <h1 className="text-2xl font-bold text-white">{t.settingsTitle}</h1>
-        <p className="text-zinc-400 text-sm mt-1">{t.settingsSubtitle}</p>
+        <h1 className="text-2xl font-bold text-gray-900">{t.settingsTitle}</h1>
+        <p className="text-gray-500 text-sm mt-1">{t.settingsSubtitle}</p>
       </div>
 
       <GoogleCalendarSection />
@@ -256,12 +256,12 @@ export default function SettingsPage() {
           <button
             type="submit"
             disabled={saving}
-            className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition"
+            className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-gray-900 text-sm font-semibold px-5 py-2.5 rounded-lg transition"
           >
             {saving ? t.saving : t.save}
           </button>
           {saved && <SavedBadge text={t.saved} />}
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {error && <p className="text-red-600 text-sm">{error}</p>}
         </div>
       </form>
     </div>

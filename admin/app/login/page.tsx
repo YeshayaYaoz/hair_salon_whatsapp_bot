@@ -64,7 +64,7 @@ export default function LoginPage() {
           min-height: 100vh;
           display: grid;
           grid-template-columns: 1fr 1fr;
-          background: #09090B;
+          background: #F5F5FF;
           direction: rtl;
           font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
         }
@@ -88,7 +88,7 @@ export default function LoginPage() {
           position: absolute;
           inset: 0;
           background:
-            radial-gradient(ellipse 600px 500px at 20% 80%, rgba(245,158,11,0.08) 0%, transparent 60%),
+            radial-gradient(ellipse 600px 500px at 20% 80%, rgba(124,58,237,0.08) 0%, transparent 60%),
             radial-gradient(ellipse 400px 400px at 80% 20%, rgba(99,102,241,0.12) 0%, transparent 60%);
           pointer-events: none;
         }
@@ -124,13 +124,13 @@ export default function LoginPage() {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          background: rgba(245,158,11,0.12);
-          border: 1px solid rgba(245,158,11,0.25);
+          background: rgba(124,58,237,0.12);
+          border: 1px solid rgba(124,58,237,0.2);
           border-radius: 20px;
           padding: 5px 14px;
           font-size: 12px;
           font-weight: 600;
-          color: #F59E0B;
+          color: #A78BFA;
           letter-spacing: 0.04em;
           margin-bottom: 32px;
         }
@@ -138,8 +138,8 @@ export default function LoginPage() {
           width: 6px;
           height: 6px;
           border-radius: 50%;
-          background: #F59E0B;
-          box-shadow: 0 0 6px #F59E0B;
+          background: #A78BFA;
+          box-shadow: 0 0 6px #A78BFA;
           animation: pulse-dot 2s ease-in-out infinite;
         }
         @keyframes pulse-dot {
@@ -158,7 +158,7 @@ export default function LoginPage() {
         }
         .login-left-headline em {
           font-style: normal;
-          color: #F59E0B;
+          color: #A78BFA;
         }
         .login-left-sub {
           font-size: 15px;
@@ -181,7 +181,7 @@ export default function LoginPage() {
           line-height: 1;
           margin-bottom: 4px;
         }
-        .login-left-stat-n span { color: #F59E0B; }
+        .login-left-stat-n span { color: #A78BFA; }
         .login-left-stat-l {
           font-size: 11px;
           color: rgba(255,255,255,0.4);
@@ -211,7 +211,7 @@ export default function LoginPage() {
           width: 32px;
           height: 32px;
           border-radius: 50%;
-          background: linear-gradient(135deg, #F59E0B, #D97706);
+          background: linear-gradient(135deg, #7C3AED, #6D28D9);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -236,7 +236,7 @@ export default function LoginPage() {
           align-items: center;
           justify-content: center;
           padding: 40px 32px;
-          background: #09090B;
+          background: #F5F5FF;
         }
 
         .login-form-wrap {
@@ -260,25 +260,25 @@ export default function LoginPage() {
         .login-form-logo-name {
           font-size: 18px;
           font-weight: 700;
-          color: #fff;
+          color: #1A1A2E;
           letter-spacing: -0.4px;
         }
         .login-form-logo-sub {
           font-size: 12px;
-          color: rgba(255,255,255,0.35);
+          color: #9CA3AF;
           margin-top: 1px;
         }
 
         .login-form-heading {
           font-size: 22px;
           font-weight: 800;
-          color: #fff;
+          color: #1A1A2E;
           letter-spacing: -0.8px;
           margin-bottom: 6px;
         }
         .login-form-sub {
           font-size: 13px;
-          color: rgba(255,255,255,0.4);
+          color: #9CA3AF;
           margin-bottom: 28px;
         }
 
@@ -291,57 +291,57 @@ export default function LoginPage() {
         .login-field label {
           font-size: 12px;
           font-weight: 600;
-          color: rgba(255,255,255,0.55);
+          color: #6B7280;
           letter-spacing: 0.03em;
         }
         .login-field input {
           width: 100%;
-          background: #18181B;
-          border: 1px solid rgba(255,255,255,0.09);
+          background: #FFFFFF;
+          border: 1px solid #E5E5F0;
           border-radius: 10px;
           padding: 12px 16px;
           font-size: 14px;
-          color: #fff;
+          color: #1A1A2E;
           outline: none;
           transition: border-color 0.15s, box-shadow 0.15s;
           direction: ltr;
           font-family: inherit;
         }
         .login-field input::placeholder {
-          color: rgba(255,255,255,0.22);
+          color: #D1D5DB;
           direction: ltr;
         }
         .login-field input:focus {
-          border-color: #F59E0B;
-          box-shadow: 0 0 0 3px rgba(245,158,11,0.12);
+          border-color: #7C3AED;
+          box-shadow: 0 0 0 3px rgba(124,58,237,0.12);
         }
 
         .login-forgot {
           display: block;
           text-align: left;
           font-size: 12px;
-          color: rgba(255,255,255,0.35);
+          color: #9CA3AF;
           text-decoration: none;
           margin-top: -6px;
           margin-bottom: 8px;
           transition: color 0.15s;
         }
-        .login-forgot:hover { color: #F59E0B; }
+        .login-forgot:hover { color: #7C3AED; }
 
         .login-error {
-          background: rgba(239,68,68,0.08);
-          border: 1px solid rgba(239,68,68,0.25);
+          background: rgba(239,68,68,0.06);
+          border: 1px solid rgba(239,68,68,0.2);
           border-radius: 10px;
           padding: 11px 14px;
           font-size: 13px;
-          color: #FCA5A5;
+          color: #DC2626;
           margin-bottom: 14px;
         }
 
         .login-submit {
           width: 100%;
-          background: #F59E0B;
-          color: #000;
+          background: #7C3AED;
+          color: #fff;
           font-size: 14px;
           font-weight: 700;
           border: none;
@@ -354,8 +354,8 @@ export default function LoginPage() {
           margin-top: 6px;
         }
         .login-submit:hover:not(:disabled) {
-          background: #FBBF24;
-          box-shadow: 0 4px 20px rgba(245,158,11,0.35);
+          background: #6D28D9;
+          box-shadow: 0 4px 20px rgba(124,58,237,0.35);
           transform: translateY(-1px);
         }
         .login-submit:active:not(:disabled) { transform: none; }
@@ -370,30 +370,30 @@ export default function LoginPage() {
         .login-divider-line {
           flex: 1;
           height: 1px;
-          background: rgba(255,255,255,0.07);
+          background: #E5E5F0;
         }
         .login-divider-text {
           font-size: 11px;
-          color: rgba(255,255,255,0.25);
+          color: #9CA3AF;
           white-space: nowrap;
         }
 
         .login-switch {
           text-align: center;
           font-size: 13px;
-          color: rgba(255,255,255,0.35);
+          color: #9CA3AF;
         }
         .login-switch button {
           background: none;
           border: none;
-          color: #F59E0B;
+          color: #7C3AED;
           font-size: 13px;
           font-weight: 600;
           cursor: pointer;
           font-family: inherit;
           transition: color 0.15s;
         }
-        .login-switch button:hover { color: #FBBF24; }
+        .login-switch button:hover { color: #6D28D9; }
 
         .login-trust {
           display: flex;
@@ -408,11 +408,11 @@ export default function LoginPage() {
           align-items: center;
           gap: 5px;
           font-size: 11px;
-          color: rgba(255,255,255,0.25);
+          color: #9CA3AF;
         }
         .login-trust-icon {
           font-size: 12px;
-          opacity: 0.5;
+          opacity: 0.6;
         }
       `}</style>
 

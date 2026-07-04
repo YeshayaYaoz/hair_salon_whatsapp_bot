@@ -58,22 +58,22 @@ export default function HoursPage() {
   return (
     <div className="max-w-lg animate-fade-in">
       <div className="mb-6 animate-fade-up">
-        <h1 className="text-2xl font-bold text-white">{t.hoursTitle}</h1>
-        <p className="text-zinc-400 text-sm mt-1">{t.hoursSubtitle}</p>
+        <h1 className="text-2xl font-bold text-gray-900">{t.hoursTitle}</h1>
+        <p className="text-gray-500 text-sm mt-1">{t.hoursSubtitle}</p>
       </div>
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden mb-4">
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-4">
         {hours.map((h, i) => (
           <div
             key={h.dayOfWeek}
-            className={`flex items-center gap-4 px-5 py-3.5 ${i !== hours.length - 1 ? "border-b border-zinc-800/50" : ""} ${!h.enabled ? "opacity-50" : ""}`}
+            className={`flex items-center gap-4 px-5 py-3.5 ${i !== hours.length - 1 ? "border-b border-gray-200/50" : ""} ${!h.enabled ? "opacity-50" : ""}`}
           >
             <input
               type="checkbox"
               checked={h.enabled}
               onChange={(e) => update(i, { enabled: e.target.checked })}
             />
-            <span className="w-24 text-sm font-medium text-zinc-200">{t.days[h.dayOfWeek]}</span>
+            <span className="w-24 text-sm font-medium text-gray-700">{t.days[h.dayOfWeek]}</span>
             <div className="flex items-center gap-2 ms-auto">
               <input
                 type="time"
@@ -82,7 +82,7 @@ export default function HoursPage() {
                 disabled={!h.enabled}
                 className="text-sm py-1.5 px-2"
               />
-              <span className="text-zinc-500 text-sm">{t.to}</span>
+              <span className="text-gray-400 text-sm">{t.to}</span>
               <input
                 type="time"
                 value={h.close}
@@ -98,7 +98,7 @@ export default function HoursPage() {
       <div className="flex items-center gap-3">
         <button
           onClick={save}
-          className="bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition"
+          className="bg-violet-600 hover:bg-violet-500 text-gray-900 text-sm font-semibold px-5 py-2.5 rounded-lg transition"
         >
           {t.saveHours}
         </button>
