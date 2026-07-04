@@ -1,29 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { AnimationItem } from "lottie-web";
 
 export default function LandingPage() {
   const tiltEl = useRef<HTMLDivElement>(null);
-  const logoRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [appts, setAppts] = useState(40);
-
-  // Lottie logo animation (nav)
-  useEffect(() => {
-    if (!logoRef.current) return;
-    let anim: AnimationItem | null = null;
-    import("lottie-web").then((lottie) => {
-      anim = lottie.default.loadAnimation({
-        container: logoRef.current!,
-        renderer: "svg",
-        loop: true,
-        autoplay: true,
-        path: "/logo_animation_black.json",
-      });
-    });
-    return () => anim?.destroy();
-  }, []);
 
 
   // 3D scroll tilt on product mock
@@ -785,7 +767,7 @@ export default function LandingPage() {
         {/* NAV */}
         <nav className="lp-nav">
           <a className="lp-nav-logo" href="#">
-            <div ref={logoRef} style={{ width: 32, height: 32 }} />
+            <video src="/logo_animation.mp4" autoPlay loop muted playsInline style={{ width: 32, height: 32, borderRadius: 8 }} />
             <span>תורי</span>
           </a>
           <div className="lp-nav-links">

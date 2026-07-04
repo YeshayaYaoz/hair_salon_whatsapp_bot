@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, setToken } from "../lib/api";
 
@@ -15,27 +15,9 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const logoRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 60);
     return () => clearTimeout(t);
-  }, []);
-
-  useEffect(() => {
-    if (!logoRef.current) return;
-    let anim: { destroy: () => void } | null = null;
-    import("lottie-web").then((lottie) => {
-      if (!logoRef.current) return;
-      anim = lottie.default.loadAnimation({
-        container: logoRef.current!,
-        renderer: "svg",
-        loop: true,
-        autoplay: true,
-        path: "/logo_animation_black.json",
-      });
-    });
-    return () => anim?.destroy();
   }, []);
 
   async function submit(e: React.FormEvent) {
@@ -422,7 +404,7 @@ export default function LoginPage() {
           <div className="login-left-grid" />
 
           <div className="login-left-brand">
-            <div ref={logoRef} style={{ width: 32, height: 32, flexShrink: 0 }} />
+            <video src="/logo_animation.mp4" autoPlay loop muted playsInline style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 8 }} />
             <span className="login-left-brand-name">תורי</span>
           </div>
 

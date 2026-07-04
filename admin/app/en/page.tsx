@@ -1,28 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { AnimationItem } from "lottie-web";
 
 export default function LandingPageEN() {
   const tiltEl = useRef<HTMLDivElement>(null);
-  const logoRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [appts, setAppts] = useState(40);
-
-  useEffect(() => {
-    if (!logoRef.current) return;
-    let anim: AnimationItem | null = null;
-    import("lottie-web").then((lottie) => {
-      anim = lottie.default.loadAnimation({
-        container: logoRef.current!,
-        renderer: "svg",
-        loop: true,
-        autoplay: true,
-        path: "/logo_animation_black.json",
-      });
-    });
-    return () => anim?.destroy();
-  }, []);
 
   useEffect(() => {
     const el = tiltEl.current;
@@ -579,7 +562,7 @@ export default function LandingPageEN() {
         {/* NAV */}
         <nav className="lp-nav">
           <a className="lp-nav-logo" href="/en">
-            <div ref={logoRef} style={{ width: 32, height: 32 }} />
+            <video src="/logo_animation.mp4" autoPlay loop muted playsInline style={{ width: 32, height: 32, borderRadius: 8 }} />
             <span>Tori</span>
           </a>
           <div className="lp-nav-links">
