@@ -457,7 +457,7 @@ export default function LoginPage() {
           <div className={`login-form-wrap ${mounted ? "show" : ""}`}>
 
             <div className="login-form-logo">
-              <Image src="/tori_logo-white.jpeg" alt="תורי" width={36} height={36} priority />
+              <Image src="/tori_logo_transparent.png" alt="תורי" width={36} height={36} priority />
               <div>
                 <div className="login-form-logo-name">תורי</div>
                 <div className="login-form-logo-sub">הזמנת תורים בוואטסאפ</div>
