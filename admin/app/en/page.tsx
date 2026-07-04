@@ -266,7 +266,8 @@ export default function LandingPageEN() {
         .phone-status-time { font-size: 11px; font-weight: 700; color: #111; letter-spacing: -0.3px; }
         .phone-status-icons { display: flex; align-items: center; gap: 5px; }
         .phone-status-icon { font-size: 10px; color: #111; font-weight: 600; }
-        .phone-wa-avatar { width: 34px; height: 34px; border-radius: 50%; background: #25D366; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 0 0 2px rgba(37,211,102,0.2); }
+        .phone-wa-avatar { width: 34px; height: 34px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 0 0 2px rgba(37,211,102,0.2); }
+        .phone-wa-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
         .phone-wa-info { flex: 1; }
         .phone-wa-name { font-size: 12.5px; font-weight: 700; color: #111; }
         .phone-wa-online { font-size: 10px; color: #128C7E; font-weight: 500; }
@@ -659,7 +660,7 @@ export default function LandingPageEN() {
                   <div className="phone-wa-bar">
                     <div className="phone-wa-back">‹</div>
                     <div className="phone-wa-avatar">
-                      <img src="/tori_logo-white.jpeg" alt="Tori" style={{ width: 22, height: 22, objectFit: "contain" }} />
+                      <img src="/tori_logo-white.jpeg" alt="Tori" />
                     </div>
                     <div className="phone-wa-info">
                       <div className="phone-wa-name">Tori — Dana's Salon</div>

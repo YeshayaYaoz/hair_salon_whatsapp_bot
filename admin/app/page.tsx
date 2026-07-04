@@ -286,7 +286,8 @@ export default function LandingPage() {
         /* WhatsApp header */
         .phone-wa-bar { background: #fff; padding: 10px 14px 10px; display: flex; align-items: center; gap: 9px; border-bottom: 1px solid #F0F0F0; }
         .phone-wa-back { color: #128C7E; font-size: 18px; font-weight: 300; line-height: 1; flex-shrink: 0; }
-        .phone-wa-avatar { width: 34px; height: 34px; border-radius: 50%; background: #25D366; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 0 0 2px rgba(37,211,102,0.2); }
+        .phone-wa-avatar { width: 34px; height: 34px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 0 0 2px rgba(37,211,102,0.2); }
+        .phone-wa-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
         .phone-wa-info { flex: 1; min-width: 0; }
         .phone-wa-name { font-size: 12.5px; font-weight: 700; color: #111; line-height: 1.2; }
         .phone-wa-online { font-size: 10px; color: #25D366; font-weight: 500; }
@@ -856,7 +857,7 @@ export default function LandingPage() {
                   <div className="phone-wa-bar">
                     <div className="phone-wa-back">‹</div>
                     <div className="phone-wa-avatar">
-                      <img src="/tori_logo-white.jpeg" alt="תורי" style={{ width: 22, height: 22, objectFit: "contain" }} />
+                      <img src="/tori_logo-white.jpeg" alt="תורי" />
                     </div>
                     <div className="phone-wa-info">
                       <div className="phone-wa-name">תורי — סלון דנה</div>
