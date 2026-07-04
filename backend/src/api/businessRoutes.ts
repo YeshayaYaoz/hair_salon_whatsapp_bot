@@ -2,9 +2,10 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, type AuthedRequest } from "../lib/auth.js";
-import { encryptSecret } from "../lib/crypto.js";
+import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import { requireActiveSubscription } from "../lib/subscriptionGate.js";
 import { getAuthUrl, saveGoogleTokens, disconnectGoogleCalendar } from "../lib/googleCalendar.js";
+import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
 
 export const businessRouter = Router();
 businessRouter.use(requireAuth);
@@ -218,13 +219,58 @@ businessRouter.get("/appointments", async (req: AuthedRequest, res) => {
 });
 
 businessRouter.patch("/appointments/:id/cancel", async (req: AuthedRequest, res) => {
-  const result = await prisma.appointment.updateMany({
+  const appointment = await prisma.appointment.findFirst({
     where: { id: req.params.id, businessId: req.businessId! },
-    data: { status: "cancelled" },
+    include: { service: true },
   });
-  if (result.count === 0) return res.status(404).json({ error: "Not found" });
+  if (!appointment) return res.status(404).json({ error: "Not found" });
+
+  await prisma.appointment.update({ where: { id: req.params.id }, data: { status: "cancelled" } });
   res.json({ ok: true });
+
+  // Notify waitlist after responding so the HTTP request isn't delayed
+  notifyWaitlist(req.businessId!, appointment.serviceId, appointment.service.name, appointment.startTime).catch(
+    (err) => console.error("[waitlist] Notification failed:", err)
+  );
 });
+
+async function notifyWaitlist(businessId: string, serviceId: string, serviceName: string, startTime: Date) {
+  const business = await prisma.business.findUnique({
+    where: { id: businessId },
+    select: { whatsappPhoneNumberId: true, whatsappAccessToken: true, name: true },
+  });
+  if (!business?.whatsappPhoneNumberId || !business.whatsappAccessToken) return;
+
+  const waitlist = await prisma.waitlistEntry.findMany({
+    where: { businessId, serviceId, notified: false },
+    include: { customer: true },
+    orderBy: { createdAt: "asc" },
+    take: 5,
+  });
+  if (waitlist.length === 0) return;
+
+  const accessToken = decryptSecret(business.whatsappAccessToken);
+  const when = startTime.toLocaleString("he-IL", {
+    weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+  });
+
+  for (const entry of waitlist) {
+    const name = entry.customer.name ? entry.customer.name.split(" ")[0] : "היי";
+    const text = `${name}! 🎉 פתח מקום ל${serviceName} ב-${when} אצל ${business.name}.\nרוצה לתפוס אותו? כתוב/י "כן" ואשריין לך את המקום!`;
+    try {
+      await sendWhatsAppMessage({
+        phoneNumberId: business.whatsappPhoneNumberId,
+        accessToken,
+        to: entry.customer.phone,
+        text,
+      });
+      await prisma.waitlistEntry.update({ where: { id: entry.id }, data: { notified: true } });
+    } catch (err) {
+      console.error(`[waitlist] Failed to notify ${entry.customer.phone}:`, err);
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
 
 // --- Customers ---
 
