@@ -71,28 +71,13 @@ businessRouter.delete("/me/whatsapp", async (req: AuthedRequest, res) => {
   res.json({ ok: true });
 });
 
-// Embedded Signup: exchange the short-lived code Meta returns for a long-lived system user token,
+// Embedded Signup: receive the access token from FB.login (response_type: "token"),
 // then fetch the phone number ID from the WABA and save everything.
 businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, res) => {
-  const parsed = z.object({ code: z.string().min(1) }).safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "Missing code" });
+  const parsed = z.object({ accessToken: z.string().min(1) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Missing accessToken" });
 
-  const appId = process.env.META_APP_ID;
-  const appSecret = process.env.WHATSAPP_APP_SECRET;
-  if (!appId || !appSecret) return res.status(500).json({ error: "Meta app credentials not configured" });
-
-  const redirectUri = "https://www.facebook.com/connect/login_success.html";
-  const tokenRes = await fetch(
-    `https://graph.facebook.com/v19.0/oauth/access_token?client_id=${appId}&client_secret=${appSecret}&code=${parsed.data.code}&redirect_uri=${encodeURIComponent(redirectUri)}`
-  );
-  const tokenData = await tokenRes.json() as any;
-  if (!tokenData.access_token) {
-    const metaMsg = tokenData?.error?.message ?? JSON.stringify(tokenData);
-    console.error("Embedded signup token exchange failed:", tokenData);
-    return res.status(400).json({ error: `Meta: ${metaMsg}` });
-  }
-
-  const userToken: string = tokenData.access_token;
+  const userToken: string = parsed.data.accessToken;
 
   // Get the WhatsApp Business Accounts the user just shared
   const wabaRes = await fetch(

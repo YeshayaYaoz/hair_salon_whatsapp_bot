@@ -81,13 +81,13 @@ export default function WhatsAppPage() {
     window.FB.login(
       (response: any) => {
         console.log("FB.login response:", JSON.stringify(response));
-        if (response.authResponse?.code) {
+        if (response.authResponse?.accessToken) {
           if (codeUsedRef.current) return; // StrictMode double-fire guard
           codeUsedRef.current = true;
           setLoading(true);
           apiFetch<{ ok: boolean; phoneNumber: string }>(
             "/api/business/me/whatsapp/embedded-signup",
-            { method: "POST", body: JSON.stringify({ code: response.authResponse.code }) }
+            { method: "POST", body: JSON.stringify({ accessToken: response.authResponse.accessToken }) }
           ).then((result) => {
             setConnected(true);
             setPhoneNumber(result.phoneNumber);
@@ -103,7 +103,7 @@ export default function WhatsAppPage() {
       },
       {
         config_id: META_CONFIG_ID,
-        response_type: "code",
+        response_type: "token",
         override_default_response_type: true,
         extras: { setup: {}, featureType: "", sessionInfoVersion: "3" },
       }
