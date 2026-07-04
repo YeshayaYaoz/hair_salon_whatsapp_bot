@@ -23,6 +23,22 @@ export default function WhatsAppPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  async function disconnect() {
+    if (!confirm(lang === "he" ? "לנתק את חיבור הוואטסאפ?" : "Disconnect WhatsApp?")) return;
+    setDisconnecting(true);
+    try {
+      await apiFetch("/api/business/me/whatsapp", { method: "DELETE" });
+      setConnected(false);
+      setPhoneNumber(null);
+      setSaved(false);
+    } catch (err: any) {
+      setError(err?.message ?? "Disconnect failed");
+    } finally {
+      setDisconnecting(false);
+    }
+  }
 
   // Manual fallback form state
   const [showManual, setShowManual] = useState(false);
@@ -120,6 +136,15 @@ export default function WhatsAppPage() {
         </span>
         {phoneNumber && <span className="text-xs text-zinc-400">{phoneNumber}</span>}
         {saved && <SavedBadge text={t.saved} />}
+        {connected && (
+          <button
+            onClick={disconnect}
+            disabled={disconnecting}
+            className="mr-auto text-xs text-red-500 hover:text-red-400 disabled:opacity-50 transition"
+          >
+            {disconnecting ? "..." : (lang === "he" ? "נתק" : "Disconnect")}
+          </button>
+        )}
       </div>
 
       {/* Embedded Signup button */}

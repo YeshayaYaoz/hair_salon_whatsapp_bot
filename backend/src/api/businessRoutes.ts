@@ -59,6 +59,14 @@ businessRouter.put("/me/whatsapp", async (req: AuthedRequest, res) => {
   res.json({ ok: true });
 });
 
+businessRouter.delete("/me/whatsapp", async (req: AuthedRequest, res) => {
+  await prisma.business.update({
+    where: { id: req.businessId! },
+    data: { whatsappPhoneNumberId: null, whatsappAccessToken: null },
+  });
+  res.json({ ok: true });
+});
+
 // Embedded Signup: exchange the short-lived code Meta returns for a long-lived system user token,
 // then fetch the phone number ID from the WABA and save everything.
 businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, res) => {
