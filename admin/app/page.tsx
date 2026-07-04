@@ -856,7 +856,7 @@ export default function LandingPage() {
                   <div className="phone-wa-bar">
                     <div className="phone-wa-back">‹</div>
                     <div className="phone-wa-avatar">
-                      <img src="/tori-logo-transparent.png" alt="תורי" style={{ width: 22, height: 22, objectFit: "contain" }} />
+                      <img src="/tori_logo-white.jpeg" alt="תורי" style={{ width: 22, height: 22, objectFit: "contain" }} />
                     </div>
                     <div className="phone-wa-info">
                       <div className="phone-wa-name">תורי — סלון דנה</div>
@@ -1524,7 +1524,7 @@ export default function LandingPage() {
           <div className="lp-footer-top">
             <div className="lp-footer-brand-block">
               <div className="lp-footer-logo-row">
-                <img src="/tori-logo-black.png" alt="תורי" loading="lazy" />
+                <img src="/tori_logo-white.jpeg" alt="תורי" loading="lazy" />
                 <span className="lp-footer-brand">תורי</span>
               </div>
               <div className="lp-footer-tagline">בוט WhatsApp AI שקובע תורים אוטומטית לסלונים ועסקים קטנים — 24/7, ללא מגע יד אדם.</div>

@@ -32,7 +32,7 @@ export default function ForgotPasswordPage() {
     <main className="min-h-screen flex items-center justify-center px-4 py-8 bg-zinc-950">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8 animate-fade-up">
-          <Image src="/tori-logo-black.png" alt="תורי" width={100} height={100} className="mb-2 drop-shadow-2xl" priority />
+          <Image src="/tori_logo-white.jpeg" alt="תורי" width={100} height={100} className="mb-2 drop-shadow-2xl" priority />
           <p className="text-zinc-400 text-sm">הזמנת תורים בוואטסאפ</p>
         </div>
 

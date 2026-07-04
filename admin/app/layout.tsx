@@ -106,7 +106,7 @@ const jsonLd = {
       url: SITE_URL,
       logo: {
         "@type": "ImageObject",
-        url: `${SITE_URL}/tori-logo-black.png`,
+        url: `${SITE_URL}/tori_logo-white.jpeg`,
       },
       description:
         "בוט WhatsApp AI לקביעת תורים אוטומטית לעסקים קטנים — סלוני שיער, קליניקות, ספרים ועוד.",
