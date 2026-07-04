@@ -79,6 +79,8 @@ model Customer {
   businessId  String
   phone       String
   name        String?
+  preferredServiceId String? // most recently booked service, for CRM memory
+  lastRetentionSentAt DateTime? // when we last sent a re-engagement message
   appointments    Appointment[]
   waitlistEntries WaitlistEntry[]
 

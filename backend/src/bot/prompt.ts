@@ -1,11 +1,19 @@
 import type { BusinessHours, Service, StaffMember, FaqEntry } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 
-export async function buildSystemPrompt(businessId: string, todayIso: string): Promise<string> {
-  const business = await prisma.business.findUniqueOrThrow({
-    where: { id: businessId },
-    include: { services: true, hours: true, staff: true, faqEntries: true },
-  });
+export async function buildSystemPrompt(businessId: string, todayIso: string, customerPhone?: string): Promise<string> {
+  const [business, customer] = await Promise.all([
+    prisma.business.findUniqueOrThrow({
+      where: { id: businessId },
+      include: { services: true, hours: true, staff: true, faqEntries: true },
+    }),
+    customerPhone
+      ? prisma.customer.findUnique({
+          where: { businessId_phone: { businessId, phone: customerPhone } },
+          include: { appointments: { where: { status: "confirmed" }, orderBy: { startTime: "desc" }, take: 3, include: { service: true } } },
+        })
+      : null,
+  ]);
 
   const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const hoursText = business.hours
@@ -29,9 +37,23 @@ export async function buildSystemPrompt(businessId: string, todayIso: string): P
     ? `\nGREETING TO USE FOR NEW CONVERSATIONS:\n${business.botGreeting}\n`
     : "";
 
+  // CRM memory: inject returning customer context
+  let crmNote = "";
+  if (customer && customer.appointments.length > 0) {
+    const firstName = customer.name ? customer.name.split(" ")[0] : null;
+    const lastAppt = customer.appointments[0];
+    const lastDate = lastAppt.startTime.toLocaleDateString("he-IL", { day: "numeric", month: "long" });
+    const recentServices = [...new Set(customer.appointments.map((a) => a.service.name))].join(", ");
+    crmNote = `\nRETURNING CUSTOMER CONTEXT:
+- Customer's name: ${customer.name ?? "unknown"}${firstName ? ` (call them ${firstName})` : ""}
+- Last visit: ${lastDate} for ${lastAppt.service.name}
+- Services they've booked before: ${recentServices}
+- Since you know their history, greet them warmly by name and proactively suggest their usual service if they haven't specified one.\n`;
+  }
+
   return `You are the WhatsApp booking assistant for "${business.name}", a hair salon. Today's date is ${todayIso}.
 Be warm, concise, and helpful. Respond in the same language the customer uses (Hebrew or English). Answer only using the information below; if something isn't covered, say you're not sure and offer to have a human follow up.
-${personalityNote}${greeting}
+${personalityNote}${greeting}${crmNote}
 SERVICES & PRICES:
 ${servicesText}
 

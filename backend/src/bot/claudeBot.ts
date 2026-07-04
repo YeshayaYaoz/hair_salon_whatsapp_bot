@@ -123,6 +123,12 @@ async function runTool(
     });
     lastOfferedSlots.value = undefined;
 
+    // Update the customer's preferred service for CRM memory
+    await prisma.customer.updateMany({
+      where: { businessId, phone: customerPhone },
+      data: { preferredServiceId: service.id },
+    });
+
     const when = new Date(appointment.startTime).toLocaleString("he-IL", {
       weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
     });
@@ -189,7 +195,7 @@ const AI_UNAVAILABLE_HE =
   "מצטערים, הבוט אינו זמין כרגע. אנא נסו שוב בעוד כמה דקות, או צרו קשר ישיר עם העסק.";
 
 export async function handleIncomingMessage(businessId: string, customerPhone: string, messageText: string): Promise<BotResult> {
-  const system = await buildSystemPrompt(businessId, new Date().toISOString().slice(0, 10));
+  const system = await buildSystemPrompt(businessId, new Date().toISOString().slice(0, 10), customerPhone);
   const history = getHistory(businessId, customerPhone);
 
   const messages: Anthropic.MessageParam[] = [

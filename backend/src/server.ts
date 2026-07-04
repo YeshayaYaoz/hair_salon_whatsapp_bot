@@ -6,6 +6,7 @@ import { businessRouter } from "./api/businessRoutes.js";
 import { whatsappRouter } from "./webhook/whatsappRoutes.js";
 import { billingRouter, stripeWebhookRouter } from "./billing/billingRoutes.js";
 import { publicRouter } from "./api/publicRoutes.js";
+import { runRetentionJob } from "./lib/retentionJob.js";
 
 const app = express();
 const allowedOrigins = (process.env.FRONTEND_URL ?? "*").split(",").map(o => o.trim());
@@ -30,3 +31,20 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 
 const port = Number(process.env.PORT ?? 4000);
 app.listen(port, () => console.log(`Backend listening on :${port}`));
+
+// Run retention job daily at 10:00 Jerusalem time
+function scheduleRetentionJob() {
+  const now = new Date();
+  const next = new Date();
+  next.setUTCHours(8, 0, 0, 0); // 10:00 Jerusalem (UTC+2) = 08:00 UTC
+  if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+  const delay = next.getTime() - now.getTime();
+  setTimeout(() => {
+    runRetentionJob().catch((err) => console.error("[retention] Job failed:", err));
+    setInterval(() => {
+      runRetentionJob().catch((err) => console.error("[retention] Job failed:", err));
+    }, 24 * 60 * 60 * 1000);
+  }, delay);
+  console.log(`[retention] Next run scheduled in ${Math.round(delay / 60000)} minutes`);
+}
+scheduleRetentionJob();

@@ -1,0 +1,2 @@
+ALTER TABLE "Customer" ADD COLUMN IF NOT EXISTS "preferredServiceId" TEXT;
+ALTER TABLE "Customer" ADD COLUMN IF NOT EXISTS "lastRetentionSentAt" TIMESTAMP(3);
