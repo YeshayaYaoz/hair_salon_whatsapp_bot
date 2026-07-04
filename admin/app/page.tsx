@@ -429,7 +429,7 @@ export default function LandingPage() {
         .lp-flow-icon { width: 80px; height: 80px; border-radius: 22px; display: flex; align-items: center; justify-content: center; font-size: 32px; position: relative; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
         .lp-flow-node:hover .lp-flow-icon { transform: scale(1.08) translateY(-4px); box-shadow: 0 10px 28px rgba(0,0,0,0.12); }
         .lp-flow-icon.wa { background: linear-gradient(135deg, #E8FFF0, #C8F7D8); border: 2px solid #86EFAC; }
-        .lp-flow-icon.ai { background: linear-gradient(135deg, #F0F0FF, #DDD6FE); border: 2px solid #A5B4FC; }
+        .lp-flow-icon.ai { background: linear-gradient(135deg, #F0F0FF, #B3E4F2); border: 2px solid #A5B4FC; }
         .lp-flow-icon.cal { background: linear-gradient(135deg, #FFF8E8, #FEF3C7); border: 2px solid #FCD34D; }
         .lp-flow-icon.phone { background: linear-gradient(135deg, #FFF0F0, #FEE2E2); border: 2px solid #FCA5A5; }
         .lp-flow-label { font-size: 14px; font-weight: 700; color: #111; text-align: center; }
@@ -936,7 +936,7 @@ export default function LandingPage() {
             {/* Claude / Anthropic */}
             <div className="lp-trust-item">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <rect width="24" height="24" rx="6" fill="#7C3AED"/>
+                <rect width="24" height="24" rx="6" fill="#1B7FA0"/>
                 <path d="M12 5l5 14H7L12 5z" fill="none" stroke="white" strokeWidth="1.5" strokeLinejoin="round"/>
                 <path d="M8.5 14h7" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
@@ -1268,7 +1268,7 @@ export default function LandingPage() {
             <div className="lp-title reveal">בעלי עסקים שכבר עושים את זה עם תורי.</div>
             <div className="lp-testi-grid">
               {[
-                { quote: "לפני תורי הייתי מפספסת הודעות כל הזמן. עכשיו הבוט עונה מיידית ואני מקבלת התראה רק על תורים שנקבעו. חסכתי שעתיים ביום.", name: "דנה כ.", role: "סלון שיער, תל אביב", color: "#8B5CF6", initial: "ד" },
+                { quote: "לפני תורי הייתי מפספסת הודעות כל הזמן. עכשיו הבוט עונה מיידית ואני מקבלת התראה רק על תורים שנקבעו. חסכתי שעתיים ביום.", name: "דנה כ.", role: "סלון שיער, תל אביב", color: "#2A9BBF", initial: "ד" },
                 { quote: "הלקוחות שלי מתפעלים שהבוט עונה ב-2 בלילה. כמה מהם אמרו שזה גרם להם לבחור בי על פני סלון אחר.", name: "מיכל ל.", role: "קליניקת יופי, ירושלים", color: "#EC4899", initial: "מ" },
                 { quote: "ניסיתי כמה מערכות לניהול תורים — זו הכי פשוטה להתקנה. 10 דקות ואני חי. הגוגל קלנדר מתעדכן לבד, זה שינה לי את החיים.", name: "יוסי ה.", role: "ברבר, חיפה", color: "#F59E0B", initial: "י" },
               ].map((t) => (

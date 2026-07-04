@@ -68,7 +68,7 @@ function MessageModal({ customer, onClose }: { customer: Customer; onClose: () =
             <button
               type="submit"
               disabled={state === "sending"}
-              className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-semibold py-2.5 rounded-lg transition"
+              className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold py-2.5 rounded-lg transition"
             >
               {state === "sending" ? t.sending : t.send}
             </button>
@@ -132,7 +132,7 @@ export default function CustomersPage() {
                 <tr key={c.id} className={i !== filtered.length - 1 ? "border-b border-gray-200/50" : ""}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-violet-600/20 border border-violet-700/40 flex items-center justify-center text-violet-400 font-semibold text-sm shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-[#1B7FA0]/20 border border-[#145F78]/40 flex items-center justify-center text-[#5BB8D4] font-semibold text-sm shrink-0">
                         {(c.name ?? c.phone).charAt(0).toUpperCase()}
                       </div>
                       <span className="text-gray-700 font-medium">{c.name ?? <span className="text-gray-400 italic">—</span>}</span>
@@ -147,7 +147,7 @@ export default function CustomersPage() {
                   <td className="px-4 py-3 text-end">
                     <button
                       onClick={() => setMessaging(c)}
-                      className="text-xs text-gray-400 hover:text-violet-600 transition border border-gray-200 hover:border-violet-300 px-3 py-1.5 rounded-lg"
+                      className="text-xs text-gray-400 hover:text-[#1B7FA0] transition border border-gray-200 hover:border-[#8DD4E8] px-3 py-1.5 rounded-lg"
                     >
                       {t.sendMessage}
                     </button>

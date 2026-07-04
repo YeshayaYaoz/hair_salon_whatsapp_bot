@@ -5,7 +5,7 @@ import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 
 const COLORS = [
-  { hex: "#8b5cf6", name: "violet" },
+  { hex: "#2A9BBF", name: "violet" },
   { hex: "#f43f5e", name: "rose" },
   { hex: "#f59e0b", name: "amber" },
   { hex: "#10b981", name: "emerald" },
@@ -163,13 +163,13 @@ export default function ServicesPage() {
                     <ColorPicker value={editState.color} onChange={(hex) => setEditState((p) => ({ ...p, color: hex }))} />
                     <div className="flex gap-2">
                       <button onClick={() => setEditingId(null)} className="text-xs text-gray-400 hover:text-gray-600 px-3 py-1.5 rounded-lg transition">{t.cancel}</button>
-                      <button onClick={() => saveEdit(s.id)} disabled={saving} className="text-xs bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-gray-900 font-semibold px-3 py-1.5 rounded-lg transition">{saving ? t.saving : t.save}</button>
+                      <button onClick={() => saveEdit(s.id)} disabled={saving} className="text-xs bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-gray-900 font-semibold px-3 py-1.5 rounded-lg transition">{saving ? t.saving : t.save}</button>
                     </div>
                   </div>
                 </div>
               ) : (
                 <div key={s.id} className="flex items-center gap-3 px-4 py-3">
-                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: s.color ?? "#8b5cf6" }} />
+                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: s.color ?? "#2A9BBF" }} />
                   <div className="flex-1 min-w-0">
                     <div className="text-gray-800 font-medium text-sm">{s.name}</div>
                     {s.description && <div className="text-gray-400 text-xs truncate">{s.description}</div>}
@@ -177,7 +177,7 @@ export default function ServicesPage() {
                   <div className="text-gray-500 text-sm shrink-0">₪{(s.priceCents / 100).toFixed(0)}</div>
                   <div className="text-gray-400 text-xs shrink-0">{s.durationMin}m</div>
                   <div className="flex gap-1 shrink-0">
-                    <button onClick={() => startEdit(s)} className="text-xs text-gray-400 hover:text-violet-600 transition px-2 py-1 rounded hover:bg-violet-50">{t.edit}</button>
+                    <button onClick={() => startEdit(s)} className="text-xs text-gray-400 hover:text-[#1B7FA0] transition px-2 py-1 rounded hover:bg-[#E0F5FB]">{t.edit}</button>
                     <button onClick={() => remove(s.id)} className="text-xs text-gray-400 hover:text-red-600 transition px-2 py-1 rounded hover:bg-red-950/30">{t.delete}</button>
                   </div>
                 </div>
@@ -199,7 +199,7 @@ export default function ServicesPage() {
           <input placeholder={t.descriptionOptional} value={newDescription} onChange={(e) => setNewDescription(e.target.value)} className="w-full" />
           <div className="flex items-center justify-between mt-1">
             <ColorPicker value={newColor} onChange={setNewColor} />
-            <button type="submit" disabled={adding} className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-gray-900 text-sm font-semibold px-4 py-2 rounded-lg transition">
+            <button type="submit" disabled={adding} className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-gray-900 text-sm font-semibold px-4 py-2 rounded-lg transition">
               {adding ? "…" : t.add}
             </button>
           </div>

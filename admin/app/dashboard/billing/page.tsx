@@ -96,7 +96,7 @@ export default function BillingPage() {
                 <button
                   onClick={subscribe}
                   disabled={checkoutLoading}
-                  className="w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-gray-900 text-sm font-semibold py-2.5 rounded-lg transition"
+                  className="w-full bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-gray-900 text-sm font-semibold py-2.5 rounded-lg transition"
                 >
                   {checkoutLoading ? t.redirecting : status === "trial" ? t.subscribeNow : t.reactivate}
                 </button>

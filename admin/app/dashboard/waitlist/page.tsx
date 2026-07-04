@@ -66,7 +66,7 @@ export default function WaitlistPage() {
                 {pending.map((e) => (
                   <div key={e.id} className="flex items-center justify-between px-4 py-3 gap-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-violet-600/20 border border-violet-700/40 flex items-center justify-center text-violet-400 font-semibold text-sm shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-[#1B7FA0]/20 border border-[#145F78]/40 flex items-center justify-center text-[#5BB8D4] font-semibold text-sm shrink-0">
                         {(e.customer.name ?? e.customer.phone).charAt(0).toUpperCase()}
                       </div>
                       <div>
@@ -79,7 +79,7 @@ export default function WaitlistPage() {
                       <button
                         onClick={() => markNotified(e.id)}
                         disabled={loadingId === e.id}
-                        className="text-xs bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-gray-900 font-semibold px-3 py-1.5 rounded-lg transition"
+                        className="text-xs bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-gray-900 font-semibold px-3 py-1.5 rounded-lg transition"
                       >
                         {loadingId === e.id ? "…" : t.markNotified}
                       </button>

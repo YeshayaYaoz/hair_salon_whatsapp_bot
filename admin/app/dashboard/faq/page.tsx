@@ -99,7 +99,7 @@ export default function FaqPage() {
           <button
             type="submit"
             disabled={adding}
-            className="self-start bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-gray-900 text-sm font-semibold px-4 py-2 rounded-lg transition"
+            className="self-start bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-gray-900 text-sm font-semibold px-4 py-2 rounded-lg transition"
           >
             {adding ? "…" : t.add}
           </button>

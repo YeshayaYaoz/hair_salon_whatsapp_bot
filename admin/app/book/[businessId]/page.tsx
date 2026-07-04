@@ -34,17 +34,17 @@ function StepIndicator({ current }: { current: number }) {
         return (
           <div key={i} className="flex items-center flex-1 last:flex-none">
             <div className="flex flex-col items-center gap-1 shrink-0">
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-colors ${done ? "bg-violet-600 text-white" : active ? "bg-violet-600 text-white ring-4 ring-violet-100" : "bg-gray-100 text-gray-400"}`}>
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-colors ${done ? "bg-[#1B7FA0] text-white" : active ? "bg-[#1B7FA0] text-white ring-4 ring-[#D6F0F8]" : "bg-gray-100 text-gray-400"}`}>
                 {done ? (
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                   </svg>
                 ) : i + 1}
               </div>
-              <span className={`text-[10px] font-medium ${active ? "text-violet-600" : done ? "text-violet-400" : "text-gray-400"}`}>{label}</span>
+              <span className={`text-[10px] font-medium ${active ? "text-[#1B7FA0]" : done ? "text-[#5BB8D4]" : "text-gray-400"}`}>{label}</span>
             </div>
             {i < STEP_LABELS.length - 1 && (
-              <div className={`flex-1 h-0.5 mx-1 mb-4 ${done ? "bg-violet-400" : "bg-gray-200"}`} />
+              <div className={`flex-1 h-0.5 mx-1 mb-4 ${done ? "bg-[#5BB8D4]" : "bg-gray-200"}`} />
             )}
           </div>
         );
@@ -148,7 +148,7 @@ export default function BookPage() {
     return (
       <main className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-[#1B7FA0] border-t-transparent rounded-full animate-spin" />
           <p className="text-gray-400 text-sm">Loading…</p>
         </div>
       </main>
@@ -160,7 +160,7 @@ export default function BookPage() {
       <div className="w-full max-w-sm">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-violet-700 mb-4 shadow-lg shadow-violet-200">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-[#2A9BBF] to-[#145F78] mb-4 shadow-lg shadow-[#1B7FA0]-200">
             <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
             </svg>
@@ -181,7 +181,7 @@ export default function BookPage() {
             </div>
             <h2 className="text-gray-900 font-semibold text-lg mb-1">Booking confirmed!</h2>
             <p className="text-gray-500 text-sm">{booked.service}</p>
-            <p className="text-violet-600 font-semibold text-sm mt-1">{fmt(booked.startTime)}</p>
+            <p className="text-[#1B7FA0] font-semibold text-sm mt-1">{fmt(booked.startTime)}</p>
             <p className="text-gray-400 text-xs mt-5">We'll see you then. You can also manage bookings via WhatsApp.</p>
           </div>
         )}
@@ -195,14 +195,14 @@ export default function BookPage() {
                 <button
                   key={svc.id}
                   onClick={() => pickService(svc)}
-                  className="flex items-center justify-between w-full text-left px-4 py-3 rounded-xl border border-gray-200 hover:border-violet-400 hover:bg-violet-50 transition group"
+                  className="flex items-center justify-between w-full text-left px-4 py-3 rounded-xl border border-gray-200 hover:border-[#5BB8D4] hover:bg-[#E0F5FB] transition group"
                 >
                   <div>
-                    <div className="text-gray-800 text-sm font-medium group-hover:text-violet-700 transition">{svc.name}</div>
+                    <div className="text-gray-800 text-sm font-medium group-hover:text-[#145F78] transition">{svc.name}</div>
                     {svc.description && <div className="text-gray-400 text-xs mt-0.5">{svc.description}</div>}
                   </div>
                   <div className="text-right shrink-0 ms-3">
-                    <div className="text-violet-600 text-sm font-semibold">₪{(svc.priceCents / 100).toFixed(0)}</div>
+                    <div className="text-[#1B7FA0] text-sm font-semibold">₪{(svc.priceCents / 100).toFixed(0)}</div>
                     <div className="text-gray-400 text-xs">{svc.durationMin} min</div>
                   </div>
                 </button>
@@ -218,7 +218,7 @@ export default function BookPage() {
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               Back
             </button>
-            <h2 className="text-sm font-semibold text-gray-900 mb-4">Choose a date for <span className="text-violet-600">{service.name}</span></h2>
+            <h2 className="text-sm font-semibold text-gray-900 mb-4">Choose a date for <span className="text-[#1B7FA0]">{service.name}</span></h2>
             <div className="grid grid-cols-4 gap-2">
               {Array.from({ length: 14 }, (_, i) => i + 1).map((offset) => {
                 const d = new Date();
@@ -227,7 +227,7 @@ export default function BookPage() {
                   <button
                     key={offset}
                     onClick={() => pickDate(offset)}
-                    className="flex flex-col items-center py-2.5 rounded-xl border border-gray-200 hover:border-violet-400 hover:bg-violet-50 transition"
+                    className="flex flex-col items-center py-2.5 rounded-xl border border-gray-200 hover:border-[#5BB8D4] hover:bg-[#E0F5FB] transition"
                   >
                     <span className="text-gray-400 text-xs">{DAYS[d.getDay()]}</span>
                     <span className="text-gray-800 font-semibold text-sm">{d.getDate()}</span>
@@ -250,12 +250,12 @@ export default function BookPage() {
             </h2>
             {slotsLoading ? (
               <div className="flex justify-center py-8">
-                <div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                <div className="w-6 h-6 border-2 border-[#2A9BBF] border-t-transparent rounded-full animate-spin" />
               </div>
             ) : slots.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-gray-400 text-sm">No availability on this day.</p>
-                <button onClick={() => setStep("date")} className="text-violet-600 text-xs mt-2 hover:underline">Try another date</button>
+                <button onClick={() => setStep("date")} className="text-[#1B7FA0] text-xs mt-2 hover:underline">Try another date</button>
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-2">
@@ -263,7 +263,7 @@ export default function BookPage() {
                   <button
                     key={s.startTime}
                     onClick={() => pickSlot(s)}
-                    className="py-2.5 rounded-xl border border-gray-200 hover:border-violet-400 hover:bg-violet-50 text-gray-700 text-sm font-medium transition"
+                    className="py-2.5 rounded-xl border border-gray-200 hover:border-[#5BB8D4] hover:bg-[#E0F5FB] text-gray-700 text-sm font-medium transition"
                   >
                     {new Date(s.startTime).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
                   </button>
@@ -280,9 +280,9 @@ export default function BookPage() {
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               Back
             </button>
-            <div className="bg-violet-50 border border-violet-100 rounded-xl px-4 py-3 mb-4">
-              <div className="text-xs font-semibold text-violet-700">{service?.name}</div>
-              <div className="text-xs text-violet-500 mt-0.5">{fmt(slot.startTime)}</div>
+            <div className="bg-[#E0F5FB] border border-[#D6F0F8] rounded-xl px-4 py-3 mb-4">
+              <div className="text-xs font-semibold text-[#145F78]">{service?.name}</div>
+              <div className="text-xs text-[#2A9BBF] mt-0.5">{fmt(slot.startTime)}</div>
             </div>
             <form onSubmit={submit} className="flex flex-col gap-3">
               <input
@@ -290,20 +290,20 @@ export default function BookPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#5BB8D4] focus:border-transparent"
               />
               <input
                 placeholder="Phone (e.g. 0501234567)"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 required
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#5BB8D4] focus:border-transparent"
               />
               {error && <p className="text-red-500 text-xs">{error}</p>}
               <button
                 type="submit"
                 disabled={submitting}
-                className="mt-1 w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-semibold rounded-xl py-3 text-sm transition shadow-sm shadow-violet-200"
+                className="mt-1 w-full bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white font-semibold rounded-xl py-3 text-sm transition shadow-sm shadow-[#1B7FA0]-200"
               >
                 {submitting ? "Booking…" : "Confirm booking"}
               </button>

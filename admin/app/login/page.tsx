@@ -46,7 +46,7 @@ export default function LoginPage() {
           min-height: 100vh;
           display: grid;
           grid-template-columns: 1fr 1fr;
-          background: #F5F5FF;
+          background: #F0F8FB;
           direction: rtl;
           font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
         }
@@ -58,7 +58,7 @@ export default function LoginPage() {
         /* ── LEFT PANEL ── */
         .login-left {
           position: relative;
-          background: linear-gradient(135deg, #0F172A 0%, #1E1B4B 50%, #0F172A 100%);
+          background: linear-gradient(135deg, #0F172A 0%, #0D2A38 50%, #0F172A 100%);
           display: flex;
           flex-direction: column;
           justify-content: space-between;
@@ -70,8 +70,8 @@ export default function LoginPage() {
           position: absolute;
           inset: 0;
           background:
-            radial-gradient(ellipse 600px 500px at 20% 80%, rgba(124,58,237,0.08) 0%, transparent 60%),
-            radial-gradient(ellipse 400px 400px at 80% 20%, rgba(99,102,241,0.12) 0%, transparent 60%);
+            radial-gradient(ellipse 600px 500px at 20% 80%, rgba(27,127,160,0.08) 0%, transparent 60%),
+            radial-gradient(ellipse 400px 400px at 80% 20%, rgba(27,127,160,0.12) 0%, transparent 60%);
           pointer-events: none;
         }
         .login-left-grid {
@@ -106,13 +106,13 @@ export default function LoginPage() {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          background: rgba(124,58,237,0.12);
-          border: 1px solid rgba(124,58,237,0.2);
+          background: rgba(27,127,160,0.12);
+          border: 1px solid rgba(27,127,160,0.2);
           border-radius: 20px;
           padding: 5px 14px;
           font-size: 12px;
           font-weight: 600;
-          color: #A78BFA;
+          color: #5BB8D4;
           letter-spacing: 0.04em;
           margin-bottom: 32px;
         }
@@ -120,8 +120,8 @@ export default function LoginPage() {
           width: 6px;
           height: 6px;
           border-radius: 50%;
-          background: #A78BFA;
-          box-shadow: 0 0 6px #A78BFA;
+          background: #5BB8D4;
+          box-shadow: 0 0 6px #5BB8D4;
           animation: pulse-dot 2s ease-in-out infinite;
         }
         @keyframes pulse-dot {
@@ -140,7 +140,7 @@ export default function LoginPage() {
         }
         .login-left-headline em {
           font-style: normal;
-          color: #A78BFA;
+          color: #5BB8D4;
         }
         .login-left-sub {
           font-size: 15px;
@@ -163,7 +163,7 @@ export default function LoginPage() {
           line-height: 1;
           margin-bottom: 4px;
         }
-        .login-left-stat-n span { color: #A78BFA; }
+        .login-left-stat-n span { color: #5BB8D4; }
         .login-left-stat-l {
           font-size: 11px;
           color: rgba(255,255,255,0.4);
@@ -193,7 +193,7 @@ export default function LoginPage() {
           width: 32px;
           height: 32px;
           border-radius: 50%;
-          background: linear-gradient(135deg, #7C3AED, #6D28D9);
+          background: linear-gradient(135deg, #1B7FA0, #145F78);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -218,7 +218,7 @@ export default function LoginPage() {
           align-items: center;
           justify-content: center;
           padding: 40px 32px;
-          background: #F5F5FF;
+          background: #F0F8FB;
         }
 
         .login-form-wrap {
@@ -294,8 +294,8 @@ export default function LoginPage() {
           direction: ltr;
         }
         .login-field input:focus {
-          border-color: #7C3AED;
-          box-shadow: 0 0 0 3px rgba(124,58,237,0.12);
+          border-color: #1B7FA0;
+          box-shadow: 0 0 0 3px rgba(27,127,160,0.12);
         }
 
         .login-forgot {
@@ -308,7 +308,7 @@ export default function LoginPage() {
           margin-bottom: 8px;
           transition: color 0.15s;
         }
-        .login-forgot:hover { color: #7C3AED; }
+        .login-forgot:hover { color: #1B7FA0; }
 
         .login-error {
           background: rgba(239,68,68,0.06);
@@ -322,7 +322,7 @@ export default function LoginPage() {
 
         .login-submit {
           width: 100%;
-          background: #7C3AED;
+          background: #1B7FA0;
           color: #fff;
           font-size: 14px;
           font-weight: 700;
@@ -336,8 +336,8 @@ export default function LoginPage() {
           margin-top: 6px;
         }
         .login-submit:hover:not(:disabled) {
-          background: #6D28D9;
-          box-shadow: 0 4px 20px rgba(124,58,237,0.35);
+          background: #145F78;
+          box-shadow: 0 4px 20px rgba(27,127,160,0.35);
           transform: translateY(-1px);
         }
         .login-submit:active:not(:disabled) { transform: none; }
@@ -368,14 +368,14 @@ export default function LoginPage() {
         .login-switch button {
           background: none;
           border: none;
-          color: #7C3AED;
+          color: #1B7FA0;
           font-size: 13px;
           font-weight: 600;
           cursor: pointer;
           font-family: inherit;
           transition: color 0.15s;
         }
-        .login-switch button:hover { color: #6D28D9; }
+        .login-switch button:hover { color: #145F78; }
 
         .login-trust {
           display: flex;

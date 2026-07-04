@@ -38,8 +38,8 @@ function StatCard({
       className="rounded-2xl p-6 animate-fade-up flex flex-col gap-3"
       style={{
         animationDelay: `${delay}ms`,
-        background: accent ? "rgba(124,58,237,0.06)" : "#FFFFFF",
-        border: `1px solid ${accent ? "rgba(124,58,237,0.2)" : "#E5E5F0"}`,
+        background: accent ? "rgba(27,127,160,0.06)" : "#FFFFFF",
+        border: `1px solid ${accent ? "rgba(27,127,160,0.2)" : "#E5E5F0"}`,
       }}
     >
       <div className="flex items-center justify-between">
@@ -52,7 +52,7 @@ function StatCard({
         <span
           className="text-lg"
           style={{
-            background: accent ? "rgba(124,58,237,0.12)" : "#E5E5F0",
+            background: accent ? "rgba(27,127,160,0.12)" : "#E5E5F0",
             borderRadius: 10,
             padding: "6px 10px",
             lineHeight: 1,
@@ -136,7 +136,7 @@ export default function AnalyticsPage() {
       {setup && !allComplete && (
         <div
           className="rounded-2xl p-6 mb-8 animate-fade-up stagger-2"
-          style={{ background: "#FFFFFF", border: "1px solid rgba(124,58,237,0.15)" }}
+          style={{ background: "#FFFFFF", border: "1px solid rgba(27,127,160,0.15)" }}
         >
           <div className="flex items-start justify-between gap-4 mb-1">
             <div>
@@ -145,7 +145,7 @@ export default function AnalyticsPage() {
             </div>
             <span
               className="text-xs font-bold px-2.5 py-1 rounded-full shrink-0"
-              style={{ background: "rgba(124,58,237,0.12)", color: "#7C3AED" }}
+              style={{ background: "rgba(27,127,160,0.12)", color: "#1B7FA0" }}
             >
               {doneCount}/{setupSteps.length}
             </span>
@@ -153,7 +153,7 @@ export default function AnalyticsPage() {
           <div className="h-1.5 rounded-full my-4 overflow-hidden" style={{ background: "#E5E5F0" }}>
             <div
               className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${(doneCount / setupSteps.length) * 100}%`, background: "linear-gradient(to right, #6D28D9, #7C3AED)" }}
+              style={{ width: `${(doneCount / setupSteps.length) * 100}%`, background: "linear-gradient(to right, #145F78, #1B7FA0)" }}
             />
           </div>
           <div className="flex flex-col gap-2">
@@ -164,14 +164,14 @@ export default function AnalyticsPage() {
                 className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all animate-fade-up"
                 style={{
                   animationDelay: `${(i + 3) * 60}ms`,
-                  background: step.done ? "transparent" : "rgba(124,58,237,0.04)",
-                  border: step.done ? "1px solid transparent" : "1px solid rgba(124,58,237,0.15)",
+                  background: step.done ? "transparent" : "rgba(27,127,160,0.04)",
+                  border: step.done ? "1px solid transparent" : "1px solid rgba(27,127,160,0.15)",
                 }}
               >
                 <div
                   className="w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all"
                   style={step.done
-                    ? { background: "#7C3AED", borderColor: "#7C3AED" }
+                    ? { background: "#1B7FA0", borderColor: "#1B7FA0" }
                     : { borderColor: "rgba(245,158,11,0.4)" }
                   }
                 >
@@ -180,7 +180,7 @@ export default function AnalyticsPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   ) : (
-                    <span className="text-xs font-bold" style={{ color: "#7C3AED" }}>{i + 1}</span>
+                    <span className="text-xs font-bold" style={{ color: "#1B7FA0" }}>{i + 1}</span>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -249,7 +249,7 @@ export default function AnalyticsPage() {
               const isToday = new Date().toDateString() === d.toDateString();
               return (
                 <div key={date} className="flex flex-col items-center flex-1 gap-1">
-                  <span className="text-xs font-semibold" style={{ color: count > 0 ? "#7C3AED" : "transparent" }}>{count > 0 ? count : "·"}</span>
+                  <span className="text-xs font-semibold" style={{ color: count > 0 ? "#1B7FA0" : "transparent" }}>{count > 0 ? count : "·"}</span>
                   <div className="w-full flex items-end" style={{ height: 88 }}>
                     <div
                       className="w-full rounded-t-lg transition-all duration-700"
@@ -257,12 +257,12 @@ export default function AnalyticsPage() {
                         height: `${Math.max(heightPct, count > 0 ? 8 : 2)}%`,
                         background: isToday
                           ? "linear-gradient(to top, #D97706, #F59E0B)"
-                          : "rgba(124,58,237,0.2)",
+                          : "rgba(27,127,160,0.2)",
                         animationDelay: `${i * 60 + 300}ms`,
                       }}
                     />
                   </div>
-                  <span className="text-xs" style={{ color: isToday ? "#7C3AED" : "#6B7280", fontWeight: isToday ? 700 : 400 }}>
+                  <span className="text-xs" style={{ color: isToday ? "#1B7FA0" : "#6B7280", fontWeight: isToday ? 700 : 400 }}>
                     {dayNames[d.getDay()]}
                   </span>
                 </div>
@@ -287,7 +287,7 @@ export default function AnalyticsPage() {
                   <div key={name} className="animate-fade-up" style={{ animationDelay: `${i * 60 + 400}ms` }}>
                     <div className="flex justify-between text-xs mb-2">
                       <span className="text-gray-700 truncate max-w-[70%] font-medium">{name}</span>
-                      <span className="font-semibold tabular-nums" style={{ color: "#7C3AED" }}>{count}</span>
+                      <span className="font-semibold tabular-nums" style={{ color: "#1B7FA0" }}>{count}</span>
                     </div>
                     <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "#E5E5F0" }}>
                       <div

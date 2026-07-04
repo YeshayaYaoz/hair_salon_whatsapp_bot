@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    background-color: #F5F5FF;
+    background-color: #F0F8FB;
     color: #1A1A2E;
   }
 
@@ -12,12 +12,12 @@
     @apply bg-white border border-gray-200 text-gray-900 rounded-lg px-3 py-2 text-sm outline-none transition placeholder:text-gray-400;
   }
   input:focus, textarea:focus, select:focus {
-    border-color: #7C3AED;
-    box-shadow: 0 0 0 2px rgba(124,58,237,0.15);
+    border-color: #1B7FA0;
+    box-shadow: 0 0 0 2px rgba(27,127,160,0.15);
   }
 
   input[type="checkbox"] {
-    accent-color: #7C3AED;
+    accent-color: #1B7FA0;
     width: 1rem;
     height: 1rem;
   }

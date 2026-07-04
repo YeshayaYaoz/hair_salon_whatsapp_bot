@@ -98,7 +98,7 @@ export default function HoursPage() {
       <div className="flex items-center gap-3">
         <button
           onClick={save}
-          className="bg-violet-600 hover:bg-violet-500 text-gray-900 text-sm font-semibold px-5 py-2.5 rounded-lg transition"
+          className="bg-[#1B7FA0] hover:bg-[#2A9BBF] text-gray-900 text-sm font-semibold px-5 py-2.5 rounded-lg transition"
         >
           {t.saveHours}
         </button>

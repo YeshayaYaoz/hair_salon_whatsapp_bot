@@ -62,7 +62,7 @@ export default function StaffPage() {
                 className={`flex items-center justify-between px-4 py-3 ${i !== staff.length - 1 ? "border-b border-gray-200/50" : ""}`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-violet-600/20 text-violet-400 flex items-center justify-center text-xs font-semibold">
+                  <div className="w-8 h-8 rounded-full bg-[#1B7FA0]/20 text-[#5BB8D4] flex items-center justify-center text-xs font-semibold">
                     {s.name.slice(0, 1).toUpperCase()}
                   </div>
                   <span className="text-gray-800 font-medium text-sm">{s.name}</span>
@@ -92,7 +92,7 @@ export default function StaffPage() {
           <button
             type="submit"
             disabled={adding}
-            className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-gray-900 text-sm font-semibold px-4 py-2 rounded-lg transition"
+            className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-gray-900 text-sm font-semibold px-4 py-2 rounded-lg transition"
           >
             {adding ? "…" : t.add}
           </button>

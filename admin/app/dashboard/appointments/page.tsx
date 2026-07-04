@@ -95,9 +95,9 @@ function WeekCalendar({
         {days.map((d) => {
           const today = d.toDateString() === new Date().toDateString();
           return (
-            <div key={d.toISOString()} className={`px-1 py-2 text-center border-e border-gray-100 last:border-e-0 ${today ? "bg-violet-50" : ""}`}>
+            <div key={d.toISOString()} className={`px-1 py-2 text-center border-e border-gray-100 last:border-e-0 ${today ? "bg-[#E0F5FB]" : ""}`}>
               <div className="text-xs text-gray-400">{t.daysShort[d.getDay()]}</div>
-              <div className={`text-sm font-semibold ${today ? "text-violet-600" : "text-gray-700"}`}>{d.getDate()}</div>
+              <div className={`text-sm font-semibold ${today ? "text-[#1B7FA0]" : "text-gray-700"}`}>{d.getDate()}</div>
             </div>
           );
         })}
@@ -112,11 +112,11 @@ function WeekCalendar({
               const appts = apptsByDay(d).filter((a) => new Date(a.startTime).getHours() === h);
               const today = d.toDateString() === new Date().toDateString();
               return (
-                <div key={d.toISOString()} className={`border-e border-gray-100 last:border-e-0 p-0.5 flex flex-col gap-0.5 ${today ? "bg-violet-50/40" : ""}`}>
+                <div key={d.toISOString()} className={`border-e border-gray-100 last:border-e-0 p-0.5 flex flex-col gap-0.5 ${today ? "bg-[#E0F5FB]/40" : ""}`}>
                   {appts.map((a) => (
                     <div
                       key={a.id}
-                      className="bg-violet-600 text-white rounded px-1.5 py-1 text-[10px] leading-tight cursor-default hover:bg-violet-500 transition group relative"
+                      className="bg-[#1B7FA0] text-white rounded px-1.5 py-1 text-[10px] leading-tight cursor-default hover:bg-[#2A9BBF] transition group relative"
                       title={`${a.customer.name ?? a.customer.phone} · ${a.service.name}`}
                     >
                       <div className="font-semibold truncate">{new Date(a.startTime).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</div>
@@ -208,7 +208,7 @@ export default function AppointmentsPage() {
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`text-xs font-medium px-3 py-1.5 rounded-md transition ${view === v ? "bg-violet-600 text-gray-900" : "text-gray-500 hover:text-gray-800"}`}
+                className={`text-xs font-medium px-3 py-1.5 rounded-md transition ${view === v ? "bg-[#1B7FA0] text-gray-900" : "text-gray-500 hover:text-gray-800"}`}
               >
                 {v === "list" ? t.listView : t.calendarView}
               </button>
@@ -250,7 +250,7 @@ export default function AppointmentsPage() {
             </button>
             <button
               onClick={() => setWeekStart(startOfWeek(new Date()))}
-              className="text-xs text-violet-600 hover:text-violet-700 font-medium px-2 py-1 rounded-lg hover:bg-violet-50 transition"
+              className="text-xs text-[#1B7FA0] hover:text-[#145F78] font-medium px-2 py-1 rounded-lg hover:bg-[#E0F5FB] transition"
             >
               Today
             </button>
@@ -270,7 +270,7 @@ export default function AppointmentsPage() {
                 <button
                   key={f.key}
                   onClick={() => setFilter(f.key)}
-                  className={`text-xs font-medium px-3 py-1.5 rounded-md transition ${filter === f.key ? "bg-violet-600 text-gray-900" : "text-gray-500 hover:text-gray-800"}`}
+                  className={`text-xs font-medium px-3 py-1.5 rounded-md transition ${filter === f.key ? "bg-[#1B7FA0] text-gray-900" : "text-gray-500 hover:text-gray-800"}`}
                 >
                   {f.label}
                 </button>
@@ -320,7 +320,7 @@ export default function AppointmentsPage() {
                         <div className="flex items-center justify-end gap-1">
                           {a.status === "confirmed" && (
                             <a href={googleCalendarUrl(a)} target="_blank" rel="noopener noreferrer" title="Add to Google Calendar"
-                              className="text-gray-400 hover:text-violet-600 transition px-1.5 py-1 rounded hover:bg-violet-50">
+                              className="text-gray-400 hover:text-[#1B7FA0] transition px-1.5 py-1 rounded hover:bg-[#E0F5FB]">
                               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                               </svg>

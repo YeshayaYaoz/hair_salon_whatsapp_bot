@@ -46,7 +46,7 @@ export default function ForgotPasswordPage() {
               </div>
               <h2 className="text-lg font-semibold text-white mb-2">בדוק את המייל שלך</h2>
               <p className="text-zinc-400 text-sm mb-6">שלחנו קישור לאיפוס סיסמה אם הכתובת קיימת במערכת.</p>
-              <Link href="/" className="text-violet-400 hover:text-violet-300 text-sm font-medium transition">
+              <Link href="/" className="text-[#5BB8D4] hover:text-[#8DD4E8] text-sm font-medium transition">
                 חזור לכניסה
               </Link>
             </div>
@@ -70,13 +70,13 @@ export default function ForgotPasswordPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg py-3 text-sm transition"
+                  className="w-full bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg py-3 text-sm transition"
                 >
                   {loading ? "שולח…" : "שלח קישור לאיפוס"}
                 </button>
               </form>
               <p className="text-center text-sm text-zinc-500 mt-5">
-                <Link href="/" className="text-violet-400 hover:text-violet-300 font-medium transition">
+                <Link href="/" className="text-[#5BB8D4] hover:text-[#8DD4E8] font-medium transition">
                   חזור לכניסה
                 </Link>
               </p>

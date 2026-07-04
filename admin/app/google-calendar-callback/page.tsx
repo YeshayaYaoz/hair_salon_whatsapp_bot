@@ -35,7 +35,7 @@ function CallbackHandler() {
       <div className="min-h-screen flex items-center justify-center bg-zinc-950">
         <div className="text-center">
           <p className="text-red-400 mb-4">חיבור Google Calendar נכשל: {error}</p>
-          <a href="/dashboard/settings" className="text-violet-400 hover:text-violet-300 text-sm">
+          <a href="/dashboard/settings" className="text-[#5BB8D4] hover:text-[#8DD4E8] text-sm">
             חזור להגדרות
           </a>
         </div>
@@ -46,7 +46,7 @@ function CallbackHandler() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-zinc-950">
       <div className="text-center">
-        <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <div className="w-8 h-8 border-2 border-[#2A9BBF] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
         <p className="text-zinc-400 text-sm">מחבר את גוגל קלנדר...</p>
       </div>
     </div>

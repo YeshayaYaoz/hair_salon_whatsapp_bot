@@ -110,7 +110,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 transition-colors ${checked ? "bg-violet-600 border-violet-600" : "bg-gray-200 border-gray-200"}`}
+      className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 transition-colors ${checked ? "bg-[#1B7FA0] border-[#1B7FA0]" : "bg-gray-200 border-gray-200"}`}
     >
       <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-4" : "translate-x-0"}`} />
     </button>
@@ -291,7 +291,7 @@ export default function SettingsPage() {
           <button
             type="submit"
             disabled={saving}
-            className="bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-gray-900 text-sm font-semibold px-5 py-2.5 rounded-lg transition"
+            className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-gray-900 text-sm font-semibold px-5 py-2.5 rounded-lg transition"
           >
             {saving ? t.saving : t.save}
           </button>
