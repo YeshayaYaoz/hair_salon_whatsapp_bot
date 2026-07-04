@@ -4,8 +4,8 @@
 
 @layer base {
   body {
-    background-color: #F0F8FB;
-    color: #1A1A2E;
+    background-color: #F4F6F8;
+    color: #111827;
   }
 
   input, textarea, select {
@@ -42,4 +42,23 @@
   .stagger-6 { animation-delay: 360ms; }
   .stagger-7 { animation-delay: 420ms; }
   .stagger-8 { animation-delay: 480ms; }
+
+  /* Professional card style */
+  .card {
+    background: #fff;
+    border: 1px solid #E5E7EB;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
+  }
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fade-in { animation: fade-in 0.4s ease both; }
+  .animate-fade-up { animation: fade-up 0.4s ease both; }
 }

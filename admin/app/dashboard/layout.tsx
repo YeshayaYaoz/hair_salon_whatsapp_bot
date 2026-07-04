@@ -64,26 +64,26 @@ function SidebarContent({ pathname }: { pathname: string }) {
   return (
     <>
       {/* Brand */}
-      <div className="px-4 mb-8">
+      <div className="px-3 mb-8">
         <div className="flex items-center gap-3">
           <Image
-            src="/tori_logo_transparent.png"
+            src="/tori_logo-white.jpeg"
             alt="תורי"
-            width={40}
-            height={40}
+            width={38}
+            height={38}
             className="rounded-xl shrink-0"
-            style={{ filter: "drop-shadow(0 0 8px rgba(245,158,11,0.3))" }}
+            style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.3)" }}
           />
           <div>
             <div className="font-bold text-base text-white leading-tight tracking-tight">תורי</div>
-            <div className="text-[11px] leading-none mt-0.5" style={{ color: "rgba(255,255,255,0.3)" }}>הזמנת תורים בוואטסאפ</div>
+            <div className="text-[10px] leading-none mt-0.5 font-medium" style={{ color: "rgba(255,255,255,0.25)", letterSpacing: "0.03em" }}>הזמנת תורים בוואטסאפ</div>
           </div>
         </div>
       </div>
 
       {/* Section label */}
-      <div className="px-4 mb-2">
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "rgba(255,255,255,0.2)", textTransform: "uppercase" }}>ניהול</span>
+      <div className="px-3 mb-1.5">
+        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", color: "rgba(255,255,255,0.18)", textTransform: "uppercase" }}>ניהול</span>
       </div>
 
       <nav className="flex flex-col gap-0.5 flex-1 overflow-y-auto">
@@ -93,18 +93,18 @@ function SidebarContent({ pathname }: { pathname: string }) {
             <Link
               key={item.href}
               href={item.href}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all"
               style={active ? {
-                background: "rgba(167,139,250,0.15)",
-                color: "#5BB8D4",
-                boxShadow: "inset 2px 0 0 #5BB8D4",
+                background: "rgba(27,127,160,0.18)",
+                color: "#fff",
+                boxShadow: "inset 3px 0 0 #1B7FA0",
               } : {
-                color: "rgba(255,255,255,0.5)",
+                color: "rgba(255,255,255,0.45)",
               }}
-              onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"; (e.currentTarget as HTMLElement).style.color = "#fff"; } }}
+              onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)"; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.85)"; } }}
               onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = ""; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.45)"; } }}
             >
-              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ opacity: active ? 1 : 0.7 }}>
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.5 : 1.75} d={item.icon} />
               </svg>
               <span className="truncate">{t.nav[item.key]}</span>
@@ -113,16 +113,16 @@ function SidebarContent({ pathname }: { pathname: string }) {
         })}
       </nav>
 
-      <div className="mt-4 pt-4 flex flex-col gap-1" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+      <div className="mt-4 pt-4 flex flex-col gap-1" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
         {/* Language toggle */}
         <div className="flex items-center gap-1 px-3 py-1.5">
-          <span className="text-xs me-1" style={{ color: "rgba(255,255,255,0.25)" }}>🌐</span>
+          <span className="text-xs me-1" style={{ color: "rgba(255,255,255,0.2)" }}>🌐</span>
           {(["en", "he"] as const).map((l) => (
             <button
               key={l}
               onClick={() => setLang(l)}
               className="text-xs px-2 py-0.5 rounded-md font-medium transition"
-              style={lang === l ? { background: "rgba(167,139,250,0.2)", color: "#5BB8D4" } : { color: "rgba(255,255,255,0.35)" }}
+              style={lang === l ? { background: "rgba(27,127,160,0.25)", color: "#5BB8D4" } : { color: "rgba(255,255,255,0.3)" }}
             >
               {l === "en" ? "EN" : "עב"}
             </button>
@@ -131,9 +131,9 @@ function SidebarContent({ pathname }: { pathname: string }) {
 
         <button
           onClick={logout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition"
           style={{ color: "rgba(255,255,255,0.3)" }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"; (e.currentTarget as HTMLElement).style.color = "#fff"; }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.75)"; }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = ""; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.3)"; }}
         >
           <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -154,11 +154,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <AuthGuard>
     <TrialBanner />
-    <div className="flex min-h-screen" style={{ background: "#F0F8FB" }}>
+    <div className="flex min-h-screen" style={{ background: "#F4F6F8" }}>
       {/* Desktop sidebar */}
       <aside
-        className="hidden md:flex w-60 flex-col py-6 px-2 shrink-0 fixed top-0 bottom-0 start-0 z-20"
-        style={{ background: "#0D2A38", borderInlineEnd: "1px solid rgba(255,255,255,0.07)" }}
+        className="hidden md:flex w-64 flex-col py-7 px-3 shrink-0 fixed top-0 bottom-0 start-0 z-20"
+        style={{
+          background: "linear-gradient(180deg, #0B2030 0%, #0D2A38 100%)",
+          borderInlineEnd: "1px solid rgba(255,255,255,0.06)",
+          boxShadow: "4px 0 24px rgba(0,0,0,0.15)",
+        }}
       >
         <SidebarContent pathname={pathname} />
       </aside>
@@ -166,10 +170,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       {/* Mobile top bar */}
       <div
         className="md:hidden fixed top-0 start-0 end-0 z-30 flex items-center px-4 h-14"
-        style={{ background: "rgba(245,245,255,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid rgba(27,127,160,0.1)" }}
+        style={{ background: "rgba(255,255,255,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid #E5E7EB" }}
       >
         <div className="flex items-center gap-2.5">
-          <Image src="/tori_logo_transparent.png" alt="תורי" width={30} height={30} className="rounded-lg" />
+          <Image src="/tori_logo-white.jpeg" alt="תורי" width={30} height={30} className="rounded-lg" />
           <span className="font-semibold text-gray-900 text-base">
             {activeItem ? t.nav[activeItem.key] : "תורי"}
           </span>
@@ -177,14 +181,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       </div>
 
       {/* Main content */}
-      <main className="flex-1 md:ms-60 p-4 pt-[4.5rem] pb-24 md:p-8 md:pt-8 md:pb-8 overflow-auto">
+      <main className="flex-1 md:ms-64 p-4 pt-[4.5rem] pb-24 md:p-8 md:pt-8 md:pb-8 overflow-auto">
         {children}
       </main>
 
       {/* Mobile bottom tab bar */}
       <nav
         className="md:hidden fixed bottom-0 start-0 end-0 z-30 flex items-stretch h-16"
-        style={{ background: "rgba(245,245,255,0.97)", backdropFilter: "blur(12px)", borderTop: "1px solid rgba(27,127,160,0.1)" }}
+        style={{ background: "rgba(255,255,255,0.97)", backdropFilter: "blur(12px)", borderTop: "1px solid #E5E7EB" }}
       >
         {BOTTOM_TAB_ITEMS.map((item) => {
           const active = pathname === item.href;
@@ -214,7 +218,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <Link
           href="/dashboard/staff"
           className="flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition"
-          style={{ color: !BOTTOM_TAB_ITEMS.find(i => i.href === pathname) && pathname !== "/" ? "#F59E0B" : "rgba(255,255,255,0.35)" }}
+          style={{ color: !BOTTOM_TAB_ITEMS.find(i => i.href === pathname) && pathname !== "/" ? "#1B7FA0" : "#9CA3AF" }}
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 6h16M4 12h16M4 18h16" />
