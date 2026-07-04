@@ -81,9 +81,11 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
   const appSecret = process.env.WHATSAPP_APP_SECRET;
   if (!appId || !appSecret) return res.status(500).json({ error: "Meta app credentials not configured" });
 
-  // Exchange auth code for a user access token
+  // Exchange auth code for a user access token.
+  // The FB JS SDK popup flow always uses this redirect_uri internally — it must match exactly.
+  const redirectUri = "https://www.facebook.com/connect/login_success.html";
   const tokenRes = await fetch(
-    `https://graph.facebook.com/v19.0/oauth/access_token?client_id=${appId}&client_secret=${appSecret}&code=${parsed.data.code}`
+    `https://graph.facebook.com/v19.0/oauth/access_token?client_id=${appId}&client_secret=${appSecret}&code=${parsed.data.code}&redirect_uri=${encodeURIComponent(redirectUri)}`
   );
   const tokenData = await tokenRes.json() as any;
   if (!tokenData.access_token) {
