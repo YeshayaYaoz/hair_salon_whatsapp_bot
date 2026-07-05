@@ -1,24 +1,58 @@
-/** In-memory per-customer conversation history. Fine for v1/single-instance; swap for Redis when scaling. */
+import { prisma } from "../lib/prisma.js";
 
-interface Turn {
+export interface Turn {
   role: "user" | "assistant";
   content: string;
 }
 
-const conversations = new Map<string, Turn[]>();
-const MAX_TURNS = 12;
+const MAX_TURNS = 16;
+// In-memory cache so we don't hit the DB on every turn within the same session.
+const cache = new Map<string, Turn[]>();
 
-function key(businessId: string, customerPhone: string) {
-  return `${businessId}:${customerPhone}`;
+function cacheKey(businessId: string, phone: string) {
+  return `${businessId}:${phone}`;
 }
 
-export function getHistory(businessId: string, customerPhone: string): Turn[] {
-  return conversations.get(key(businessId, customerPhone)) ?? [];
+export async function getHistory(businessId: string, customerPhone: string): Promise<Turn[]> {
+  const k = cacheKey(businessId, customerPhone);
+  if (cache.has(k)) return cache.get(k)!;
+
+  const rows = await prisma.conversationMessage.findMany({
+    where: { businessId, phone: customerPhone },
+    orderBy: { createdAt: "asc" },
+    take: MAX_TURNS,
+  });
+
+  const turns: Turn[] = rows.map((r) => ({ role: r.role as Turn["role"], content: r.content }));
+  cache.set(k, turns);
+  return turns;
 }
 
-export function appendTurn(businessId: string, customerPhone: string, turn: Turn) {
-  const k = key(businessId, customerPhone);
-  const history = conversations.get(k) ?? [];
+export async function appendTurn(businessId: string, customerPhone: string, turn: Turn): Promise<void> {
+  const k = cacheKey(businessId, customerPhone);
+  const history = cache.get(k) ?? [];
   history.push(turn);
-  conversations.set(k, history.slice(-MAX_TURNS));
+  // Keep only the last MAX_TURNS in memory
+  if (history.length > MAX_TURNS) history.splice(0, history.length - MAX_TURNS);
+  cache.set(k, history);
+
+  // Persist to DB (non-blocking — fire and forget, failure is non-fatal)
+  prisma.conversationMessage.create({
+    data: { businessId, phone: customerPhone, role: turn.role, content: turn.content },
+  }).catch((err) => console.error("[conversationStore] Failed to persist turn:", err));
+
+  // Prune old messages beyond MAX_TURNS in the background
+  pruneOldMessages(businessId, customerPhone).catch(() => {});
+}
+
+async function pruneOldMessages(businessId: string, phone: string) {
+  const rows = await prisma.conversationMessage.findMany({
+    where: { businessId, phone },
+    orderBy: { createdAt: "desc" },
+    skip: MAX_TURNS,
+    select: { id: true },
+  });
+  if (rows.length > 0) {
+    await prisma.conversationMessage.deleteMany({ where: { id: { in: rows.map((r) => r.id) } } });
+  }
 }

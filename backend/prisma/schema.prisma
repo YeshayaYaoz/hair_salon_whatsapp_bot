@@ -146,6 +146,17 @@ model GoogleCalendarToken {
   updatedAt     DateTime @updatedAt
 }
 
+model ConversationMessage {
+  id         String   @id @default(cuid())
+  businessId String
+  phone      String
+  role       String   // "user" | "assistant"
+  content    String
+  createdAt  DateTime @default(now())
+
+  @@index([businessId, phone, createdAt])
+}
+
 model PasswordResetToken {
   id         String   @id @default(cuid())
   business   Business @relation(fields: [businessId], references: [id])

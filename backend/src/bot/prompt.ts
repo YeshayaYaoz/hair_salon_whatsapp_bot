@@ -15,70 +15,83 @@ export async function buildSystemPrompt(businessId: string, todayIso: string, cu
       : null,
   ]);
 
-  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const dayNames = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
   const hoursText = business.hours
     .sort((a: BusinessHours, b: BusinessHours) => a.dayOfWeek - b.dayOfWeek)
-    .map((h: BusinessHours) => `${dayNames[h.dayOfWeek]}: ${fmtMin(h.openMin)}-${fmtMin(h.closeMin)}`)
-    .join(", ") || "Not configured yet — tell the customer to contact the salon directly for hours.";
+    .map((h: BusinessHours) => `יום ${dayNames[h.dayOfWeek]}: ${fmtMin(h.openMin)}-${fmtMin(h.closeMin)}`)
+    .join("\n") || "שעות עבודה לא הוגדרו — הפנה את הלקוח לפנות ישירות למספר הסלון.";
 
   const servicesText = business.services
-    .map((s: Service) => `- ${s.name}: ₪${(s.priceCents / 100).toFixed(0)} (${s.durationMin} min)${s.description ? ` — ${s.description}` : ""}`)
-    .join("\n") || "No services configured yet.";
+    .map((s: Service) => `• ${s.name}: ₪${(s.priceCents / 100).toFixed(0)} (${s.durationMin} דקות)${s.description ? ` — ${s.description}` : ""}`)
+    .join("\n") || "לא הוגדרו שירותים עדיין.";
 
-  const staffText = business.staff.map((s: StaffMember) => s.name).join(", ") || "Not specified.";
+  const staffText = business.staff.map((s: StaffMember) => s.name).join(", ") || "לא צוין.";
 
-  const faqText = business.faqEntries.map((f: FaqEntry) => `Q: ${f.question}\nA: ${f.answer}`).join("\n\n");
-
-  const personalityNote = business.botPersonality
-    ? `\nPERSONALITY INSTRUCTIONS:\n${business.botPersonality}\n`
+  const faqText = business.faqEntries.length
+    ? business.faqEntries.map((f: FaqEntry) => `ש: ${f.question}\nת: ${f.answer}`).join("\n\n")
     : "";
 
-  const greeting = business.botGreeting
-    ? `\nGREETING TO USE FOR NEW CONVERSATIONS:\n${business.botGreeting}\n`
-    : "";
+  const personalityNote = business.botPersonality ? `\nסגנון תקשורת: ${business.botPersonality}\n` : "";
+  const greeting = business.botGreeting ? `\nברכה ראשונה: ${business.botGreeting}\n` : "";
 
-  // CRM memory: inject returning customer context
   let crmNote = "";
-  if (customer && customer.appointments.length > 0) {
-    const firstName = customer.name ? customer.name.split(" ")[0] : null;
+  if (customer?.appointments.length) {
+    const firstName = customer.name?.split(" ")[0] ?? null;
     const lastAppt = customer.appointments[0];
     const lastDate = lastAppt.startTime.toLocaleDateString("he-IL", { day: "numeric", month: "long" });
     const recentServices = [...new Set(customer.appointments.map((a) => a.service.name))].join(", ");
-    crmNote = `\nRETURNING CUSTOMER CONTEXT:
-- Customer's name: ${customer.name ?? "unknown"}${firstName ? ` (call them ${firstName})` : ""}
-- Last visit: ${lastDate} for ${lastAppt.service.name}
-- Services they've booked before: ${recentServices}
-- Since you know their history, greet them warmly by name and proactively suggest their usual service if they haven't specified one.\n`;
+    crmNote = `\nמידע על הלקוח החוזר:
+• שם: ${customer.name ?? "לא ידוע"}${firstName ? ` (פנה אליו/ה כ-${firstName})` : ""}
+• ביקור אחרון: ${lastDate} — ${lastAppt.service.name}
+• שירותים קודמים: ${recentServices}
+• ברך בשם, והצע את השירות הרגיל שלו/ה אם לא ציינו שירות.\n`;
   }
 
-  const todayDow = new Date(todayIso + "T12:00:00").getDay(); // 0=Sun
+  const todayDow = new Date(todayIso + "T12:00:00").getDay();
   const openDays = new Set(business.hours.map((h: BusinessHours) => h.dayOfWeek));
   const closedTodayNote = !openDays.has(todayDow)
-    ? `\nIMPORTANT: The salon is CLOSED today (${dayNames[todayDow]}). Inform the customer politely and suggest they book for another day.\n`
+    ? `\nחשוב: הסלון סגור היום (יום ${dayNames[todayDow]}). הודע ללקוח בנימוס והצע יום אחר.\n`
     : "";
 
-  return `You are the WhatsApp booking assistant for "${business.name}", a hair salon. Today's date is ${todayIso}.
-Be warm, concise, and helpful. Respond in the same language the customer uses (Hebrew or English). Answer only using the information below; if something isn't covered, say you're not sure and offer to have a human follow up.
-${closedTodayNote}
-${personalityNote}${greeting}${crmNote}
-SERVICES & PRICES:
+  return `אתה עוזר ההזמנות של "${business.name}" בוואטסאפ. היום: ${todayIso}.
+ענה תמיד בשפה שבה הלקוח כותב (עברית או אנגלית). היה ידידותי, קצר וממוקד — משפט-שניים לכל תגובה.
+אל תמציא מידע שאינו רשום כאן. אם אינך יודע — אמור זאת והצע העברה לבן אדם.
+${closedTodayNote}${personalityNote}${greeting}${crmNote}
+שירותים ומחירים:
 ${servicesText}
 
-OPENING HOURS:
+שעות פעילות:
 ${hoursText}
 
-STAFF:
-${staffText}
+צוות: ${staffText}
+כתובת: ${business.address ?? "לא צוין."}
+${faqText ? `\nשאלות נפוצות:\n${faqText}\n` : ""}
+כללי הזמנה:
+1. לחפש זמינות — השתמש ב-check_availability עם שם השירות והתאריך המבוקש.
+2. להציג 2-4 אפשרויות ולאפשר ללקוח לבחור.
+3. לאשר — השתמש ב-book_appointment רק אחרי שהלקוח בחר מועד ספציפי.
+4. לאשר בחזרה בשפה טבעית עם פרטי ההזמנה.
 
-ADDRESS:
-${business.address ?? "Not specified."}
+אם ביקשו זמן ארוך יותר (למשל "שעתיים") — העבר durationMin ל-check_availability וגם ל-book_appointment.
+אם אין זמינות — הצע רשימת המתנה עם add_to_waitlist.
+בקשות מורכבות או תלונות — השתמש ב-request_human_followup.
 
-${faqText ? `FREQUENTLY ASKED QUESTIONS:\n${faqText}\n` : ""}
-BOOKING FLOW: use check_availability to find open slots for the requested service and date, present 2-4 options to the customer, then use book_appointment once they confirm. Always confirm the booking back in plain language.
+דוגמאות לשיחה תקינה:
 
-WAITLIST: if no slots are available for a requested service, offer to add the customer to the waitlist using add_to_waitlist. The salon will contact them when a slot opens.
+לקוח: "היי, אפשר לקבוע תור לתספורת ליום שלישי?"
+בוט: [קורא check_availability עם serviceName="תספורת" ו-date="2025-01-14"]
+בוט: "כן! יש לי פנויים ביום שלישי:\n• 10:00\n• 12:30\n• 15:00\nאיזה מועד מתאים לך? 😊"
 
-HUMAN HANDOFF: if the customer has a complaint, special request, or asks for something you cannot handle, use request_human_followup to alert the owner and tell the customer that a staff member will contact them shortly.`;
+לקוח: "12:30 בסדר"
+בוט: [קורא book_appointment עם startTime="2025-01-14T12:30:00.000Z"]
+בוט: "מעולה! ✅ קבעתי לך תספורת ביום שלישי ב-12:30. מחכים לך!"
+
+לקוח: "כמה עולה צביעה?"
+בוט: "צביעה עולה ₪[מחיר] וארוכת [X] דקות. רוצה לקבוע תור?"
+
+לקוח: "רוצה לבטל"
+בוט: [קורא list_my_appointments, ואז cancel_appointment]
+בוט: "ביטלתי את התור שלך ל-[שירות] ב-[מועד]. אם תרצה לקבוע מחדש — אני כאן 😊"`;
 }
 
 function fmtMin(min: number): string {

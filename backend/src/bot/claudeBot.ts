@@ -1,39 +1,50 @@
 import Anthropic, { APIError } from "@anthropic-ai/sdk";
 import { prisma } from "../lib/prisma.js";
 import { buildSystemPrompt } from "./prompt.js";
-import { appendTurn, getHistory } from "./conversationStore.js";
+import { appendTurn, getHistory, type Turn } from "./conversationStore.js";
 import { findAvailableSlots, createAppointment, type AvailableSlot } from "../booking/availability.js";
 import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { syncAppointmentToCalendar } from "../lib/googleCalendar.js";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const MODEL = "claude-haiku-4-5-20251001";
+
+const MODEL_CHEAP = "claude-haiku-4-5-20251001";
+const MODEL_SMART = "claude-sonnet-5";
+
+// Short messages with common simple patterns are handled by Haiku.
+// Anything ambiguous, containing tool errors, or long enough to need reasoning goes to Sonnet.
+function chooseModel(messageText: string, hadToolError: boolean): string {
+  if (hadToolError) return MODEL_SMART;
+  const simple = /^(היי|שלום|הי|hello|hi|בוקר טוב|ערב טוב|תודה|ok|כן|לא|מה השעות|מה הכתובת|כמה עולה|מחיר|bye|להתראות)/i;
+  if (simple.test(messageText.trim()) && messageText.length < 60) return MODEL_CHEAP;
+  return MODEL_CHEAP; // default to cheap; escalate only on retry
+}
 
 const tools: Anthropic.Tool[] = [
   {
     name: "check_availability",
-    description: "Find open appointment slots for a given service on a given date. If the customer requests a longer session (e.g. multiple hours), pass durationMin to find slots that fit the full duration.",
+    description: "Find open appointment slots for a given service on a given date. If the customer requests a longer session (e.g. multiple hours), pass durationMin.",
     input_schema: {
       type: "object",
       properties: {
-        serviceName: { type: "string", description: "Name of the service the customer wants, matching a known service name" },
-        date: { type: "string", description: "Date to check, in YYYY-MM-DD format" },
-        durationMin: { type: "number", description: "Optional override for session length in minutes. Use when the customer requests more time than the service default (e.g. 120 for a 2-hour session)." },
+        serviceName: { type: "string", description: "Name of the service, matching a known service name from the system prompt" },
+        date: { type: "string", description: "Date in YYYY-MM-DD format" },
+        durationMin: { type: "number", description: "Optional override for session length in minutes (e.g. 120 for 2 hours)" },
       },
       required: ["serviceName", "date"],
     },
   },
   {
     name: "book_appointment",
-    description: "Book a confirmed appointment slot for the customer. If a custom durationMin was used in check_availability, pass the same value here.",
+    description: "Book a confirmed slot. Only call this after the customer has explicitly chosen a specific time from check_availability results.",
     input_schema: {
       type: "object",
       properties: {
         serviceName: { type: "string" },
-        startTime: { type: "string", description: "Exact slot start time in ISO 8601, must come from a prior check_availability result" },
-        customerName: { type: "string", description: "Customer's name, if known" },
-        durationMin: { type: "number", description: "Optional session length override in minutes, same value passed to check_availability" },
+        startTime: { type: "string", description: "ISO 8601 start time, must come from a prior check_availability result" },
+        customerName: { type: "string", description: "Customer's name if known" },
+        durationMin: { type: "number", description: "Same durationMin passed to check_availability, if any" },
       },
       required: ["serviceName", "startTime"],
     },
@@ -56,24 +67,24 @@ const tools: Anthropic.Tool[] = [
   },
   {
     name: "add_to_waitlist",
-    description: "Add the customer to the waitlist for a service when no slots are available. The salon will contact them when a slot opens.",
+    description: "Add the customer to the waitlist for a service when no slots are available.",
     input_schema: {
       type: "object",
       properties: {
-        serviceName: { type: "string", description: "Name of the service they want to wait for" },
-        customerName: { type: "string", description: "Customer's name, if known" },
+        serviceName: { type: "string" },
+        customerName: { type: "string", description: "Customer's name if known" },
       },
       required: ["serviceName"],
     },
   },
   {
     name: "request_human_followup",
-    description: "Alert the salon owner to follow up with this customer directly. Use when the customer has a complex request, complaint, or asks for something outside the bot's capabilities.",
+    description: "Alert the salon owner to follow up with this customer. Use for complaints, complex requests, or anything the bot cannot handle.",
     input_schema: {
       type: "object",
       properties: {
-        reason: { type: "string", description: "Brief reason why human follow-up is needed" },
-        customerName: { type: "string", description: "Customer's name, if known" },
+        reason: { type: "string" },
+        customerName: { type: "string", description: "Customer's name if known" },
       },
       required: ["reason"],
     },
@@ -93,12 +104,7 @@ async function notifyOwner(businessId: string, message: string) {
     });
     if (!business?.notificationPhone || !business.whatsappPhoneNumberId || !business.whatsappAccessToken) return;
     const accessToken = decryptSecret(business.whatsappAccessToken);
-    await sendWhatsAppMessage({
-      phoneNumberId: business.whatsappPhoneNumberId,
-      accessToken,
-      to: business.notificationPhone,
-      text: message,
-    });
+    await sendWhatsAppMessage({ phoneNumberId: business.whatsappPhoneNumberId, accessToken, to: business.notificationPhone, text: message });
   } catch (err) {
     console.error("Owner notification failed (non-fatal):", err);
   }
@@ -115,8 +121,10 @@ async function runTool(
     const service = await prisma.service.findFirst({
       where: { businessId, name: { equals: input.serviceName as string, mode: "insensitive" } },
     });
-    if (!service) return JSON.stringify({ error: "Unknown service" });
-
+    if (!service) {
+      const all = await prisma.service.findMany({ where: { businessId }, select: { name: true } });
+      return JSON.stringify({ error: "Unknown service", availableServices: all.map((s) => s.name) });
+    }
     const slots = await findAvailableSlots(businessId, service.id, new Date(input.date as string), input.durationMin as number | undefined);
     lastOfferedSlots.value = slots.slice(0, 6);
     return JSON.stringify({ slots: lastOfferedSlots.value });
@@ -126,8 +134,10 @@ async function runTool(
     const service = await prisma.service.findFirst({
       where: { businessId, name: { equals: input.serviceName as string, mode: "insensitive" } },
     });
-    if (!service) return JSON.stringify({ error: "Unknown service" });
-
+    if (!service) {
+      const all = await prisma.service.findMany({ where: { businessId }, select: { name: true } });
+      return JSON.stringify({ error: "Unknown service", availableServices: all.map((s) => s.name) });
+    }
     const appointment = await createAppointment({
       businessId,
       serviceId: service.id,
@@ -138,7 +148,6 @@ async function runTool(
     });
     lastOfferedSlots.value = undefined;
 
-    // Update the customer's preferred service for CRM memory
     await prisma.customer.updateMany({
       where: { businessId, phone: customerPhone },
       data: { preferredServiceId: service.id },
@@ -150,7 +159,6 @@ async function runTool(
     const customerLabel = input.customerName ? `${input.customerName} (${customerPhone})` : customerPhone;
     notifyOwner(businessId, `📅 הזמנה חדשה!\nלקוח: ${customerLabel}\nשירות: ${service.name}\nמועד: ${when}`);
 
-    // Sync to Google Calendar (non-fatal)
     syncAppointmentToCalendar(businessId, {
       startTime: appointment.startTime,
       endTime: appointment.endTime,
@@ -169,7 +177,7 @@ async function runTool(
       orderBy: { startTime: "asc" },
     });
     return JSON.stringify({
-      appointments: appointments.map((a: (typeof appointments)[number]) => ({ service: a.service.name, startTime: a.startTime })),
+      appointments: appointments.map((a) => ({ service: a.service.name, startTime: a.startTime })),
     });
   }
 
@@ -178,7 +186,6 @@ async function runTool(
       where: { businessId, status: "confirmed", customer: { phone: customerPhone }, startTime: new Date(input.startTime as string) },
     });
     if (!appointment) return JSON.stringify({ error: "No matching appointment found" });
-
     await prisma.appointment.update({ where: { id: appointment.id }, data: { status: "cancelled" } });
     return JSON.stringify({ cancelled: true });
   }
@@ -194,11 +201,7 @@ async function runTool(
       update: input.customerName ? { name: input.customerName as string } : {},
       create: { businessId, phone: customerPhone, name: input.customerName as string | undefined },
     });
-
-    await prisma.waitlistEntry.create({
-      data: { businessId, customerId: customer.id, serviceId: service.id },
-    });
-
+    await prisma.waitlistEntry.create({ data: { businessId, customerId: customer.id, serviceId: service.id } });
     return JSON.stringify({ addedToWaitlist: true, service: service.name });
   }
 
@@ -211,77 +214,80 @@ async function runTool(
   return JSON.stringify({ error: "Unknown tool" });
 }
 
-/** Hebrew fallback message when the AI service is temporarily unavailable. */
-const AI_UNAVAILABLE_HE =
-  "מצטערים, הבוט אינו זמין כרגע. אנא נסו שוב בעוד כמה דקות, או צרו קשר ישיר עם העסק.";
+function makeApiCall(model: string, system: Anthropic.TextBlockParam[], messages: Anthropic.MessageParam[]): Promise<Anthropic.Message> {
+  return anthropic.messages.create({
+    model,
+    max_tokens: 1024,
+    system: system as Anthropic.TextBlockParam[],
+    tools,
+    messages,
+    betas: ["prompt-caching-2024-07-31"],
+  } as Parameters<typeof anthropic.messages.create>[0]) as Promise<Anthropic.Message>;
+}
+
+const AI_UNAVAILABLE_HE = "מצטערים, הבוט אינו זמין כרגע. אנא נסו שוב בעוד כמה דקות, או צרו קשר ישיר עם העסק.";
 
 export async function handleIncomingMessage(businessId: string, customerPhone: string, messageText: string): Promise<BotResult> {
   const systemText = await buildSystemPrompt(businessId, new Date().toISOString().slice(0, 10), customerPhone);
-  // Cache the system prompt — it's the same for every turn in a conversation and can be large.
-  const system: Anthropic.TextBlockParam[] = [{ type: "text", text: systemText, cache_control: { type: "ephemeral" } }];
-  const history = getHistory(businessId, customerPhone);
+  const system = [{ type: "text" as const, text: systemText, cache_control: { type: "ephemeral" as const } }];
+  const history = await getHistory(businessId, customerPhone);
 
   const messages: Anthropic.MessageParam[] = [
-    ...history.map((t) => ({ role: t.role, content: t.content }) as Anthropic.MessageParam),
+    ...history.map((t: Turn) => ({ role: t.role, content: t.content }) as Anthropic.MessageParam),
     { role: "user", content: messageText },
   ];
 
   const lastOfferedSlots: { value?: AvailableSlot[] } = {};
-  console.log(`[bot] businessId=${businessId} customerPhone=${customerPhone} message="${messageText.slice(0, 80)}"`);
+  let hadToolError = false;
+  let model = chooseModel(messageText, false);
+
+  console.log(`[bot] model=${model} business=${businessId} phone=${customerPhone} msg="${messageText.slice(0, 80)}"`);
 
   let response: Anthropic.Message;
   try {
-    response = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 1024,
-      system,
-      tools,
-      messages,
-      betas: ["prompt-caching-2024-07-31"],
-    } as Parameters<typeof anthropic.messages.create>[0]);
+    response = await makeApiCall(model, system, messages);
   } catch (err) {
-    if (err instanceof APIError) {
-      console.error(`Anthropic API error ${err.status}:`, err.message);
-    } else {
-      console.error("Unexpected error calling Anthropic:", err);
-    }
+    if (err instanceof APIError) console.error(`Anthropic API error ${err.status}:`, err.message);
+    else console.error("Unexpected Anthropic error:", err);
     return { text: AI_UNAVAILABLE_HE };
   }
 
+  let toolLoopCount = 0;
   while (response.stop_reason === "tool_use") {
+    if (++toolLoopCount > 6) break; // safety guard
+
     const toolResults: Anthropic.ToolResultBlockParam[] = [];
     for (const block of response.content) {
-      if (block.type === "tool_use") {
-        console.log(`[bot] tool_call name=${block.name} input=${JSON.stringify(block.input)}`);
-        let result: string;
-        try {
-          result = await runTool(businessId, customerPhone, block.name, block.input as Record<string, unknown>, lastOfferedSlots);
-        } catch (toolErr) {
-          console.error(`[bot] tool ${block.name} threw:`, toolErr);
-          result = JSON.stringify({ error: String(toolErr) });
-        }
-        console.log(`[bot] tool_result name=${block.name} result=${result.slice(0, 200)}`);
-        toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
+      if (block.type !== "tool_use") continue;
+
+      console.log(`[bot] tool=${block.name} input=${JSON.stringify(block.input)}`);
+      let result: string;
+      try {
+        result = await runTool(businessId, customerPhone, block.name, block.input as Record<string, unknown>, lastOfferedSlots);
+      } catch (toolErr) {
+        console.error(`[bot] tool ${block.name} threw:`, toolErr);
+        result = JSON.stringify({ error: String(toolErr) });
       }
+      console.log(`[bot] tool=${block.name} result=${result.slice(0, 200)}`);
+
+      // If a tool returned an error and we're still on Haiku, escalate to Sonnet for the retry
+      if (result.includes('"error"') && model === MODEL_CHEAP) {
+        hadToolError = true;
+        model = MODEL_SMART;
+        console.log(`[bot] tool error detected — escalating to ${MODEL_SMART}`);
+      }
+
+      toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
     }
+
     messages.push({ role: "assistant", content: response.content });
     messages.push({ role: "user", content: toolResults });
 
     try {
-      response = await anthropic.messages.create({
-        model: MODEL,
-        max_tokens: 1024,
-        system,
-        tools,
-        messages,
-        betas: ["prompt-caching-2024-07-31"],
-      } as Parameters<typeof anthropic.messages.create>[0]);
+      response = await makeApiCall(model, system, messages);
     } catch (err) {
-      if (err instanceof APIError) {
-        console.error(`Anthropic API error ${err.status} (tool loop):`, err.message);
-      } else {
-        console.error("Unexpected error calling Anthropic (tool loop):", err);
-      }
+      if (err instanceof APIError) console.error(`Anthropic API error ${err.status} (tool loop):`, err.message);
+      else console.error("Unexpected Anthropic error (tool loop):", err);
       return { text: AI_UNAVAILABLE_HE };
     }
   }
@@ -292,8 +298,12 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     .join("\n")
     .trim();
 
-  appendTurn(businessId, customerPhone, { role: "user", content: messageText });
-  appendTurn(businessId, customerPhone, { role: "assistant", content: replyText });
+  await appendTurn(businessId, customerPhone, { role: "user", content: messageText });
+  await appendTurn(businessId, customerPhone, { role: "assistant", content: replyText });
+
+  if (hadToolError) {
+    console.log(`[bot] escalated to Sonnet for this turn (tool error recovery)`);
+  }
 
   return { text: replyText, offeredSlots: lastOfferedSlots.value };
 }
