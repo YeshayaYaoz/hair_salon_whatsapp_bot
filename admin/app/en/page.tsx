@@ -269,8 +269,7 @@ export default function LandingPageEN() {
           animation: glowPulse 5s ease-in-out infinite;
         }
         @keyframes glowPulse { 0%, 100% { opacity: 0.6; transform: translate(-50%,-50%) scale(0.92); } 50% { opacity: 1; transform: translate(-50%,-50%) scale(1.06); } }
-        .phone-wrap { filter: drop-shadow(0 32px 64px rgba(0,0,0,0.28)) drop-shadow(0 0 1px rgba(0,0,0,0.4)); animation: phoneFloat 6.5s ease-in-out infinite; }
-        @keyframes phoneFloat { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-12px) rotate(-0.4deg); } }
+        .phone-wrap { filter: drop-shadow(0 32px 64px rgba(0,0,0,0.28)) drop-shadow(0 0 1px rgba(0,0,0,0.4)); }
         .phone-frame { background: #1C1C1E; border-radius: 44px; border: 8px solid #1C1C1E; max-width: 290px; margin: 0 auto; position: relative; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12); }
         .phone-frame::before { content: ''; position: absolute; left: -12px; top: 80px; width: 4px; height: 32px; background: #2A2A2C; border-radius: 2px 0 0 2px; }
         .phone-frame::after { content: ''; position: absolute; right: -12px; top: 100px; width: 4px; height: 48px; background: #2A2A2C; border-radius: 0 2px 2px 0; }

@@ -267,8 +267,7 @@ export default function LandingPage() {
 
         /* PHONE MOCKUP */
         .lp-hero-phone { animation: fadeUp 0.8s ease 0.4s both; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 0; position: relative; z-index: 1; }
-        .phone-wrap { position: relative; width: 250px; filter: drop-shadow(0 32px 64px rgba(0,0,0,0.22)) drop-shadow(0 8px 24px rgba(0,0,0,0.14)); animation: phoneFloat 6.5s ease-in-out infinite; }
-        @keyframes phoneFloat { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-12px) rotate(-0.4deg); } }
+        .phone-wrap { position: relative; width: 250px; filter: drop-shadow(0 32px 64px rgba(0,0,0,0.22)) drop-shadow(0 8px 24px rgba(0,0,0,0.14)); }
         /* Soft ambient glow behind the phone */
         .lp-hero-phone::before {
           content: ''; position: absolute; width: 340px; height: 340px; border-radius: 50%;
