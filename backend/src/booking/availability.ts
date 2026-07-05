@@ -13,7 +13,8 @@ export interface AvailableSlot {
 export async function findAvailableSlots(
   businessId: string,
   serviceId: string,
-  date: Date
+  date: Date,
+  overrideDurationMin?: number
 ): Promise<AvailableSlot[]> {
   const [service, hours, staff, dayAppointments] = await Promise.all([
     prisma.service.findUniqueOrThrow({ where: { id: serviceId } }),
@@ -32,12 +33,13 @@ export async function findAvailableSlots(
 
   if (!hours) return [];
 
+  const durationMin = overrideDurationMin ?? service.durationMin;
   const staffOptions: (string | null)[] = staff.length > 0 ? staff.map((s: StaffMember) => s.id) : [null];
   const slots: AvailableSlot[] = [];
 
-  for (let startMin = hours.openMin; startMin + service.durationMin <= hours.closeMin; startMin += SLOT_STEP_MIN) {
+  for (let startMin = hours.openMin; startMin + durationMin <= hours.closeMin; startMin += SLOT_STEP_MIN) {
     const slotStart = addMinutes(startOfDay(date), startMin);
-    const slotEnd = addMinutes(slotStart, service.durationMin);
+    const slotEnd = addMinutes(slotStart, durationMin);
     if (slotStart < new Date()) continue;
 
     for (const staffId of staffOptions) {
@@ -64,9 +66,10 @@ export async function createAppointment(params: {
   customerName?: string;
   startTime: Date;
   staffId?: string | null;
+  overrideDurationMin?: number;
 }) {
   const service = await prisma.service.findUniqueOrThrow({ where: { id: params.serviceId } });
-  const endTime = addMinutes(params.startTime, service.durationMin);
+  const endTime = addMinutes(params.startTime, params.overrideDurationMin ?? service.durationMin);
 
   const customer = await prisma.customer.upsert({
     where: { businessId_phone: { businessId: params.businessId, phone: params.customerPhone } },

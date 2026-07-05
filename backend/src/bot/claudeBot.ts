@@ -13,25 +13,27 @@ const MODEL = "claude-sonnet-5";
 const tools: Anthropic.Tool[] = [
   {
     name: "check_availability",
-    description: "Find open appointment slots for a given service on a given date.",
+    description: "Find open appointment slots for a given service on a given date. If the customer requests a longer session (e.g. multiple hours), pass durationMin to find slots that fit the full duration.",
     input_schema: {
       type: "object",
       properties: {
         serviceName: { type: "string", description: "Name of the service the customer wants, matching a known service name" },
         date: { type: "string", description: "Date to check, in YYYY-MM-DD format" },
+        durationMin: { type: "number", description: "Optional override for session length in minutes. Use when the customer requests more time than the service default (e.g. 120 for a 2-hour session)." },
       },
       required: ["serviceName", "date"],
     },
   },
   {
     name: "book_appointment",
-    description: "Book a confirmed appointment slot for the customer.",
+    description: "Book a confirmed appointment slot for the customer. If a custom durationMin was used in check_availability, pass the same value here.",
     input_schema: {
       type: "object",
       properties: {
         serviceName: { type: "string" },
         startTime: { type: "string", description: "Exact slot start time in ISO 8601, must come from a prior check_availability result" },
         customerName: { type: "string", description: "Customer's name, if known" },
+        durationMin: { type: "number", description: "Optional session length override in minutes, same value passed to check_availability" },
       },
       required: ["serviceName", "startTime"],
     },
@@ -115,7 +117,7 @@ async function runTool(
     });
     if (!service) return JSON.stringify({ error: "Unknown service" });
 
-    const slots = await findAvailableSlots(businessId, service.id, new Date(input.date as string));
+    const slots = await findAvailableSlots(businessId, service.id, new Date(input.date as string), input.durationMin as number | undefined);
     lastOfferedSlots.value = slots.slice(0, 6);
     return JSON.stringify({ slots: lastOfferedSlots.value });
   }
@@ -132,6 +134,7 @@ async function runTool(
       customerPhone,
       customerName: input.customerName as string | undefined,
       startTime: new Date(input.startTime as string),
+      overrideDurationMin: input.durationMin as number | undefined,
     });
     lastOfferedSlots.value = undefined;
 
