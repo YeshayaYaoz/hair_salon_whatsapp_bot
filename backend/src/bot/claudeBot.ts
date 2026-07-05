@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { appendTurn, getHistory, type Turn } from "./conversationStore.js";
 import { findAvailableSlots, createAppointment, SlotUnavailableError, type AvailableSlot } from "../booking/availability.js";
+import { parseBookingTime } from "../lib/timezone.js";
 import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { syncAppointmentToCalendar } from "../lib/googleCalendar.js";
@@ -138,6 +139,7 @@ async function runTool(
       const all = await prisma.service.findMany({ where: { businessId }, select: { name: true } });
       return JSON.stringify({ error: "Unknown service", availableServices: all.map((s) => s.name) });
     }
+    const biz = await prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { timezone: true } });
     let appointment;
     try {
       appointment = await createAppointment({
@@ -145,7 +147,7 @@ async function runTool(
         serviceId: service.id,
         customerPhone,
         customerName: input.customerName as string | undefined,
-        startTime: new Date(input.startTime as string),
+        startTime: parseBookingTime(input.startTime as string, biz.timezone || "Asia/Jerusalem"),
         overrideDurationMin: input.durationMin as number | undefined,
       });
     } catch (err) {
@@ -190,8 +192,10 @@ async function runTool(
   }
 
   if (name === "cancel_appointment") {
+    const biz = await prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { timezone: true } });
+    const target = parseBookingTime(input.startTime as string, biz.timezone || "Asia/Jerusalem");
     const appointment = await prisma.appointment.findFirst({
-      where: { businessId, status: "confirmed", customer: { phone: customerPhone }, startTime: new Date(input.startTime as string) },
+      where: { businessId, status: "confirmed", customer: { phone: customerPhone }, startTime: target },
     });
     if (!appointment) return JSON.stringify({ error: "No matching appointment found" });
     await prisma.appointment.update({ where: { id: appointment.id }, data: { status: "cancelled" } });

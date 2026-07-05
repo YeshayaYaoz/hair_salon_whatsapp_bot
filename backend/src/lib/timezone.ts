@@ -71,6 +71,23 @@ export function parseDateString(dateStr: string): { year: number; month: number;
   return { year, month, day };
 }
 
+/**
+ * Interpret a booking start-time string produced by the bot.
+ * - If it carries an explicit UTC/offset designator (…Z or ±hh:mm), it's already an exact
+ *   instant (e.g. the exact ISO from check_availability / a tapped slot) → use as-is.
+ * - If it's a naive local datetime (no timezone), interpret its wall-clock in the business
+ *   timezone. This prevents the model from accidentally storing "11:00" as 11:00 UTC.
+ */
+export function parseBookingTime(input: string, timeZone: string): Date {
+  const hasZone = /(z|[+-]\d{2}:?\d{2})$/i.test(input.trim());
+  if (hasZone) return new Date(input);
+
+  const m = input.trim().match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  if (!m) return new Date(input); // fallback; let Date do its best
+  const [, y, mo, d, hh, mm] = m;
+  return zonedWallTimeToUtc(+y, +mo, +d, +hh * 60 + +mm, timeZone);
+}
+
 /** Day of week (0=Sun) for a YYYY-MM-DD calendar date. */
 export function dayOfWeekForDate(year: number, month: number, day: number): number {
   return new Date(Date.UTC(year, month - 1, day, 12)).getUTCDay();
