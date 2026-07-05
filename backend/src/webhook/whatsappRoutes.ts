@@ -61,7 +61,7 @@ function extractMessageText(message: any): string | null {
   if (message.type === "interactive" && message.interactive?.type === "list_reply") {
     // The row id is the slot's ISO start time (see buildSlotRows); phrase it as a natural reply
     // so Claude's book_appointment tool call still has the exact ISO time to work with.
-    return `I'll take the ${message.interactive.list_reply.title} slot (${message.interactive.list_reply.id})`;
+    return `אני רוצה את המועד ${message.interactive.list_reply.title} (${message.interactive.list_reply.id})`;
   }
   return null;
 }
@@ -71,7 +71,7 @@ function buildSlotRows(slots: { startTime: string }[]): ListRow[] {
     const d = new Date(s.startTime);
     return {
       id: s.startTime,
-      title: d.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" }).slice(0, 24),
+      title: d.toLocaleString("he-IL", { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }).slice(0, 24),
     };
   });
 }
@@ -133,7 +133,7 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
         accessToken,
         to: customerPhone,
         bodyText: reply,
-        buttonText: "Pick a time",
+        buttonText: "בחר מועד",
         rows: buildSlotRows(offeredSlots),
       });
     } else {
