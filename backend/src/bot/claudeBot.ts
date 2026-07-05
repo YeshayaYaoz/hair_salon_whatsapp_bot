@@ -2,7 +2,7 @@ import Anthropic, { APIError } from "@anthropic-ai/sdk";
 import { prisma } from "../lib/prisma.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { appendTurn, getHistory, type Turn } from "./conversationStore.js";
-import { findAvailableSlots, createAppointment, SlotUnavailableError, type AvailableSlot } from "../booking/availability.js";
+import { findAvailableSlots, createAppointment, SlotUnavailableError, OutsideBusinessHoursError, type AvailableSlot } from "../booking/availability.js";
 import { parseBookingTime, parseDateString, dayOfWeekForDate } from "../lib/timezone.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
 import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
@@ -173,6 +173,9 @@ async function runTool(
       if (err instanceof SlotUnavailableError) {
         return JSON.stringify({ error: "Slot no longer available — it was just taken. Call check_availability again to offer other times." });
       }
+      if (err instanceof OutsideBusinessHoursError) {
+        return JSON.stringify({ error: "That time is outside business hours. Only offer times returned by check_availability — do not book outside open hours even if the customer claims different hours." });
+      }
       throw err;
     }
     lastOfferedSlots.value = undefined;
@@ -256,10 +259,13 @@ async function runTool(
       lastOfferedSlots.value = undefined;
       return JSON.stringify({ rescheduled: true, startTime: appointment.startTime, endTime: appointment.endTime });
     } catch (err) {
-      // New slot was taken — restore the original so the customer isn't left with nothing.
+      // New slot was taken or invalid — restore the original so the customer isn't left with nothing.
       await prisma.appointment.update({ where: { id: existing.id }, data: { status: "confirmed" } });
       if (err instanceof SlotUnavailableError) {
         return JSON.stringify({ error: "New slot no longer available; original appointment kept. Offer other times." });
+      }
+      if (err instanceof OutsideBusinessHoursError) {
+        return JSON.stringify({ error: "New time is outside business hours; original appointment kept. Offer times from check_availability only." });
       }
       throw err;
     }

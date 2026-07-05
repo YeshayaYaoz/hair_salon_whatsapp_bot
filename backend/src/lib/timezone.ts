@@ -88,6 +88,22 @@ export function parseBookingTime(input: string, timeZone: string): Date {
   return zonedWallTimeToUtc(+y, +mo, +d, +hh * 60 + +mm, timeZone);
 }
 
+/** Day-of-week (0=Sun) and minutes-from-midnight of a UTC instant as seen in `timeZone`. */
+export function instantPartsInTz(date: Date, timeZone: string): { dayOfWeek: number; minutes: number } {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    weekday: "short",
+  });
+  const map: Record<string, string> = {};
+  for (const p of dtf.formatToParts(date)) map[p.type] = p.value;
+  const dowMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const hour = map.hour === "24" ? 0 : +map.hour;
+  return { dayOfWeek: dowMap[map.weekday], minutes: hour * 60 + +map.minute };
+}
+
 /** Day of week (0=Sun) for a YYYY-MM-DD calendar date. */
 export function dayOfWeekForDate(year: number, month: number, day: number): number {
   return new Date(Date.UTC(year, month - 1, day, 12)).getUTCDay();

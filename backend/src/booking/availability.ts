@@ -1,6 +1,6 @@
 import type { StaffMember, Appointment } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
-import { zonedWallTimeToUtc, parseDateString, dayOfWeekForDate } from "../lib/timezone.js";
+import { zonedWallTimeToUtc, parseDateString, dayOfWeekForDate, instantPartsInTz } from "../lib/timezone.js";
 
 const SLOT_STEP_MIN = 30;
 
@@ -14,6 +14,14 @@ export class SlotUnavailableError extends Error {
   constructor() {
     super("Slot no longer available");
     this.name = "SlotUnavailableError";
+  }
+}
+
+/** Thrown when a requested time falls outside the business's open hours for that day. */
+export class OutsideBusinessHoursError extends Error {
+  constructor(message = "Requested time is outside business hours") {
+    super(message);
+    this.name = "OutsideBusinessHoursError";
   }
 }
 
@@ -82,7 +90,20 @@ export async function createAppointment(params: {
   overrideDurationMin?: number;
 }) {
   const service = await prisma.service.findUniqueOrThrow({ where: { id: params.serviceId } });
-  const endTime = new Date(params.startTime.getTime() + (params.overrideDurationMin ?? service.durationMin) * 60_000);
+  const durationMin = params.overrideDurationMin ?? service.durationMin;
+  const endTime = new Date(params.startTime.getTime() + durationMin * 60_000);
+
+  // Reject bookings outside the business's open hours — the bot must not be able to book past
+  // closing time (or on a closed day) even if it sends a bad time.
+  const business = await prisma.business.findUniqueOrThrow({ where: { id: params.businessId }, select: { timezone: true } });
+  const tz = business.timezone || "Asia/Jerusalem";
+  const { dayOfWeek, minutes: startMin } = instantPartsInTz(params.startTime, tz);
+  const hours = await prisma.businessHours.findUnique({
+    where: { businessId_dayOfWeek: { businessId: params.businessId, dayOfWeek } },
+  });
+  if (!hours || startMin < hours.openMin || startMin + durationMin > hours.closeMin) {
+    throw new OutsideBusinessHoursError();
+  }
 
   const customer = await prisma.customer.upsert({
     where: { businessId_phone: { businessId: params.businessId, phone: params.customerPhone } },

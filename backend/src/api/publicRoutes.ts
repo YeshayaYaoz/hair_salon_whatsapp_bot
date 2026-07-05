@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
-import { findAvailableSlots, createAppointment } from "../booking/availability.js";
+import { findAvailableSlots, createAppointment, OutsideBusinessHoursError, SlotUnavailableError } from "../booking/availability.js";
 import { hasActiveSubscription } from "../lib/subscriptionGate.js";
 
 export const publicRouter = Router();
@@ -86,13 +86,20 @@ publicRouter.post("/:businessId/book", async (req, res) => {
   const service = await prisma.service.findFirst({ where: { id: serviceId, businessId } });
   if (!service) return res.status(404).json({ error: "Service not found" });
 
-  const appointment = await createAppointment({
-    businessId,
-    serviceId,
-    customerPhone,
-    customerName,
-    startTime: new Date(startTime),
-  });
+  let appointment;
+  try {
+    appointment = await createAppointment({
+      businessId,
+      serviceId,
+      customerPhone,
+      customerName,
+      startTime: new Date(startTime),
+    });
+  } catch (err) {
+    if (err instanceof OutsideBusinessHoursError) return res.status(400).json({ error: "That time is outside business hours." });
+    if (err instanceof SlotUnavailableError) return res.status(409).json({ error: "That slot was just taken. Please pick another." });
+    throw err;
+  }
 
   res.status(201).json({
     id: appointment.id,
