@@ -3,6 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
+import { formatTimeInTz, formatDateTimeInTz, partsInTz, dayKeyInTz } from "../../lib/tz";
+
+function localDayKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 interface Appointment {
   id: string;
@@ -67,11 +72,13 @@ function WeekCalendar({
   weekStart,
   onCancel,
   cancellingId,
+  tz,
 }: {
   appointments: Appointment[];
   weekStart: Date;
   onCancel: (id: string) => void;
   cancellingId: string | null;
+  tz: string;
 }) {
   const { t } = useLanguage();
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -83,8 +90,8 @@ function WeekCalendar({
   const hours = Array.from({ length: 15 }, (_, i) => i + 7); // 7am-9pm
 
   function apptsByDay(day: Date) {
-    const iso = day.toISOString().slice(0, 10);
-    return appointments.filter((a) => a.startTime.slice(0, 10) === iso && a.status === "confirmed");
+    const key = localDayKey(day);
+    return appointments.filter((a) => dayKeyInTz(a.startTime, tz) === key && a.status === "confirmed");
   }
 
   return (
@@ -109,7 +116,7 @@ function WeekCalendar({
           <div key={h} className="grid border-b border-gray-100/70 last:border-b-0" style={{ gridTemplateColumns: "3.5rem repeat(7, 1fr)", minHeight: 48 }}>
             <div className="px-2 pt-1 text-xs text-gray-400 border-e border-gray-100 leading-none">{h}:00</div>
             {days.map((d) => {
-              const appts = apptsByDay(d).filter((a) => new Date(a.startTime).getHours() === h);
+              const appts = apptsByDay(d).filter((a) => partsInTz(a.startTime, tz).hour === h);
               const today = d.toDateString() === new Date().toDateString();
               return (
                 <div key={d.toISOString()} className={`border-e border-gray-100 last:border-e-0 p-0.5 flex flex-col gap-0.5 ${today ? "bg-[#E0F5FB]/40" : ""}`}>
@@ -119,7 +126,7 @@ function WeekCalendar({
                       className="bg-[#1B7FA0] text-white rounded px-1.5 py-1 text-[10px] leading-tight cursor-default hover:bg-[#2A9BBF] transition group relative"
                       title={`${a.customer.name ?? a.customer.phone} · ${a.service.name}`}
                     >
-                      <div className="font-semibold truncate">{new Date(a.startTime).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</div>
+                      <div className="font-semibold truncate">{formatTimeInTz(a.startTime, tz)}</div>
                       <div className="truncate opacity-80">{a.customer.name ?? a.customer.phone}</div>
                       <div className="truncate opacity-70">{a.service.name}</div>
                       {new Date(a.startTime) >= new Date() && (
@@ -150,12 +157,16 @@ export default function AppointmentsPage() {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>("list");
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [tz, setTz] = useState("Asia/Jerusalem");
 
   async function load() {
     setAppointments(await apiFetch<Appointment[]>("/api/business/appointments"));
   }
 
   useEffect(() => {
+    apiFetch<{ timezone?: string }>("/api/business/me")
+      .then((me) => { if (me.timezone) setTz(me.timezone); })
+      .catch(() => {});
     load();
     // Auto-refresh so new bookings made via WhatsApp appear without a manual reload.
     const interval = setInterval(() => {
@@ -273,6 +284,7 @@ export default function AppointmentsPage() {
             weekStart={weekStart}
             onCancel={cancel}
             cancellingId={cancellingId}
+            tz={tz}
           />
         </>
       ) : (
@@ -316,7 +328,7 @@ export default function AppointmentsPage() {
                   {filtered.map((a, i) => (
                     <tr key={a.id} className={i !== filtered.length - 1 ? "border-b border-gray-200/50" : ""}>
                       <td className="px-4 py-3 text-gray-700 whitespace-nowrap text-xs">
-                        {new Date(a.startTime).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                        {formatDateTimeInTz(a.startTime, tz)}
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-gray-700 font-medium text-sm">{a.customer.name ?? "—"}</div>

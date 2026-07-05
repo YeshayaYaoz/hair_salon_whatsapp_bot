@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { useCountUp } from "../../lib/useCountUp";
+import { formatTimeInTz, dayKeyInTz } from "../../lib/tz";
 import Link from "next/link";
 
 interface Analytics {
@@ -92,26 +93,29 @@ export default function AnalyticsPage() {
   const [data, setData] = useState<Analytics | null>(null);
   const [setup, setSetup] = useState<SetupState | null>(null);
   const [todayAppts, setTodayAppts] = useState<Appt[]>([]);
+  const [tz, setTz] = useState("Asia/Jerusalem");
 
   useEffect(() => {
     Promise.all([
       apiFetch<Analytics>("/api/business/analytics"),
-      apiFetch<Me>("/api/business/me"),
+      apiFetch<Me & { timezone?: string }>("/api/business/me"),
       apiFetch<{ id: string }[]>("/api/business/services"),
       apiFetch<{ id: string }[]>("/api/business/hours"),
       apiFetch<Appt[]>("/api/business/appointments"),
     ]).then(([analytics, me, services, hours, appts]) => {
       setData(analytics);
+      const businessTz = me.timezone || "Asia/Jerusalem";
+      setTz(businessTz);
       setSetup({
         hasServices: services.length > 0,
         hasHours: hours.length > 0,
         whatsappConnected: me.whatsappConnected,
         subscriptionActive: me.subscriptionStatus === "active",
       });
-      const todayStr = new Date().toDateString();
+      const todayKey = dayKeyInTz(new Date(), businessTz);
       setTodayAppts(
         appts
-          .filter((a) => a.status === "confirmed" && new Date(a.startTime).toDateString() === todayStr)
+          .filter((a) => a.status === "confirmed" && dayKeyInTz(a.startTime, businessTz) === todayKey)
           .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
       );
     });
@@ -172,7 +176,7 @@ export default function AnalyticsPage() {
                 style={{ animationDelay: `${i * 50}ms`, background: "rgba(27,127,160,0.04)", border: "1px solid #EEF1F4" }}
               >
                 <div className="text-sm font-bold tabular-nums shrink-0" style={{ color: "#1B7FA0", minWidth: 52 }}>
-                  {new Date(a.startTime).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                  {formatTimeInTz(a.startTime, tz)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{a.customer.name || a.customer.phone}</p>
