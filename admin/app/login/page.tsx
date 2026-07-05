@@ -246,7 +246,7 @@ export default function LoginPage() {
           letter-spacing: -0.4px;
         }
         .login-form-logo-sub {
-          font-size: 12px;
+          font-size: 13px;
           color: #9CA3AF;
           margin-top: 1px;
         }
@@ -259,7 +259,7 @@ export default function LoginPage() {
           margin-bottom: 6px;
         }
         .login-form-sub {
-          font-size: 13px;
+          font-size: 14.5px;
           color: #9CA3AF;
           margin-bottom: 28px;
         }
@@ -271,7 +271,7 @@ export default function LoginPage() {
           margin-bottom: 14px;
         }
         .login-field label {
-          font-size: 12px;
+          font-size: 13.5px;
           font-weight: 600;
           color: #6B7280;
           letter-spacing: 0.03em;
@@ -282,7 +282,7 @@ export default function LoginPage() {
           border: 1px solid #E5E5F0;
           border-radius: 10px;
           padding: 12px 16px;
-          font-size: 14px;
+          font-size: 15px;
           color: #1A1A2E;
           outline: none;
           transition: border-color 0.15s, box-shadow 0.15s;
@@ -301,7 +301,7 @@ export default function LoginPage() {
         .login-forgot {
           display: block;
           text-align: left;
-          font-size: 12px;
+          font-size: 13px;
           color: #9CA3AF;
           text-decoration: none;
           margin-top: -6px;
@@ -355,21 +355,21 @@ export default function LoginPage() {
           background: #E5E5F0;
         }
         .login-divider-text {
-          font-size: 11px;
+          font-size: 13px;
           color: #9CA3AF;
           white-space: nowrap;
         }
 
         .login-switch {
           text-align: center;
-          font-size: 13px;
+          font-size: 15px;
           color: #9CA3AF;
         }
         .login-switch button {
           background: none;
           border: none;
           color: #1B7FA0;
-          font-size: 13px;
+          font-size: 15px;
           font-weight: 600;
           cursor: pointer;
           font-family: inherit;
@@ -381,20 +381,20 @@ export default function LoginPage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 16px;
+          gap: 20px;
           margin-top: 28px;
           flex-wrap: wrap;
         }
         .login-trust-item {
           display: flex;
           align-items: center;
-          gap: 5px;
-          font-size: 11px;
-          color: #9CA3AF;
+          gap: 7px;
+          font-size: 13px;
+          color: #6B7280;
         }
         .login-trust-icon {
-          font-size: 12px;
-          opacity: 0.6;
+          font-size: 15px;
+          opacity: 0.9;
         }
       `}</style>
 
