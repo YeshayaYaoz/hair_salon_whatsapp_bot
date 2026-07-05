@@ -940,7 +940,7 @@ export default function LandingPage() {
                       <div className="typing-dot" /><div className="typing-dot" /><div className="typing-dot" />
                     </div>
                     <div className="chat-bubble outgoing" style={{ display: "none" }}>
-                      אשלח תזכורת יום לפני. להתראות! 👋
+                      בשמחה! אשלח תזכורת יום לפני. להתראות! 👋
                       <div className="chat-time">21:04</div>
                     </div>
                   </div>
@@ -1385,7 +1385,7 @@ export default function LandingPage() {
                 <div className="vline caller-l"><div className="vspeaker caller">לקוח</div>שלום, רציתי לקבוע תספורת ליום חמישי בבוקר</div>
                 <div className="vline ai-l"><div className="vspeaker ai">תורי AI</div>שלום! ביום חמישי יש לי פנוי ב-9:30 וב-11:00. מה מתאים?</div>
                 <div className="vline caller-l"><div className="vspeaker caller">לקוח</div>9:30 מושלם</div>
-                <div className="vline ai-l"><div className="vspeaker ai">תורי AI</div>מעולה. קבעתי תספורת ביום חמישי ב-9:30. תקבל אישור בוואטסאפ.</div>
+                <div className="vline ai-l"><div className="vspeaker ai">תורי AI</div>בשמחה! קבעתי תספורת ביום חמישי ב-9:30. תקבל אישור בוואטסאפ.</div>
               </div>
             </div>
           </div>
