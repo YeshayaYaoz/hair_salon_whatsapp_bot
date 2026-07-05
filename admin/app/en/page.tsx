@@ -119,29 +119,53 @@ export default function LandingPageEN() {
     return () => document.removeEventListener("click", handler);
   }, []);
 
+  // Phone chat playback: incoming messages appear, the bot "types" (transient indicator
+  // + live header status), then the typing morphs into the reply — like real WhatsApp.
   useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
     function runSequence() {
       const container = document.querySelector<HTMLElement>(".phone-chat");
-      const items = Array.from(document.querySelectorAll<HTMLElement>(".phone-chat > *")).filter(el => !el.classList.contains("chat-date"));
-      items.forEach(el => { el.style.display = "none"; el.classList.remove("show"); });
+      const header = document.querySelector<HTMLElement>(".phone-wa-online");
+      const items = Array.from(document.querySelectorAll<HTMLElement>(".phone-chat > *"))
+        .filter((el) => !el.classList.contains("chat-date"));
+
+      // DOM order: [incoming, typing, outgoing, incoming, typing, outgoing, incoming]
+      items.forEach((el) => { el.style.display = "none"; el.classList.remove("show"); });
       if (container) container.scrollTop = 0;
-      const delays = [300, 1600, 3000, 3500, 5000, 6400, 7800];
-      const timers: ReturnType<typeof setTimeout>[] = [];
-      items.forEach((el, i) => {
-        const t = setTimeout(() => {
-          el.style.display = "";
-          requestAnimationFrame(() => requestAnimationFrame(() => {
-            el.classList.add("show");
-            if (container) container.scrollTop = container.scrollHeight;
-          }));
-        }, delays[i] ?? i * 1200);
-        timers.push(t);
-      });
-      const loop = setTimeout(runSequence, 11500);
-      timers.push(loop);
-      return timers;
+      if (header) { header.textContent = "online"; header.classList.remove("is-typing"); }
+
+      const scrollDown = () => { if (container) container.scrollTop = container.scrollHeight; };
+      const showEl = (el: HTMLElement) => {
+        el.style.display = el.classList.contains("chat-typing") ? "flex" : "";
+        requestAnimationFrame(() => requestAnimationFrame(() => { el.classList.add("show"); scrollDown(); }));
+      };
+      const hideEl = (el: HTMLElement) => {
+        el.classList.remove("show");
+        timers.push(setTimeout(() => { el.style.display = "none"; }, 240));
+      };
+      const setTyping = (on: boolean) => {
+        if (!header) return;
+        header.textContent = on ? "typing" : "online";
+        header.classList.toggle("is-typing", on);
+      };
+
+      const actions: { at: number; fn: () => void }[] = [];
+      let t = 500;
+      const triples = [[0, 1, 2], [3, 4, 5]];
+      for (const [inc, typ, out] of triples) {
+        actions.push({ at: t, fn: () => showEl(items[inc]) }); t += 1300;
+        actions.push({ at: t, fn: () => { setTyping(true); showEl(items[typ]); } }); t += 1250;
+        actions.push({ at: t, fn: () => { setTyping(false); hideEl(items[typ]); showEl(items[out]); } }); t += 1500;
+      }
+      // Trailing incoming "thanks" message
+      actions.push({ at: t, fn: () => showEl(items[6]) }); t += 1200;
+
+      for (const a of actions) timers.push(setTimeout(a.fn, a.at));
+      timers.push(setTimeout(runSequence, t + 2600));
     }
-    const timers = runSequence();
+
+    runSequence();
     return () => timers.forEach(clearTimeout);
   }, []);
 
@@ -238,7 +262,15 @@ export default function LandingPageEN() {
 
         /* Phone mock */
         .lp-hero-phone { position: relative; z-index: 1; animation: fadeUp 0.7s ease 0.3s both; }
-        .phone-wrap { filter: drop-shadow(0 32px 64px rgba(0,0,0,0.28)) drop-shadow(0 0 1px rgba(0,0,0,0.4)); }
+        .lp-hero-phone::before {
+          content: ''; position: absolute; width: 340px; height: 340px; border-radius: 50%;
+          background: radial-gradient(circle, rgba(37,211,102,0.16) 0%, rgba(37,211,102,0) 68%);
+          top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: -1;
+          animation: glowPulse 5s ease-in-out infinite;
+        }
+        @keyframes glowPulse { 0%, 100% { opacity: 0.6; transform: translate(-50%,-50%) scale(0.92); } 50% { opacity: 1; transform: translate(-50%,-50%) scale(1.06); } }
+        .phone-wrap { filter: drop-shadow(0 32px 64px rgba(0,0,0,0.28)) drop-shadow(0 0 1px rgba(0,0,0,0.4)); animation: phoneFloat 6.5s ease-in-out infinite; }
+        @keyframes phoneFloat { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-12px) rotate(-0.4deg); } }
         .phone-frame { background: #1C1C1E; border-radius: 44px; border: 8px solid #1C1C1E; max-width: 290px; margin: 0 auto; position: relative; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12); }
         .phone-frame::before { content: ''; position: absolute; left: -12px; top: 80px; width: 4px; height: 32px; background: #2A2A2C; border-radius: 2px 0 0 2px; }
         .phone-frame::after { content: ''; position: absolute; right: -12px; top: 100px; width: 4px; height: 48px; background: #2A2A2C; border-radius: 0 2px 2px 0; }
@@ -248,6 +280,7 @@ export default function LandingPageEN() {
         .phone-status-bar { display: flex; align-items: center; justify-content: space-between; padding: 2px 18px 6px; background: #fff; }
         .phone-status-time { font-size: 11px; font-weight: 700; color: #111; letter-spacing: -0.3px; }
         .phone-status-icons { display: flex; align-items: center; gap: 5px; }
+        .phone-status-icons svg { display: block; }
         .phone-status-icon { font-size: 10px; color: #111; font-weight: 600; }
         .phone-wa-avatar { width: 34px; height: 34px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 0 0 2px rgba(37,211,102,0.2); }
         .phone-wa-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
@@ -260,8 +293,13 @@ export default function LandingPageEN() {
         .phone-chat { background-color: #E5DDD5; padding: 12px 10px; display: flex; flex-direction: column; gap: 6px; height: 330px; overflow-y: auto; scroll-behavior: smooth; scrollbar-width: none; }
         .phone-chat::-webkit-scrollbar { display: none; }
         .chat-date { align-self: center; font-size: 10px; background: rgba(255,255,255,0.75); color: #666; border-radius: 6px; padding: 2px 8px; margin: 2px 0 4px; font-weight: 500; }
-        .chat-bubble { max-width: 82%; padding: 7px 10px 4px; border-radius: 8px; font-size: 12.5px; line-height: 1.45; opacity: 0; transform: translateY(6px); transition: opacity 0.3s ease, transform 0.3s ease; position: relative; }
+        .chat-bubble { max-width: 82%; padding: 7px 10px 4px; border-radius: 8px; font-size: 12.5px; line-height: 1.45; opacity: 0; transform: translateY(8px) scale(0.9); transition: opacity 0.3s ease, transform 0.34s cubic-bezier(0.22, 1, 0.36, 1); position: relative; }
+        .chat-bubble.incoming { transform-origin: top left; }
+        .chat-bubble.outgoing { transform-origin: top right; }
         .chat-bubble.show { opacity: 1; transform: none; }
+        .phone-wa-online.is-typing { color: #25D366; }
+        .phone-wa-online.is-typing::after { content: ''; display: inline-block; width: 3px; height: 3px; border-radius: 50%; background: currentColor; margin-inline-start: 3px; animation: typingDotHeader 1s steps(3) infinite; box-shadow: 5px 0 0 currentColor, 10px 0 0 currentColor; }
+        @keyframes typingDotHeader { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
         .chat-bubble.incoming { background: #fff; border-radius: 0 8px 8px 8px; align-self: flex-start; color: #111; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
         .chat-bubble.outgoing { background: #D9FDD3; border-radius: 8px 8px 0 8px; align-self: flex-end; color: #111; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
         .chat-bubble.incoming::before { content: ''; position: absolute; top: 0; left: -7px; width: 0; height: 0; border-top: 0px solid transparent; border-right: 8px solid #fff; border-bottom: 8px solid transparent; }
@@ -635,9 +673,22 @@ export default function LandingPageEN() {
                   <div className="phone-status-bar">
                     <span className="phone-status-time">9:41</span>
                     <div className="phone-status-icons">
-                      <span className="phone-status-icon">▲▲▲</span>
-                      <span className="phone-status-icon">WiFi</span>
-                      <span className="phone-status-icon">100%</span>
+                      <svg width="16" height="11" viewBox="0 0 16 11" fill="#111" aria-hidden>
+                        <rect x="0" y="7" width="3" height="4" rx="0.6" />
+                        <rect x="4.3" y="5" width="3" height="6" rx="0.6" />
+                        <rect x="8.6" y="2.5" width="3" height="8.5" rx="0.6" />
+                        <rect x="12.9" y="0" width="3" height="11" rx="0.6" />
+                      </svg>
+                      <svg width="15" height="11" viewBox="0 0 15 11" fill="#111" aria-hidden>
+                        <path d="M7.5 2C10.1 2 12.5 3 14.2 4.8l-1.3 1.3C11.5 4.7 9.6 3.9 7.5 3.9S3.5 4.7 2.1 6.1L0.8 4.8C2.5 3 4.9 2 7.5 2z" />
+                        <path d="M7.5 5.4c1.6 0 3.1.6 4.2 1.7l-1.3 1.3c-.8-.8-1.8-1.2-2.9-1.2s-2.1.4-2.9 1.2L3.3 7.1C4.4 6 5.9 5.4 7.5 5.4z" />
+                        <circle cx="7.5" cy="9.5" r="1.4" />
+                      </svg>
+                      <svg width="24" height="12" viewBox="0 0 24 12" fill="none" aria-hidden>
+                        <rect x="0.5" y="1" width="20" height="10" rx="2.5" stroke="#111" strokeWidth="1" opacity="0.4" />
+                        <rect x="2" y="2.5" width="17" height="7" rx="1.2" fill="#111" />
+                        <rect x="21.5" y="4" width="1.6" height="4" rx="0.8" fill="#111" opacity="0.4" />
+                      </svg>
                     </div>
                   </div>
                   <div className="phone-wa-bar">

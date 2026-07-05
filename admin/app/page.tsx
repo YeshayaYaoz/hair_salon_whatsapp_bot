@@ -127,30 +127,58 @@ export default function LandingPage() {
     return () => document.removeEventListener("click", handler);
   }, []);
 
-  // Phone chat sequential reveal with auto-scroll
+  // Phone chat playback: incoming messages appear, the bot "types" (transient indicator
+  // + live header status), then the typing morphs into the reply — like real WhatsApp.
   useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
     function runSequence() {
       const container = document.querySelector<HTMLElement>(".phone-chat");
-      const items = Array.from(document.querySelectorAll<HTMLElement>(".phone-chat > *")).filter(el => !el.classList.contains("chat-date"));
-      items.forEach(el => { el.style.display = "none"; el.classList.remove("show"); });
+      const header = document.querySelector<HTMLElement>(".phone-wa-online");
+      const items = Array.from(document.querySelectorAll<HTMLElement>(".phone-chat > *"))
+        .filter((el) => !el.classList.contains("chat-date"));
+
+      // DOM order: [incoming, typing, outgoing, incoming, typing, outgoing, incoming, typing, outgoing]
+      items.forEach((el) => { el.style.display = "none"; el.classList.remove("show"); });
       if (container) container.scrollTop = 0;
-      const delays = [300, 1600, 3000, 3500, 5000, 6400, 6900, 8300];
-      const timers: ReturnType<typeof setTimeout>[] = [];
-      items.forEach((el, i) => {
-        const t = setTimeout(() => {
-          el.style.display = "";
-          requestAnimationFrame(() => requestAnimationFrame(() => {
-            el.classList.add("show");
-            if (container) container.scrollTop = container.scrollHeight;
-          }));
-        }, delays[i] ?? i * 1200);
+      if (header) { header.textContent = "מחובר"; header.classList.remove("is-typing"); }
+
+      const scrollDown = () => { if (container) container.scrollTop = container.scrollHeight; };
+
+      const showEl = (el: HTMLElement) => {
+        el.style.display = el.classList.contains("chat-typing") ? "flex" : "";
+        requestAnimationFrame(() => requestAnimationFrame(() => { el.classList.add("show"); scrollDown(); }));
+      };
+      const hideEl = (el: HTMLElement) => {
+        el.classList.remove("show");
+        const t = setTimeout(() => { el.style.display = "none"; }, 240);
         timers.push(t);
-      });
-      const loop = setTimeout(runSequence, 11500);
-      timers.push(loop);
-      return timers;
+      };
+      const setTyping = (on: boolean) => {
+        if (!header) return;
+        header.textContent = on ? "מקליד" : "מחובר";
+        header.classList.toggle("is-typing", on);
+      };
+
+      // Build the timeline as a list of {at, fn} actions (times in ms from sequence start).
+      const actions: { at: number; fn: () => void }[] = [];
+      let t = 500;
+      // triples: indices [incoming, typing, outgoing]
+      const triples = [[0, 1, 2], [3, 4, 5], [6, 7, 8]];
+      for (const [inc, typ, out] of triples) {
+        actions.push({ at: t, fn: () => showEl(items[inc]) });
+        t += 1300;
+        actions.push({ at: t, fn: () => { setTyping(true); showEl(items[typ]); } });
+        t += 1250;
+        actions.push({ at: t, fn: () => { setTyping(false); hideEl(items[typ]); showEl(items[out]); } });
+        t += 1500;
+      }
+
+      for (const a of actions) timers.push(setTimeout(a.fn, a.at));
+      timers.push(setTimeout(runSequence, t + 2600)); // pause on the full thread, then replay
     }
-    const timers = runSequence();
+
+    runSequence();
     return () => timers.forEach(clearTimeout);
   }, []);
 
@@ -239,7 +267,16 @@ export default function LandingPage() {
 
         /* PHONE MOCKUP */
         .lp-hero-phone { animation: fadeUp 0.8s ease 0.4s both; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 0; position: relative; z-index: 1; }
-        .phone-wrap { position: relative; width: 250px; filter: drop-shadow(0 32px 64px rgba(0,0,0,0.22)) drop-shadow(0 8px 24px rgba(0,0,0,0.14)); }
+        .phone-wrap { position: relative; width: 250px; filter: drop-shadow(0 32px 64px rgba(0,0,0,0.22)) drop-shadow(0 8px 24px rgba(0,0,0,0.14)); animation: phoneFloat 6.5s ease-in-out infinite; }
+        @keyframes phoneFloat { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-12px) rotate(-0.4deg); } }
+        /* Soft ambient glow behind the phone */
+        .lp-hero-phone::before {
+          content: ''; position: absolute; width: 340px; height: 340px; border-radius: 50%;
+          background: radial-gradient(circle, rgba(37,211,102,0.16) 0%, rgba(37,211,102,0) 68%);
+          top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: -1;
+          animation: glowPulse 5s ease-in-out infinite;
+        }
+        @keyframes glowPulse { 0%, 100% { opacity: 0.6; transform: translate(-50%,-50%) scale(0.92); } 50% { opacity: 1; transform: translate(-50%,-50%) scale(1.06); } }
         .phone-frame {
           width: 250px; background: #111;
           border-radius: 40px;
@@ -263,6 +300,7 @@ export default function LandingPage() {
         .phone-status-bar { display: flex; align-items: center; justify-content: space-between; padding: 2px 18px 6px; background: #fff; }
         .phone-status-time { font-size: 11px; font-weight: 700; color: #111; letter-spacing: -0.3px; }
         .phone-status-icons { display: flex; align-items: center; gap: 5px; }
+        .phone-status-icons svg { display: block; }
         .phone-status-icon { font-size: 10px; color: #111; font-weight: 600; }
 
         /* WhatsApp header */
@@ -341,9 +379,16 @@ export default function LandingPage() {
         .phone-wa-input-icon { color: #999; font-size: 13px; }
         .phone-wa-send { width: 34px; height: 34px; border-radius: 50%; background: #128C7E; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 6px rgba(18,140,126,0.35); }
 
-        /* Chat animation classes */
-        .chat-bubble, .chat-typing { opacity: 0; transform: translateY(6px); transition: opacity 0.28s ease, transform 0.28s ease; }
+        /* Chat animation classes — bubbles pop in with a subtle scale from their tail corner */
+        .chat-bubble { opacity: 0; transform: translateY(8px) scale(0.9); transition: opacity 0.3s ease, transform 0.34s cubic-bezier(0.22, 1, 0.36, 1); }
+        .chat-bubble.incoming { transform-origin: top right; }
+        .chat-bubble.outgoing { transform-origin: top left; }
+        .chat-typing { opacity: 0; transform: translateY(6px) scale(0.92); transition: opacity 0.22s ease, transform 0.22s ease; transform-origin: top right; }
         .chat-bubble.show, .chat-typing.show { opacity: 1; transform: none; }
+        /* Header live "typing…" state */
+        .phone-wa-online.is-typing { color: #25D366; }
+        .phone-wa-online.is-typing::after { content: ''; display: inline-block; width: 3px; height: 3px; border-radius: 50%; background: currentColor; margin-inline-start: 3px; animation: typingDotHeader 1s steps(3) infinite; box-shadow: 5px 0 0 currentColor, 10px 0 0 currentColor; }
+        @keyframes typingDotHeader { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
 
         /* BUTTONS */
         .btn-green { background: #25D366; color: #fff; font-size: 15px; font-weight: 700; padding: 13px 28px; border-radius: 10px; text-decoration: none; transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s; box-shadow: 0 4px 14px rgba(37,211,102,0.35); display: inline-block; }
@@ -831,9 +876,25 @@ export default function LandingPage() {
                   <div className="phone-status-bar">
                     <span className="phone-status-time">9:41</span>
                     <div className="phone-status-icons">
-                      <span className="phone-status-icon">▲▲▲</span>
-                      <span className="phone-status-icon">WiFi</span>
-                      <span className="phone-status-icon">100%</span>
+                      {/* signal */}
+                      <svg width="16" height="11" viewBox="0 0 16 11" fill="#111" aria-hidden>
+                        <rect x="0" y="7" width="3" height="4" rx="0.6" />
+                        <rect x="4.3" y="5" width="3" height="6" rx="0.6" />
+                        <rect x="8.6" y="2.5" width="3" height="8.5" rx="0.6" />
+                        <rect x="12.9" y="0" width="3" height="11" rx="0.6" />
+                      </svg>
+                      {/* wifi */}
+                      <svg width="15" height="11" viewBox="0 0 15 11" fill="#111" aria-hidden>
+                        <path d="M7.5 2C10.1 2 12.5 3 14.2 4.8l-1.3 1.3C11.5 4.7 9.6 3.9 7.5 3.9S3.5 4.7 2.1 6.1L0.8 4.8C2.5 3 4.9 2 7.5 2z" />
+                        <path d="M7.5 5.4c1.6 0 3.1.6 4.2 1.7l-1.3 1.3c-.8-.8-1.8-1.2-2.9-1.2s-2.1.4-2.9 1.2L3.3 7.1C4.4 6 5.9 5.4 7.5 5.4z" />
+                        <circle cx="7.5" cy="9.5" r="1.4" />
+                      </svg>
+                      {/* battery */}
+                      <svg width="24" height="12" viewBox="0 0 24 12" fill="none" aria-hidden>
+                        <rect x="0.5" y="1" width="20" height="10" rx="2.5" stroke="#111" strokeWidth="1" opacity="0.4" />
+                        <rect x="2" y="2.5" width="17" height="7" rx="1.2" fill="#111" />
+                        <rect x="21.5" y="4" width="1.6" height="4" rx="0.8" fill="#111" opacity="0.4" />
+                      </svg>
                     </div>
                   </div>
                   <div className="phone-wa-bar">
@@ -855,6 +916,9 @@ export default function LandingPage() {
                     <div className="chat-bubble incoming" style={{ display: "none" }}>
                       שלום, רוצה לקבוע תספורת ביום חמישי
                       <div className="chat-time">21:03 <span className="chat-ticks">✓✓</span></div>
+                    </div>
+                    <div className="chat-typing" style={{ display: "none" }}>
+                      <div className="typing-dot" /><div className="typing-dot" /><div className="typing-dot" />
                     </div>
                     <div className="chat-bubble outgoing" style={{ display: "none" }}>
                       היי! 😊 ביום חמישי יש לי פנוי ב-9:30, 11:00 ו-14:30. מה מתאים?
