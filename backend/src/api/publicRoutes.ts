@@ -6,6 +6,24 @@ import { hasActiveSubscription } from "../lib/subscriptionGate.js";
 
 export const publicRouter = Router();
 
+// Cache stats briefly so the landing page can't hammer the DB.
+let statsCache: { at: number; data: { businesses: number; appointments: number } } | null = null;
+const STATS_TTL_MS = 5 * 60 * 1000;
+
+/** Aggregate social-proof numbers for the marketing site. Declared before the /:businessId catch-all. */
+publicRouter.get("/stats/summary", async (_req, res) => {
+  if (statsCache && Date.now() - statsCache.at < STATS_TTL_MS) {
+    return res.json(statsCache.data);
+  }
+  const [businesses, appointments] = await Promise.all([
+    prisma.business.count(),
+    prisma.appointment.count(),
+  ]);
+  const data = { businesses, appointments };
+  statsCache = { at: Date.now(), data };
+  res.json(data);
+});
+
 /** Public business info — used by the web booking page. */
 publicRouter.get("/:businessId", async (req, res) => {
   const business = await prisma.business.findUnique({

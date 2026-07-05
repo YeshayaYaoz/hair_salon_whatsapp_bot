@@ -4,6 +4,7 @@ import { buildSystemPrompt } from "./prompt.js";
 import { appendTurn, getHistory, type Turn } from "./conversationStore.js";
 import { findAvailableSlots, createAppointment, SlotUnavailableError, type AvailableSlot } from "../booking/availability.js";
 import { parseBookingTime } from "../lib/timezone.js";
+import { notifyWaitlist } from "../lib/waitlist.js";
 import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { syncAppointmentToCalendar } from "../lib/googleCalendar.js";
@@ -64,6 +65,20 @@ const tools: Anthropic.Tool[] = [
         startTime: { type: "string", description: "ISO 8601 start time of the appointment to cancel, from list_my_appointments" },
       },
       required: ["startTime"],
+    },
+  },
+  {
+    name: "reschedule_appointment",
+    description: "Move an existing appointment to a new time in one step. Verify the new slot is free with check_availability first, then call this. The old appointment is cancelled and the new one booked atomically.",
+    input_schema: {
+      type: "object",
+      properties: {
+        oldStartTime: { type: "string", description: "ISO 8601 start time of the current appointment, from list_my_appointments" },
+        newStartTime: { type: "string", description: "Exact new slot start time from check_availability" },
+        serviceName: { type: "string", description: "Service name (defaults to the existing appointment's service if omitted)" },
+        durationMin: { type: "number", description: "Optional duration override in minutes" },
+      },
+      required: ["oldStartTime", "newStartTime"],
     },
   },
   {
@@ -196,10 +211,54 @@ async function runTool(
     const target = parseBookingTime(input.startTime as string, biz.timezone || "Asia/Jerusalem");
     const appointment = await prisma.appointment.findFirst({
       where: { businessId, status: "confirmed", customer: { phone: customerPhone }, startTime: target },
+      include: { service: true },
     });
     if (!appointment) return JSON.stringify({ error: "No matching appointment found" });
     await prisma.appointment.update({ where: { id: appointment.id }, data: { status: "cancelled" } });
+    // Offer the freed slot to anyone waiting for this service.
+    notifyWaitlist(businessId, appointment.serviceId, appointment.service.name, appointment.startTime).catch((err) =>
+      console.error("[waitlist] Notification failed:", err)
+    );
     return JSON.stringify({ cancelled: true });
+  }
+
+  if (name === "reschedule_appointment") {
+    const biz = await prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { timezone: true } });
+    const tz = biz.timezone || "Asia/Jerusalem";
+    const oldTarget = parseBookingTime(input.oldStartTime as string, tz);
+    const existing = await prisma.appointment.findFirst({
+      where: { businessId, status: "confirmed", customer: { phone: customerPhone }, startTime: oldTarget },
+      include: { service: true },
+    });
+    if (!existing) return JSON.stringify({ error: "No matching appointment found to reschedule" });
+
+    const serviceName = (input.serviceName as string | undefined) ?? existing.service.name;
+    const service = await prisma.service.findFirst({
+      where: { businessId, name: { equals: serviceName, mode: "insensitive" } },
+    });
+    if (!service) return JSON.stringify({ error: "Unknown service" });
+
+    // Cancel the old one first so its slot doesn't block the new booking, then book the new time.
+    await prisma.appointment.update({ where: { id: existing.id }, data: { status: "cancelled" } });
+    try {
+      const appointment = await createAppointment({
+        businessId,
+        serviceId: service.id,
+        customerPhone,
+        customerName: input.customerName as string | undefined,
+        startTime: parseBookingTime(input.newStartTime as string, tz),
+        overrideDurationMin: input.durationMin as number | undefined,
+      });
+      lastOfferedSlots.value = undefined;
+      return JSON.stringify({ rescheduled: true, startTime: appointment.startTime, endTime: appointment.endTime });
+    } catch (err) {
+      // New slot was taken — restore the original so the customer isn't left with nothing.
+      await prisma.appointment.update({ where: { id: existing.id }, data: { status: "confirmed" } });
+      if (err instanceof SlotUnavailableError) {
+        return JSON.stringify({ error: "New slot no longer available; original appointment kept. Offer other times." });
+      }
+      throw err;
+    }
   }
 
   if (name === "add_to_waitlist") {
