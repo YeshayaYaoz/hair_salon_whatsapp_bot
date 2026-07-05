@@ -214,22 +214,21 @@ async function runTool(
   return JSON.stringify({ error: "Unknown tool" });
 }
 
-function makeApiCall(model: string, system: Anthropic.TextBlockParam[], messages: Anthropic.MessageParam[]): Promise<Anthropic.Message> {
+function makeApiCall(model: string, system: string, messages: Anthropic.MessageParam[]): Promise<Anthropic.Message> {
   return anthropic.messages.create({
     model,
     max_tokens: 1024,
-    system: system as Anthropic.TextBlockParam[],
+    system,
     tools,
     messages,
-    betas: ["prompt-caching-2024-07-31"],
-  } as Parameters<typeof anthropic.messages.create>[0]) as Promise<Anthropic.Message>;
+  }) as Promise<Anthropic.Message>;
 }
 
 const AI_UNAVAILABLE_HE = "מצטערים, הבוט אינו זמין כרגע. אנא נסו שוב בעוד כמה דקות, או צרו קשר ישיר עם העסק.";
 
 export async function handleIncomingMessage(businessId: string, customerPhone: string, messageText: string): Promise<BotResult> {
   const systemText = await buildSystemPrompt(businessId, new Date().toISOString().slice(0, 10), customerPhone);
-  const system = [{ type: "text" as const, text: systemText, cache_control: { type: "ephemeral" as const } }];
+  const system = systemText;
   const history = await getHistory(businessId, customerPhone);
 
   const messages: Anthropic.MessageParam[] = [
