@@ -1196,6 +1196,7 @@ export default function LandingPageEN() {
               <h4>Help</h4>
               <a href="#faq">FAQ</a>
               <a href="/login">Dashboard</a>
+              <a href="/privacy">Privacy Policy</a>
             </div>
           </div>
           <div className="lp-footer-bottom">
