@@ -97,6 +97,19 @@ export default function LoginPage() {
           color: #fff;
           letter-spacing: -0.5px;
         }
+        .login-left-golden {
+          position: relative;
+          z-index: 1;
+          margin-top: 10px;
+          font-size: 15px;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+          background: linear-gradient(90deg, #F5D77A 0%, #E0A93B 50%, #F5D77A 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+          color: #E0A93B;
+        }
 
         .login-left-content {
           position: relative;
@@ -403,9 +416,12 @@ export default function LoginPage() {
         <div className="login-left">
           <div className="login-left-grid" />
 
-          <div className="login-left-brand">
-            <video src="/logo_animation.mp4" autoPlay loop muted playsInline style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 8 }} />
-            <span className="login-left-brand-name">תורי</span>
+          <div>
+            <div className="login-left-brand">
+              <Image src="/tori_logo_transparent.png" alt="תורי" width={32} height={32} style={{ flexShrink: 0, borderRadius: 8 }} />
+              <span className="login-left-brand-name">תורי</span>
+            </div>
+            <div className="login-left-golden">תור הזהב של העסק שלך</div>
           </div>
 
           <div className="login-left-content">
@@ -455,14 +471,6 @@ export default function LoginPage() {
         {/* Right panel */}
         <div className="login-right">
           <div className={`login-form-wrap ${mounted ? "show" : ""}`}>
-
-            <div className="login-form-logo">
-              <Image src="/tori_logo_transparent.png" alt="תורי" width={36} height={36} priority />
-              <div>
-                <div className="login-form-logo-name">תורי</div>
-                <div className="login-form-logo-sub">הזמנת תורים בוואטסאפ</div>
-              </div>
-            </div>
 
             <h1 className="login-form-heading">
               {mode === "login" ? "ברוך הבא" : "יצירת חשבון חדש"}
