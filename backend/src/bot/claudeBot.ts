@@ -39,16 +39,16 @@ const tools: Anthropic.Tool[] = [
   },
   {
     name: "book_appointment",
-    description: "Book a confirmed slot. Only call this after the customer has explicitly chosen a specific time from check_availability results.",
+    description: "Book a confirmed slot. Only call this after the customer has explicitly chosen a specific time from check_availability results AND you know their name (ask for it first if not already known from CRM context).",
     input_schema: {
       type: "object",
       properties: {
         serviceName: { type: "string" },
         startTime: { type: "string", description: "ISO 8601 start time, must come from a prior check_availability result" },
-        customerName: { type: "string", description: "Customer's name if known" },
+        customerName: { type: "string", description: "Customer's first name — required. Ask the customer for their name before calling this tool if it isn't already known." },
         durationMin: { type: "number", description: "Same durationMin passed to check_availability, if any" },
       },
-      required: ["serviceName", "startTime"],
+      required: ["serviceName", "startTime", "customerName"],
     },
   },
   {
@@ -165,13 +165,25 @@ async function runTool(
       return JSON.stringify({ error: "Unknown service", availableServices: all.map((s) => s.name) });
     }
     const biz = await prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { timezone: true } });
+
+    // Fall back to the customer's saved CRM name if the model didn't pass one (e.g. a
+    // returning customer) — only block on missing name for genuinely new customers.
+    let customerName = input.customerName as string | undefined;
+    if (!customerName) {
+      const existing = await prisma.customer.findUnique({ where: { businessId_phone: { businessId, phone: customerPhone } } });
+      if (existing?.name) customerName = existing.name;
+    }
+    if (!customerName) {
+      return JSON.stringify({ error: "Customer name is required before booking. Ask the customer for their name, then call book_appointment again with it." });
+    }
+
     let appointment;
     try {
       appointment = await createAppointment({
         businessId,
         serviceId: service.id,
         customerPhone,
-        customerName: input.customerName as string | undefined,
+        customerName,
         startTime: parseBookingTime(input.startTime as string, biz.timezone || "Asia/Jerusalem"),
         overrideDurationMin: input.durationMin as number | undefined,
       });
@@ -199,14 +211,14 @@ async function runTool(
       timeZone: tz, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
     });
     const localTime = new Date(appointment.startTime).toLocaleTimeString("he-IL", { timeZone: tz, hour: "2-digit", minute: "2-digit" });
-    const customerLabel = input.customerName ? `${input.customerName} (${customerPhone})` : customerPhone;
+    const customerLabel = `${customerName} (${customerPhone})`;
     notifyOwner(businessId, `📅 הזמנה חדשה!\nלקוח: ${customerLabel}\nשירות: ${service.name}\nמועד: ${weekdayHe} ${when}`);
 
     syncAppointmentToCalendar(businessId, {
       startTime: appointment.startTime,
       endTime: appointment.endTime,
       serviceName: service.name,
-      customerName: input.customerName as string | undefined,
+      customerName,
       customerPhone,
     }).catch((err) => console.error("Calendar sync failed:", err));
 
@@ -392,11 +404,34 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     }
   }
 
-  const replyText = response.content
+  let replyText = response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
     .map((b) => b.text)
     .join("\n")
     .trim();
+
+  // Claude sometimes ends a tool-use turn with no accompanying text (e.g. right after a
+  // successful booking). An empty reply here is doubly bad: the customer sees nothing, AND
+  // storing an empty assistant turn in history would break the *next* API call (Anthropic
+  // rejects empty text content blocks), which is what caused "have to ask twice" — the
+  // following message would silently fail and fall back to the generic error text. Nudge the
+  // model once for an actual reply instead of ever sending/storing blank content.
+  if (!replyText) {
+    console.warn("[bot] Model returned empty text after tool use — requesting a follow-up summary");
+    messages.push({ role: "assistant", content: response.content });
+    messages.push({ role: "user", content: "(תן ללקוח סיכום קצר של מה שקרה כרגע, במשפט אחד.)" });
+    try {
+      const followUp = await makeApiCall(model, system, messages);
+      replyText = followUp.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("\n")
+        .trim();
+    } catch (err) {
+      console.error("Follow-up summary call failed:", err);
+    }
+  }
+  if (!replyText) replyText = "בוצע! ✅"; // last-resort guarantee — never send/store an empty message
 
   await appendTurn(businessId, customerPhone, { role: "user", content: messageText });
   await appendTurn(businessId, customerPhone, { role: "assistant", content: replyText });

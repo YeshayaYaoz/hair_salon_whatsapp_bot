@@ -32,12 +32,18 @@ export async function getHistory(businessId: string, customerPhone: string): Pro
   });
   rows.reverse();
 
-  const turns: Turn[] = rows.map((r) => ({ role: r.role as Turn["role"], content: r.content }));
+  // Defensive: drop any empty-content rows (e.g. persisted before a since-fixed bug where the
+  // model returned no text). The Anthropic API rejects empty text content blocks outright, so a
+  // single stale blank turn here would break every future call for this conversation.
+  const turns: Turn[] = rows
+    .map((r) => ({ role: r.role as Turn["role"], content: r.content }))
+    .filter((t) => t.content.trim().length > 0);
   cache.set(k, turns);
   return turns;
 }
 
 export async function appendTurn(businessId: string, customerPhone: string, turn: Turn): Promise<void> {
+  if (!turn.content.trim()) return; // never persist empty content — see getHistory for why
   const k = cacheKey(businessId, customerPhone);
   const history = cache.get(k) ?? [];
   history.push(turn);

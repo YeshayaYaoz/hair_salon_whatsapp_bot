@@ -112,10 +112,14 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       type="button"
       role="switch"
       aria-checked={checked}
+      dir="ltr"
       onClick={() => onChange(!checked)}
       className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 transition-colors ${checked ? "bg-[#1B7FA0] border-[#1B7FA0]" : "bg-gray-200 border-gray-200"}`}
     >
-      <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-4" : "translate-x-0"}`} />
+      <span
+        className="absolute top-0 left-0 h-4 w-4 rounded-full bg-white shadow transition-transform"
+        style={{ transform: checked ? "translateX(1rem)" : "translateX(0)" }}
+      />
     </button>
   );
 }
