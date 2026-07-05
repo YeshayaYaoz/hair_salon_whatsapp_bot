@@ -155,7 +155,7 @@ export default function AppointmentsPage() {
   const [filter, setFilter] = useState<Filter>("upcoming");
   const [search, setSearch] = useState("");
   const [cancellingId, setCancellingId] = useState<string | null>(null);
-  const [view, setView] = useState<ViewMode>("list");
+  const [view, setView] = useState<ViewMode>("calendar");
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [tz, setTz] = useState("Asia/Jerusalem");
 
