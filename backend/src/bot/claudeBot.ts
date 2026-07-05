@@ -8,7 +8,7 @@ import { decryptSecret } from "../lib/crypto.js";
 import { syncAppointmentToCalendar } from "../lib/googleCalendar.js";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const MODEL = "claude-sonnet-5";
+const MODEL = "claude-haiku-4-5-20251001";
 
 const tools: Anthropic.Tool[] = [
   {
@@ -216,7 +216,9 @@ const AI_UNAVAILABLE_HE =
   "מצטערים, הבוט אינו זמין כרגע. אנא נסו שוב בעוד כמה דקות, או צרו קשר ישיר עם העסק.";
 
 export async function handleIncomingMessage(businessId: string, customerPhone: string, messageText: string): Promise<BotResult> {
-  const system = await buildSystemPrompt(businessId, new Date().toISOString().slice(0, 10), customerPhone);
+  const systemText = await buildSystemPrompt(businessId, new Date().toISOString().slice(0, 10), customerPhone);
+  // Cache the system prompt — it's the same for every turn in a conversation and can be large.
+  const system: Anthropic.TextBlockParam[] = [{ type: "text", text: systemText, cache_control: { type: "ephemeral" } }];
   const history = getHistory(businessId, customerPhone);
 
   const messages: Anthropic.MessageParam[] = [
@@ -235,7 +237,8 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
       system,
       tools,
       messages,
-    });
+      betas: ["prompt-caching-2024-07-31"],
+    } as Parameters<typeof anthropic.messages.create>[0]);
   } catch (err) {
     if (err instanceof APIError) {
       console.error(`Anthropic API error ${err.status}:`, err.message);
@@ -271,7 +274,8 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
         system,
         tools,
         messages,
-      });
+        betas: ["prompt-caching-2024-07-31"],
+      } as Parameters<typeof anthropic.messages.create>[0]);
     } catch (err) {
       if (err instanceof APIError) {
         console.error(`Anthropic API error ${err.status} (tool loop):`, err.message);
