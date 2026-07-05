@@ -28,6 +28,86 @@ const STATUS_STYLES: Record<string, string> = {
 type Filter = "upcoming" | "past" | "cancelled" | "all";
 type ViewMode = "list" | "calendar";
 
+function NewAppointmentModal({ tz, onClose, onCreated }: { tz: string; onClose: () => void; onCreated: () => void }) {
+  const { lang } = useLanguage();
+  const he = lang === "he";
+  const [services, setServices] = useState<{ id: string; name: string }[]>([]);
+  const [serviceId, setServiceId] = useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiFetch<{ id: string; name: string }[]>("/api/business/services").then((s) => {
+      setServices(s);
+      if (s[0]) setServiceId(s[0].id);
+    }).catch(() => {});
+  }, []);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      await apiFetch("/api/business/appointments", {
+        method: "POST",
+        body: JSON.stringify({ serviceId, customerName, customerPhone, startTime }),
+      });
+      onCreated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={submit}
+        className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl flex flex-col gap-4 animate-fade-up"
+        dir={he ? "rtl" : "ltr"}
+      >
+        <h2 className="text-lg font-bold text-gray-900">{he ? "תור חדש (ידני)" : "New appointment (manual)"}</h2>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">{he ? "שירות" : "Service"}</label>
+          <select value={serviceId} onChange={(e) => setServiceId(e.target.value)} required className="w-full">
+            {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">{he ? "שם הלקוח" : "Customer name"}</label>
+          <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} required className="w-full" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">{he ? "טלפון" : "Phone"}</label>
+          <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} required placeholder="972501234567" className="w-full" dir="ltr" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">{he ? "מועד" : "Date & time"}</label>
+          <input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} required className="w-full" dir="ltr" />
+          <p className="text-[11px] text-gray-400 mt-1">{he ? `לפי אזור הזמן ${tz}` : `In timezone ${tz}`}</p>
+        </div>
+
+        {error && <p className="text-red-600 text-sm">{error}</p>}
+
+        <div className="flex items-center gap-2 justify-end">
+          <button type="button" onClick={onClose} className="text-sm text-gray-500 hover:text-gray-800 px-4 py-2">
+            {he ? "ביטול" : "Cancel"}
+          </button>
+          <button type="submit" disabled={saving || !serviceId} className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+            {saving ? "…" : (he ? "קבע תור" : "Book")}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function googleCalendarUrl(a: Appointment) {
   const fmt = (d: string) => new Date(d).toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
   const params = new URLSearchParams({
@@ -158,6 +238,7 @@ export default function AppointmentsPage() {
   const [view, setView] = useState<ViewMode>("calendar");
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [tz, setTz] = useState("Asia/Jerusalem");
+  const [showNew, setShowNew] = useState(false);
 
   async function load() {
     setAppointments(await apiFetch<Appointment[]>("/api/business/appointments"));
@@ -247,8 +328,25 @@ export default function AppointmentsPage() {
             </svg>
             {t.exportCsv}
           </button>
+          <button
+            onClick={() => setShowNew(true)}
+            className="flex items-center gap-1.5 text-xs bg-[#1B7FA0] hover:bg-[#2A9BBF] text-white font-semibold px-3 py-2 rounded-lg transition"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+            </svg>
+            {t.newAppointment}
+          </button>
         </div>
       </div>
+
+      {showNew && (
+        <NewAppointmentModal
+          tz={tz}
+          onClose={() => setShowNew(false)}
+          onCreated={() => { setShowNew(false); load(); }}
+        />
+      )}
 
       {view === "calendar" ? (
         <>

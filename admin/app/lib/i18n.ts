@@ -5,6 +5,7 @@ const translations = {
     nav: {
       analytics: "Analytics", appointments: "Appointments", customers: "Customers",
       waitlist: "Waitlist", services: "Services", staff: "Staff", hours: "Hours",
+      blocked: "Time off", conversations: "Conversations",
       whatsapp: "WhatsApp", faq: "FAQ", settings: "Settings", billing: "Billing", logout: "Log out",
     },
     days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
@@ -93,6 +94,7 @@ const translations = {
 
     // Appointments view toggle
     listView: "List", calendarView: "Calendar",
+    newAppointment: "New appointment",
 
     // Trial banner
     trialBanner: (days: number) => `Your free trial ends in ${days} day${days !== 1 ? "s" : ""}. Subscribe to keep the bot running.`,
@@ -129,6 +131,7 @@ const translations = {
     nav: {
       analytics: "סטטיסטיקות", appointments: "תורים", customers: "לקוחות",
       waitlist: "רשימת המתנה", services: "שירותים", staff: "צוות", hours: "שעות פעילות",
+      blocked: "חופשות", conversations: "שיחות",
       whatsapp: "וואטסאפ", faq: "שאלות נפוצות", settings: "הגדרות", billing: "תשלום", logout: "התנתקות",
     },
     days: ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"],
@@ -217,6 +220,7 @@ const translations = {
 
     // Appointments view toggle
     listView: "רשימה", calendarView: "לוח שנה",
+    newAppointment: "תור חדש",
 
     // Trial banner
     trialBanner: (days: number) => `תקופת הניסיון שלך מסתיימת בעוד ${days} יום${days !== 1 ? "ים" : ""}. הירשם כדי להמשיך.`,

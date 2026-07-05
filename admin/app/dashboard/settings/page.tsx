@@ -101,6 +101,9 @@ interface BusinessProfile {
   googleMapsUrl?: string;
   remindersEnabled?: boolean;
   reviewsEnabled?: boolean;
+  cancellationPolicy?: string;
+  referralText?: string;
+  digestEnabled?: boolean;
 }
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
@@ -138,11 +141,13 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 }
 
 export default function SettingsPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const he = lang === "he";
   const [fields, setFields] = useState<BusinessProfile>({
     name: "", address: "", timezone: "Asia/Jerusalem", email: "",
     notificationPhone: "", botGreeting: "", botPersonality: "", googleMapsUrl: "",
     remindersEnabled: true, reviewsEnabled: true,
+    cancellationPolicy: "", referralText: "", digestEnabled: true,
   });
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -162,6 +167,9 @@ export default function SettingsPage() {
         googleMapsUrl: me.googleMapsUrl ?? "",
         remindersEnabled: me.remindersEnabled ?? true,
         reviewsEnabled: me.reviewsEnabled ?? true,
+        cancellationPolicy: me.cancellationPolicy ?? "",
+        referralText: me.referralText ?? "",
+        digestEnabled: me.digestEnabled ?? true,
       });
       setLoaded(true);
     });
@@ -188,6 +196,9 @@ export default function SettingsPage() {
           googleMapsUrl: fields.googleMapsUrl,
           remindersEnabled: fields.remindersEnabled,
           reviewsEnabled: fields.reviewsEnabled,
+          cancellationPolicy: fields.cancellationPolicy,
+          referralText: fields.referralText,
+          digestEnabled: fields.digestEnabled,
         }),
       });
       setSaved(true);
@@ -264,6 +275,39 @@ export default function SettingsPage() {
             <span className="text-xs text-gray-700">{t.reviewsLabel}</span>
             <Toggle checked={fields.reviewsEnabled ?? true} onChange={(v) => set("reviewsEnabled", v)} />
           </label>
+          <label className="flex items-center justify-between gap-3">
+            <span className="text-xs text-gray-700">{he ? "סיכום יומי בבוקר (וואטסאפ)" : "Morning daily digest (WhatsApp)"}</span>
+            <Toggle checked={fields.digestEnabled ?? true} onChange={(v) => set("digestEnabled", v)} />
+          </label>
+        </Section>
+
+        <Section
+          title={he ? "מדיניות ותמריצים" : "Policy & incentives"}
+          description={he ? "טקסטים שהבוט משתמש בהם בשיחות עם לקוחות" : "Text the bot uses in customer conversations"}
+        >
+          <Field
+            label={he ? "מדיניות ביטולים" : "Cancellation policy"}
+            hint={he ? "הבוט יזכיר את זה כשלקוח מבטל תור" : "The bot mentions this when a customer cancels"}
+          >
+            <textarea
+              rows={2}
+              placeholder={he ? "לדוגמה: ביטול עד 24 שעות מראש ללא עלות." : "e.g. Free cancellation up to 24h in advance."}
+              value={fields.cancellationPolicy}
+              onChange={(e) => set("cancellationPolicy", e.target.value)}
+              className="w-full"
+            />
+          </Field>
+          <Field
+            label={he ? "הצעת חבר מביא חבר" : "Referral offer"}
+            hint={he ? "נוסף להודעת הביקורת אחרי הביקור" : "Appended to the post-visit review message"}
+          >
+            <input
+              placeholder={he ? "לדוגמה: הזמן חבר וקבל 10% הנחה בביקור הבא!" : "e.g. Refer a friend and get 10% off your next visit!"}
+              value={fields.referralText}
+              onChange={(e) => set("referralText", e.target.value)}
+              className="w-full"
+            />
+          </Field>
         </Section>
 
         <Section title={t.botPersonalityTitle} description={t.botPersonalityDesc}>
