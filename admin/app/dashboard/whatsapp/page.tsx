@@ -18,6 +18,7 @@ const META_CONFIG_ID = process.env.NEXT_PUBLIC_META_CONFIG_ID || "10117527450598
 export default function WhatsAppPage() {
   const { t, lang } = useLanguage();
   const [connected, setConnected] = useState(false);
+  const [tokenValid, setTokenValid] = useState(true);
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
   const [sdkReady, setSdkReady] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -48,8 +49,9 @@ export default function WhatsAppPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    apiFetch<{ whatsappConnected: boolean; whatsappPhoneNumberId?: string }>("/api/business/me").then((me) => {
+    apiFetch<{ whatsappConnected: boolean; whatsappTokenValid?: boolean; whatsappPhoneNumberId?: string }>("/api/business/me").then((me) => {
       setConnected(me.whatsappConnected);
+      setTokenValid(me.whatsappTokenValid !== false);
     });
   }, []);
 
@@ -90,6 +92,7 @@ export default function WhatsAppPage() {
             { method: "POST", body: JSON.stringify({ accessToken: response.authResponse.accessToken }) }
           ).then((result) => {
             setConnected(true);
+            setTokenValid(true);
             setPhoneNumber(result.phoneNumber);
             setSaved(true);
           }).catch((err: any) => {
@@ -119,6 +122,7 @@ export default function WhatsAppPage() {
       await apiFetch("/api/business/me/whatsapp", { method: "PUT", body: JSON.stringify({ phoneNumberId, accessToken }) });
       setSaved(true);
       setConnected(true);
+      setTokenValid(true);
     } catch (err: any) {
       setError(err?.message ?? "Save failed");
     } finally {
@@ -133,11 +137,37 @@ export default function WhatsAppPage() {
         <p className="text-gray-500 text-sm mt-1">{t.whatsappSubtitle}</p>
       </div>
 
+      {/* Broken-connection warning (token expired/revoked) */}
+      {connected && !tokenValid && (
+        <div className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 mb-4 flex items-start gap-3">
+          <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.2 16c-.77 1.33.19 3 1.73 3z" />
+          </svg>
+          <div>
+            <p className="text-sm font-semibold text-amber-800">
+              {lang === "he" ? "חיבור הוואטסאפ נותק" : "WhatsApp connection lost"}
+            </p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              {lang === "he"
+                ? "אישור הגישה פג תוקף או בוטל, והבוט אינו יכול לשלוח הודעות. חבר מחדש כדי להמשיך לקבל הזמנות."
+                : "The access token expired or was revoked, so the bot can't send messages. Reconnect to keep receiving bookings."}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Connection status */}
       <div className="flex items-center gap-2 mb-6">
-        <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${connected ? "bg-green-50 text-green-700 border border-green-200" : "bg-gray-100 text-gray-500 border border-gray-200"}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-green-400" : "bg-gray-300"}`} />
-          {connected ? t.connected : t.notConnected}
+        <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${
+          connected && tokenValid ? "bg-green-50 text-green-700 border border-green-200"
+          : connected && !tokenValid ? "bg-amber-50 text-amber-700 border border-amber-300"
+          : "bg-gray-100 text-gray-500 border border-gray-200"
+        }`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${
+            connected && tokenValid ? "bg-green-400" : connected && !tokenValid ? "bg-amber-400" : "bg-gray-300"
+          }`} />
+          {connected && !tokenValid ? (lang === "he" ? "נותק — נדרש חיבור מחדש" : "Disconnected — reconnect")
+            : connected ? t.connected : t.notConnected}
         </span>
         {phoneNumber && <span className="text-xs text-gray-500">{phoneNumber}</span>}
         {saved && <SavedBadge text={t.saved} />}

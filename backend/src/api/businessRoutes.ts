@@ -23,6 +23,7 @@ businessRouter.get("/me", async (req: AuthedRequest, res) => {
   const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! } });
   const { passwordHash, whatsappAccessToken, ...safe } = business;
   res.json({ ...safe, whatsappConnected: Boolean(whatsappAccessToken) });
+  // (whatsappTokenValid is included in ...safe)
 });
 
 const whatsappSchema = z.object({
@@ -58,6 +59,7 @@ businessRouter.put("/me/whatsapp", async (req: AuthedRequest, res) => {
     data: {
       whatsappPhoneNumberId: parsed.data.phoneNumberId,
       whatsappAccessToken: encryptSecret(parsed.data.accessToken),
+      whatsappTokenValid: true, // freshly saved token is assumed valid
     },
   });
   res.json({ ok: true });
@@ -122,6 +124,7 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
     data: {
       whatsappPhoneNumberId: phone.id,
       whatsappAccessToken: encryptSecret(userToken),
+      whatsappTokenValid: true,
     },
   });
 

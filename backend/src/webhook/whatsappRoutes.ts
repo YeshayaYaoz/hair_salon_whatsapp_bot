@@ -9,6 +9,7 @@ import { clearHistory } from "../bot/conversationStore.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { hasActiveSubscription } from "../lib/subscriptionGate.js";
 import { rateLimit } from "../lib/rateLimit.js";
+import { prisma } from "../lib/prisma.js";
 
 export const whatsappRouter = Router();
 
@@ -180,6 +181,12 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
     // A bad/expired access token: alert the owner by email (we can't WhatsApp them — same token).
     if (err instanceof WhatsAppAuthError) {
       console.error("WhatsApp access token expired/invalid:", err.message);
+      if (businessRef?.id) {
+        // Reflect the broken connection in the dashboard.
+        await prisma.business
+          .update({ where: { id: businessRef.id }, data: { whatsappTokenValid: false } })
+          .catch((dbErr) => console.error("Failed to flag WhatsApp token invalid:", dbErr));
+      }
       if (businessRef?.email) {
         await sendWhatsAppTokenExpiredEmail(businessRef.email, businessRef.name).catch((mailErr) =>
           console.error("Failed to send token-expiry email:", mailErr)

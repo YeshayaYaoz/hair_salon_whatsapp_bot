@@ -20,6 +20,7 @@ model Business {
   address           String?
   whatsappPhoneNumberId String? @unique
   whatsappAccessToken   String? // encrypted at rest
+  whatsappTokenValid    Boolean @default(true) // set false when Meta rejects the token (expired/revoked)
   notificationPhone     String? // owner's personal phone for booking alerts
   botGreeting           String? // custom greeting override
   botPersonality        String? // tone/personality instructions for the bot
