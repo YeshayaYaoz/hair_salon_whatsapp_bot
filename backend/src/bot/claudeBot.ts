@@ -112,17 +112,23 @@ export interface BotResult {
   offeredSlots?: AvailableSlot[];
 }
 
-async function notifyOwner(businessId: string, message: string) {
+/** Returns true only if the owner was actually reachable and the WhatsApp send succeeded. */
+async function notifyOwner(businessId: string, message: string): Promise<boolean> {
   try {
     const business = await prisma.business.findUnique({
       where: { id: businessId },
       select: { notificationPhone: true, whatsappPhoneNumberId: true, whatsappAccessToken: true },
     });
-    if (!business?.notificationPhone || !business.whatsappPhoneNumberId || !business.whatsappAccessToken) return;
+    if (!business?.notificationPhone || !business.whatsappPhoneNumberId || !business.whatsappAccessToken) {
+      console.warn(`[notifyOwner] business ${businessId} has no notificationPhone configured — skipping`);
+      return false;
+    }
     const accessToken = decryptSecret(business.whatsappAccessToken);
     await sendWhatsAppMessage({ phoneNumberId: business.whatsappPhoneNumberId, accessToken, to: business.notificationPhone, text: message });
+    return true;
   } catch (err) {
     console.error("Owner notification failed (non-fatal):", err);
+    return false;
   }
 }
 
@@ -294,7 +300,15 @@ async function runTool(
 
   if (name === "request_human_followup") {
     const label = (input.customerName as string | undefined) ?? customerPhone;
-    notifyOwner(businessId, `🙋 לקוח ${label} ביקש המשך טיפול אנושי:\n${input.reason}`);
+    const notified = await notifyOwner(businessId, `🙋 לקוח ${label} ביקש המשך טיפול אנושי:\n${input.reason}`);
+    if (!notified) {
+      const biz = await prisma.business.findUnique({ where: { id: businessId }, select: { address: true, name: true } });
+      return JSON.stringify({
+        notified: false,
+        error: "No owner notification phone is configured for this business, so no one was actually alerted. Do NOT tell the customer someone will call them. Instead apologize that live handoff isn't set up yet, and if an address/contact is known suggest they reach the salon directly.",
+        businessName: biz?.name,
+      });
+    }
     return JSON.stringify({ notified: true });
   }
 
