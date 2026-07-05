@@ -86,12 +86,18 @@ function extractMessage(message: any): ExtractedMessage {
   return { kind: "ignore" };
 }
 
-function buildSlotRows(slots: { startTime: string }[]): ListRow[] {
+/** Rough per-message language detection: any Hebrew character → Hebrew, otherwise English. */
+function detectLang(text: string): "he" | "en" {
+  return /[֐-׿]/.test(text) ? "he" : "en";
+}
+
+function buildSlotRows(slots: { startTime: string }[], lang: "he" | "en"): ListRow[] {
+  const locale = lang === "he" ? "he-IL" : "en-US";
   return slots.map((s) => {
     const d = new Date(s.startTime);
     return {
       id: s.startTime,
-      title: d.toLocaleString("he-IL", { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }).slice(0, 24),
+      title: d.toLocaleString(locale, { timeZone: "Asia/Jerusalem", weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }).slice(0, 24),
     };
   });
 }
@@ -147,6 +153,9 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
     accessToken = decryptSecret(business.whatsappAccessToken);
     businessRef = { id: business.id, name: business.name, email: business.email };
 
+    // Follow the customer's language for canned replies and interactive UI pieces.
+    const lang: "he" | "en" = extracted.kind === "text" ? detectLang(extracted.text) : "he";
+
     if (extracted.kind === "reset") {
       await clearHistory(business.id, customerPhone);
       await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: "השיחה אופסה. איך אפשר לעזור? 😊" });
@@ -158,7 +167,7 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
         phoneNumberId,
         accessToken,
         to: customerPhone,
-        text: "מצטערים, אני יכול לקרוא רק הודעות טקסט. אנא כתבו לי מה תרצו ואשמח לעזור 😊",
+        text: "מצטערים, אני יכול לקרוא רק הודעות טקסט. אנא כתבו לי מה תרצו ואשמח לעזור 😊\nSorry, I can only read text messages — please type what you need 😊",
       });
       return;
     }
@@ -171,8 +180,9 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
         accessToken,
         to: customerPhone,
         bodyText: reply,
-        buttonText: "בחר מועד",
-        rows: buildSlotRows(offeredSlots),
+        buttonText: lang === "he" ? "בחר מועד" : "Pick a time",
+        sectionTitle: lang === "he" ? "מועדים פנויים" : "Available times",
+        rows: buildSlotRows(offeredSlots, lang),
       });
     } else {
       await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: reply });

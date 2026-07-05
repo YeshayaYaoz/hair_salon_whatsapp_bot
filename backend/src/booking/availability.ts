@@ -49,9 +49,14 @@ export async function findAvailableSlots(
   const dayStartUtc = zonedWallTimeToUtc(year, month, day, 0, tz);
   const dayEndUtc = zonedWallTimeToUtc(year, month, day, 24 * 60, tz);
 
-  const dayAppointments = await prisma.appointment.findMany({
-    where: { businessId, status: "confirmed", startTime: { gte: dayStartUtc, lt: dayEndUtc } },
-  });
+  const [dayAppointments, dayBlocks] = await Promise.all([
+    prisma.appointment.findMany({
+      where: { businessId, status: "confirmed", startTime: { gte: dayStartUtc, lt: dayEndUtc } },
+    }),
+    prisma.blockedTime.findMany({
+      where: { businessId, startTime: { lt: dayEndUtc }, endTime: { gt: dayStartUtc } },
+    }),
+  ]);
 
   const durationMin = overrideDurationMin ?? service.durationMin;
   const staffOptions: (string | null)[] = staff.length > 0 ? staff.map((s: StaffMember) => s.id) : [null];
@@ -62,6 +67,8 @@ export async function findAvailableSlots(
     const slotStart = zonedWallTimeToUtc(year, month, day, startMin, tz);
     const slotEnd = new Date(slotStart.getTime() + durationMin * 60_000);
     if (slotStart < now) continue;
+    // Skip slots that overlap an owner-defined closure (vacation, break, holiday).
+    if (dayBlocks.some((b) => slotStart < b.endTime && slotEnd > b.startTime)) continue;
 
     for (const staffId of staffOptions) {
       const conflict = dayAppointments.some(
@@ -104,6 +111,12 @@ export async function createAppointment(params: {
   if (!hours || startMin < hours.openMin || startMin + durationMin > hours.closeMin) {
     throw new OutsideBusinessHoursError();
   }
+
+  // Also reject times inside an owner-defined closure (vacation, break, holiday).
+  const blocked = await prisma.blockedTime.findFirst({
+    where: { businessId: params.businessId, startTime: { lt: endTime }, endTime: { gt: params.startTime } },
+  });
+  if (blocked) throw new OutsideBusinessHoursError("Requested time falls within a blocked period (closure/vacation)");
 
   const customer = await prisma.customer.upsert({
     where: { businessId_phone: { businessId: params.businessId, phone: params.customerPhone } },

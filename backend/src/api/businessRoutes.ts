@@ -7,6 +7,8 @@ import { requireActiveSubscription } from "../lib/subscriptionGate.js";
 import { getAuthUrl, saveGoogleTokens, disconnectGoogleCalendar, GoogleCalendarNotConfiguredError } from "../lib/googleCalendar.js";
 import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
+import { createAppointment, OutsideBusinessHoursError, SlotUnavailableError } from "../booking/availability.js";
+import { parseBookingTime } from "../lib/timezone.js";
 
 export const businessRouter = Router();
 businessRouter.use(requireAuth);
@@ -42,6 +44,9 @@ const profileSchema = z.object({
   googleMapsUrl: z.string().optional(),
   remindersEnabled: z.boolean().optional(),
   reviewsEnabled: z.boolean().optional(),
+  cancellationPolicy: z.string().max(500).optional(),
+  referralText: z.string().max(500).optional(),
+  digestEnabled: z.boolean().optional(),
 });
 
 businessRouter.put("/me", async (req: AuthedRequest, res) => {
@@ -215,7 +220,37 @@ businessRouter.delete("/staff/:id", async (req: AuthedRequest, res) => {
   res.json({ ok: true });
 });
 
-// --- Appointments (read-only here; created by the bot) ---
+// --- Appointments ---
+
+/** Manual booking from the dashboard (phone bookings, walk-ins). Same validation as the bot. */
+businessRouter.post("/appointments", async (req: AuthedRequest, res) => {
+  const parsed = z.object({
+    serviceId: z.string().min(1),
+    customerName: z.string().min(1),
+    customerPhone: z.string().min(3),
+    startTime: z.string().min(1), // local wall time "YYYY-MM-DDTHH:mm" or ISO
+  }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! }, select: { timezone: true } });
+  const service = await prisma.service.findFirst({ where: { id: parsed.data.serviceId, businessId: req.businessId! } });
+  if (!service) return res.status(404).json({ error: "Service not found" });
+
+  try {
+    const appointment = await createAppointment({
+      businessId: req.businessId!,
+      serviceId: service.id,
+      customerPhone: parsed.data.customerPhone.replace(/[^\d+]/g, ""),
+      customerName: parsed.data.customerName,
+      startTime: parseBookingTime(parsed.data.startTime, business.timezone || "Asia/Jerusalem"),
+    });
+    res.status(201).json(appointment);
+  } catch (err) {
+    if (err instanceof OutsideBusinessHoursError) return res.status(400).json({ error: "מחוץ לשעות הפעילות או בתקופת חופשה" });
+    if (err instanceof SlotUnavailableError) return res.status(409).json({ error: "המועד תפוס — בחר שעה אחרת" });
+    throw err;
+  }
+});
 
 businessRouter.get("/appointments", async (req: AuthedRequest, res) => {
   const appointments = await prisma.appointment.findMany({
@@ -240,6 +275,78 @@ businessRouter.patch("/appointments/:id/cancel", async (req: AuthedRequest, res)
   notifyWaitlist(req.businessId!, appointment.serviceId, appointment.service.name, appointment.startTime).catch(
     (err) => console.error("[waitlist] Notification failed:", err)
   );
+});
+
+// --- Blocked times (vacations, breaks, holidays) ---
+
+businessRouter.get("/blocked-times", async (req: AuthedRequest, res) => {
+  const blocks = await prisma.blockedTime.findMany({
+    where: { businessId: req.businessId!, endTime: { gte: new Date() } },
+    orderBy: { startTime: "asc" },
+  });
+  res.json(blocks);
+});
+
+businessRouter.post("/blocked-times", async (req: AuthedRequest, res) => {
+  const parsed = z.object({
+    startTime: z.string().min(1), // local wall time "YYYY-MM-DDTHH:mm"
+    endTime: z.string().min(1),
+    reason: z.string().max(200).optional(),
+  }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! }, select: { timezone: true } });
+  const tz = business.timezone || "Asia/Jerusalem";
+  const start = parseBookingTime(parsed.data.startTime, tz);
+  const end = parseBookingTime(parsed.data.endTime, tz);
+  if (end <= start) return res.status(400).json({ error: "End must be after start" });
+
+  const block = await prisma.blockedTime.create({
+    data: { businessId: req.businessId!, startTime: start, endTime: end, reason: parsed.data.reason },
+  });
+  res.status(201).json(block);
+});
+
+businessRouter.delete("/blocked-times/:id", async (req: AuthedRequest, res) => {
+  await prisma.blockedTime.deleteMany({ where: { id: req.params.id, businessId: req.businessId! } });
+  res.json({ ok: true });
+});
+
+// --- Bot conversations (read-only transcripts) ---
+
+businessRouter.get("/conversations", async (req: AuthedRequest, res) => {
+  // Group persisted bot messages by customer phone, newest conversations first.
+  const grouped = await prisma.conversationMessage.groupBy({
+    by: ["phone"],
+    where: { businessId: req.businessId! },
+    _count: { _all: true },
+    _max: { createdAt: true },
+    orderBy: { _max: { createdAt: "desc" } },
+    take: 100,
+  });
+  const phones = grouped.map((g) => g.phone);
+  const customers = await prisma.customer.findMany({
+    where: { businessId: req.businessId!, phone: { in: phones } },
+    select: { phone: true, name: true },
+  });
+  const nameByPhone = new Map(customers.map((c) => [c.phone, c.name]));
+  res.json(
+    grouped.map((g) => ({
+      phone: g.phone,
+      customerName: nameByPhone.get(g.phone) ?? null,
+      messageCount: g._count._all,
+      lastMessageAt: g._max.createdAt,
+    }))
+  );
+});
+
+businessRouter.get("/conversations/:phone", async (req: AuthedRequest, res) => {
+  const messages = await prisma.conversationMessage.findMany({
+    where: { businessId: req.businessId!, phone: req.params.phone },
+    orderBy: { createdAt: "asc" },
+    take: 200,
+  });
+  res.json(messages);
 });
 
 // --- Customers ---

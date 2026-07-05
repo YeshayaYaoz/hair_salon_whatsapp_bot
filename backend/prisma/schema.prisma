@@ -27,6 +27,10 @@ model Business {
   googleMapsUrl         String? // linked in post-visit review requests
   remindersEnabled      Boolean  @default(true)
   reviewsEnabled        Boolean  @default(true)
+  cancellationPolicy    String?  // shown by the bot when a customer cancels
+  referralText          String?  // appended to post-visit review messages (e.g. referral discount offer)
+  digestEnabled         Boolean  @default(true)
+  lastDigestSentAt      DateTime? // last morning-digest send, to avoid duplicates
   createdAt         DateTime @default(now())
 
   services       Service[]
@@ -38,6 +42,20 @@ model Business {
   waitlistEntries WaitlistEntry[]
   passwordResetTokens PasswordResetToken[]
   googleCalendar      GoogleCalendarToken?
+  blockedTimes        BlockedTime[]
+}
+
+/// Owner-defined closures (vacations, lunch breaks, holidays) during which no bookings are allowed.
+model BlockedTime {
+  id         String   @id @default(cuid())
+  business   Business @relation(fields: [businessId], references: [id])
+  businessId String
+  startTime  DateTime
+  endTime    DateTime
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  @@index([businessId, startTime])
 }
 
 model Service {

@@ -29,7 +29,7 @@ export interface ListRow {
 
 /** Interactive list message — lets the customer tap a slot instead of typing a time back. */
 export async function sendWhatsAppList(
-  params: SendCommon & { bodyText: string; buttonText: string; rows: ListRow[] }
+  params: SendCommon & { bodyText: string; buttonText: string; rows: ListRow[]; sectionTitle?: string }
 ) {
   await send(params, {
     type: "interactive",
@@ -38,7 +38,7 @@ export async function sendWhatsAppList(
       body: { text: params.bodyText },
       action: {
         button: params.buttonText.slice(0, 20),
-        sections: [{ title: "מועדים פנויים", rows: params.rows.slice(0, 10) }],
+        sections: [{ title: (params.sectionTitle ?? "מועדים פנויים").slice(0, 24), rows: params.rows.slice(0, 10) }],
       },
     },
   });

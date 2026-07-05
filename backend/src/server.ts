@@ -7,7 +7,7 @@ import { whatsappRouter } from "./webhook/whatsappRoutes.js";
 import { billingRouter, stripeWebhookRouter } from "./billing/billingRoutes.js";
 import { publicRouter } from "./api/publicRoutes.js";
 import { runRetentionJob } from "./lib/retentionJob.js";
-import { runReminderJob, runReviewJob } from "./lib/scheduledMessages.js";
+import { runReminderJob, runReviewJob, runDigestJob } from "./lib/scheduledMessages.js";
 
 const app = express();
 const allowedOrigins = (process.env.FRONTEND_URL ?? "*").split(",").map(o => o.trim());
@@ -50,12 +50,14 @@ function scheduleRetentionJob() {
 }
 scheduleRetentionJob();
 
-// Run reminder and review jobs every hour
+// Run reminder, review, and digest jobs every hour
 const ONE_HOUR = 60 * 60 * 1000;
 setInterval(() => {
   runReminderJob().catch((err) => console.error("[reminders] Job failed:", err));
   runReviewJob().catch((err) => console.error("[reviews] Job failed:", err));
+  runDigestJob().catch((err) => console.error("[digest] Job failed:", err));
 }, ONE_HOUR);
 // Also run immediately on startup to catch any missed windows
 runReminderJob().catch((err) => console.error("[reminders] Startup run failed:", err));
 runReviewJob().catch((err) => console.error("[reviews] Startup run failed:", err));
+runDigestJob().catch((err) => console.error("[digest] Startup run failed:", err));

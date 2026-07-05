@@ -1,5 +1,6 @@
 import type { BusinessHours, Service, StaffMember, FaqEntry } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { instantPartsInTz } from "../lib/timezone.js";
 
 export async function buildSystemPrompt(businessId: string, todayIso: string, customerPhone?: string): Promise<string> {
   const [business, customer] = await Promise.all([
@@ -47,16 +48,32 @@ export async function buildSystemPrompt(businessId: string, todayIso: string, cu
 • ברך בשם, והצע את השירות הרגיל שלו/ה אם לא ציינו שירות.\n`;
   }
 
-  const todayDow = new Date(todayIso + "T12:00:00").getDay();
-  const openDays = new Set(business.hours.map((h: BusinessHours) => h.dayOfWeek));
-  const closedTodayNote = !openDays.has(todayDow)
-    ? `\nחשוב: הסלון סגור היום (יום ${dayNames[todayDow]}). הודע ללקוח בנימוס והצע יום אחר.\n`
+  // Anchor the model to the real clock in the business timezone — without this it invents times.
+  const tz = business.timezone || "Asia/Jerusalem";
+  const nowParts = instantPartsInTz(new Date(), tz);
+  const nowHHMM = fmtMin(nowParts.minutes);
+  const todayHours = business.hours.find((h: BusinessHours) => h.dayOfWeek === nowParts.dayOfWeek);
+  let openNowNote: string;
+  if (!todayHours) {
+    openNowNote = `הסלון סגור היום (יום ${dayNames[nowParts.dayOfWeek]}). אם לקוח מבקש תור "עכשיו" או "היום" — הסבר בנימוס והצע יום אחר.`;
+  } else if (nowParts.minutes < todayHours.openMin) {
+    openNowNote = `הסלון עדיין סגור כרגע — נפתח היום ב-${fmtMin(todayHours.openMin)}.`;
+  } else if (nowParts.minutes >= todayHours.closeMin) {
+    openNowNote = `הסלון כבר סגור להיום (נסגר ב-${fmtMin(todayHours.closeMin)}). אפשר לקבוע תורים לימים הבאים.`;
+  } else {
+    openNowNote = `הסלון פתוח כרגע (עד ${fmtMin(todayHours.closeMin)} היום).`;
+  }
+
+  const cancellationNote = business.cancellationPolicy
+    ? `\nמדיניות ביטולים: ${business.cancellationPolicy}\nכאשר לקוח מבטל תור — הזכר את המדיניות בנימוס.\n`
     : "";
 
-  return `אתה עוזר ההזמנות של "${business.name}" בוואטסאפ. היום: ${todayIso}.
+  return `אתה עוזר ההזמנות של "${business.name}" בוואטסאפ.
+היום: ${todayIso} (יום ${dayNames[nowParts.dayOfWeek]}), השעה כעת: ${nowHHMM} (שעון ישראל). ${openNowNote}
+אל תנקוב בשעה הנוכחית אחרת מזו — זו השעה האמיתית.
 ענה תמיד בשפה שבה הלקוח כותב (עברית או אנגלית). היה ידידותי, קצר וממוקד — משפט-שניים לכל תגובה.
 אל תמציא מידע שאינו רשום כאן. אם אינך יודע — אמור זאת והצע העברה לבן אדם.
-${closedTodayNote}${personalityNote}${greeting}${crmNote}
+${cancellationNote}${personalityNote}${greeting}${crmNote}
 שירותים ומחירים:
 ${servicesText}
 
