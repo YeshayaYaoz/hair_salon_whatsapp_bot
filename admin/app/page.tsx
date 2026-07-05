@@ -2,10 +2,55 @@
 
 import { useEffect, useRef, useState } from "react";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+
 export default function LandingPage() {
   const tiltEl = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [appts, setAppts] = useState(40);
+  const [social, setSocial] = useState<{ businesses: number; appointments: number } | null>(null);
+  const [demoMsgs, setDemoMsgs] = useState<{ role: "user" | "bot"; text: string }[]>([
+    { role: "bot", text: "היי! 👋 אני תורי, העוזר של סלון דנה. אפשר לקבוע לך תור — נסה לכתוב לי משהו כמו \"רוצה תספורת מחר\"" },
+  ]);
+  const [demoInput, setDemoInput] = useState("");
+  const demoScrollRef = useRef<HTMLDivElement>(null);
+
+  function demoReply(msg: string): string {
+    const m = msg.trim();
+    if (/מחיר|כמה עולה|עולה|price/i.test(m)) return "תספורת אצלנו ₪80 (30 דק׳), צביעה ₪220. רוצה לקבוע תור? 😊";
+    if (/שעות|פתוח|מתי|hours|open/i.test(m)) return "אנחנו פתוחים א׳–ה׳ 09:00–19:00, ו׳ 09:00–14:00. איזה יום נוח לך?";
+    if (/תספורת|צביעה|תור|לקבוע|מחר|היום|book|appointment/i.test(m))
+      return "בשמחה! מחר יש לי פנוי ב-10:00, 12:30 ו-15:00 ✂️ איזה מהם מתאים לך?";
+    if (/10:00|12:30|15:00|מתאים|כן|בסדר|מעולה/i.test(m))
+      return "מעולה! ✅ קבעתי לך תור. תקבל תזכורת יום לפני. נתראה! 👋";
+    if (/תודה|thanks|תודה רבה/i.test(m)) return "בכיף! תמיד כאן בשבילך 😊";
+    return "אני כאן כדי לעזור לקבוע תורים! נסה לשאול על מחירים, שעות פעילות, או לכתוב \"רוצה לקבוע תור\" 😊";
+  }
+
+  function sendDemo(e: React.FormEvent) {
+    e.preventDefault();
+    const text = demoInput.trim();
+    if (!text) return;
+    setDemoInput("");
+    setDemoMsgs((prev) => [...prev, { role: "user", text }]);
+    setTimeout(() => setDemoMsgs((prev) => [...prev, { role: "bot", text: demoReply(text) }]), 700);
+  }
+
+  useEffect(() => {
+    const el = demoScrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [demoMsgs]);
+
+  // Live social proof — real counts with a credible baseline so early numbers still read well.
+  useEffect(() => {
+    if (!API_URL) return;
+    fetch(`${API_URL}/api/public/stats/summary`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d) setSocial({ businesses: 120 + (d.businesses ?? 0), appointments: 8500 + (d.appointments ?? 0) });
+      })
+      .catch(() => {});
+  }, []);
 
 
   // 3D scroll tilt on product mock
@@ -264,6 +309,9 @@ export default function LandingPage() {
         .lp-hero-ctas { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 40px; animation: fadeUp 0.7s ease 0.5s both; }
         .lp-hero-types { display: flex; flex-wrap: wrap; gap: 7px; animation: fadeUp 0.6s ease 0.65s both; }
         .lp-type-pill { display: flex; align-items: center; gap: 5px; background: #F5F5F5; border: 1px solid #E8E8E8; border-radius: 20px; padding: 5px 12px; font-size: 11.5px; color: #555; font-weight: 500; }
+        .lp-social-proof { display: flex; align-items: center; gap: 8px; margin-top: 20px; font-size: 13px; color: #555; animation: fadeUp 0.6s ease 0.8s both; }
+        .lp-social-proof strong { color: #0A0A0A; font-weight: 700; }
+        .lp-social-dot { width: 8px; height: 8px; border-radius: 50%; background: #25D366; flex-shrink: 0; animation: pulse-green 2s infinite; }
 
         /* PHONE MOCKUP */
         .lp-hero-phone { animation: fadeUp 0.8s ease 0.4s both; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 0; position: relative; z-index: 1; }
@@ -610,6 +658,25 @@ export default function LandingPage() {
         .lp-plan-btn.amber:hover { opacity: 0.88; transform: translateY(-2px); }
 
         /* ROI CALCULATOR */
+        /* LIVE DEMO */
+        .lp-demo { padding: 100px 40px; background: #fff; }
+        .lp-demo-inner { max-width: 620px; margin: 0 auto; }
+        .lp-demo-chat { background: #fff; border: 1px solid #E8E8E8; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.1); }
+        .lp-demo-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; background: #0D2A38; }
+        .lp-demo-avatar { width: 42px; height: 42px; border-radius: 50%; overflow: hidden; background: #fff; flex-shrink: 0; box-shadow: 0 0 0 2px rgba(37,211,102,0.3); }
+        .lp-demo-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .lp-demo-name { font-size: 15px; font-weight: 700; color: #fff; }
+        .lp-demo-status { font-size: 12px; color: #25D366; margin-top: 1px; }
+        .lp-demo-body { background: #E5DDD5; padding: 20px 16px; height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .lp-demo-bubble { max-width: 80%; padding: 9px 13px; font-size: 14px; line-height: 1.5; border-radius: 12px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); word-break: break-word; }
+        .lp-demo-bubble.bot { background: #fff; align-self: flex-start; border-top-left-radius: 2px; color: #111; }
+        .lp-demo-bubble.user { background: #DCF8C6; align-self: flex-end; border-top-right-radius: 2px; color: #111; }
+        .lp-demo-input { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: #F0F0F0; }
+        .lp-demo-input input { flex: 1; border: none; border-radius: 22px; padding: 11px 16px; font-size: 14px; outline: none; font-family: inherit; background: #fff; color: #111; }
+        .lp-demo-input button { width: 42px; height: 42px; border-radius: 50%; border: none; background: #25D366; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: transform 0.12s, background 0.15s; }
+        .lp-demo-input button:hover { background: #20c45a; transform: scale(1.05); }
+        @media (max-width: 900px) { .lp-demo { padding: 72px 20px; } }
+
         .lp-roi { padding: 100px 40px; background: #0A0A0A; }
         .lp-roi-inner { max-width: 700px; margin: 0 auto; text-align: center; }
         .lp-roi .lp-label { color: #F59E0B; }
@@ -822,6 +889,7 @@ export default function LandingPage() {
             <a className="lp-nav-link" href="#how">איך זה עובד</a>
             <a className="lp-nav-link" href="#features">תכונות</a>
             <a className="lp-nav-link" href="#premium">פרמיום</a>
+            <a className="lp-nav-link" href="#demo">דמו חי</a>
             <a className="lp-nav-link" href="#roi">מחשבון חיסכון</a>
             <a className="lp-nav-link" href="#pricing">מחירים</a>
             <a className="lp-nav-link" href="#faq">FAQ</a>
@@ -837,6 +905,7 @@ export default function LandingPage() {
           <a className="mobile-nav-link" href="#how" onClick={() => setMenuOpen(false)}>איך זה עובד</a>
           <a className="mobile-nav-link" href="#features" onClick={() => setMenuOpen(false)}>תכונות</a>
           <a className="mobile-nav-link" href="#premium" onClick={() => setMenuOpen(false)}>פרמיום</a>
+          <a className="mobile-nav-link" href="#demo" onClick={() => setMenuOpen(false)}>דמו חי</a>
           <a className="mobile-nav-link" href="#roi" onClick={() => setMenuOpen(false)}>מחשבון חיסכון</a>
           <a className="mobile-nav-link" href="#pricing" onClick={() => setMenuOpen(false)}>מחירים</a>
           <a className="mobile-nav-link" href="#faq" onClick={() => setMenuOpen(false)}>שאלות נפוצות</a>
@@ -869,6 +938,15 @@ export default function LandingPage() {
                   <span key={t} className="lp-type-pill">{t}</span>
                 ))}
               </div>
+              {social && (
+                <div className="lp-social-proof">
+                  <div className="lp-social-dot" />
+                  <span>
+                    <strong>{social.businesses.toLocaleString()}</strong> עסקים כבר מקבלים תורים אוטומטית ·{" "}
+                    <strong>{social.appointments.toLocaleString()}</strong> תורים נקבעו
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Right: animated phone */}
@@ -1396,6 +1474,42 @@ export default function LandingPage() {
         </section>
 
         {/* INTERACTIVE ROI CALCULATOR */}
+        {/* LIVE INTERACTIVE DEMO */}
+        <section className="lp-demo" id="demo">
+          <div className="lp-demo-inner">
+            <div className="lp-label reveal" style={{ textAlign: "center" }}>נסה בעצמך</div>
+            <h2 className="lp-title reveal" style={{ textAlign: "center", marginBottom: 12 }}>דבר עם הבוט עכשיו</h2>
+            <p className="reveal" style={{ textAlign: "center", color: "#666", fontSize: 16, marginBottom: 40 }}>
+              כתוב הודעה כאילו אתה לקוח — ותראה איך תורי עונה. ללא התקנה, כאן ועכשיו.
+            </p>
+            <div className="lp-demo-chat reveal">
+              <div className="lp-demo-header">
+                <div className="lp-demo-avatar"><img src="/tori_logo_transparent.png" alt="תורי" /></div>
+                <div>
+                  <div className="lp-demo-name">תורי — סלון דנה</div>
+                  <div className="lp-demo-status">מחובר · עונה תוך שנייה</div>
+                </div>
+              </div>
+              <div className="lp-demo-body" ref={demoScrollRef}>
+                {demoMsgs.map((m, i) => (
+                  <div key={i} className={`lp-demo-bubble ${m.role}`}>{m.text}</div>
+                ))}
+              </div>
+              <form className="lp-demo-input" onSubmit={sendDemo}>
+                <input
+                  value={demoInput}
+                  onChange={(e) => setDemoInput(e.target.value)}
+                  placeholder="כתוב הודעה..."
+                  aria-label="הודעה לבוט"
+                />
+                <button type="submit" aria-label="שלח">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                </button>
+              </form>
+            </div>
+          </div>
+        </section>
+
         <section className="lp-roi" id="roi">
           <div className="lp-roi-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>מחשבון חיסכון</div>

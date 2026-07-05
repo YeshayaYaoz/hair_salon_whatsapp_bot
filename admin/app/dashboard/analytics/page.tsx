@@ -79,10 +79,19 @@ function AnimatedCount({ n }: { n: number }) {
   return <>{val}</>;
 }
 
+interface Appt {
+  id: string;
+  startTime: string;
+  status: string;
+  customer: { name?: string; phone: string };
+  service: { name: string };
+}
+
 export default function AnalyticsPage() {
   const { t, lang } = useLanguage();
   const [data, setData] = useState<Analytics | null>(null);
   const [setup, setSetup] = useState<SetupState | null>(null);
+  const [todayAppts, setTodayAppts] = useState<Appt[]>([]);
 
   useEffect(() => {
     Promise.all([
@@ -90,7 +99,8 @@ export default function AnalyticsPage() {
       apiFetch<Me>("/api/business/me"),
       apiFetch<{ id: string }[]>("/api/business/services"),
       apiFetch<{ id: string }[]>("/api/business/hours"),
-    ]).then(([analytics, me, services, hours]) => {
+      apiFetch<Appt[]>("/api/business/appointments"),
+    ]).then(([analytics, me, services, hours, appts]) => {
       setData(analytics);
       setSetup({
         hasServices: services.length > 0,
@@ -98,6 +108,12 @@ export default function AnalyticsPage() {
         whatsappConnected: me.whatsappConnected,
         subscriptionActive: me.subscriptionStatus === "active",
       });
+      const todayStr = new Date().toDateString();
+      setTodayAppts(
+        appts
+          .filter((a) => a.status === "confirmed" && new Date(a.startTime).toDateString() === todayStr)
+          .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+      );
     });
   }, []);
 
@@ -130,6 +146,42 @@ export default function AnalyticsPage() {
       <div className="mb-8 animate-fade-up">
         <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">{t.analyticsTitle}</h1>
         <p className="text-sm mt-1" style={{ color: "#9CA3AF" }}>{t.analyticsSubtitle}</p>
+      </div>
+
+      {/* Today's schedule */}
+      <div className="rounded-2xl p-6 mb-8 animate-fade-up" style={{ background: "#FFFFFF", border: "1px solid #E5E5F0" }}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-bold text-gray-900">{lang === "he" ? "היום" : "Today"}</h2>
+          <Link href="/dashboard/appointments" className="text-xs font-semibold" style={{ color: "#1B7FA0" }}>
+            {lang === "he" ? "כל התורים ←" : "All appointments →"}
+          </Link>
+        </div>
+        {todayAppts.length === 0 ? (
+          <div className="text-center py-8">
+            <div className="text-3xl mb-2">🗓️</div>
+            <p className="text-sm" style={{ color: "#9CA3AF" }}>
+              {lang === "he" ? "אין תורים מתוזמנים להיום" : "No appointments scheduled today"}
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {todayAppts.map((a, i) => (
+              <div
+                key={a.id}
+                className="flex items-center gap-4 px-4 py-3 rounded-xl animate-fade-up"
+                style={{ animationDelay: `${i * 50}ms`, background: "rgba(27,127,160,0.04)", border: "1px solid #EEF1F4" }}
+              >
+                <div className="text-sm font-bold tabular-nums shrink-0" style={{ color: "#1B7FA0", minWidth: 52 }}>
+                  {new Date(a.startTime).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{a.customer.name || a.customer.phone}</p>
+                  <p className="text-xs truncate" style={{ color: "#9CA3AF" }}>{a.service.name}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Onboarding checklist */}
