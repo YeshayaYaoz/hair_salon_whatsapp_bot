@@ -293,16 +293,18 @@ export default function LandingPageEN() {
         .phone-chat::-webkit-scrollbar { display: none; }
         .chat-date { align-self: center; font-size: 10px; background: rgba(255,255,255,0.75); color: #666; border-radius: 6px; padding: 2px 8px; margin: 2px 0 4px; font-weight: 500; }
         .chat-bubble { max-width: 82%; padding: 7px 10px 4px; border-radius: 8px; font-size: 12.5px; line-height: 1.45; opacity: 0; transform: translateY(8px) scale(0.9); transition: opacity 0.3s ease, transform 0.34s cubic-bezier(0.22, 1, 0.36, 1); position: relative; }
-        .chat-bubble.incoming { transform-origin: top left; }
-        .chat-bubble.outgoing { transform-origin: top right; }
+        .chat-bubble.incoming { transform-origin: top right; }
+        .chat-bubble.outgoing { transform-origin: top left; }
         .chat-bubble.show { opacity: 1; transform: none; }
         .phone-wa-online.is-typing { color: #25D366; }
         .phone-wa-online.is-typing::after { content: ''; display: inline-block; width: 3px; height: 3px; border-radius: 50%; background: currentColor; margin-inline-start: 3px; animation: typingDotHeader 1s steps(3) infinite; box-shadow: 5px 0 0 currentColor, 10px 0 0 currentColor; }
         @keyframes typingDotHeader { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
-        .chat-bubble.incoming { background: #fff; border-radius: 0 8px 8px 8px; align-self: flex-start; color: #111; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
-        .chat-bubble.outgoing { background: #D9FDD3; border-radius: 8px 8px 0 8px; align-self: flex-end; color: #111; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
-        .chat-bubble.incoming::before { content: ''; position: absolute; top: 0; left: -7px; width: 0; height: 0; border-top: 0px solid transparent; border-right: 8px solid #fff; border-bottom: 8px solid transparent; }
-        .chat-bubble.outgoing::before { content: ''; position: absolute; top: 0; right: -7px; width: 0; height: 0; border-top: 0px solid transparent; border-left: 8px solid #D9FDD3; border-bottom: 8px solid transparent; }
+        /* Customer's own messages — green, right side */
+        .chat-bubble.incoming { background: #D9FDD3; border-radius: 8px 8px 0 8px; align-self: flex-end; color: #111; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+        /* Bot (salon) messages — white, left side */
+        .chat-bubble.outgoing { background: #fff; border-radius: 0 8px 8px 8px; align-self: flex-start; color: #111; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+        .chat-bubble.incoming::before { content: ''; position: absolute; top: 0; right: -7px; width: 0; height: 0; border-top: 0px solid transparent; border-left: 8px solid #D9FDD3; border-bottom: 8px solid transparent; }
+        .chat-bubble.outgoing::before { content: ''; position: absolute; top: 0; left: -7px; width: 0; height: 0; border-top: 0px solid transparent; border-right: 8px solid #fff; border-bottom: 8px solid transparent; }
         .chat-time { font-size: 9.5px; color: #999; margin-top: 2px; text-align: right; display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
         .chat-ticks { color: #53BDEB; font-size: 9px; }
         .chat-typing { align-self: flex-start; background: #fff; padding: 9px 12px; border-radius: 0 8px 8px 8px; display: flex; gap: 4px; align-items: center; opacity: 0; transform: translateY(6px); transition: opacity 0.3s ease, transform 0.3s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
@@ -385,7 +387,7 @@ export default function LandingPageEN() {
         .lp-step { display: grid; grid-template-columns: 52px 1fr; gap: 24px; align-items: start; }
         .lp-step-num { width: 52px; height: 52px; border-radius: 14px; background: #F5F5F5; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 900; color: #111; flex-shrink: 0; }
         .lp-step-title { font-size: 17px; font-weight: 700; color: #111; margin-bottom: 6px; }
-        .lp-step-desc { font-size: 14px; color: #666; line-height: 1.65; }
+        .lp-step-desc { font-size: 15.5px; color: #666; line-height: 1.65; }
 
         /* Features */
         .lp-features { padding: 100px 40px; background: #F9FAFB; }
@@ -424,7 +426,7 @@ export default function LandingPageEN() {
         @keyframes scrollLeft { from { transform: translateX(0); } to { transform: translateX(-50%); } }
         .lp-testi-track:hover { animation-play-state: paused; }
         .lp-testi-card { background: #F9FAFB; border: 1px solid #EBEBEB; border-radius: 16px; padding: 22px 24px; width: 280px; flex-shrink: 0; }
-        .lp-testi-quote { font-size: 13.5px; line-height: 1.65; color: #333; margin-bottom: 14px; }
+        .lp-testi-quote { font-size: 15px; line-height: 1.65; color: #333; margin-bottom: 14px; }
         .lp-testi-author { font-size: 12px; font-weight: 600; color: #888; }
 
         /* 3D mock */
@@ -464,7 +466,7 @@ export default function LandingPageEN() {
         /* ROI */
         .lp-roi { padding: 100px 40px; background: #0A0A0A; }
         .lp-roi-inner { max-width: 900px; margin: 0 auto; }
-        .lp-roi-sub { font-size: 15px; color: rgba(255,255,255,0.5); text-align: center; margin-bottom: 36px; }
+        .lp-roi-sub { font-size: 16px; color: rgba(255,255,255,0.5); text-align: center; margin-bottom: 36px; }
         .lp-roi-slider-row { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; }
         .lp-roi-slider-label { font-size: 13px; color: rgba(255,255,255,0.5); white-space: nowrap; }
         .lp-roi-val { font-size: 22px; font-weight: 800; color: #F59E0B; min-width: 40px; text-align: center; }
@@ -490,7 +492,7 @@ export default function LandingPageEN() {
         .lp-plan-per { font-size: 13px; color: #888; margin-bottom: 24px; }
         .lp-plan-divider { height: 1px; background: #F0F0F0; margin-bottom: 24px; }
         .lp-plan-features { display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
-        .lp-plan-feat { font-size: 13.5px; color: #444; display: flex; align-items: flex-start; gap: 8px; }
+        .lp-plan-feat { font-size: 15px; color: #444; display: flex; align-items: flex-start; gap: 8px; }
         .lp-plan-feat::before { content: "✓"; color: #25D366; font-weight: 700; flex-shrink: 0; }
         .lp-plan-btn { display: block; text-align: center; padding: 13px; border-radius: 10px; font-size: 14px; font-weight: 700; text-decoration: none; transition: opacity 0.15s, transform 0.15s; }
         .lp-plan-btn:hover { opacity: 0.85; transform: translateY(-1px); }
@@ -516,7 +518,7 @@ export default function LandingPageEN() {
         .faq-q { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; cursor: pointer; font-size: 15px; font-weight: 600; color: #111; gap: 16px; }
         .faq-icon { font-size: 20px; color: #999; transition: transform 0.2s; flex-shrink: 0; }
         .faq-a { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
-        .faq-a-inner { padding: 0 0 20px; font-size: 14px; color: #666; line-height: 1.7; }
+        .faq-a-inner { padding: 0 0 20px; font-size: 15.5px; color: #666; line-height: 1.7; }
         .feat-desc { font-size: 13.5px; }
 
         /* CTA section */
@@ -599,7 +601,7 @@ export default function LandingPageEN() {
         {/* NAV */}
         <nav className="lp-nav">
           <a className="lp-nav-logo" href="/en">
-            <video src="/logo_animation.mp4" autoPlay loop muted playsInline style={{ width: 32, height: 32, borderRadius: 8 }} />
+            <img src="/tori_logo_transparent.png" alt="Tori" style={{ width: 32, height: 32, borderRadius: 8 }} />
             <span>Tori</span>
           </a>
           <div className="lp-nav-links">
@@ -698,10 +700,6 @@ export default function LandingPageEN() {
                     <div className="phone-wa-info">
                       <div className="phone-wa-name">Tori — Dana's Salon</div>
                       <div className="phone-wa-online">online</div>
-                    </div>
-                    <div className="phone-wa-actions">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#128C7E" strokeWidth="2"><path d="M15.05 5A5 5 0 0 1 19 8.95M15.05 1A9 9 0 0 1 23 8.94m-1 7.98v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 10a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6 6l.9-.9a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.5 16.5z"/></svg>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#128C7E" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
                     </div>
                   </div>
                   <div className="phone-chat">

@@ -260,7 +260,7 @@ export default function LandingPage() {
         @keyframes pulse-green { 0%,100% { box-shadow: 0 0 0 0 rgba(37,211,102,0.4); } 50% { box-shadow: 0 0 0 5px rgba(37,211,102,0); } }
         .lp-h1 { font-size: clamp(36px, 4.5vw, 62px); font-weight: 800; line-height: 1.06; letter-spacing: -2.5px; color: #0A0A0A; max-width: 520px; margin-bottom: 20px; animation: fadeUp 0.7s ease 0.3s both; }
         .lp-h1 .green { color: #25D366; }
-        .lp-hero-sub { font-size: clamp(15px, 1.4vw, 17px); color: #666; line-height: 1.75; max-width: 420px; margin-bottom: 36px; animation: fadeUp 0.7s ease 0.4s both; }
+        .lp-hero-sub { font-size: clamp(16px, 1.5vw, 18px); color: #666; line-height: 1.75; max-width: 420px; margin-bottom: 36px; animation: fadeUp 0.7s ease 0.4s both; }
         .lp-hero-ctas { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 40px; animation: fadeUp 0.7s ease 0.5s both; }
         .lp-hero-types { display: flex; flex-wrap: wrap; gap: 7px; animation: fadeUp 0.6s ease 0.65s both; }
         .lp-type-pill { display: flex; align-items: center; gap: 5px; background: #F5F5F5; border: 1px solid #E8E8E8; border-radius: 20px; padding: 5px 12px; font-size: 11.5px; color: #555; font-weight: 500; }
@@ -327,8 +327,9 @@ export default function LandingPage() {
 
         /* Bubbles */
         .chat-bubble { max-width: 78%; padding: 6px 9px 4px; font-size: 12px; line-height: 1.5; position: relative; word-break: break-word; }
+        /* Customer's own messages — green, right side */
         .chat-bubble.incoming {
-          background: #fff; align-self: flex-end;
+          background: #DCF8C6; align-self: flex-end;
           border-radius: 0 10px 10px 10px;
           box-shadow: 0 1px 2px rgba(0,0,0,0.12);
           color: #111;
@@ -336,11 +337,12 @@ export default function LandingPage() {
         }
         .chat-bubble.incoming::before {
           content: ''; position: absolute; top: 0; right: -7px;
-          border: 7px solid transparent; border-top-color: #fff; border-left-color: #fff;
+          border: 7px solid transparent; border-top-color: #DCF8C6; border-left-color: #DCF8C6;
           border-radius: 2px 0 0 0;
         }
+        /* Bot (salon) messages — white, left side */
         .chat-bubble.outgoing {
-          background: #DCF8C6; align-self: flex-start;
+          background: #fff; align-self: flex-start;
           border-radius: 10px 0 10px 10px;
           box-shadow: 0 1px 2px rgba(0,0,0,0.12);
           color: #111;
@@ -348,7 +350,7 @@ export default function LandingPage() {
         }
         .chat-bubble.outgoing::before {
           content: ''; position: absolute; top: 0; left: -7px;
-          border: 7px solid transparent; border-top-color: #DCF8C6; border-right-color: #DCF8C6;
+          border: 7px solid transparent; border-top-color: #fff; border-right-color: #fff;
           border-radius: 0 2px 0 0;
         }
         .chat-time { font-size: 9px; color: #aaa; text-align: left; margin-top: 1px; display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
@@ -357,15 +359,15 @@ export default function LandingPage() {
         /* Typing indicator */
         .chat-typing {
           display: flex; align-items: center; gap: 3px;
-          background: #fff; align-self: flex-end;
-          padding: 10px 13px; border-radius: 0 10px 10px 10px;
+          background: #fff; align-self: flex-start;
+          padding: 10px 13px; border-radius: 10px 0 10px 10px;
           box-shadow: 0 1px 2px rgba(0,0,0,0.12);
-          margin-right: 2px;
+          margin-left: 2px; position: relative;
         }
         .chat-typing::before {
-          content: ''; position: absolute; top: 0; right: -7px;
-          border: 7px solid transparent; border-top-color: #fff; border-left-color: #fff;
-          border-radius: 2px 0 0 0;
+          content: ''; position: absolute; top: 0; left: -7px;
+          border: 7px solid transparent; border-top-color: #fff; border-right-color: #fff;
+          border-radius: 0 2px 0 0;
         }
         .typing-dot { width: 7px; height: 7px; border-radius: 50%; background: #B0B0B0; animation: typing-bounce 1.4s ease infinite; }
         .typing-dot:nth-child(2) { animation-delay: 0.18s; }
@@ -382,7 +384,7 @@ export default function LandingPage() {
         .chat-bubble { opacity: 0; transform: translateY(8px) scale(0.9); transition: opacity 0.3s ease, transform 0.34s cubic-bezier(0.22, 1, 0.36, 1); }
         .chat-bubble.incoming { transform-origin: top right; }
         .chat-bubble.outgoing { transform-origin: top left; }
-        .chat-typing { opacity: 0; transform: translateY(6px) scale(0.92); transition: opacity 0.22s ease, transform 0.22s ease; transform-origin: top right; }
+        .chat-typing { opacity: 0; transform: translateY(6px) scale(0.92); transition: opacity 0.22s ease, transform 0.22s ease; transform-origin: top left; }
         .chat-bubble.show, .chat-typing.show { opacity: 1; transform: none; }
         /* Header live "typing…" state */
         .phone-wa-online.is-typing { color: #25D366; }
@@ -494,7 +496,7 @@ export default function LandingPage() {
         .lp-step:last-child { border-left: none; }
         .lp-step-num { font-size: 12px; font-weight: 700; color: #25D366; margin-bottom: 20px; letter-spacing: 0.06em; }
         .lp-step-title { font-size: 16px; font-weight: 700; color: #111; margin-bottom: 10px; letter-spacing: -0.3px; line-height: 1.35; }
-        .lp-step-desc { font-size: 15px; color: #666; line-height: 1.7; }
+        .lp-step-desc { font-size: 16px; color: #666; line-height: 1.7; }
 
         /* FEATURES */
         .lp-features { background: #F8F8F8; padding: 100px 40px; }
@@ -504,7 +506,7 @@ export default function LandingPage() {
         .lp-feat:hover { box-shadow: 0 16px 40px rgba(0,0,0,0.08); }
         .lp-feat-icon { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; font-size: 20px; background: #F0FFF4; }
         .lp-feat-title { font-size: 15px; font-weight: 700; color: #111; margin-bottom: 7px; letter-spacing: -0.2px; }
-        .lp-feat-desc { font-size: 14.5px; color: #666; line-height: 1.65; }
+        .lp-feat-desc { font-size: 16px; color: #666; line-height: 1.65; }
 
         /* TESTIMONIALS */
         .lp-testi { padding: 100px 40px; background: #fff; }
@@ -514,7 +516,7 @@ export default function LandingPage() {
         .lp-testi-card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0,0,0,0.07); }
         .lp-testi-stars { display: flex; gap: 2px; }
         .lp-testi-star { color: #F59E0B; font-size: 14px; }
-        .lp-testi-quote { font-size: 15px; color: #333; line-height: 1.7; flex: 1; }
+        .lp-testi-quote { font-size: 16px; color: #333; line-height: 1.7; flex: 1; }
         .lp-testi-footer { display: flex; align-items: center; gap: 12px; padding-top: 16px; border-top: 1px solid #E8E8E8; }
         .lp-testi-avatar { width: 38px; height: 38px; border-radius: 50%; font-size: 15px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .lp-testi-name { font-size: 13px; font-weight: 700; color: #111; }
@@ -537,7 +539,7 @@ export default function LandingPage() {
         .before .lp-ba-tag { color: #F87171; }
         .after .lp-ba-tag { color: #4ADE80; }
         .lp-ba-items { display: flex; flex-direction: column; gap: 16px; }
-        .lp-ba-item { display: flex; align-items: flex-start; gap: 12px; font-size: 15px; line-height: 1.6; color: rgba(255,255,255,0.75); }
+        .lp-ba-item { display: flex; align-items: flex-start; gap: 12px; font-size: 16px; line-height: 1.6; color: rgba(255,255,255,0.75); }
         .lp-ba-bullet { font-size: 14px; margin-top: 1px; flex-shrink: 0; font-weight: 700; }
         .before .lp-ba-bullet { color: #F87171; }
         .after .lp-ba-bullet { color: #4ADE80; }
@@ -549,7 +551,7 @@ export default function LandingPage() {
         .lp-premium-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.25); color: #F59E0B; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 20px; margin-bottom: 18px; letter-spacing: 0.08em; text-transform: uppercase; }
         .lp-premium-title { font-size: clamp(28px, 3vw, 42px); font-weight: 800; color: #fff; letter-spacing: -1.5px; line-height: 1.1; margin-bottom: 16px; }
         .lp-premium-title .amber { color: #F59E0B; }
-        .lp-premium-desc { font-size: 15px; color: rgba(255,255,255,0.72); line-height: 1.75; margin-bottom: 28px; }
+        .lp-premium-desc { font-size: 16px; color: rgba(255,255,255,0.72); line-height: 1.75; margin-bottom: 28px; }
         .lp-premium-note { display: inline-flex; align-items: center; gap: 8px; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); border-radius: 8px; padding: 10px 16px; font-size: 13px; color: rgba(255,255,255,0.72); margin-bottom: 32px; }
         .lp-premium-note strong { color: #F59E0B; }
         .btn-amber { display: inline-flex; align-items: center; gap: 8px; background: #F59E0B; color: #000; font-size: 14px; font-weight: 700; padding: 12px 24px; border-radius: 9px; text-decoration: none; transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s; box-shadow: 0 4px 16px rgba(245,158,11,0.3); }
@@ -597,7 +599,7 @@ export default function LandingPage() {
         .lp-plan-divider { height: 1px; background: #EBEBEB; margin-bottom: 24px; }
         .lp-plan.featured .lp-plan-divider { background: rgba(255,255,255,0.08); }
         .lp-plan-features { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
-        .lp-plan-feat { display: flex; align-items: flex-start; gap: 10px; font-size: 15px; color: #444; line-height: 1.5; }
+        .lp-plan-feat { display: flex; align-items: flex-start; gap: 10px; font-size: 16px; color: #444; line-height: 1.5; }
         .lp-plan.featured .lp-plan-feat { color: rgba(255,255,255,0.82); }
         .lp-plan-feat .check { color: #25D366; font-size: 13px; flex-shrink: 0; margin-top: 1px; }
         .lp-plan.featured .lp-plan-feat .check { color: #F59E0B; }
@@ -612,7 +614,7 @@ export default function LandingPage() {
         .lp-roi-inner { max-width: 700px; margin: 0 auto; text-align: center; }
         .lp-roi .lp-label { color: #F59E0B; }
         .lp-roi .lp-title { color: #fff; margin-bottom: 16px; }
-        .lp-roi-sub { font-size: 15px; color: rgba(255,255,255,0.65); margin-bottom: 48px; }
+        .lp-roi-sub { font-size: 16px; color: rgba(255,255,255,0.65); margin-bottom: 48px; }
         .lp-roi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 36px; }
         .lp-roi-cell { padding: 28px 20px; background: #141414; border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; text-align: center; }
         .lp-roi-n { font-size: 36px; font-weight: 800; letter-spacing: -2px; color: #fff; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
@@ -628,17 +630,17 @@ export default function LandingPage() {
         .lp-faq-list { display: flex; flex-direction: column; gap: 0; margin-top: 52px; border: 1px solid #E8E8E8; border-radius: 14px; overflow: hidden; }
         .faq-item { background: #fff; border-bottom: 1px solid #EBEBEB; }
         .faq-item:last-child { border-bottom: none; }
-        .faq-q { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 24px; cursor: pointer; font-size: 15px; font-weight: 600; color: #111; transition: background 0.15s; user-select: none; }
+        .faq-q { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 24px; cursor: pointer; font-size: 16px; font-weight: 600; color: #111; transition: background 0.15s; user-select: none; }
         .faq-q:hover { background: #FAFAFA; }
         .faq-icon { width: 20px; height: 20px; border-radius: 50%; background: #F0F0F0; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #555; flex-shrink: 0; transition: transform 0.25s ease, background 0.15s; font-style: normal; }
         .faq-item.open .faq-icon { background: #25D366; color: #fff; }
         .faq-a { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
-        .faq-a-inner { padding: 0 24px 20px; font-size: 15px; color: #555; line-height: 1.75; }
+        .faq-a-inner { padding: 0 24px 20px; font-size: 16px; color: #555; line-height: 1.75; }
 
         /* CTA */
         .lp-cta { background: #fff; padding: 120px 40px; text-align: center; }
         .lp-cta-title { font-size: clamp(28px, 4.5vw, 56px); font-weight: 800; letter-spacing: -2.5px; color: #0A0A0A; margin-bottom: 12px; line-height: 1.05; }
-        .lp-cta-sub { font-size: 16px; color: #888; margin-bottom: 36px; }
+        .lp-cta-sub { font-size: 17px; color: #888; margin-bottom: 36px; }
         .lp-cta-row { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
         .lp-cta-trust { display: flex; align-items: center; justify-content: center; gap: 20px; margin-top: 28px; flex-wrap: wrap; }
         .lp-cta-trust-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #AAA; }
@@ -811,7 +813,7 @@ export default function LandingPage() {
         {/* NAV */}
         <nav className="lp-nav">
           <a className="lp-nav-logo" href="#">
-            <video src="/logo_animation.mp4" autoPlay loop muted playsInline style={{ width: 32, height: 32, borderRadius: 8 }} />
+            <img src="/tori_logo_transparent.png" alt="תורי" style={{ width: 32, height: 32, borderRadius: 8 }} />
             <span>תורי</span>
           </a>
           <div className="lp-nav-links">
@@ -904,10 +906,6 @@ export default function LandingPage() {
                     <div className="phone-wa-info">
                       <div className="phone-wa-name">תורי — סלון דנה</div>
                       <div className="phone-wa-online">מחובר</div>
-                    </div>
-                    <div className="phone-wa-actions">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#128C7E" strokeWidth="2"><path d="M15.05 5A5 5 0 0 1 19 8.95M15.05 1A9 9 0 0 1 23 8.94m-1 7.98v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 10a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6 6l.9-.9a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.5 16.5z"/></svg>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#128C7E" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
                     </div>
                   </div>
                   <div className="phone-chat">
