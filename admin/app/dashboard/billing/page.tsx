@@ -11,8 +11,74 @@ const STATUS_COLORS: Record<string, string> = {
   canceled: "bg-gray-100 text-gray-500 border-gray-200",
 };
 
+const SUBSCRIPTION_COST = 149; // ₪/month
+const WEEKS_PER_MONTH = 4.33;
+const AFTER_HOURS_CAPTURE = 0.15; // share of bookings recovered by answering 24/7
+const MINUTES_SAVED_PER_BOOKING = 4; // manual admin time saved per booking
+
+function SavingsCalculator({ lang }: { lang: "he" | "en" }) {
+  const [weekly, setWeekly] = useState(40);
+  const [price, setPrice] = useState(120);
+  const he = lang === "he";
+
+  const monthlyBookings = weekly * WEEKS_PER_MONTH;
+  const recoveredRevenue = Math.round(monthlyBookings * AFTER_HOURS_CAPTURE * price);
+  const hoursSaved = Math.round((monthlyBookings * MINUTES_SAVED_PER_BOOKING) / 60);
+  const netSavings = recoveredRevenue - SUBSCRIPTION_COST;
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-6 mt-4">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-lg">🧮</span>
+        <h2 className="text-sm font-semibold text-gray-900">{he ? "מחשבון חיסכון" : "Savings calculator"}</h2>
+      </div>
+      <p className="text-xs text-gray-500 mb-5">
+        {he ? "הערכה של החיסכון החודשי שלך עם תורי" : "An estimate of your monthly savings with Tori"}
+      </p>
+
+      <div className="flex flex-col gap-5">
+        <div>
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-gray-600">{he ? "תורים בשבוע" : "Appointments per week"}</span>
+            <span className="font-bold text-[#1B7FA0]">{weekly}</span>
+          </div>
+          <input type="range" min={5} max={150} value={weekly} onChange={(e) => setWeekly(+e.target.value)} className="w-full accent-[#1B7FA0]" />
+        </div>
+        <div>
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-gray-600">{he ? "מחיר ממוצע לתור (₪)" : "Average price per appointment (₪)"}</span>
+            <span className="font-bold text-[#1B7FA0]">₪{price}</span>
+          </div>
+          <input type="range" min={30} max={500} step={10} value={price} onChange={(e) => setPrice(+e.target.value)} className="w-full accent-[#1B7FA0]" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3 mt-6">
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center">
+          <div className="text-lg font-extrabold text-gray-900 tabular-nums">₪{recoveredRevenue.toLocaleString()}</div>
+          <div className="text-[11px] text-gray-500 mt-0.5">{he ? "הכנסה משוחזרת/חודש" : "Recovered revenue/mo"}</div>
+        </div>
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center">
+          <div className="text-lg font-extrabold text-gray-900 tabular-nums">{hoursSaved}</div>
+          <div className="text-[11px] text-gray-500 mt-0.5">{he ? "שעות שנחסכו/חודש" : "Hours saved/mo"}</div>
+        </div>
+        <div className="bg-[#1B7FA0]/10 border border-[#1B7FA0]/30 rounded-lg p-3 text-center">
+          <div className="text-lg font-extrabold text-[#1B7FA0] tabular-nums">₪{netSavings.toLocaleString()}</div>
+          <div className="text-[11px] text-gray-500 mt-0.5">{he ? "חיסכון נטו/חודש" : "Net savings/mo"}</div>
+        </div>
+      </div>
+
+      <p className="text-[11px] text-gray-400 mt-4 leading-relaxed">
+        {he
+          ? `בהנחה ש-${Math.round(AFTER_HOURS_CAPTURE * 100)}% מהתורים נקבעים מחוץ לשעות העבודה (שאחרת היו אובדים), בניכוי עלות המנוי (₪${SUBSCRIPTION_COST}/חודש). הערכה בלבד.`
+          : `Assumes ${Math.round(AFTER_HOURS_CAPTURE * 100)}% of bookings happen after-hours (otherwise lost), minus the subscription (₪${SUBSCRIPTION_COST}/mo). Estimate only.`}
+      </p>
+    </div>
+  );
+}
+
 export default function BillingPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [status, setStatus] = useState<string | null>(null);
   const [whatsappConnected, setWhatsappConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -117,6 +183,8 @@ export default function BillingPage() {
           </>
         )}
       </div>
+
+      <SavingsCalculator lang={lang} />
     </div>
   );
 }

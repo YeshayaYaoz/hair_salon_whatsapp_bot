@@ -646,17 +646,18 @@ export default function LandingPage() {
         .lp-cta-trust-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #AAA; }
 
         /* FOOTER */
-        .lp-footer { background: #0A0A0A; padding: 56px 44px 36px; }
-        .lp-footer-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 40px; gap: 48px; flex-wrap: wrap; }
-        .lp-footer-brand-block { max-width: 260px; }
-        .lp-footer-logo-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-        .lp-footer-logo-row img { width: 28px; height: 28px; border-radius: 7px; opacity: 0.9; }
-        .lp-footer-brand { font-size: 15px; font-weight: 700; color: #fff; }
-        .lp-footer-tagline { font-size: 13.5px; color: rgba(255,255,255,0.62); line-height: 1.7; }
-        .lp-footer-cols { display: flex; gap: 56px; flex-wrap: wrap; }
-        .lp-footer-col h4 { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.4); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 14px; }
-        .lp-footer-col a { display: block; font-size: 13.5px; color: rgba(255,255,255,0.65); text-decoration: none; margin-bottom: 10px; transition: color 0.15s; }
-        .lp-footer-col a:hover { color: #fff; }
+        .lp-footer { background: #0A0A0A; padding: 64px 44px 36px; }
+        .lp-footer-top { display: grid; grid-template-columns: 1.7fr 1fr 1fr 1.5fr; gap: 48px; margin-bottom: 44px; align-items: start; max-width: 1200px; }
+        .lp-footer-brand-block { max-width: 300px; }
+        .lp-footer-logo-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+        .lp-footer-logo-row img { width: 30px; height: 30px; border-radius: 7px; opacity: 0.95; }
+        .lp-footer-brand { font-size: 16px; font-weight: 700; color: #fff; }
+        .lp-footer-tagline { font-size: 14px; color: rgba(255,255,255,0.62); line-height: 1.7; }
+        .lp-footer-col h4 { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.4); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 16px; }
+        .lp-footer-col a { display: block; font-size: 14px; color: rgba(255,255,255,0.65); text-decoration: none; margin-bottom: 11px; transition: color 0.15s; }
+        .lp-footer-col a:hover { color: #25D366; }
+        /* "Suitable for" uses a compact 2-column list so the many business types stay tidy */
+        .lp-footer-suitable { display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; }
         .lp-footer-bottom { display: flex; align-items: center; justify-content: space-between; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08); flex-wrap: wrap; gap: 12px; }
         .lp-footer-copy { font-size: 12.5px; color: rgba(255,255,255,0.45); }
 
@@ -702,7 +703,8 @@ export default function LandingPage() {
           .lp-faq { padding: 72px 20px; }
           .lp-cta { padding: 72px 20px; }
           .lp-footer { padding: 32px 20px; }
-          .lp-footer-top { flex-direction: column; gap: 28px; }
+          .lp-footer-top { grid-template-columns: 1fr 1fr; gap: 32px; }
+          .lp-footer-brand-block { grid-column: 1 / -1; }
           .lp-stats-band { padding: 40px 20px; }
           .lp-stats-band-inner { grid-template-columns: 1fr 1fr; }
           .lp-flow { padding: 72px 20px; }
@@ -820,6 +822,7 @@ export default function LandingPage() {
             <a className="lp-nav-link" href="#how">איך זה עובד</a>
             <a className="lp-nav-link" href="#features">תכונות</a>
             <a className="lp-nav-link" href="#premium">פרמיום</a>
+            <a className="lp-nav-link" href="#roi">מחשבון חיסכון</a>
             <a className="lp-nav-link" href="#pricing">מחירים</a>
             <a className="lp-nav-link" href="#faq">FAQ</a>
           </div>
@@ -834,6 +837,7 @@ export default function LandingPage() {
           <a className="mobile-nav-link" href="#how" onClick={() => setMenuOpen(false)}>איך זה עובד</a>
           <a className="mobile-nav-link" href="#features" onClick={() => setMenuOpen(false)}>תכונות</a>
           <a className="mobile-nav-link" href="#premium" onClick={() => setMenuOpen(false)}>פרמיום</a>
+          <a className="mobile-nav-link" href="#roi" onClick={() => setMenuOpen(false)}>מחשבון חיסכון</a>
           <a className="mobile-nav-link" href="#pricing" onClick={() => setMenuOpen(false)}>מחירים</a>
           <a className="mobile-nav-link" href="#faq" onClick={() => setMenuOpen(false)}>שאלות נפוצות</a>
           <div className="mobile-nav-divider" />
@@ -1392,7 +1396,7 @@ export default function LandingPage() {
         </section>
 
         {/* INTERACTIVE ROI CALCULATOR */}
-        <section className="lp-roi">
+        <section className="lp-roi" id="roi">
           <div className="lp-roi-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>מחשבון חיסכון</div>
             <div className="lp-title reveal" style={{ color: "#fff", textAlign: "center" }}>כמה תורי חוסך לך?</div>
@@ -1573,26 +1577,33 @@ export default function LandingPage() {
               </div>
               <div className="lp-footer-tagline">בוט WhatsApp AI שקובע תורים אוטומטית לסלונים ועסקים קטנים — 24/7, ללא מגע יד אדם.</div>
             </div>
-            <div className="lp-footer-cols">
-              <div className="lp-footer-col">
-                <h4>מוצר</h4>
-                <a href="#how">איך זה עובד</a>
-                <a href="#features">תכונות</a>
-                <a href="#premium">פרמיום</a>
-                <a href="#pricing">מחירים</a>
-              </div>
-              <div className="lp-footer-col">
-                <h4>עזרה</h4>
-                <a href="#faq">שאלות נפוצות</a>
-                <a href="/login">כניסה לדשבורד</a>
-                <a href="/en">English</a>
-              </div>
-              <div className="lp-footer-col">
-                <h4>מתאים ל</h4>
+            <div className="lp-footer-col">
+              <h4>מוצר</h4>
+              <a href="#how">איך זה עובד</a>
+              <a href="#features">תכונות</a>
+              <a href="#premium">פרמיום</a>
+              <a href="#pricing">מחירים</a>
+              <a href="#roi">מחשבון חיסכון</a>
+            </div>
+            <div className="lp-footer-col">
+              <h4>עזרה</h4>
+              <a href="#faq">שאלות נפוצות</a>
+              <a href="/login">כניסה לדשבורד</a>
+              <a href="/en">English</a>
+            </div>
+            <div className="lp-footer-col">
+              <h4>מתאים ל</h4>
+              <div className="lp-footer-suitable">
                 <a href="#">סלוני שיער</a>
+                <a href="#">מספרות</a>
+                <a href="#">ציפורניים</a>
+                <a href="#">קוסמטיקה</a>
+                <a href="#">עיסוי וספא</a>
                 <a href="#">קליניקות</a>
-                <a href="#">ספרים</a>
+                <a href="#">מרפאות שיניים</a>
                 <a href="#">סטודיו כושר</a>
+                <a href="#">צימרים</a>
+                <a href="#">וטרינרים</a>
               </div>
             </div>
           </div>
