@@ -1,5 +1,4 @@
-# 1. Overwrite the file with explicit white background and dark text styles
-cat << 'EOF' > app/privacy/page.tsx
+```tsx
 import React from 'react';
 
 export default function PrivacyPolicy() {
@@ -53,9 +52,5 @@ export default function PrivacyPolicy() {
     </div>
   );
 }
-EOF
 
-# 2. Stage, commit, and push the fix
-git add app/privacy/page.tsx
-git commit -m "fix: force white background and dark text on privacy policy page"
-git push origin main
+```
