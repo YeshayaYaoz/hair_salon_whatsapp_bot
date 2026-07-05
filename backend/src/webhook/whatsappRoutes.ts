@@ -2,8 +2,10 @@ import { Router } from "express";
 import express from "express";
 import crypto from "crypto";
 import { resolveBusinessByPhoneNumberId } from "../tenants/resolve.js";
-import { sendWhatsAppMessage, sendWhatsAppList, type ListRow } from "./whatsappClient.js";
+import { sendWhatsAppMessage, sendWhatsAppList, WhatsAppAuthError, type ListRow } from "./whatsappClient.js";
+import { sendWhatsAppTokenExpiredEmail } from "../lib/email.js";
 import { handleIncomingMessage } from "../bot/claudeBot.js";
+import { clearHistory } from "../bot/conversationStore.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { hasActiveSubscription } from "../lib/subscriptionGate.js";
 import { rateLimit } from "../lib/rateLimit.js";
@@ -55,15 +57,32 @@ function verifyMetaSignature(rawBody: Buffer, signature: string | undefined): bo
 
 const rawBodyMiddleware = express.raw({ type: "application/json" });
 
-/** Extracts the customer's text from either a typed message or a tapped interactive list row. */
-function extractMessageText(message: any): string | null {
-  if (message.type === "text") return message.text.body as string;
+type ExtractedMessage =
+  | { kind: "text"; text: string }
+  | { kind: "reset" }
+  | { kind: "unsupported" }
+  | { kind: "ignore" };
+
+// Keywords that reset the conversation, in Hebrew and English.
+const RESET_KEYWORDS = ["התחל מחדש", "אתחל", "איפוס", "restart", "start over", "reset"];
+
+/** Classifies an incoming WhatsApp message into how the bot should react. */
+function extractMessage(message: any): ExtractedMessage {
+  if (message.type === "text") {
+    const body = (message.text?.body as string ?? "").trim();
+    if (RESET_KEYWORDS.some((k) => body.toLowerCase() === k.toLowerCase())) return { kind: "reset" };
+    return { kind: "text", text: body };
+  }
   if (message.type === "interactive" && message.interactive?.type === "list_reply") {
     // The row id is the slot's ISO start time (see buildSlotRows); phrase it as a natural reply
     // so Claude's book_appointment tool call still has the exact ISO time to work with.
-    return `אני רוצה את המועד ${message.interactive.list_reply.title} (${message.interactive.list_reply.id})`;
+    return { kind: "text", text: `אני רוצה את המועד ${message.interactive.list_reply.title} (${message.interactive.list_reply.id})` };
   }
-  return null;
+  // Voice notes, images, stickers, documents, location, etc. — the bot can't read these.
+  if (["audio", "voice", "image", "video", "sticker", "document", "location", "contacts"].includes(message.type)) {
+    return { kind: "unsupported" };
+  }
+  return { kind: "ignore" };
 }
 
 function buildSlotRows(slots: { startTime: string }[]): ListRow[] {
@@ -96,6 +115,7 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
   let phoneNumberId: string | undefined;
   let accessToken: string | undefined;
   let customerPhone: string | undefined;
+  let businessRef: { id: string; name: string; email: string } | undefined;
 
   try {
     const entry = payload?.entry?.[0];
@@ -109,8 +129,8 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
       return;
     }
 
-    const text = extractMessageText(message);
-    if (!text) return;
+    const extracted = extractMessage(message);
+    if (extracted.kind === "ignore") return;
 
     const business = await resolveBusinessByPhoneNumberId(phoneNumberId);
     if (!business?.whatsappAccessToken) {
@@ -124,8 +144,25 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
 
     customerPhone = message.from as string;
     accessToken = decryptSecret(business.whatsappAccessToken);
+    businessRef = { id: business.id, name: business.name, email: business.email };
 
-    const { text: reply, offeredSlots } = await handleIncomingMessage(business.id, customerPhone, text);
+    if (extracted.kind === "reset") {
+      await clearHistory(business.id, customerPhone);
+      await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: "השיחה אופסה. איך אפשר לעזור? 😊" });
+      return;
+    }
+
+    if (extracted.kind === "unsupported") {
+      await sendWhatsAppMessage({
+        phoneNumberId,
+        accessToken,
+        to: customerPhone,
+        text: "מצטערים, אני יכול לקרוא רק הודעות טקסט. אנא כתבו לי מה תרצו ואשמח לעזור 😊",
+      });
+      return;
+    }
+
+    const { text: reply, offeredSlots } = await handleIncomingMessage(business.id, customerPhone, extracted.text);
 
     if (offeredSlots && offeredSlots.length > 0) {
       await sendWhatsAppList({
@@ -140,6 +177,17 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
       await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: reply });
     }
   } catch (err) {
+    // A bad/expired access token: alert the owner by email (we can't WhatsApp them — same token).
+    if (err instanceof WhatsAppAuthError) {
+      console.error("WhatsApp access token expired/invalid:", err.message);
+      if (businessRef?.email) {
+        await sendWhatsAppTokenExpiredEmail(businessRef.email, businessRef.name).catch((mailErr) =>
+          console.error("Failed to send token-expiry email:", mailErr)
+        );
+      }
+      return;
+    }
+
     console.error("Error handling WhatsApp webhook event:", err);
     // Let the customer know something went wrong instead of leaving them hanging on silence.
     if (phoneNumberId && accessToken && customerPhone) {

@@ -1,11 +1,22 @@
 import { prisma } from "./prisma.js";
 import { encryptSecret, decryptSecret } from "./crypto.js";
 
-const CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
-const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
-const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI!;
+const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI;
+
+export class GoogleCalendarNotConfiguredError extends Error {
+  constructor() {
+    super("Google Calendar integration is not configured on the server (missing GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REDIRECT_URI).");
+    this.name = "GoogleCalendarNotConfiguredError";
+  }
+}
 
 export function getAuthUrl(state: string): string {
+  // Guard against building a malformed URL (client_id=undefined) that makes Google return a raw 400.
+  if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI) {
+    throw new GoogleCalendarNotConfiguredError();
+  }
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     redirect_uri: REDIRECT_URI,
@@ -18,19 +29,25 @@ export function getAuthUrl(state: string): string {
   return `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
 }
 
+function requireConfig(): { clientId: string; clientSecret: string; redirectUri: string } {
+  if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI) throw new GoogleCalendarNotConfiguredError();
+  return { clientId: CLIENT_ID, clientSecret: CLIENT_SECRET, redirectUri: REDIRECT_URI };
+}
+
 async function exchangeCode(code: string): Promise<{
   access_token: string;
   refresh_token: string;
   expires_in: number;
 }> {
+  const { clientId, clientSecret, redirectUri } = requireConfig();
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       code,
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-      redirect_uri: REDIRECT_URI,
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: redirectUri,
       grant_type: "authorization_code",
     }),
   });
@@ -40,13 +57,14 @@ async function exchangeCode(code: string): Promise<{
 }
 
 async function refreshAccessToken(refreshToken: string): Promise<{ access_token: string; expires_in: number }> {
+  const { clientId, clientSecret } = requireConfig();
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       refresh_token: refreshToken,
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
+      client_id: clientId,
+      client_secret: clientSecret,
       grant_type: "refresh_token",
     }),
   });

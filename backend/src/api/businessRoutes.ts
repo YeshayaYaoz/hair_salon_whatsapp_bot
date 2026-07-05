@@ -4,7 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth, type AuthedRequest } from "../lib/auth.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import { requireActiveSubscription } from "../lib/subscriptionGate.js";
-import { getAuthUrl, saveGoogleTokens, disconnectGoogleCalendar } from "../lib/googleCalendar.js";
+import { getAuthUrl, saveGoogleTokens, disconnectGoogleCalendar, GoogleCalendarNotConfiguredError } from "../lib/googleCalendar.js";
 import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
 
 export const businessRouter = Router();
@@ -419,8 +419,15 @@ businessRouter.get("/google-calendar/status", async (req: AuthedRequest, res) =>
 });
 
 businessRouter.get("/google-calendar/auth-url", async (req: AuthedRequest, res) => {
-  const url = getAuthUrl(req.businessId!);
-  res.json({ url });
+  try {
+    const url = getAuthUrl(req.businessId!);
+    res.json({ url });
+  } catch (err) {
+    if (err instanceof GoogleCalendarNotConfiguredError) {
+      return res.status(503).json({ error: "אינטגרציית Google Calendar אינה מוגדרת בשרת. פנה לתמיכה." });
+    }
+    throw err;
+  }
 });
 
 businessRouter.post("/google-calendar/callback", async (req: AuthedRequest, res) => {

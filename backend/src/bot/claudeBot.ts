@@ -2,7 +2,7 @@ import Anthropic, { APIError } from "@anthropic-ai/sdk";
 import { prisma } from "../lib/prisma.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { appendTurn, getHistory, type Turn } from "./conversationStore.js";
-import { findAvailableSlots, createAppointment, type AvailableSlot } from "../booking/availability.js";
+import { findAvailableSlots, createAppointment, SlotUnavailableError, type AvailableSlot } from "../booking/availability.js";
 import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { syncAppointmentToCalendar } from "../lib/googleCalendar.js";
@@ -138,14 +138,22 @@ async function runTool(
       const all = await prisma.service.findMany({ where: { businessId }, select: { name: true } });
       return JSON.stringify({ error: "Unknown service", availableServices: all.map((s) => s.name) });
     }
-    const appointment = await createAppointment({
-      businessId,
-      serviceId: service.id,
-      customerPhone,
-      customerName: input.customerName as string | undefined,
-      startTime: new Date(input.startTime as string),
-      overrideDurationMin: input.durationMin as number | undefined,
-    });
+    let appointment;
+    try {
+      appointment = await createAppointment({
+        businessId,
+        serviceId: service.id,
+        customerPhone,
+        customerName: input.customerName as string | undefined,
+        startTime: new Date(input.startTime as string),
+        overrideDurationMin: input.durationMin as number | undefined,
+      });
+    } catch (err) {
+      if (err instanceof SlotUnavailableError) {
+        return JSON.stringify({ error: "Slot no longer available — it was just taken. Call check_availability again to offer other times." });
+      }
+      throw err;
+    }
     lastOfferedSlots.value = undefined;
 
     await prisma.customer.updateMany({

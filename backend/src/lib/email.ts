@@ -34,6 +34,21 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   });
 }
 
+export async function sendWhatsAppTokenExpiredEmail(to: string, businessName: string) {
+  await resendSend({
+    from: "תורי <noreply@torionline.com>",
+    to,
+    subject: "⚠️ חיבור הוואטסאפ נותק — תורי",
+    html: `
+      <div dir="rtl" style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#09090b;color:#e4e4e7;border-radius:12px;">
+        <h2 style="color:#fff;margin-bottom:8px;">חיבור הוואטסאפ של ${businessName} נותק</h2>
+        <p style="color:#a1a1aa;margin-bottom:24px;">אישור הגישה לוואטסאפ פג תוקף, והבוט אינו יכול לשלוח הודעות ללקוחות. יש לחבר מחדש את הוואטסאפ בדשבורד כדי להמשיך לקבל הזמנות.</p>
+        <a href="${APP_URL}/dashboard/whatsapp" style="display:inline-block;background:#1B7FA0;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;">חיבור מחדש</a>
+      </div>
+    `,
+  });
+}
+
 export async function sendWelcomeEmail(to: string, name: string) {
   await resendSend({
     from: "תורי <noreply@torionline.com>",

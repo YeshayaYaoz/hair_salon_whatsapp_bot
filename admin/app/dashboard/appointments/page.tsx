@@ -155,7 +155,20 @@ export default function AppointmentsPage() {
     setAppointments(await apiFetch<Appointment[]>("/api/business/appointments"));
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    // Auto-refresh so new bookings made via WhatsApp appear without a manual reload.
+    const interval = setInterval(() => {
+      load().catch(() => {});
+    }, 30_000);
+    // Also refresh when the tab regains focus.
+    const onFocus = () => load().catch(() => {});
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
 
   async function cancel(id: string) {
     setCancellingId(id);

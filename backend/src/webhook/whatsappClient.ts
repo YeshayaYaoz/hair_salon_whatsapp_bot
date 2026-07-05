@@ -6,6 +6,14 @@ interface SendCommon {
   to: string;
 }
 
+/** Thrown when WhatsApp rejects the access token (expired/invalid). Callers can alert the owner. */
+export class WhatsAppAuthError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "WhatsAppAuthError";
+  }
+}
+
 export async function sendWhatsAppMessage(params: SendCommon & { text: string }) {
   await send(params, {
     type: "text",
@@ -30,25 +38,55 @@ export async function sendWhatsAppList(
       body: { text: params.bodyText },
       action: {
         button: params.buttonText.slice(0, 20),
-        sections: [{ title: "Available times", rows: params.rows.slice(0, 10) }],
+        sections: [{ title: "מועדים פנויים", rows: params.rows.slice(0, 10) }],
       },
     },
   });
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function send(params: SendCommon, payload: Record<string, unknown>) {
   const url = `https://graph.facebook.com/${GRAPH_VERSION}/${params.phoneNumberId}/messages`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${params.accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ messaging_product: "whatsapp", to: params.to, ...payload }),
-  });
+  const MAX_ATTEMPTS = 3;
 
-  if (!res.ok) {
+  let lastError: Error | undefined;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${params.accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ messaging_product: "whatsapp", to: params.to, ...payload }),
+      });
+    } catch (netErr) {
+      // Network-level failure — retry with backoff.
+      lastError = netErr instanceof Error ? netErr : new Error(String(netErr));
+      if (attempt < MAX_ATTEMPTS) await sleep(500 * 2 ** (attempt - 1));
+      continue;
+    }
+
+    if (res.ok) return;
+
     const body = await res.text();
-    throw new Error(`WhatsApp send failed (${res.status}): ${body}`);
+
+    // 401/403 = bad token; retrying won't help. Surface distinctly so the owner can be alerted.
+    if (res.status === 401 || res.status === 403) {
+      throw new WhatsAppAuthError(`WhatsApp auth failed (${res.status}): ${body}`);
+    }
+
+    // 429 / 5xx are transient — retry. 4xx (bad payload) are not.
+    const transient = res.status === 429 || res.status >= 500;
+    lastError = new Error(`WhatsApp send failed (${res.status}): ${body}`);
+    if (transient && attempt < MAX_ATTEMPTS) {
+      await sleep(500 * 2 ** (attempt - 1));
+      continue;
+    }
+    throw lastError;
   }
+
+  throw lastError ?? new Error("WhatsApp send failed after retries");
 }

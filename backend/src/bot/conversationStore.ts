@@ -45,6 +45,13 @@ export async function appendTurn(businessId: string, customerPhone: string, turn
   pruneOldMessages(businessId, customerPhone).catch(() => {});
 }
 
+export async function clearHistory(businessId: string, customerPhone: string): Promise<void> {
+  cache.delete(cacheKey(businessId, customerPhone));
+  await prisma.conversationMessage.deleteMany({ where: { businessId, phone: customerPhone } }).catch((err) =>
+    console.error("[conversationStore] Failed to clear history:", err)
+  );
+}
+
 async function pruneOldMessages(businessId: string, phone: string) {
   const rows = await prisma.conversationMessage.findMany({
     where: { businessId, phone },
