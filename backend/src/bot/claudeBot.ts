@@ -3,7 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { appendTurn, getHistory, type Turn } from "./conversationStore.js";
 import { findAvailableSlots, createAppointment, SlotUnavailableError, OutsideBusinessHoursError, type AvailableSlot } from "../booking/availability.js";
-import { parseBookingTime, parseDateString, dayOfWeekForDate } from "../lib/timezone.js";
+import { parseBookingTime, parseDateString, dayOfWeekForDate, instantPartsInTz } from "../lib/timezone.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
 import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
 import { decryptSecret } from "../lib/crypto.js";
@@ -185,11 +185,16 @@ async function runTool(
       data: { preferredServiceId: service.id },
     });
 
+    const tz = biz.timezone || "Asia/Jerusalem";
+    const heDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+    const { dayOfWeek } = instantPartsInTz(appointment.startTime, tz);
+    const weekdayHe = `יום ${heDays[dayOfWeek]}`;
     const when = new Date(appointment.startTime).toLocaleString("he-IL", {
-      weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+      timeZone: tz, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
     });
+    const localTime = new Date(appointment.startTime).toLocaleTimeString("he-IL", { timeZone: tz, hour: "2-digit", minute: "2-digit" });
     const customerLabel = input.customerName ? `${input.customerName} (${customerPhone})` : customerPhone;
-    notifyOwner(businessId, `📅 הזמנה חדשה!\nלקוח: ${customerLabel}\nשירות: ${service.name}\nמועד: ${when}`);
+    notifyOwner(businessId, `📅 הזמנה חדשה!\nלקוח: ${customerLabel}\nשירות: ${service.name}\nמועד: ${weekdayHe} ${when}`);
 
     syncAppointmentToCalendar(businessId, {
       startTime: appointment.startTime,
@@ -199,7 +204,8 @@ async function runTool(
       customerPhone,
     }).catch((err) => console.error("Calendar sync failed:", err));
 
-    return JSON.stringify({ booked: true, startTime: appointment.startTime, endTime: appointment.endTime });
+    // Return the authoritative weekday + local time so the model's confirmation matches the real date.
+    return JSON.stringify({ booked: true, dayOfWeek: weekdayHe, localTime, startTime: appointment.startTime, endTime: appointment.endTime });
   }
 
   if (name === "list_my_appointments") {
