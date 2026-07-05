@@ -22,7 +22,7 @@ function toHHMM(min: number): string {
 }
 
 export default function HoursPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [hours, setHours] = useState<DayHours[]>(
     t.days.map((_, i) => ({ dayOfWeek: i, open: "09:00", close: "18:00", enabled: i !== 6 }))
   );
@@ -74,13 +74,15 @@ export default function HoursPage() {
               onChange={(e) => update(i, { enabled: e.target.checked })}
             />
             <span className="w-24 text-sm font-medium text-gray-700">{t.days[h.dayOfWeek]}</span>
-            <div className="flex items-center gap-2 ms-auto">
+            <div className="flex items-center gap-2 ms-auto" dir={lang === "he" ? "rtl" : "ltr"}>
+              <label className="text-gray-400 text-xs">{lang === "he" ? "מ־" : "from"}</label>
               <input
                 type="time"
                 value={h.open}
                 onChange={(e) => update(i, { open: e.target.value })}
                 disabled={!h.enabled}
                 className="text-sm py-1.5 px-2"
+                dir="ltr"
               />
               <span className="text-gray-400 text-sm">{t.to}</span>
               <input
@@ -89,6 +91,7 @@ export default function HoursPage() {
                 onChange={(e) => update(i, { close: e.target.value })}
                 disabled={!h.enabled}
                 className="text-sm py-1.5 px-2"
+                dir="ltr"
               />
             </div>
           </div>

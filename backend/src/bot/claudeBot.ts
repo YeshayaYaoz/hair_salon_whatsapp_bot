@@ -3,7 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { appendTurn, getHistory, type Turn } from "./conversationStore.js";
 import { findAvailableSlots, createAppointment, SlotUnavailableError, type AvailableSlot } from "../booking/availability.js";
-import { parseBookingTime } from "../lib/timezone.js";
+import { parseBookingTime, parseDateString, dayOfWeekForDate } from "../lib/timezone.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
 import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
 import { decryptSecret } from "../lib/crypto.js";
@@ -143,7 +143,11 @@ async function runTool(
     }
     const slots = await findAvailableSlots(businessId, service.id, new Date(input.date as string), input.durationMin as number | undefined);
     lastOfferedSlots.value = slots.slice(0, 6);
-    return JSON.stringify({ slots: lastOfferedSlots.value });
+    // Provide the correct Hebrew weekday so the model doesn't miscompute it.
+    const heDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+    const { year, month, day } = parseDateString(input.date as string);
+    const dow = dayOfWeekForDate(year, month, day);
+    return JSON.stringify({ date: input.date, dayOfWeek: `יום ${heDays[dow]}`, slots: lastOfferedSlots.value });
   }
 
   if (name === "book_appointment") {
