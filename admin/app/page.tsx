@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { jsonLd } from "./lib/jsonLd";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -253,6 +254,7 @@ export default function LandingPage() {
 
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <noscript><style>{`.phone-chat > * { display: flex !important; }`}</style></noscript>
       <style>{`
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

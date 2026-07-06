@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { jsonLd } from "../lib/jsonLd";
 
 export default function LandingPageEN() {
   const tiltEl = useRef<HTMLDivElement>(null);
@@ -199,6 +200,7 @@ export default function LandingPageEN() {
 
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <style>{`
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         .lp {
