@@ -11,6 +11,7 @@ import { hasActiveSubscription } from "../lib/subscriptionGate.js";
 import { rateLimit } from "../lib/rateLimit.js";
 import { prisma } from "../lib/prisma.js";
 import { captureError } from "../lib/errorMonitoring.js";
+import { transcribeWhatsAppVoiceNote, TranscriptionNotConfiguredError } from "../lib/transcription.js";
 
 export const whatsappRouter = Router();
 
@@ -61,6 +62,7 @@ const rawBodyMiddleware = express.raw({ type: "application/json" });
 
 type ExtractedMessage =
   | { kind: "text"; text: string }
+  | { kind: "voiceNote"; mediaId: string }
   | { kind: "reset" }
   | { kind: "unsupported" }
   | { kind: "ignore" };
@@ -80,8 +82,13 @@ function extractMessage(message: any): ExtractedMessage {
     // so Claude's book_appointment tool call still has the exact ISO time to work with.
     return { kind: "text", text: `אני רוצה את המועד ${message.interactive.list_reply.title} (${message.interactive.list_reply.id})` };
   }
-  // Voice notes, images, stickers, documents, location, etc. — the bot can't read these.
-  if (["audio", "voice", "image", "video", "sticker", "document", "location", "contacts"].includes(message.type)) {
+  // WhatsApp's real message type for both voice notes (PTT) and regular audio files is "audio"
+  // (message.audio.voice distinguishes the two, but we treat both as speech-to-transcribe).
+  if (message.type === "audio" && message.audio?.id) {
+    return { kind: "voiceNote", mediaId: message.audio.id as string };
+  }
+  // Images, videos, stickers, documents, location, etc. — the bot can't read these.
+  if (["image", "video", "sticker", "document", "location", "contacts"].includes(message.type)) {
     return { kind: "unsupported" };
   }
   return { kind: "ignore" };
@@ -154,9 +161,6 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
     accessToken = decryptSecret(business.whatsappAccessToken);
     businessRef = { id: business.id, name: business.name, email: business.email };
 
-    // Follow the customer's language for canned replies and interactive UI pieces.
-    const lang: "he" | "en" = extracted.kind === "text" ? detectLang(extracted.text) : "he";
-
     if (extracted.kind === "reset") {
       await clearHistory(business.id, customerPhone);
       await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: "השיחה אופסה. איך אפשר לעזור? 😊" });
@@ -173,7 +177,43 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
       return;
     }
 
-    const { text: reply, offeredSlots } = await handleIncomingMessage(business.id, customerPhone, extracted.text);
+    // Resolve the actual message text to hand to the bot — either typed directly, or
+    // transcribed from a voice note first.
+    let textToProcess: string;
+    if (extracted.kind === "voiceNote") {
+      try {
+        textToProcess = await transcribeWhatsAppVoiceNote(extracted.mediaId, accessToken);
+        if (!textToProcess) throw new Error("Empty transcription result");
+        console.log(`[bot] Transcribed voice note: "${textToProcess.slice(0, 80)}"`);
+      } catch (err) {
+        if (err instanceof TranscriptionNotConfiguredError) {
+          await sendWhatsAppMessage({
+            phoneNumberId,
+            accessToken,
+            to: customerPhone,
+            text: "מצטערים, אני עדיין לא יכול להאזין להודעות קוליות. אפשר לכתוב לי בטקסט? 😊\nSorry, I can't listen to voice messages yet — could you type instead? 😊",
+          });
+          return;
+        }
+        console.error("Voice transcription failed:", err);
+        captureError(err, { businessId: business.id, customerPhone, kind: "voiceTranscription" });
+        await sendWhatsAppMessage({
+          phoneNumberId,
+          accessToken,
+          to: customerPhone,
+          text: "לא הצלחתי להבין את ההודעה הקולית. אפשר לנסות שוב או לכתוב בטקסט? 😊",
+        });
+        return;
+      }
+    } else {
+      textToProcess = extracted.text;
+    }
+
+    // Follow the customer's language (detected from typed text or the voice transcript) for
+    // canned replies and interactive UI pieces.
+    const lang: "he" | "en" = detectLang(textToProcess);
+
+    const { text: reply, offeredSlots } = await handleIncomingMessage(business.id, customerPhone, textToProcess);
 
     if (offeredSlots && offeredSlots.length > 0) {
       await sendWhatsAppList({

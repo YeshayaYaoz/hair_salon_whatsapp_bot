@@ -27,6 +27,7 @@ const RECOMMENDED: RequiredVar[] = [
   { name: "STRIPE_PRICE_ID", description: "subscription checkout" },
   { name: "STRIPE_WEBHOOK_SECRET", description: "subscription status sync" },
   { name: "RESEND_API_KEY", description: "transactional emails (welcome, password reset)" },
+  { name: "OPENAI_API_KEY", description: "voice-note transcription in the WhatsApp bot (Whisper)" },
 ];
 
 export function validateEnv(): void {
