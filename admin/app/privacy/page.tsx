@@ -91,7 +91,7 @@ export default function PrivacyPolicy() {
           <Section id="information-we-collect" title="2. Information We Collect">
             <p><strong>Business account data</strong> — name, email address, password (hashed, never stored in plain text), business name, address, timezone, and configured settings (services, staff, hours, bot personality).</p>
             <p><strong>End-customer data (via the WhatsApp bot)</strong> — when someone messages a business's Tori number, we store their phone number, name (if given), the appointments they book, and the full conversation transcript with the bot, so the business can review it and the bot can maintain context across messages.</p>
-            <p><strong>Payment data</strong> — subscription billing is handled entirely by Stripe. We store a Stripe customer/subscription reference ID; we never see or store full card numbers.</p>
+            <p><strong>Payment data</strong> — subscription billing is handled entirely by PayPlus. We store a recurring charge token reference; we never see or store full card numbers.</p>
             <p><strong>Google Calendar data</strong> — if a business connects Google Calendar, we request the <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">calendar.events</code> scope to read availability and create booking events.</p>
             <p><strong>Technical data</strong> — standard server logs (timestamps, error traces, IP address) for debugging and abuse prevention.</p>
           </Section>
@@ -101,7 +101,7 @@ export default function PrivacyPolicy() {
               <li>Operating the WhatsApp bot: understanding messages, checking availability, booking/cancelling/rescheduling appointments.</li>
               <li>Syncing confirmed bookings to a business's connected Google Calendar.</li>
               <li>Sending appointment reminders, review requests, and — if enabled — a daily schedule digest to the business owner.</li>
-              <li>Processing subscription payments and billing notifications via Stripe.</li>
+              <li>Processing subscription payments and billing notifications via PayPlus.</li>
               <li>Improving reliability and diagnosing bugs from anonymized server logs.</li>
             </ul>
           </Section>
@@ -122,7 +122,7 @@ export default function PrivacyPolicy() {
               <li><strong>Meta (WhatsApp Business Platform)</strong> — transmits and receives WhatsApp messages.</li>
               <li><strong>Anthropic</strong> — processes conversation text to power the AI assistant.</li>
               <li><strong>Google</strong> — Calendar API, only for businesses that opt in to calendar sync.</li>
-              <li><strong>Stripe</strong> — subscription billing and payment processing.</li>
+              <li><strong>PayPlus</strong> — subscription billing and payment processing.</li>
               <li><strong>Resend</strong> — transactional emails (password resets, account notifications).</li>
               <li><strong>Railway</strong> — application hosting and database infrastructure.</li>
             </ul>

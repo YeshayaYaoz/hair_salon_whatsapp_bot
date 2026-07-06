@@ -91,7 +91,7 @@ export default function TermsOfService() {
           </Section>
 
           <Section id="subscriptions" title="4. Subscriptions, Trials & Billing">
-            <p>New accounts receive a 14-day free trial. After the trial ends, continued use requires an active paid subscription, billed monthly via Stripe. You can cancel at any time from the dashboard billing page; cancellation takes effect at the end of the current billing period, and no partial refunds are issued for unused time unless required by law.</p>
+            <p>New accounts receive a 14-day free trial. After the trial ends, continued use requires an active paid subscription, billed monthly via PayPlus. You can cancel at any time from the dashboard billing page; cancellation takes effect at the end of the current billing period, and no partial refunds are issued for unused time unless required by law.</p>
             <p>We may change subscription pricing with reasonable advance notice. Continued use after a price change takes effect constitutes acceptance of the new price.</p>
           </Section>
 
@@ -138,7 +138,7 @@ export default function TermsOfService() {
           </Section>
 
           <Section id="third-party" title="9. Third-Party Services">
-            <p>Tori integrates with third-party services including Meta (WhatsApp), Google (Calendar), Anthropic (AI), and Stripe (billing). Your use of these integrations is also subject to each provider's own terms of service. We are not responsible for outages, policy changes, or data handling by these third parties beyond our control.</p>
+            <p>Tori integrates with third-party services including Meta (WhatsApp), Google (Calendar), Anthropic (AI), and PayPlus (billing). Your use of these integrations is also subject to each provider's own terms of service. We are not responsible for outages, policy changes, or data handling by these third parties beyond our control.</p>
           </Section>
 
           <Section id="availability" title="10. Availability & Support">

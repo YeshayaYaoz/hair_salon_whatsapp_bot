@@ -48,10 +48,23 @@ function parseCardcomEvent(body: Record<string, unknown>): ParsedPaymentEvent {
   };
 }
 
+function parseGrowEvent(body: Record<string, unknown>): ParsedPaymentEvent {
+  const data = (body.data ?? body) as Record<string, unknown>;
+  const fields = (data.pageField ?? {}) as Record<string, unknown>;
+  return {
+    success: Number(body.status) === 1,
+    amountIls: Number(data.sum) || undefined,
+    referenceId: (fields.cField1 as string) || undefined,
+    customerName: (data.fullName as string) || undefined,
+    customerPhone: (data.phone as string) || undefined,
+  };
+}
+
 const PARSERS: Record<string, (body: Record<string, unknown>) => ParsedPaymentEvent> = {
   payplus: parsePayPlusEvent,
   tranzila: parseTranzilaEvent,
   cardcom: parseCardcomEvent,
+  grow: parseGrowEvent,
 };
 
 // Configure this URL (…/webhook/payments/<provider>/<businessId>) as the notify/webhook/IPN URL

@@ -5,7 +5,7 @@ import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SavedBadge } from "../../lib/SavedBadge";
 
-const PAYMENT_PROVIDERS = ["payplus", "tranzila", "cardcom"] as const;
+const PAYMENT_PROVIDERS = ["payplus", "tranzila", "cardcom", "grow"] as const;
 type PaymentProviderName = (typeof PAYMENT_PROVIDERS)[number];
 
 const INVOICE_PROVIDERS = ["greeninvoice", "icount", "payplus-invoice"] as const;
@@ -13,10 +13,18 @@ type InvoiceProviderName = (typeof INVOICE_PROVIDERS)[number];
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
-const PAYMENT_META: Record<PaymentProviderName, { label: string; color: string; instructions: { he: string; en: string } }> = {
+interface ProviderMeta {
+  label: string;
+  color: string;
+  monogram: string;
+  instructions: { he: string; en: string } | null;
+}
+
+const PAYMENT_META: Record<PaymentProviderName, ProviderMeta> = {
   payplus: {
     label: "PayPlus",
     color: "#0F62FE",
+    monogram: "PP",
     instructions: {
       he: "היכנס לחשבון PayPlus ← הגדרות ← מפתחות API, והעתק את ה-API Key וה-Secret Key.",
       en: "Log into PayPlus → Settings → API Keys, and copy your API Key and Secret Key.",
@@ -25,6 +33,7 @@ const PAYMENT_META: Record<PaymentProviderName, { label: string; color: string; 
   tranzila: {
     label: "Tranzila",
     color: "#E4572E",
+    monogram: "TZ",
     instructions: {
       he: "שם המסוף (Terminal) שלך ב-Tranzila משמש כ-API Key. הסיסמה/מפתח ה-API נמצאים תחת הגדרות ← אבטחה.",
       en: "Your Tranzila terminal name is used as the API Key. The API password/secret is under Settings → Security.",
@@ -33,17 +42,28 @@ const PAYMENT_META: Record<PaymentProviderName, { label: string; color: string; 
   cardcom: {
     label: "Cardcom",
     color: "#8E44AD",
+    monogram: "CC",
     instructions: {
       he: "היכנס לחשבון Cardcom ← הגדרות טרמינל, והעתק את מספר הטרמינל (TerminalNumber) ואת שם ה-API (ApiName).",
       en: "Log into Cardcom → Terminal Settings, and copy your TerminalNumber and ApiName.",
     },
   },
+  grow: {
+    label: "Grow",
+    color: "#00C48C",
+    monogram: "GR",
+    instructions: {
+      he: "היכנס לחשבון Grow ← הגדרות ← API, והעתק את מזהה המשתמש (userId) ואת קוד הדף (pageCode).",
+      en: "Log into Grow → Settings → API, and copy your userId and pageCode.",
+    },
+  },
 };
 
-const INVOICE_META: Record<InvoiceProviderName, { label: string; color: string; instructions: { he: string; en: string } | null }> = {
+const INVOICE_META: Record<InvoiceProviderName, ProviderMeta> = {
   greeninvoice: {
     label: "חשבונית ירוקה",
     color: "#00A651",
+    monogram: "GI",
     instructions: {
       he: "היכנס לחשבונית ירוקה ← הגדרות ← API, וצור זוג מפתחות (Key ו-Secret) חדש.",
       en: "Log into Green Invoice → Settings → API, and generate a new Key/Secret pair.",
@@ -52,6 +72,7 @@ const INVOICE_META: Record<InvoiceProviderName, { label: string; color: string; 
   icount: {
     label: "iCount",
     color: "#F5A623",
+    monogram: "iC",
     instructions: {
       he: "מזהה החברה (cid) נמצא בכתובת ה-URL של החשבון. את ה-API Token מייצרים תחת הגדרות ← API.",
       en: "Your company id (cid) is in your account's URL. Generate an API Token under Settings → API.",
@@ -60,6 +81,7 @@ const INVOICE_META: Record<InvoiceProviderName, { label: string; color: string; 
   "payplus-invoice": {
     label: "PayPlus חשבונית+",
     color: "#0F62FE",
+    monogram: "P+",
     instructions: null, // reuses payment credentials — no separate setup
   },
 };
@@ -72,15 +94,15 @@ interface Me {
   invoiceProvider?: string | null;
 }
 
-function ProviderIcon({ color }: { color: string }) {
+function ProviderIcon({ color, monogram, size = "md" }: { color: string; monogram: string; size?: "sm" | "md" }) {
+  const dims = size === "sm" ? "w-6 h-6 text-[9px]" : "w-9 h-9 text-xs";
   return (
     <span
-      className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-white font-bold text-sm"
+      className={`${dims} rounded-lg flex items-center justify-center shrink-0 text-white font-bold tracking-tight shadow-sm`}
       style={{ backgroundColor: color }}
+      dir="ltr"
     >
-      <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-      </svg>
+      {monogram}
     </span>
   );
 }
@@ -115,7 +137,7 @@ function ProviderCard<T extends string>({
   he: boolean;
   title: string;
   options: readonly T[];
-  meta: Record<T, { label: string; color: string; instructions: { he: string; en: string } | null }>;
+  meta: Record<T, ProviderMeta>;
   selected: T;
   onSelect: (v: T) => void;
   connected: boolean;
@@ -152,7 +174,7 @@ function ProviderCard<T extends string>({
   return (
     <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
       <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
-        <ProviderIcon color={info.color} />
+        <ProviderIcon color={info.color} monogram={info.monogram} />
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
           <p className="text-xs text-gray-400 truncate">{info.label}</p>
@@ -169,13 +191,14 @@ function ProviderCard<T extends string>({
               key={p}
               type="button"
               onClick={() => onSelect(p)}
-              className={`text-xs font-semibold px-3 py-2 rounded-lg border transition ${
+              className={`flex items-center gap-1.5 text-xs font-semibold pe-3 ps-1.5 py-1.5 rounded-lg border transition ${
                 selected === p
                   ? "text-white border-transparent"
                   : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
               }`}
               style={selected === p ? { backgroundColor: meta[p].color } : undefined}
             >
+              <ProviderIcon color={selected === p ? "rgba(255,255,255,0.25)" : meta[p].color} monogram={meta[p].monogram} size="sm" />
               {meta[p].label}
               {connectedProvider === p && connected && " ✓"}
             </button>

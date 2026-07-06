@@ -6,7 +6,6 @@ import { initErrorMonitoring, captureError } from "./lib/errorMonitoring.js";
 import { authRouter } from "./api/authRoutes.js";
 import { businessRouter } from "./api/businessRoutes.js";
 import { whatsappRouter } from "./webhook/whatsappRoutes.js";
-import { billingRouter, stripeWebhookRouter } from "./billing/billingRoutes.js";
 import { publicRouter } from "./api/publicRoutes.js";
 import { paymentWebhookRouter } from "./webhook/paymentWebhooks.js";
 import { payplusBillingRouter, payplusBillingWebhookRouter } from "./billing/payplusBillingRoutes.js";
@@ -38,7 +37,6 @@ app.use(cors({
 
 // Routes that need the raw, unparsed body for signature verification must be mounted
 // before the global express.json() middleware below would otherwise consume the stream.
-app.use("/api/billing/webhook", stripeWebhookRouter);
 app.use("/webhook/whatsapp", whatsappRouter);
 
 app.use(express.json());
@@ -50,7 +48,6 @@ app.use("/webhook/billing/payplus", payplusBillingWebhookRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/public", publicRouter);
 app.use("/api/business", businessRouter);
-app.use("/api/billing", billingRouter);
 app.use("/api/billing", payplusBillingRouter);
 
 app.get("/health", (_req, res) => res.json({ ok: true }));

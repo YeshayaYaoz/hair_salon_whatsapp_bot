@@ -39,8 +39,7 @@ export async function runSubscriptionBillingJob(): Promise<void> {
       console.log(`[subscriptionBilling] Charged ${business.id} (${business.name}) ₪${amountIls}`);
     } else {
       // One failed charge doesn't cancel the account outright — mark past_due so
-      // requireActiveSubscription blocks access until the owner updates their payment method,
-      // same UX as the existing Stripe past_due flow.
+      // requireActiveSubscription blocks access until the owner updates their payment method.
       await prisma.business.update({
         where: { id: business.id },
         data: { subscriptionStatus: "past_due", lastBillingAttemptAt: now },

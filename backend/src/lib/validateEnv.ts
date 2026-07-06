@@ -23,9 +23,6 @@ const REQUIRED: RequiredVar[] = [
 const RECOMMENDED: RequiredVar[] = [
   { name: "WHATSAPP_APP_SECRET", description: "verifies WhatsApp webhook signatures (dev mode allows unsigned requests without it)" },
   { name: "WHATSAPP_VERIFY_TOKEN", description: "required for Meta to verify the webhook URL" },
-  { name: "STRIPE_SECRET_KEY", description: "subscription billing" },
-  { name: "STRIPE_PRICE_ID", description: "subscription checkout" },
-  { name: "STRIPE_WEBHOOK_SECRET", description: "subscription status sync" },
   { name: "PAYPLUS_API_KEY", description: "Tori's own PayPlus account — recurring subscription billing" },
   { name: "PAYPLUS_SECRET_KEY", description: "Tori's own PayPlus account — recurring subscription billing" },
   { name: "RESEND_API_KEY", description: "transactional emails (welcome, password reset)" },

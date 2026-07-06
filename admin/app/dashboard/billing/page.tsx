@@ -144,7 +144,6 @@ export default function BillingPage() {
   const [createdAt, setCreatedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
-  const [portalLoading, setPortalLoading] = useState(false);
   const [plan, setPlan] = useState<"standard" | "premium">("standard");
   const [currentPlan, setCurrentPlan] = useState<string | null>(null);
 
@@ -197,21 +196,6 @@ export default function BillingPage() {
     }
   }
 
-  async function openPortal() {
-    setError(null);
-    setPortalLoading(true);
-    try {
-      const { url } = await apiFetch<{ url: string }>("/api/billing/portal", {
-        method: "POST",
-        body: JSON.stringify({ returnUrl: window.location.href }),
-      });
-      window.location.href = url;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not open billing portal");
-    } finally {
-      setPortalLoading(false);
-    }
-  }
 
   const statusKey = status as keyof typeof t.billingStatuses | null;
   const info = statusKey && t.billingStatuses[statusKey] ? t.billingStatuses[statusKey] : null;
@@ -317,13 +301,13 @@ export default function BillingPage() {
                     {checkoutLoading ? t.redirecting : status === "trial" ? t.subscribeNow : t.reactivate}
                   </button>
                 )}
-                {(status === "active" || status === "past_due") && (
+                {status === "past_due" && (
                   <button
-                    onClick={openPortal}
-                    disabled={portalLoading}
+                    onClick={subscribe}
+                    disabled={checkoutLoading}
                     className="inline-flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-800 text-sm font-semibold px-4 py-2 rounded-lg transition"
                   >
-                    {portalLoading ? t.redirecting : t.manageBilling}
+                    {checkoutLoading ? t.redirecting : t.manageBilling}
                   </button>
                 )}
               </div>
@@ -342,15 +326,6 @@ export default function BillingPage() {
                   <p className="text-xs text-gray-500 mt-1 leading-relaxed">{info?.description}</p>
                 </div>
               </div>
-              {status === "active" && (
-                <button
-                  onClick={openPortal}
-                  disabled={portalLoading}
-                  className="text-xs text-[#1B7FA0] hover:text-[#145F78] font-medium mt-4 self-start underline underline-offset-2"
-                >
-                  {lang === "he" ? "צפייה בחשבוניות וכרטיס אשראי ←" : "View invoices & payment method →"}
-                </button>
-              )}
             </div>
           </div>
         )}

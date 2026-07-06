@@ -1,4 +1,4 @@
-export const PAYMENT_PROVIDERS = ["payplus", "tranzila", "cardcom"] as const;
+export const PAYMENT_PROVIDERS = ["payplus", "tranzila", "cardcom", "grow"] as const;
 export type PaymentProviderName = (typeof PAYMENT_PROVIDERS)[number];
 
 export interface PaymentCredentials {
