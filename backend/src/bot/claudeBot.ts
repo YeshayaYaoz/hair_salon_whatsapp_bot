@@ -27,13 +27,14 @@ function chooseModel(messageText: string, hadToolError: boolean): string {
 const tools: Anthropic.Tool[] = [
   {
     name: "check_availability",
-    description: "Find open appointment slots for a given service on a given date. If the customer requests a longer session (e.g. multiple hours), pass durationMin.",
+    description: "Find open appointment slots for a given service on a given date. If the customer requests a longer session (e.g. multiple hours), pass durationMin. If the customer asks for a specific staff member by name, pass staffName to only show that person's open times.",
     input_schema: {
       type: "object",
       properties: {
         serviceName: { type: "string", description: "Name of the service, matching a known service name from the system prompt" },
         date: { type: "string", description: "Date in YYYY-MM-DD format" },
         durationMin: { type: "number", description: "Optional override for session length in minutes (e.g. 120 for 2 hours)" },
+        staffName: { type: "string", description: "Optional — only set if the customer explicitly asked for a specific staff member by name" },
       },
       required: ["serviceName", "date"],
     },
@@ -48,6 +49,7 @@ const tools: Anthropic.Tool[] = [
         startTime: { type: "string", description: "ISO 8601 start time, must come from a prior check_availability result" },
         customerName: { type: "string", description: "Customer's first name — required. Ask the customer for their name before calling this tool if it isn't already known." },
         durationMin: { type: "number", description: "Same durationMin passed to check_availability, if any" },
+        staffName: { type: "string", description: "Same staffName passed to check_availability, if the customer requested a specific staff member" },
       },
       required: ["serviceName", "startTime", "customerName"],
     },
@@ -133,6 +135,22 @@ async function notifyOwner(businessId: string, message: string): Promise<boolean
   }
 }
 
+/**
+ * Resolves a customer-provided staff name to a StaffMember id. Returns:
+ * - { staffId: undefined } if no name was given (no preference — any staff member is fine)
+ * - { staffId } if resolved
+ * - { error } if the name doesn't match anyone, listing real staff names so the model can retry
+ */
+async function resolveStaffId(businessId: string, staffName: string | undefined): Promise<{ staffId?: string; error?: string }> {
+  if (!staffName) return {};
+  const match = await prisma.staffMember.findFirst({
+    where: { businessId, name: { equals: staffName, mode: "insensitive" } },
+  });
+  if (match) return { staffId: match.id };
+  const all = await prisma.staffMember.findMany({ where: { businessId }, select: { name: true } });
+  return { error: JSON.stringify({ error: "Unknown staff member", availableStaff: all.map((s) => s.name) }) };
+}
+
 async function runTool(
   businessId: string,
   customerPhone: string,
@@ -148,7 +166,16 @@ async function runTool(
       const all = await prisma.service.findMany({ where: { businessId }, select: { name: true } });
       return JSON.stringify({ error: "Unknown service", availableServices: all.map((s) => s.name) });
     }
-    const slots = await findAvailableSlots(businessId, service.id, new Date(input.date as string), input.durationMin as number | undefined);
+    const staffResolution = await resolveStaffId(businessId, input.staffName as string | undefined);
+    if (staffResolution.error) return staffResolution.error;
+
+    const slots = await findAvailableSlots(
+      businessId,
+      service.id,
+      new Date(input.date as string),
+      input.durationMin as number | undefined,
+      staffResolution.staffId
+    );
     lastOfferedSlots.value = slots.slice(0, 6);
     // Provide the correct Hebrew weekday so the model doesn't miscompute it.
     const heDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
@@ -178,6 +205,9 @@ async function runTool(
       return JSON.stringify({ error: "Customer name is required before booking. Ask the customer for their name, then call book_appointment again with it." });
     }
 
+    const staffResolution = await resolveStaffId(businessId, input.staffName as string | undefined);
+    if (staffResolution.error) return staffResolution.error;
+
     let appointment;
     try {
       appointment = await createAppointment({
@@ -187,6 +217,7 @@ async function runTool(
         customerName,
         startTime: parseBookingTime(input.startTime as string, biz.timezone || "Asia/Jerusalem"),
         overrideDurationMin: input.durationMin as number | undefined,
+        staffId: staffResolution.staffId ?? null,
       });
     } catch (err) {
       if (err instanceof SlotUnavailableError) {
@@ -213,7 +244,8 @@ async function runTool(
     });
     const localTime = new Date(appointment.startTime).toLocaleTimeString("he-IL", { timeZone: tz, hour: "2-digit", minute: "2-digit" });
     const customerLabel = `${customerName} (${customerPhone})`;
-    notifyOwner(businessId, `📅 הזמנה חדשה!\nלקוח: ${customerLabel}\nשירות: ${service.name}\nמועד: ${weekdayHe} ${when}`);
+    const staffLine = input.staffName ? `\nעם: ${input.staffName as string}` : "";
+    notifyOwner(businessId, `📅 הזמנה חדשה!\nלקוח: ${customerLabel}\nשירות: ${service.name}\nמועד: ${weekdayHe} ${when}${staffLine}`);
 
     syncAppointmentToCalendar(businessId, {
       startTime: appointment.startTime,
@@ -224,7 +256,14 @@ async function runTool(
     }).catch((err) => console.error("Calendar sync failed:", err));
 
     // Return the authoritative weekday + local time so the model's confirmation matches the real date.
-    return JSON.stringify({ booked: true, dayOfWeek: weekdayHe, localTime, startTime: appointment.startTime, endTime: appointment.endTime });
+    return JSON.stringify({
+      booked: true,
+      dayOfWeek: weekdayHe,
+      localTime,
+      startTime: appointment.startTime,
+      endTime: appointment.endTime,
+      staffName: input.staffName ?? undefined,
+    });
   }
 
   if (name === "list_my_appointments") {

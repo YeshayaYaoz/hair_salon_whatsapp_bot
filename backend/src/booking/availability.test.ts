@@ -105,6 +105,25 @@ describe("findAvailableSlots", () => {
     const slots = await findAvailableSlots(BUSINESS_ID, SERVICE_ID, "2026-07-09", 60);
     expect(slots.map((s) => s.startTime)).toEqual(["2026-07-09T06:00:00.000Z"]);
   });
+
+  it("only offers times the preferred staff member is free at, when a preference is given", async () => {
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ timezone: TZ });
+    mockPrisma.service.findUniqueOrThrow.mockResolvedValue({ durationMin: 30 });
+    mockPrisma.businessHours.findUnique.mockResolvedValue({ openMin: 9 * 60, closeMin: 10 * 60 });
+    mockPrisma.staffMember.findMany.mockResolvedValue([{ id: "staff-a" }, { id: "staff-b" }]);
+    // staff-a is booked 09:00-09:30; staff-b is free the whole window.
+    mockPrisma.appointment.findMany.mockResolvedValue([
+      { staffId: "staff-a", startTime: new Date("2026-07-09T06:00:00.000Z"), endTime: new Date("2026-07-09T06:30:00.000Z") },
+    ]);
+    mockPrisma.blockedTime.findMany.mockResolvedValue([]);
+
+    const slots = await findAvailableSlots(BUSINESS_ID, SERVICE_ID, "2026-07-09", undefined, "staff-a");
+
+    // Even though staff-b is free at 09:00, the customer asked for staff-a specifically —
+    // that slot must not be silently offered with a different staff member substituted in.
+    expect(slots.every((s) => s.staffId === "staff-a")).toBe(true);
+    expect(slots.map((s) => s.startTime)).toEqual(["2026-07-09T06:30:00.000Z"]);
+  });
 });
 
 describe("createAppointment", () => {

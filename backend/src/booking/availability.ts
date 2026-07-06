@@ -30,7 +30,8 @@ export async function findAvailableSlots(
   businessId: string,
   serviceId: string,
   date: Date | string,
-  overrideDurationMin?: number
+  overrideDurationMin?: number,
+  preferredStaffId?: string
 ): Promise<AvailableSlot[]> {
   const dateStr = typeof date === "string" ? date : date.toISOString();
   const { year, month, day } = parseDateString(dateStr);
@@ -59,7 +60,13 @@ export async function findAvailableSlots(
   ]);
 
   const durationMin = overrideDurationMin ?? service.durationMin;
-  const staffOptions: (string | null)[] = staff.length > 0 ? staff.map((s: StaffMember) => s.id) : [null];
+  // If the customer asked for a specific staff member, only offer times that person is free —
+  // don't silently substitute someone else. Otherwise any staff member (or unassigned) will do.
+  const staffOptions: (string | null)[] = preferredStaffId
+    ? [preferredStaffId]
+    : staff.length > 0
+      ? staff.map((s: StaffMember) => s.id)
+      : [null];
   const slots: AvailableSlot[] = [];
   const now = new Date();
 

@@ -27,6 +27,11 @@ export async function buildSystemPrompt(businessId: string, todayIso: string, cu
     .join("\n") || "לא הוגדרו שירותים עדיין.";
 
   const staffText = business.staff.map((s: StaffMember) => s.name).join(", ") || "לא צוין.";
+  // Only bother asking about staff preference when there's actually a choice to make —
+  // avoid adding an extra required question for single-staff (or staff-less) businesses.
+  const staffPromptNote = business.staff.length > 1
+    ? `אם הלקוח מציין שם ספציפי של איש/אשת צוות (${staffText}) — העבר את staffName ל-check_availability ול-book_appointment. אחרת אל תשאל מי מבצע את הטיפול; זה לא שלב חובה.`
+    : "";
 
   const faqText = business.faqEntries.length
     ? business.faqEntries.map((f: FaqEntry) => `ש: ${f.question}\nת: ${f.answer}`).join("\n\n")
@@ -93,6 +98,7 @@ ${faqText ? `\nשאלות נפוצות:\n${faqText}\n` : ""}
 אם ביקשו זמן ארוך יותר (למשל "שעתיים") — העבר durationMin ל-check_availability וגם ל-book_appointment.
 אם אין זמינות — הצע רשימת המתנה עם add_to_waitlist.
 בקשות מורכבות או תלונות — השתמש ב-request_human_followup.
+${staffPromptNote}
 
 חשוב לגבי זמנים: כאשר אתה קורא ל-book_appointment, העבר את startTime בדיוק כפי שהוחזר מ-check_availability (מחרוזת ISO עם Z). אל תמציא זמן בעצמך. אם הלקוח נקב בשעה מספרית בלבד — התאם אותה לאחד המועדים שהצעת והשתמש ב-startTime המדויק שלו.
 
