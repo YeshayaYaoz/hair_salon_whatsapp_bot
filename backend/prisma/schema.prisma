@@ -31,6 +31,17 @@ model Business {
   referralText          String?  // appended to post-visit review messages (e.g. referral discount offer)
   digestEnabled         Boolean  @default(true)
   lastDigestSentAt      DateTime? // last morning-digest send, to avoid duplicates
+
+  // Per-business transaction (payment) provider — the salon's own merchant account, not ours.
+  paymentProvider   String? // "payplus" | "tranzila" | "cardcom"
+  paymentApiKey     String? // encrypted at rest — provider's key/terminal/username
+  paymentApiSecret  String? // encrypted at rest — provider's secret/password
+
+  // Per-business Israeli invoice/receipt provider — issues the actual חשבונית/קבלה after payment.
+  invoiceProvider   String? // "greeninvoice" | "icount"
+  invoiceApiKey     String? // encrypted at rest
+  invoiceApiSecret  String? // encrypted at rest
+
   createdAt         DateTime @default(now())
 
   services       Service[]

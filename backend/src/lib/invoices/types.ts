@@ -1,0 +1,26 @@
+export const INVOICE_PROVIDERS = ["greeninvoice", "icount"] as const;
+export type InvoiceProviderName = (typeof INVOICE_PROVIDERS)[number];
+
+export interface InvoiceCredentials {
+  apiKey: string;
+  apiSecret: string;
+}
+
+export interface CreateReceiptParams {
+  amountIls: number;
+  description: string;
+  customerName: string;
+  customerPhone?: string;
+  customerEmail?: string;
+}
+
+export interface ReceiptResult {
+  documentUrl: string;
+  providerDocumentId: string;
+}
+
+/** Uniform surface every Israeli invoicing provider adapter implements — issues a customer-facing
+ * חשבונית/קבלה after a successful payment, using that business's own connected account. */
+export interface InvoiceProvider {
+  createReceipt(creds: InvoiceCredentials, params: CreateReceiptParams): Promise<ReceiptResult>;
+}

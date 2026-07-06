@@ -10,6 +10,8 @@ import { notifyWaitlist } from "../lib/waitlist.js";
 import { createAppointment, OutsideBusinessHoursError, SlotUnavailableError } from "../booking/availability.js";
 import { parseBookingTime } from "../lib/timezone.js";
 import { getJobStatuses } from "../lib/jobStatus.js";
+import { getPaymentProvider, PAYMENT_PROVIDERS, UnknownPaymentProviderError } from "../lib/payments/index.js";
+import { getInvoiceProvider, INVOICE_PROVIDERS, UnknownInvoiceProviderError } from "../lib/invoices/index.js";
 
 export const businessRouter = Router();
 businessRouter.use(requireAuth);
@@ -25,8 +27,13 @@ businessRouter.use((req, res, next) => {
 
 businessRouter.get("/me", async (req: AuthedRequest, res) => {
   const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! } });
-  const { passwordHash, whatsappAccessToken, ...safe } = business;
-  res.json({ ...safe, whatsappConnected: Boolean(whatsappAccessToken) });
+  const { passwordHash, whatsappAccessToken, paymentApiKey, paymentApiSecret, invoiceApiKey, invoiceApiSecret, ...safe } = business;
+  res.json({
+    ...safe,
+    whatsappConnected: Boolean(whatsappAccessToken),
+    paymentConnected: Boolean(paymentApiKey),
+    invoiceConnected: Boolean(invoiceApiKey),
+  });
   // (whatsappTokenValid is included in ...safe)
 });
 
@@ -84,6 +91,128 @@ businessRouter.delete("/me/whatsapp", async (req: AuthedRequest, res) => {
     data: { whatsappPhoneNumberId: null, whatsappAccessToken: null },
   });
   res.json({ ok: true });
+});
+
+// --- Payment provider (PayPlus / Tranzila / Cardcom) — the business's own merchant account ---
+
+const paymentConnectSchema = z.object({
+  provider: z.enum(PAYMENT_PROVIDERS),
+  apiKey: z.string().min(1),
+  apiSecret: z.string().min(1),
+});
+
+businessRouter.put("/me/payment-provider", async (req: AuthedRequest, res) => {
+  const parsed = paymentConnectSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  await prisma.business.update({
+    where: { id: req.businessId! },
+    data: {
+      paymentProvider: parsed.data.provider,
+      paymentApiKey: encryptSecret(parsed.data.apiKey),
+      paymentApiSecret: encryptSecret(parsed.data.apiSecret),
+    },
+  });
+  res.json({ ok: true });
+});
+
+businessRouter.delete("/me/payment-provider", async (req: AuthedRequest, res) => {
+  await prisma.business.update({
+    where: { id: req.businessId! },
+    data: { paymentProvider: null, paymentApiKey: null, paymentApiSecret: null },
+  });
+  res.json({ ok: true });
+});
+
+// --- Invoice provider (Green Invoice / iCount) — issues the actual חשבונית/קבלה ---
+
+const invoiceConnectSchema = z.object({
+  provider: z.enum(INVOICE_PROVIDERS),
+  apiKey: z.string().min(1),
+  apiSecret: z.string().min(1),
+});
+
+businessRouter.put("/me/invoice-provider", async (req: AuthedRequest, res) => {
+  const parsed = invoiceConnectSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  await prisma.business.update({
+    where: { id: req.businessId! },
+    data: {
+      invoiceProvider: parsed.data.provider,
+      invoiceApiKey: encryptSecret(parsed.data.apiKey),
+      invoiceApiSecret: encryptSecret(parsed.data.apiSecret),
+    },
+  });
+  res.json({ ok: true });
+});
+
+businessRouter.delete("/me/invoice-provider", async (req: AuthedRequest, res) => {
+  await prisma.business.update({
+    where: { id: req.businessId! },
+    data: { invoiceProvider: null, invoiceApiKey: null, invoiceApiSecret: null },
+  });
+  res.json({ ok: true });
+});
+
+// Creates a hosted payment link via the business's connected provider (e.g. to send the
+// customer a "pay now" link over WhatsApp for a specific appointment).
+businessRouter.post("/payments/link", async (req: AuthedRequest, res) => {
+  const parsed = z
+    .object({ amountIls: z.number().positive(), description: z.string().min(1), customerName: z.string().optional(), customerPhone: z.string().optional(), referenceId: z.string().min(1) })
+    .safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const business = await prisma.business.findUniqueOrThrow({
+    where: { id: req.businessId! },
+    select: { paymentProvider: true, paymentApiKey: true, paymentApiSecret: true },
+  });
+  if (!business.paymentProvider || !business.paymentApiKey || !business.paymentApiSecret) {
+    return res.status(400).json({ error: "No payment provider connected" });
+  }
+
+  try {
+    const provider = getPaymentProvider(business.paymentProvider);
+    const result = await provider.createPaymentLink(
+      { apiKey: decryptSecret(business.paymentApiKey), apiSecret: decryptSecret(business.paymentApiSecret) },
+      parsed.data
+    );
+    res.json(result);
+  } catch (err) {
+    if (err instanceof UnknownPaymentProviderError) return res.status(400).json({ error: err.message });
+    console.error("Payment link creation failed:", err);
+    res.status(502).json({ error: "Payment provider request failed" });
+  }
+});
+
+// Issues a receipt/invoice via the business's connected invoicing provider — call this after a
+// payment has actually been confirmed (e.g. from the payment provider's success webhook).
+businessRouter.post("/invoices/receipt", async (req: AuthedRequest, res) => {
+  const parsed = z
+    .object({ amountIls: z.number().positive(), description: z.string().min(1), customerName: z.string().min(1), customerPhone: z.string().optional(), customerEmail: z.string().email().optional() })
+    .safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const business = await prisma.business.findUniqueOrThrow({
+    where: { id: req.businessId! },
+    select: { invoiceProvider: true, invoiceApiKey: true, invoiceApiSecret: true },
+  });
+  if (!business.invoiceProvider || !business.invoiceApiKey || !business.invoiceApiSecret) {
+    return res.status(400).json({ error: "No invoice provider connected" });
+  }
+
+  try {
+    const provider = getInvoiceProvider(business.invoiceProvider);
+    const result = await provider.createReceipt(
+      { apiKey: decryptSecret(business.invoiceApiKey), apiSecret: decryptSecret(business.invoiceApiSecret) },
+      parsed.data
+    );
+    res.json(result);
+  } catch (err) {
+    if (err instanceof UnknownInvoiceProviderError) return res.status(400).json({ error: err.message });
+    console.error("Receipt creation failed:", err);
+    res.status(502).json({ error: "Invoice provider request failed" });
+  }
 });
 
 // Embedded Signup: receive the access token from FB.login (response_type: "token"),
