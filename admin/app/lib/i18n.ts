@@ -4,7 +4,7 @@ const translations = {
   en: {
     nav: {
       analytics: "Analytics", appointments: "Appointments", customers: "Customers",
-      waitlist: "Waitlist", services: "Services", staff: "Staff", hours: "Hours",
+      waitlist: "Waitlist", services: "Services", staff: "Staff", hours: "Schedule",
       blocked: "Time off", conversations: "Conversations",
       whatsapp: "WhatsApp", faq: "FAQ", settings: "Settings", billing: "Billing", logout: "Log out",
     },
@@ -132,7 +132,7 @@ const translations = {
   he: {
     nav: {
       analytics: "סטטיסטיקות", appointments: "תורים", customers: "לקוחות",
-      waitlist: "רשימת המתנה", services: "שירותים", staff: "צוות", hours: "שעות פעילות",
+      waitlist: "רשימת המתנה", services: "שירותים", staff: "צוות", hours: "לוח זמנים",
       blocked: "חופשות", conversations: "שיחות",
       whatsapp: "וואטסאפ", faq: "שאלות נפוצות", settings: "הגדרות", billing: "תשלום", logout: "התנתקות",
     },
