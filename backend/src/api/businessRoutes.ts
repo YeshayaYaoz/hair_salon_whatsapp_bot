@@ -9,6 +9,7 @@ import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
 import { createAppointment, OutsideBusinessHoursError, SlotUnavailableError } from "../booking/availability.js";
 import { parseBookingTime } from "../lib/timezone.js";
+import { getJobStatuses } from "../lib/jobStatus.js";
 
 export const businessRouter = Router();
 businessRouter.use(requireAuth);
@@ -27,6 +28,12 @@ businessRouter.get("/me", async (req: AuthedRequest, res) => {
   const { passwordHash, whatsappAccessToken, ...safe } = business;
   res.json({ ...safe, whatsappConnected: Boolean(whatsappAccessToken) });
   // (whatsappTokenValid is included in ...safe)
+});
+
+// Global background job health (reminders/reviews/digest/retention) — same info for every
+// business, since these jobs run once for the whole system rather than per-tenant.
+businessRouter.get("/system-status", async (_req: AuthedRequest, res) => {
+  res.json(await getJobStatuses());
 });
 
 const whatsappSchema = z.object({

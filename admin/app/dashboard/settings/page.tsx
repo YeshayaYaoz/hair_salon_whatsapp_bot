@@ -125,6 +125,77 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   );
 }
 
+interface JobStatus {
+  jobName: string;
+  lastRunAt: string;
+  lastStatus: string;
+  lastError: string | null;
+  lastDurationMs: number | null;
+}
+
+const JOB_LABELS: Record<string, { he: string; en: string }> = {
+  reminders: { he: "תזכורות תורים", en: "Appointment reminders" },
+  reviews: { he: "בקשות ביקורת", en: "Review requests" },
+  digest: { he: "סיכום יומי", en: "Daily digest" },
+  retention: { he: "ניקוי נתונים", en: "Data retention cleanup" },
+};
+
+function SystemStatusSection() {
+  const { lang } = useLanguage();
+  const he = lang === "he";
+  const [jobs, setJobs] = useState<JobStatus[] | null>(null);
+
+  useEffect(() => {
+    apiFetch<JobStatus[]>("/api/business/system-status").then(setJobs).catch(() => setJobs([]));
+  }, []);
+
+  function relativeTime(iso: string): string {
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const mins = Math.round(diffMs / 60_000);
+    if (mins < 1) return he ? "עכשיו" : "just now";
+    if (mins < 60) return he ? `לפני ${mins} דק׳` : `${mins}m ago`;
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return he ? `לפני ${hours} שעות` : `${hours}h ago`;
+    const days = Math.round(hours / 24);
+    return he ? `לפני ${days} ימים` : `${days}d ago`;
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
+      <h2 className="text-sm font-semibold text-gray-900 mb-0.5">{he ? "בריאות המערכת" : "System health"}</h2>
+      <p className="text-xs text-gray-400 mb-4">
+        {he ? "מעקב אחרי תהליכים אוטומטיים שרצים ברקע" : "Status of automated jobs running in the background"}
+      </p>
+      {jobs === null ? (
+        <SkeletonCard lines={4} />
+      ) : jobs.length === 0 ? (
+        <p className="text-xs text-gray-400">{he ? "עדיין אין נתונים — הריצה הראשונה עוד לא הושלמה" : "No data yet — jobs haven't completed a first run"}</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {jobs.map((j) => {
+            const label = JOB_LABELS[j.jobName] ?? { he: j.jobName, en: j.jobName };
+            const ok = j.lastStatus === "ok";
+            return (
+              <div key={j.jobName} className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg bg-gray-50/60 border border-gray-100">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${ok ? "bg-green-500" : "bg-red-500"}`} />
+                  <span className="text-sm text-gray-700 font-medium truncate">{he ? label.he : label.en}</span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {!ok && j.lastError && (
+                    <span className="text-[11px] text-red-500 max-w-[200px] truncate" title={j.lastError}>{j.lastError}</span>
+                  )}
+                  <span className="text-xs text-gray-400 tabular-nums">{relativeTime(j.lastRunAt)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
@@ -352,6 +423,8 @@ export default function SettingsPage() {
           {error && <p className="text-red-600 text-sm">{error}</p>}
         </div>
       </form>
+
+      <SystemStatusSection />
     </div>
   );
 }

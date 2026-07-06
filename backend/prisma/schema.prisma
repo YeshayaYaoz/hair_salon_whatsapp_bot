@@ -45,6 +45,16 @@ model Business {
   blockedTimes        BlockedTime[]
 }
 
+/// Tracks the last run of each global background job (reminders, reviews, digest, retention) so
+/// its health can be surfaced in the dashboard instead of living only in Railway logs.
+model SystemJobRun {
+  jobName       String   @id
+  lastRunAt     DateTime
+  lastStatus    String   // "ok" | "error"
+  lastError     String?
+  lastDurationMs Int?
+}
+
 /// Owner-defined closures (vacations, lunch breaks, holidays) during which no bookings are allowed.
 model BlockedTime {
   id         String   @id @default(cuid())

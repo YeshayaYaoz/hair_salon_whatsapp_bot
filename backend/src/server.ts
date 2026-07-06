@@ -10,6 +10,7 @@ import { billingRouter, stripeWebhookRouter } from "./billing/billingRoutes.js";
 import { publicRouter } from "./api/publicRoutes.js";
 import { runRetentionJob } from "./lib/retentionJob.js";
 import { runReminderJob, runReviewJob, runDigestJob } from "./lib/scheduledMessages.js";
+import { runTrackedJob } from "./lib/jobStatus.js";
 
 validateEnv(); // exits the process before anything binds to a port if required config is missing
 initErrorMonitoring();
@@ -66,10 +67,8 @@ function scheduleRetentionJob() {
   if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
   const delay = next.getTime() - now.getTime();
   setTimeout(() => {
-    runRetentionJob().catch((err) => { console.error("[retention] Job failed:", err); captureError(err, { job: "retention" }); });
-    setInterval(() => {
-      runRetentionJob().catch((err) => { console.error("[retention] Job failed:", err); captureError(err, { job: "retention" }); });
-    }, 24 * 60 * 60 * 1000);
+    runTrackedJob("retention", runRetentionJob);
+    setInterval(() => runTrackedJob("retention", runRetentionJob), 24 * 60 * 60 * 1000);
   }, delay);
   console.log(`[retention] Next run scheduled in ${Math.round(delay / 60000)} minutes`);
 }
@@ -78,11 +77,11 @@ scheduleRetentionJob();
 // Run reminder, review, and digest jobs every hour
 const ONE_HOUR = 60 * 60 * 1000;
 setInterval(() => {
-  runReminderJob().catch((err) => { console.error("[reminders] Job failed:", err); captureError(err, { job: "reminders" }); });
-  runReviewJob().catch((err) => { console.error("[reviews] Job failed:", err); captureError(err, { job: "reviews" }); });
-  runDigestJob().catch((err) => { console.error("[digest] Job failed:", err); captureError(err, { job: "digest" }); });
+  runTrackedJob("reminders", runReminderJob);
+  runTrackedJob("reviews", runReviewJob);
+  runTrackedJob("digest", runDigestJob);
 }, ONE_HOUR);
 // Also run immediately on startup to catch any missed windows
-runReminderJob().catch((err) => { console.error("[reminders] Startup run failed:", err); captureError(err, { job: "reminders", phase: "startup" }); });
-runReviewJob().catch((err) => { console.error("[reviews] Startup run failed:", err); captureError(err, { job: "reviews", phase: "startup" }); });
-runDigestJob().catch((err) => { console.error("[digest] Startup run failed:", err); captureError(err, { job: "digest", phase: "startup" }); });
+runTrackedJob("reminders", runReminderJob);
+runTrackedJob("reviews", runReviewJob);
+runTrackedJob("digest", runDigestJob);
