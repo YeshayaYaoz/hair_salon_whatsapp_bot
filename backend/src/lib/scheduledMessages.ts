@@ -173,6 +173,73 @@ export async function runDigestJob() {
   }
 }
 
+const MINUTES_SAVED_PER_BOOKING = 4; // matches the admin billing page's savings calculator estimate
+
+/**
+ * Monthly ROI report: on the 1st of each month, message the owner a summary of the value Tori
+ * delivered last month (bookings handled, revenue closed via the bot, waitlist saves, time
+ * saved) — the antidote to "I forgot why I'm paying for this" cancellations.
+ */
+export async function runRoiReportJob() {
+  const businesses = await prisma.business.findMany({
+    where: {
+      digestEnabled: true,
+      notificationPhone: { not: null },
+      whatsappPhoneNumberId: { not: null },
+      whatsappAccessToken: { not: null },
+    },
+    select: {
+      id: true, name: true, timezone: true, notificationPhone: true,
+      whatsappPhoneNumberId: true, whatsappAccessToken: true, lastRoiReportSentAt: true,
+    },
+  });
+
+  const now = new Date();
+  for (const biz of businesses) {
+    const tz = biz.timezone || "Asia/Jerusalem";
+    const { year, month, day } = ymdInTz(now, tz);
+    if (day !== 1) continue; // only fires on the 1st of the month, local time
+    // Guard against duplicates: skip if already sent within the last 25 days.
+    if (biz.lastRoiReportSentAt && now.getTime() - biz.lastRoiReportSentAt.getTime() < 25 * 24 * 60 * 60 * 1000) continue;
+
+    // Previous calendar month's window in the business timezone → UTC bounds.
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevYear = month === 1 ? year - 1 : year;
+    const startUtc = wallToUtc(prevYear, prevMonth, 1, 0, tz);
+    const endUtc = wallToUtc(year, month, 1, 0, tz);
+
+    const [appointments, waitlistFilled] = await Promise.all([
+      prisma.appointment.findMany({
+        where: { businessId: biz.id, status: "confirmed", createdAt: { gte: startUtc, lt: endUtc } },
+        include: { service: true },
+      }),
+      prisma.waitlistEntry.count({
+        where: { businessId: biz.id, notified: true, createdAt: { gte: startUtc, lt: endUtc } },
+      }),
+    ]);
+
+    if (appointments.length === 0) continue; // nothing meaningful to report
+
+    const revenueIls = appointments.reduce((sum, a) => sum + a.service.priceCents, 0) / 100;
+    const hoursSaved = Math.max(1, Math.round((appointments.length * MINUTES_SAVED_PER_BOOKING) / 60));
+    const heMonths = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
+    const monthName = heMonths[prevMonth - 1];
+
+    const waitlistLine = waitlistFilled > 0 ? `\nמילאה ${waitlistFilled} ביטולים של הרגע האחרון דרך רשימת ההמתנה 🎯` : "";
+    const text = `📊 סיכום חודש ${monthName}!\n\nתורי החודש:\n✅ קבעה ${appointments.length} תורים\n💰 הכנסות שנסגרו דרך הבוט: ₪${revenueIls.toLocaleString()}\n⏱️ חסכה לך כ-${hoursSaved} שעות של סימוסים מול לקוחות${waitlistLine}\n\nתודה שאת/ה איתנו! 🙏`;
+
+    try {
+      const accessToken = decryptSecret(biz.whatsappAccessToken!);
+      await sendWhatsAppMessage({ phoneNumberId: biz.whatsappPhoneNumberId!, accessToken, to: biz.notificationPhone!, text });
+      await prisma.business.update({ where: { id: biz.id }, data: { lastRoiReportSentAt: now } });
+      console.log(`[roiReport] Sent monthly ROI report to business ${biz.id}`);
+    } catch (err) {
+      console.error(`[roiReport] Failed for business ${biz.id}:`, err);
+    }
+    await new Promise((r) => setTimeout(r, 300));
+  }
+}
+
 // Local helpers to avoid importing the whole timezone module surface here.
 function ymdInTz(date: Date, tz: string): { year: number; month: number; day: number } {
   const dtf = new Intl.DateTimeFormat("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });

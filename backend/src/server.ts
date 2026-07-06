@@ -11,7 +11,7 @@ import { paymentWebhookRouter } from "./webhook/paymentWebhooks.js";
 import { payplusBillingRouter, payplusBillingWebhookRouter } from "./billing/payplusBillingRoutes.js";
 import { runSubscriptionBillingJob } from "./billing/subscriptionBillingJob.js";
 import { runRetentionJob } from "./lib/retentionJob.js";
-import { runReminderJob, runReviewJob, runDigestJob } from "./lib/scheduledMessages.js";
+import { runReminderJob, runReviewJob, runDigestJob, runRoiReportJob } from "./lib/scheduledMessages.js";
 import { runTrackedJob } from "./lib/jobStatus.js";
 
 validateEnv(); // exits the process before anything binds to a port if required config is missing
@@ -89,8 +89,10 @@ setInterval(() => {
   runTrackedJob("reminders", runReminderJob);
   runTrackedJob("reviews", runReviewJob);
   runTrackedJob("digest", runDigestJob);
+  runTrackedJob("roiReport", runRoiReportJob);
 }, ONE_HOUR);
 // Also run immediately on startup to catch any missed windows
 runTrackedJob("reminders", runReminderJob);
 runTrackedJob("reviews", runReviewJob);
 runTrackedJob("digest", runDigestJob);
+runTrackedJob("roiReport", runRoiReportJob);

@@ -37,6 +37,7 @@ model Business {
   referralText          String?  // appended to post-visit review messages (e.g. referral discount offer)
   digestEnabled         Boolean  @default(true)
   lastDigestSentAt      DateTime? // last morning-digest send, to avoid duplicates
+  lastRoiReportSentAt   DateTime? // last monthly ROI report send, to avoid duplicates
 
   // Per-business transaction (payment) provider — the salon's own merchant account, not ours.
   paymentProvider   String? // "payplus" | "tranzila" | "cardcom"
