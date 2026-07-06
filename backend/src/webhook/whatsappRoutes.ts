@@ -10,6 +10,7 @@ import { decryptSecret } from "../lib/crypto.js";
 import { hasActiveSubscription } from "../lib/subscriptionGate.js";
 import { rateLimit } from "../lib/rateLimit.js";
 import { prisma } from "../lib/prisma.js";
+import { captureError } from "../lib/errorMonitoring.js";
 
 export const whatsappRouter = Router();
 
@@ -206,6 +207,7 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
     }
 
     console.error("Error handling WhatsApp webhook event:", err);
+    captureError(err, { businessId: businessRef?.id, customerPhone });
     // Let the customer know something went wrong instead of leaving them hanging on silence.
     if (phoneNumberId && accessToken && customerPhone) {
       await sendWhatsAppMessage({

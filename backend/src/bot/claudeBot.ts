@@ -8,6 +8,7 @@ import { notifyWaitlist } from "../lib/waitlist.js";
 import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { syncAppointmentToCalendar } from "../lib/googleCalendar.js";
+import { captureError } from "../lib/errorMonitoring.js";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -361,6 +362,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   } catch (err) {
     if (err instanceof APIError) console.error(`Anthropic API error ${err.status}:`, err.message);
     else console.error("Unexpected Anthropic error:", err);
+    captureError(err, { businessId, customerPhone, model });
     return { text: AI_UNAVAILABLE_HE };
   }
 
@@ -400,6 +402,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     } catch (err) {
       if (err instanceof APIError) console.error(`Anthropic API error ${err.status} (tool loop):`, err.message);
       else console.error("Unexpected Anthropic error (tool loop):", err);
+      captureError(err, { businessId, customerPhone, model, phase: "tool loop" });
       return { text: AI_UNAVAILABLE_HE };
     }
   }

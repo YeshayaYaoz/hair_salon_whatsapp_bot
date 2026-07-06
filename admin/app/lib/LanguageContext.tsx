@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { translations, type Lang, type Translations } from "./i18n";
+import { initClientMonitoring } from "./sentry";
 
 interface LanguageContextValue {
   lang: Lang;
@@ -22,6 +23,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     const stored = (localStorage.getItem("lang") as Lang) ?? "he";
     setLangState(stored);
     applyLang(stored);
+    initClientMonitoring();
   }, []);
 
   function setLang(l: Lang) {
