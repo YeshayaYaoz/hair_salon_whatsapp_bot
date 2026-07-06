@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
+import { SkeletonBlock, SkeletonRow } from "../../lib/Skeleton";
 
 interface Customer {
   id: string;
@@ -100,7 +101,11 @@ function ConversationPanel({ customer, onClose }: { customer: Customer; onClose:
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 bg-gray-50/60">
           {loading ? (
-            <p className="text-gray-400 text-sm text-center py-10">{he ? "טוען…" : "Loading…"}</p>
+            <div className="flex flex-col gap-2">
+              <SkeletonBlock className="h-10 w-2/3 self-start rounded-2xl" />
+              <SkeletonBlock className="h-8 w-1/2 self-end rounded-2xl" />
+              <SkeletonBlock className="h-10 w-3/5 self-start rounded-2xl" />
+            </div>
           ) : messages.length === 0 ? (
             <p className="text-gray-400 text-sm text-center py-10">{he ? "עדיין אין הודעות עם לקוח זה" : "No messages with this customer yet"}</p>
           ) : (
@@ -153,8 +158,10 @@ export default function CustomersPage() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState<Customer | null>(null);
 
+  const [loaded, setLoaded] = useState(false);
+
   useEffect(() => {
-    apiFetch<Customer[]>("/api/business/customers").then(setCustomers);
+    apiFetch<Customer[]>("/api/business/customers").then((c) => { setCustomers(c); setLoaded(true); });
   }, []);
 
   const filtered = customers.filter(
@@ -188,7 +195,11 @@ export default function CustomersPage() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden animate-fade-up stagger-2">
-        {filtered.length === 0 ? (
+        {!loaded ? (
+          <div>
+            {Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={3} />)}
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="px-6 py-12 text-center text-gray-400 text-sm">
             {t.noCustomers}
           </div>

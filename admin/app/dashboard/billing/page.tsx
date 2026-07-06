@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
+import { SkeletonBlock } from "../../lib/Skeleton";
 
 const STATUS_COLORS: Record<string, string> = {
   trial: "bg-amber-50 text-amber-700 border-amber-200",
@@ -210,7 +211,21 @@ export default function BillingPage() {
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         {status === null ? (
-          <p className="text-gray-400 text-sm p-6">{t.loading}</p>
+          <div className="grid md:grid-cols-2">
+            <div className="p-6 border-b md:border-b-0 md:border-l border-gray-100 flex flex-col gap-3">
+              <SkeletonBlock className="h-3 w-24" />
+              <SkeletonBlock className="h-9 w-28" />
+              <SkeletonBlock className="h-3 w-40 mb-2" />
+              {Array.from({ length: 5 }).map((_, i) => <SkeletonBlock key={i} className="h-3.5 w-full" />)}
+            </div>
+            <div className="p-6 bg-gray-50/60 flex items-center gap-3">
+              <SkeletonBlock className="h-9 w-9 rounded-lg shrink-0" />
+              <div className="flex-1 flex flex-col gap-2">
+                <SkeletonBlock className="h-3.5 w-32" />
+                <SkeletonBlock className="h-3 w-full" />
+              </div>
+            </div>
+          </div>
         ) : (
           <div className="grid md:grid-cols-2">
             {/* Plan summary */}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SavedBadge } from "../../lib/SavedBadge";
+import { SkeletonCard } from "../../lib/Skeleton";
 
 function GoogleCalendarSection() {
   const [connected, setConnected] = useState<boolean | null>(null);
@@ -216,9 +217,13 @@ export default function SettingsPage() {
 
   if (!loaded) {
     return (
-      <div>
+      <div className="animate-fade-in">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">{t.settingsTitle}</h1>
-        <p className="text-gray-400 text-sm">{t.loading}</p>
+        <div className="flex flex-col gap-4">
+          <SkeletonCard lines={4} />
+          <SkeletonCard lines={2} />
+          <SkeletonCard lines={3} />
+        </div>
       </div>
     );
   }

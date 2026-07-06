@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { formatTimeInTz, formatDateTimeInTz, partsInTz, dayKeyInTz } from "../../lib/tz";
+import { SkeletonBlock, SkeletonRow } from "../../lib/Skeleton";
 
 function localDayKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -239,9 +240,11 @@ export default function AppointmentsPage() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [tz, setTz] = useState("Asia/Jerusalem");
   const [showNew, setShowNew] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   async function load() {
     setAppointments(await apiFetch<Appointment[]>("/api/business/appointments"));
+    setLoaded(true);
   }
 
   useEffect(() => {
@@ -377,13 +380,33 @@ export default function AppointmentsPage() {
               Today
             </button>
           </div>
-          <WeekCalendar
-            appointments={appointments}
-            weekStart={weekStart}
-            onCancel={cancel}
-            cancellingId={cancellingId}
-            tz={tz}
-          />
+          {loaded ? (
+            <WeekCalendar
+              appointments={appointments}
+              weekStart={weekStart}
+              onCancel={cancel}
+              cancellingId={cancellingId}
+              tz={tz}
+            />
+          ) : (
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <div className="grid" style={{ gridTemplateColumns: "3.5rem repeat(7, 1fr)" }}>
+                <div className="px-2 py-2 border-e border-b border-gray-100" />
+                {Array.from({ length: 7 }).map((_, i) => (
+                  <div key={i} className="px-1 py-2 border-e border-b border-gray-100 last:border-e-0 flex flex-col items-center gap-1">
+                    <SkeletonBlock className="h-2.5 w-6" />
+                    <SkeletonBlock className="h-4 w-4" />
+                  </div>
+                ))}
+              </div>
+              {Array.from({ length: 6 }).map((_, row) => (
+                <div key={row} className="grid border-b border-gray-100/70 last:border-b-0" style={{ gridTemplateColumns: "3.5rem repeat(7, 1fr)", minHeight: 48 }}>
+                  <div className="px-2 pt-2 border-e border-gray-100"><SkeletonBlock className="h-2.5 w-6" /></div>
+                  {Array.from({ length: 7 }).map((_, col) => <div key={col} className="border-e border-gray-100 last:border-e-0 p-1" />)}
+                </div>
+              ))}
+            </div>
+          )}
         </>
       ) : (
         <>
@@ -408,7 +431,11 @@ export default function AppointmentsPage() {
           </div>
 
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden animate-fade-up stagger-3">
-            {filtered.length === 0 ? (
+            {!loaded ? (
+              <div>
+                {Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} cols={4} />)}
+              </div>
+            ) : filtered.length === 0 ? (
               <div className="px-6 py-12 text-center text-gray-400 text-sm">{t.noAppointments}</div>
             ) : (
               <table className="w-full text-sm">

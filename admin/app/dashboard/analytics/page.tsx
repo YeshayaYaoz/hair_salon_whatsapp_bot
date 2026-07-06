@@ -5,6 +5,7 @@ import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { useCountUp } from "../../lib/useCountUp";
 import { formatTimeInTz, dayKeyInTz } from "../../lib/tz";
+import { SkeletonCard, SkeletonStatCard } from "../../lib/Skeleton";
 import Link from "next/link";
 
 interface Analytics {
@@ -135,8 +136,18 @@ export default function AnalyticsPage() {
   if (!data) {
     return (
       <div className="animate-fade-in">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">{t.analyticsTitle}</h1>
-        <p className="text-sm" style={{ color: "#9CA3AF" }}>{t.loading}</p>
+        <div className="mb-8">
+          <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">{t.analyticsTitle}</h1>
+          <p className="text-sm mt-1" style={{ color: "#9CA3AF" }}>{t.analyticsSubtitle}</p>
+        </div>
+        <SkeletonCard lines={3} />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-8">
+          {Array.from({ length: 4 }).map((_, i) => <SkeletonStatCard key={i} />)}
+        </div>
+        <div className="grid md:grid-cols-2 gap-6">
+          <SkeletonCard lines={5} />
+          <SkeletonCard lines={5} />
+        </div>
       </div>
     );
   }
