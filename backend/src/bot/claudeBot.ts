@@ -10,7 +10,10 @@ import { decryptSecret } from "../lib/crypto.js";
 import { syncAppointmentToCalendar } from "../lib/googleCalendar.js";
 import { captureError } from "../lib/errorMonitoring.js";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// maxRetries: 0 here because we do our own retry in makeApiCall below — that lets us log each
+// attempt and control the backoff explicitly, rather than relying on the SDK's opaque internal
+// retry (which also doesn't cover Anthropic's own "overloaded" (529) status).
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 0 });
 
 const MODEL_CHEAP = "claude-haiku-4-5-20251001";
 const MODEL_SMART = "claude-sonnet-5";
@@ -367,14 +370,35 @@ async function runTool(
   return JSON.stringify({ error: "Unknown tool" });
 }
 
-function makeApiCall(model: string, system: string, messages: Anthropic.MessageParam[]): Promise<Anthropic.Message> {
-  return anthropic.messages.create({
-    model,
-    max_tokens: 1024,
-    system,
-    tools,
-    messages,
-  }) as Promise<Anthropic.Message>;
+// Anthropic's own status is retried once on transient failures — a customer waiting mid-chat
+// benefits far more from one quick retry than from an instant "the bot is down" reply.
+const RETRYABLE_STATUSES = new Set([408, 409, 429, 500, 502, 503, 529]);
+const RETRY_DELAY_MS = 700;
+
+async function makeApiCall(model: string, system: string, messages: Anthropic.MessageParam[]): Promise<Anthropic.Message> {
+  try {
+    return (await anthropic.messages.create({
+      model,
+      max_tokens: 1024,
+      system,
+      tools,
+      messages,
+    })) as Anthropic.Message;
+  } catch (err) {
+    const retryable = err instanceof APIError ? RETRYABLE_STATUSES.has(err.status ?? 0) : true; // network errors: also retry once
+    if (!retryable) throw err;
+
+    console.warn(`[bot] Anthropic call failed (${err instanceof APIError ? err.status : "network"}), retrying once...`);
+    await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+
+    return (await anthropic.messages.create({
+      model,
+      max_tokens: 1024,
+      system,
+      tools,
+      messages,
+    })) as Anthropic.Message;
+  }
 }
 
 const AI_UNAVAILABLE_HE = "מצטערים, הבוט אינו זמין כרגע. אנא נסו שוב בעוד כמה דקות, או צרו קשר ישיר עם העסק.";

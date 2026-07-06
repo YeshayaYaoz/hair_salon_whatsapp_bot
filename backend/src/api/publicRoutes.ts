@@ -3,8 +3,22 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { findAvailableSlots, createAppointment, OutsideBusinessHoursError, SlotUnavailableError } from "../booking/availability.js";
 import { hasActiveSubscription } from "../lib/subscriptionGate.js";
+import { rateLimit } from "../lib/rateLimit.js";
 
 export const publicRouter = Router();
+
+// This whole router is unauthenticated by design (it's the public booking widget), so it's the
+// one surface anyone could hammer with a script. Reads are looser (a real customer browsing
+// services/slots), writes are tight (nobody legitimately submits more than a couple bookings a
+// minute from one IP).
+const publicReadLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, keyPrefix: "public-read" });
+const publicBookLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  keyPrefix: "public-book",
+  message: "יותר מדי בקשות הזמנה. אנא נסו שוב בעוד כמה דקות.",
+});
+publicRouter.use(publicReadLimiter);
 
 // Cache stats briefly so the landing page can't hammer the DB.
 let statsCache: { at: number; data: { businesses: number; appointments: number } } | null = null;
@@ -72,7 +86,7 @@ const bookSchema = z.object({
 });
 
 /** Public booking — no auth required. */
-publicRouter.post("/:businessId/book", async (req, res) => {
+publicRouter.post("/:businessId/book", publicBookLimiter, async (req, res) => {
   const parsed = bookSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
