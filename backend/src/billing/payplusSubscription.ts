@@ -12,6 +12,19 @@ const GRAPH_VERSION = "v1.0";
 const BASE_URL = `https://restapi.payplus.co.il/api/${GRAPH_VERSION}`;
 
 export const PLAN_PRICES_ILS: Record<string, number> = { standard: 149, premium: 299 };
+// Annual plan: 10 months' worth charged upfront (2 months free) — a common SaaS annual incentive.
+export const ANNUAL_MONTHS_CHARGED = 10;
+export const BILLING_PERIOD_DAYS: Record<string, number> = { monthly: 30, annual: 365 };
+// Auto-applied loyalty discount once a business has completed this many successful monthly
+// charges on Premium — rewards tenure without requiring the owner to ask for it.
+export const LOYALTY_DISCOUNT_AFTER_CYCLES = 6;
+export const LOYALTY_DISCOUNT_ILS = 50;
+
+export function planPriceForCycle(plan: string, cycle: string): number {
+  const base = PLAN_PRICES_ILS[plan];
+  if (!base) throw new Error(`Unknown plan: ${plan}`);
+  return cycle === "annual" ? base * ANNUAL_MONTHS_CHARGED : base;
+}
 
 export class PayPlusBillingNotConfiguredError extends Error {
   constructor() {
@@ -27,13 +40,15 @@ function creds() {
   return { apiKey, secretKey };
 }
 
-/** Generates a hosted payment page that both charges the first month and stores a reusable
- * token for future recurring charges. more_info carries "<businessId>:<plan>" so the webhook
- * can attribute the resulting token to the right business/plan. */
-export async function createSubscriptionCheckoutLink(businessId: string, plan: string, returnUrl: string): Promise<string> {
-  const amountIls = PLAN_PRICES_ILS[plan];
-  if (!amountIls) throw new Error(`Unknown plan: ${plan}`);
+/** Generates a hosted payment page that both charges the first period and stores a reusable
+ * token for future recurring charges. more_info carries "<businessId>:<plan>:<cycle>" so the
+ * webhook can attribute the resulting token to the right business/plan/billing cycle. */
+export async function createSubscriptionCheckoutLink(businessId: string, plan: string, returnUrl: string, cycle: "monthly" | "annual" = "monthly"): Promise<string> {
+  const amountIls = planPriceForCycle(plan, cycle);
   const { apiKey, secretKey } = creds();
+
+  const planLabel = plan === "premium" ? "Premium" : "Standard";
+  const cycleLabel = cycle === "annual" ? "שנתי" : "חודשי";
 
   const res = await fetch(`${BASE_URL}/PaymentPages/generateLink`, {
     method: "POST",
@@ -46,9 +61,9 @@ export async function createSubscriptionCheckoutLink(businessId: string, plan: s
       amount: amountIls,
       currency_code: "ILS",
       sendEmailApproval: true,
-      more_info: `${businessId}:${plan}`,
+      more_info: `${businessId}:${plan}:${cycle}`,
       refURL_success: returnUrl,
-      items: [{ name: `תורי — מנוי ${plan === "premium" ? "Premium" : "Standard"}`, quantity: 1, price: amountIls }],
+      items: [{ name: `תורי — מנוי ${planLabel} (${cycleLabel})`, quantity: 1, price: amountIls }],
     }),
   });
 

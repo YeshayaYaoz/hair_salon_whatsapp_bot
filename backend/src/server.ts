@@ -10,6 +10,8 @@ import { publicRouter } from "./api/publicRoutes.js";
 import { paymentWebhookRouter } from "./webhook/paymentWebhooks.js";
 import { payplusBillingRouter, payplusBillingWebhookRouter } from "./billing/payplusBillingRoutes.js";
 import { runSubscriptionBillingJob } from "./billing/subscriptionBillingJob.js";
+import { runBillingReminderJob } from "./billing/billingReminderJob.js";
+import { runYieldCampaignJob } from "./billing/yieldCampaignJob.js";
 import { runRetentionJob } from "./lib/retentionJob.js";
 import { runReminderJob, runReviewJob, runDigestJob, runRoiReportJob } from "./lib/scheduledMessages.js";
 import { runTrackedJob } from "./lib/jobStatus.js";
@@ -90,9 +92,17 @@ setInterval(() => {
   runTrackedJob("reviews", runReviewJob);
   runTrackedJob("digest", runDigestJob);
   runTrackedJob("roiReport", runRoiReportJob);
+  runTrackedJob("billingReminder", runBillingReminderJob);
 }, ONE_HOUR);
 // Also run immediately on startup to catch any missed windows
 runTrackedJob("reminders", runReminderJob);
 runTrackedJob("reviews", runReviewJob);
 runTrackedJob("digest", runDigestJob);
 runTrackedJob("roiReport", runRoiReportJob);
+runTrackedJob("billingReminder", runBillingReminderJob);
+
+// Yield-management (empty-slot) campaign scan — runs once daily at 18:00 local business time;
+// like the digest job, the underlying function itself gates on each business's local clock, so
+// this just needs to fire hourly and let it self-select the right businesses each day.
+setInterval(() => runTrackedJob("yieldCampaign", runYieldCampaignJob), ONE_HOUR);
+runTrackedJob("yieldCampaign", runYieldCampaignJob);

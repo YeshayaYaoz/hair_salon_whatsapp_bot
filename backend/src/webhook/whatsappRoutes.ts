@@ -10,8 +10,10 @@ import { decryptSecret } from "../lib/crypto.js";
 import { hasActiveSubscription } from "../lib/subscriptionGate.js";
 import { rateLimit } from "../lib/rateLimit.js";
 import { prisma } from "../lib/prisma.js";
+import { Prisma } from "@prisma/client";
 import { captureError } from "../lib/errorMonitoring.js";
 import { transcribeWhatsAppVoiceNote, TranscriptionNotConfiguredError } from "../lib/transcription.js";
+import { sendYieldCampaignOffers, type PendingYieldCampaign } from "../billing/yieldCampaignJob.js";
 
 export const whatsappRouter = Router();
 
@@ -110,6 +112,38 @@ function buildSlotRows(slots: { startTime: string }[], lang: "he" | "en"): ListR
   });
 }
 
+const AFFIRMATIVE = /^(כן|בטח|אישור|yes|y|ok|okay|sure)/i;
+const NEGATIVE = /^(לא|no|n|skip|בטל)/i;
+
+/** Handles the business owner's reply to a pending yield-management campaign proposal. */
+async function handleYieldCampaignReply(
+  business: { id: string; name: string; notificationPhone: string; whatsappPhoneNumberId: string; whatsappAccessToken: string; pendingYieldCampaign: unknown },
+  phoneNumberId: string,
+  accessToken: string,
+  replyText: string
+): Promise<void> {
+  const trimmed = replyText.trim();
+  const campaign = business.pendingYieldCampaign as PendingYieldCampaign;
+
+  if (AFFIRMATIVE.test(trimmed)) {
+    const sent = await sendYieldCampaignOffers(business, campaign);
+    await prisma.business.update({ where: { id: business.id }, data: { pendingYieldCampaign: Prisma.JsonNull } });
+    await sendWhatsAppMessage({ phoneNumberId, accessToken, to: business.notificationPhone, text: `נשלחה הצעה ל-${sent} לקוחות. בהצלחה! 🎉` });
+    return;
+  }
+
+  if (NEGATIVE.test(trimmed)) {
+    await prisma.business.update({ where: { id: business.id }, data: { pendingYieldCampaign: Prisma.JsonNull } });
+    await sendWhatsAppMessage({ phoneNumberId, accessToken, to: business.notificationPhone, text: "בסדר גמור, לא שלחתי כלום 👍" });
+    return;
+  }
+
+  await sendWhatsAppMessage({
+    phoneNumberId, accessToken, to: business.notificationPhone,
+    text: `יש לי הצעה ממתינה לאישור: לשלוח הנחה ל-${campaign.candidateCustomerIds.length} לקוחות למילוי מקומות פנויים מחר. ענה/י "כן" או "לא".`,
+  });
+}
+
 whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => {
   // Verify Meta's HMAC signature before processing.
   const signature = req.headers["x-hub-signature-256"] as string | undefined;
@@ -160,6 +194,18 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
     customerPhone = message.from as string;
     accessToken = decryptSecret(business.whatsappAccessToken);
     businessRef = { id: business.id, name: business.name, email: business.email };
+
+    // The owner's own number replying to a pending yield-management campaign proposal
+    // (see yieldCampaignJob.ts) is handled here, before any of this routes to the customer bot.
+    if (business.pendingYieldCampaign && business.notificationPhone && customerPhone === business.notificationPhone && extracted.kind === "text") {
+      await handleYieldCampaignReply(
+        { ...business, notificationPhone: business.notificationPhone, whatsappPhoneNumberId: phoneNumberId, whatsappAccessToken: business.whatsappAccessToken },
+        phoneNumberId,
+        accessToken,
+        extracted.text
+      );
+      return;
+    }
 
     if (extracted.kind === "reset") {
       await clearHistory(business.id, customerPhone);

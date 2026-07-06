@@ -23,6 +23,12 @@ model Business {
   subscriptionToken       String?   // encrypted at rest — PayPlus recurring charge token
   nextBillingDate         DateTime?
   lastBillingAttemptAt    DateTime?
+  billingCycle            String    @default("monthly") // "monthly" | "annual"
+  billingCyclesCompleted  Int       @default(0) // successful charges — drives the loyalty discount
+  loyaltyDiscountIls      Int       @default(0) // auto-applied recurring discount once tenure threshold is hit
+  lastBillingReminderSentAt DateTime? // last "charge in 2 days" heads-up, to avoid duplicates
+  walletBalanceIls        Int       @default(0) // prepaid balance for metered add-ons (extra WhatsApp/SMS sends)
+  pendingYieldCampaign    Json?     // set when the empty-slot campaign is awaiting the owner's WhatsApp confirmation
   address           String?
   whatsappPhoneNumberId String? @unique
   whatsappAccessToken   String? // encrypted at rest

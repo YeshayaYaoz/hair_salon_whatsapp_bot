@@ -146,16 +146,60 @@ export default function BillingPage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [plan, setPlan] = useState<"standard" | "premium">("standard");
   const [currentPlan, setCurrentPlan] = useState<string | null>(null);
+  const [billingCycle, setBillingCycle] = useState<string>("monthly");
+  const [loyaltyDiscountIls, setLoyaltyDiscountIls] = useState(0);
+  const [walletBalanceIls, setWalletBalanceIls] = useState(0);
+  const [annualLoading, setAnnualLoading] = useState(false);
+  const [topupAmount, setTopupAmount] = useState(50);
+  const [topupLoading, setTopupLoading] = useState(false);
+
+  async function load() {
+    const me = await apiFetch<{
+      subscriptionStatus: string; whatsappConnected: boolean; createdAt: string;
+      subscriptionPlan?: string | null; billingCycle?: string; loyaltyDiscountIls?: number; walletBalanceIls?: number;
+    }>("/api/business/me");
+    setStatus(me.subscriptionStatus);
+    setWhatsappConnected(me.whatsappConnected);
+    setCreatedAt(me.createdAt);
+    setCurrentPlan(me.subscriptionPlan ?? null);
+    if (me.subscriptionPlan === "premium" || me.subscriptionPlan === "standard") setPlan(me.subscriptionPlan);
+    setBillingCycle(me.billingCycle ?? "monthly");
+    setLoyaltyDiscountIls(me.loyaltyDiscountIls ?? 0);
+    setWalletBalanceIls(me.walletBalanceIls ?? 0);
+  }
 
   useEffect(() => {
-    apiFetch<{ subscriptionStatus: string; whatsappConnected: boolean; createdAt: string; subscriptionPlan?: string | null }>("/api/business/me").then((me) => {
-      setStatus(me.subscriptionStatus);
-      setWhatsappConnected(me.whatsappConnected);
-      setCreatedAt(me.createdAt);
-      setCurrentPlan(me.subscriptionPlan ?? null);
-      if (me.subscriptionPlan === "premium" || me.subscriptionPlan === "standard") setPlan(me.subscriptionPlan);
-    });
+    load();
   }, []);
+
+  async function switchToAnnual() {
+    setError(null);
+    setAnnualLoading(true);
+    try {
+      await apiFetch("/api/billing/payplus/switch-to-annual", { method: "POST" });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not switch to annual");
+    } finally {
+      setAnnualLoading(false);
+    }
+  }
+
+  async function topUpWallet() {
+    setError(null);
+    setTopupLoading(true);
+    try {
+      const result = await apiFetch<{ walletBalanceIls: number }>("/api/billing/payplus/wallet/topup", {
+        method: "POST",
+        body: JSON.stringify({ amountIls: topupAmount }),
+      });
+      setWalletBalanceIls(result.walletBalanceIls);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not top up wallet");
+    } finally {
+      setTopupLoading(false);
+    }
+  }
 
   async function subscribe() {
     setError(null);
@@ -253,9 +297,17 @@ export default function BillingPage() {
                 )}
               </div>
               <div className="flex items-baseline gap-1 mb-1">
-                <span className="text-3xl font-extrabold text-gray-900 tabular-nums">₪{PLAN_PRICES[plan]}</span>
+                {loyaltyDiscountIls > 0 && (
+                  <span className="text-lg text-gray-400 line-through tabular-nums">₪{PLAN_PRICES[plan]}</span>
+                )}
+                <span className="text-3xl font-extrabold text-gray-900 tabular-nums">₪{Math.max(0, PLAN_PRICES[plan] - loyaltyDiscountIls)}</span>
                 <span className="text-sm text-gray-400">{lang === "he" ? "/חודש" : "/month"}</span>
               </div>
+              {loyaltyDiscountIls > 0 && (
+                <p className="text-xs font-medium text-green-600 mb-1">
+                  🎁 {lang === "he" ? `הנחת נאמנות של ₪${loyaltyDiscountIls} מוחלת אוטומטית` : `₪${loyaltyDiscountIls} loyalty discount applied automatically`}
+                </p>
+              )}
 
               <div className="flex gap-2 mb-4">
                 {(["standard", "premium"] as const).map((p) => (
@@ -330,6 +382,64 @@ export default function BillingPage() {
           </div>
         )}
       </div>
+
+      {status === "active" && (
+        <div className="grid md:grid-cols-2 gap-4 mt-4">
+          {/* Annual plan */}
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-8 h-8 rounded-lg bg-[#1B7FA0]/10 flex items-center justify-center text-base flex-shrink-0">📅</span>
+              <h2 className="text-sm font-semibold text-gray-900">{lang === "he" ? "מנוי שנתי" : "Annual plan"}</h2>
+            </div>
+            {billingCycle === "annual" ? (
+              <p className="text-sm text-gray-500 mt-3">
+                {lang === "he" ? "אתה כבר במסלול השנתי — תודה! 🎉" : "You're already on the annual plan — thank you! 🎉"}
+              </p>
+            ) : (
+              <>
+                <p className="text-xs text-gray-500 mt-1 mb-4">
+                  {lang === "he"
+                    ? `עבור למנוי שנתי וקבל חודשיים מתנה — ₪${PLAN_PRICES[plan] * 10} לשנה במקום ₪${PLAN_PRICES[plan] * 12}.`
+                    : `Switch to annual and get 2 months free — ₪${PLAN_PRICES[plan] * 10}/year instead of ₪${PLAN_PRICES[plan] * 12}.`}
+                </p>
+                <button
+                  onClick={switchToAnnual}
+                  disabled={annualLoading}
+                  className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
+                >
+                  {annualLoading ? t.redirecting : (lang === "he" ? "עבור למנוי שנתי" : "Switch to annual")}
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Wallet top-up */}
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-lg bg-[#1B7FA0]/10 flex items-center justify-center text-base flex-shrink-0">💳</span>
+                <h2 className="text-sm font-semibold text-gray-900">{lang === "he" ? "ארנק הודעות" : "Message wallet"}</h2>
+              </div>
+              <span className="text-sm font-bold text-[#1B7FA0] tabular-nums">₪{walletBalanceIls}</span>
+            </div>
+            <p className="text-xs text-gray-500 mt-1 mb-4">
+              {lang === "he" ? "יתרה לשימוש עתידי בהודעות/SMS נוספים מעבר למכסת המנוי." : "Prepaid balance for future extra WhatsApp/SMS sends beyond your plan quota."}
+            </p>
+            <div className="flex items-center gap-2">
+              <select value={topupAmount} onChange={(e) => setTopupAmount(+e.target.value)} className="text-sm">
+                {[20, 50, 100, 200].map((v) => <option key={v} value={v}>₪{v}</option>)}
+              </select>
+              <button
+                onClick={topUpWallet}
+                disabled={topupLoading}
+                className="bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-800 text-sm font-semibold px-4 py-2 rounded-lg transition"
+              >
+                {topupLoading ? t.redirecting : (lang === "he" ? "טען יתרה" : "Top up")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <SavingsCalculator lang={lang} />
     </div>
