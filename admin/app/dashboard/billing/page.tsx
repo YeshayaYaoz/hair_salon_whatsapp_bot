@@ -12,7 +12,8 @@ const STATUS_COLORS: Record<string, string> = {
   canceled: "bg-gray-100 text-gray-500 border-gray-200",
 };
 
-const PLAN_PRICE = 149; // ₪/month
+const PLAN_PRICES: Record<"standard" | "premium", number> = { standard: 149, premium: 299 };
+const PLAN_PRICE = PLAN_PRICES.standard; // ₪/month — used by the savings calculator copy below
 const PLAN_FEATURES_HE = [
   "בוט WhatsApp פעיל 24/7",
   "קביעת תורים ותזכורות אוטומטיות",
@@ -144,12 +145,16 @@ export default function BillingPage() {
   const [error, setError] = useState<string | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [plan, setPlan] = useState<"standard" | "premium">("standard");
+  const [currentPlan, setCurrentPlan] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch<{ subscriptionStatus: string; whatsappConnected: boolean; createdAt: string }>("/api/business/me").then((me) => {
+    apiFetch<{ subscriptionStatus: string; whatsappConnected: boolean; createdAt: string; subscriptionPlan?: string | null }>("/api/business/me").then((me) => {
       setStatus(me.subscriptionStatus);
       setWhatsappConnected(me.whatsappConnected);
       setCreatedAt(me.createdAt);
+      setCurrentPlan(me.subscriptionPlan ?? null);
+      if (me.subscriptionPlan === "premium" || me.subscriptionPlan === "standard") setPlan(me.subscriptionPlan);
     });
   }, []);
 
@@ -157,13 +162,36 @@ export default function BillingPage() {
     setError(null);
     setCheckoutLoading(true);
     try {
-      const { url } = await apiFetch<{ url: string }>("/api/billing/checkout", {
+      // PayPlus checkout — charges the first month and stores a token for recurring billing.
+      const { url } = await apiFetch<{ url: string }>("/api/billing/payplus/checkout", {
         method: "POST",
-        body: JSON.stringify({ returnUrl: window.location.href }),
+        body: JSON.stringify({ plan, returnUrl: window.location.href }),
       });
       window.location.href = url;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start checkout");
+    } finally {
+      setCheckoutLoading(false);
+    }
+  }
+
+  async function changePlan(newPlan: "standard" | "premium") {
+    setError(null);
+    setPlan(newPlan);
+    if (status !== "active" || !currentPlan) return; // just a pre-checkout selection, nothing to charge yet
+    setCheckoutLoading(true);
+    try {
+      const result = await apiFetch<{ ok: boolean; proratedChargeIls?: number }>("/api/billing/payplus/plan", {
+        method: "PUT",
+        body: JSON.stringify({ plan: newPlan }),
+      });
+      setCurrentPlan(newPlan);
+      if (result.proratedChargeIls) {
+        // no dedicated toast system on this page — a brief confirmation is enough here
+        alert(lang === "he" ? `חויבת ₪${result.proratedChargeIls} עבור יתרת התקופה` : `Charged ₪${result.proratedChargeIls} for the remainder of this period`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not change plan");
     } finally {
       setCheckoutLoading(false);
     }
@@ -241,9 +269,26 @@ export default function BillingPage() {
                 )}
               </div>
               <div className="flex items-baseline gap-1 mb-1">
-                <span className="text-3xl font-extrabold text-gray-900 tabular-nums">₪{PLAN_PRICE}</span>
+                <span className="text-3xl font-extrabold text-gray-900 tabular-nums">₪{PLAN_PRICES[plan]}</span>
                 <span className="text-sm text-gray-400">{lang === "he" ? "/חודש" : "/month"}</span>
               </div>
+
+              <div className="flex gap-2 mb-4">
+                {(["standard", "premium"] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => changePlan(p)}
+                    disabled={checkoutLoading}
+                    className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition disabled:opacity-50 ${
+                      plan === p ? "bg-[#1B7FA0] text-white border-transparent" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    {p === "standard" ? "Standard" : "Premium"} · ₪{PLAN_PRICES[p]}
+                  </button>
+                ))}
+              </div>
+
               {trialDaysLeft !== null && (
                 <p className="text-xs font-medium text-amber-600 mb-4">
                   {lang === "he" ? `${trialDaysLeft} ימים נותרו בתקופת הניסיון` : `${trialDaysLeft} days left in your trial`}

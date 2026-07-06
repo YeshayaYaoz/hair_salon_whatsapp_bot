@@ -17,6 +17,14 @@ model Business {
   subscriptionStatus String  @default("trial") // trial | active | past_due | canceled
   stripeCustomerId     String? @unique
   stripeSubscriptionId String? @unique
+
+  // Own-account recurring billing via PayPlus tokens — charges the business (salon owner) for
+  // their Tori subscription. Separate from paymentProvider/paymentApiKey above, which are the
+  // salon's own merchant account for charging their customers, not this.
+  subscriptionPlan        String?   // "standard" | "premium"
+  subscriptionToken       String?   // encrypted at rest — PayPlus recurring charge token
+  nextBillingDate         DateTime?
+  lastBillingAttemptAt    DateTime?
   address           String?
   whatsappPhoneNumberId String? @unique
   whatsappAccessToken   String? // encrypted at rest

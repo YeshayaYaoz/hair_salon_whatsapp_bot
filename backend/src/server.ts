@@ -9,6 +9,8 @@ import { whatsappRouter } from "./webhook/whatsappRoutes.js";
 import { billingRouter, stripeWebhookRouter } from "./billing/billingRoutes.js";
 import { publicRouter } from "./api/publicRoutes.js";
 import { paymentWebhookRouter } from "./webhook/paymentWebhooks.js";
+import { payplusBillingRouter, payplusBillingWebhookRouter } from "./billing/payplusBillingRoutes.js";
+import { runSubscriptionBillingJob } from "./billing/subscriptionBillingJob.js";
 import { runRetentionJob } from "./lib/retentionJob.js";
 import { runReminderJob, runReviewJob, runDigestJob } from "./lib/scheduledMessages.js";
 import { runTrackedJob } from "./lib/jobStatus.js";
@@ -43,11 +45,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Tranzila's notify webhook posts form-encoded, not JSON
 
 app.use("/webhook/payments", paymentWebhookRouter);
+app.use("/webhook/billing/payplus", payplusBillingWebhookRouter);
 
 app.use("/api/auth", authRouter);
 app.use("/api/public", publicRouter);
 app.use("/api/business", businessRouter);
 app.use("/api/billing", billingRouter);
+app.use("/api/billing", payplusBillingRouter);
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
@@ -72,7 +76,11 @@ function scheduleRetentionJob() {
   const delay = next.getTime() - now.getTime();
   setTimeout(() => {
     runTrackedJob("retention", runRetentionJob);
-    setInterval(() => runTrackedJob("retention", runRetentionJob), 24 * 60 * 60 * 1000);
+    runTrackedJob("subscriptionBilling", runSubscriptionBillingJob);
+    setInterval(() => {
+      runTrackedJob("retention", runRetentionJob);
+      runTrackedJob("subscriptionBilling", runSubscriptionBillingJob);
+    }, 24 * 60 * 60 * 1000);
   }, delay);
   console.log(`[retention] Next run scheduled in ${Math.round(delay / 60000)} minutes`);
 }

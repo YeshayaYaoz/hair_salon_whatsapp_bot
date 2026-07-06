@@ -26,6 +26,8 @@ const RECOMMENDED: RequiredVar[] = [
   { name: "STRIPE_SECRET_KEY", description: "subscription billing" },
   { name: "STRIPE_PRICE_ID", description: "subscription checkout" },
   { name: "STRIPE_WEBHOOK_SECRET", description: "subscription status sync" },
+  { name: "PAYPLUS_API_KEY", description: "Tori's own PayPlus account — recurring subscription billing" },
+  { name: "PAYPLUS_SECRET_KEY", description: "Tori's own PayPlus account — recurring subscription billing" },
   { name: "RESEND_API_KEY", description: "transactional emails (welcome, password reset)" },
   { name: "OPENAI_API_KEY", description: "voice-note transcription in the WhatsApp bot (Whisper)" },
 ];
