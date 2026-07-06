@@ -190,8 +190,8 @@ function WeekCalendar({
         })}
       </div>
 
-      {/* Time grid */}
-      <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 320px)" }}>
+      {/* Time grid — renders in full; the page itself scrolls rather than nesting another scrollbar */}
+      <div>
         {hours.map((h) => (
           <div key={h} className="grid border-b border-gray-100/70 last:border-b-0" style={{ gridTemplateColumns: "3.5rem repeat(7, 1fr)", minHeight: 48 }}>
             <div className="px-2 pt-1 text-xs text-gray-400 border-e border-gray-100 leading-none">{h}:00</div>
