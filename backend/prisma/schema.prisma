@@ -113,6 +113,7 @@ model Customer {
   name        String?
   preferredServiceId String? // most recently booked service, for CRM memory
   lastRetentionSentAt DateTime? // when we last sent a re-engagement message
+  notes       String? // free-text staff note about this customer, shown next to their conversation
   appointments    Appointment[]
   waitlistEntries WaitlistEntry[]
 

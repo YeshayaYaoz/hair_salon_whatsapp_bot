@@ -369,6 +369,22 @@ businessRouter.get("/customers", async (req: AuthedRequest, res) => {
   res.json(customers);
 });
 
+businessRouter.patch("/customers/:id/notes", async (req: AuthedRequest, res) => {
+  const parsed = z.object({ notes: z.string().max(2000) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const customer = await prisma.customer.findFirst({
+    where: { id: req.params.id, businessId: req.businessId! },
+  });
+  if (!customer) return res.status(404).json({ error: "Not found" });
+
+  const updated = await prisma.customer.update({
+    where: { id: customer.id },
+    data: { notes: parsed.data.notes || null },
+  });
+  res.json({ notes: updated.notes });
+});
+
 businessRouter.post("/customers/:id/message", async (req: AuthedRequest, res) => {
   const parsed = z.object({ text: z.string().min(1).max(1000) }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });

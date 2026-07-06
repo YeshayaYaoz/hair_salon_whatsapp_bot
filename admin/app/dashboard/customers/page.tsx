@@ -4,11 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SkeletonBlock, SkeletonRow } from "../../lib/Skeleton";
+import { formatPhone } from "../../lib/formatPhone";
 
 interface Customer {
   id: string;
   name?: string;
   phone: string;
+  notes?: string | null;
   _count: { appointments: number };
 }
 
@@ -19,7 +21,7 @@ interface Message {
   createdAt: string;
 }
 
-function ConversationPanel({ customer, onClose }: { customer: Customer; onClose: () => void }) {
+function ConversationPanel({ customer, onClose, onNotesSaved }: { customer: Customer; onClose: () => void; onNotesSaved: (notes: string) => void }) {
   const { t, lang } = useLanguage();
   const he = lang === "he";
   const [messages, setMessages] = useState<Message[]>([]);
@@ -28,6 +30,28 @@ function ConversationPanel({ customer, onClose }: { customer: Customer; onClose:
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [notes, setNotes] = useState(customer.notes ?? "");
+  const [savingNotes, setSavingNotes] = useState(false);
+  const notesSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function scheduleNotesSave(value: string) {
+    setNotes(value);
+    if (notesSaveTimer.current) clearTimeout(notesSaveTimer.current);
+    notesSaveTimer.current = setTimeout(async () => {
+      setSavingNotes(true);
+      try {
+        await apiFetch(`/api/business/customers/${customer.id}/notes`, {
+          method: "PATCH",
+          body: JSON.stringify({ notes: value }),
+        });
+        onNotesSaved(value);
+      } catch {
+        // best-effort — the note stays in the textarea either way, retry happens on next edit
+      } finally {
+        setSavingNotes(false);
+      }
+    }, 800);
+  }
 
   async function load() {
     setLoading(true);
@@ -88,8 +112,8 @@ function ConversationPanel({ customer, onClose }: { customer: Customer; onClose:
               {(customer.name ?? customer.phone).charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
-              <div className="text-sm font-semibold text-gray-900 truncate">{customer.name ?? customer.phone}</div>
-              <div className="text-xs text-gray-400 font-mono">{customer.phone}</div>
+              <div className="text-sm font-semibold text-gray-900 truncate">{customer.name ?? formatPhone(customer.phone)}</div>
+              <div className="text-xs text-gray-400 font-mono">{formatPhone(customer.phone)}</div>
             </div>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition p-1">
@@ -97,6 +121,20 @@ function ConversationPanel({ customer, onClose }: { customer: Customer; onClose:
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
+        </div>
+
+        <div className="px-5 py-3 border-b border-gray-100 shrink-0 bg-amber-50/40">
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-semibold text-gray-500">{he ? "הערה על הלקוח" : "Customer note"}</label>
+            {savingNotes && <span className="text-[10px] text-gray-400">{he ? "שומר…" : "Saving…"}</span>}
+          </div>
+          <textarea
+            rows={2}
+            placeholder={he ? "הערה פנימית — לא נראית ללקוח…" : "Internal note — not visible to the customer…"}
+            value={notes}
+            onChange={(e) => scheduleNotesSave(e.target.value)}
+            className="w-full text-sm resize-none bg-white"
+          />
         </div>
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 bg-gray-50/60">
@@ -263,7 +301,16 @@ export default function CustomersPage() {
 
   return (
     <div className="animate-fade-in">
-      {open && <ConversationPanel customer={open} onClose={() => setOpen(null)} />}
+      {open && (
+        <ConversationPanel
+          customer={open}
+          onClose={() => setOpen(null)}
+          onNotesSaved={(notes) => {
+            setCustomers((prev) => prev.map((c) => (c.id === open.id ? { ...c, notes } : c)));
+            setOpen((prev) => (prev ? { ...prev, notes } : prev));
+          }}
+        />
+      )}
       {showBulkModal && (
         <BulkMessageModal
           customers={selectedCustomers}
@@ -353,7 +400,7 @@ export default function CustomersPage() {
                       <span className="text-gray-700 font-medium">{c.name ?? <span className="text-gray-400 italic">—</span>}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-gray-500 font-mono text-xs">{c.phone}</td>
+                  <td className="px-4 py-3 text-gray-500 font-mono text-xs">{formatPhone(c.phone)}</td>
                   <td className="px-4 py-3 text-end">
                     <span className="inline-flex items-center justify-center min-w-[2rem] px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
                       {c._count.appointments}

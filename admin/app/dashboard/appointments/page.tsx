@@ -5,6 +5,7 @@ import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { formatTimeInTz, formatDateTimeInTz, partsInTz, dayKeyInTz } from "../../lib/tz";
 import { SkeletonBlock, SkeletonRow } from "../../lib/Skeleton";
+import { formatPhone } from "../../lib/formatPhone";
 
 function localDayKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -205,10 +206,10 @@ function WeekCalendar({
                     <div
                       key={a.id}
                       className="bg-[#1B7FA0] text-white rounded px-1.5 py-1 text-[10px] leading-tight cursor-default hover:bg-[#2A9BBF] transition group relative"
-                      title={`${a.customer.name ?? a.customer.phone} · ${a.service.name}`}
+                      title={`${a.customer.name ?? formatPhone(a.customer.phone)} · ${a.service.name}`}
                     >
                       <div className="font-semibold truncate">{formatTimeInTz(a.startTime, tz)}</div>
-                      <div className="truncate opacity-80">{a.customer.name ?? a.customer.phone}</div>
+                      <div className="truncate opacity-80">{a.customer.name ?? formatPhone(a.customer.phone)}</div>
                       <div className="truncate opacity-70">{a.service.name}</div>
                       {new Date(a.startTime) >= new Date() && (
                         <button
@@ -529,7 +530,7 @@ export default function AppointmentsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-gray-700 font-medium text-sm">{a.customer.name ?? "—"}</div>
-                        <div className="text-gray-400 text-xs">{a.customer.phone}</div>
+                        <div className="text-gray-400 text-xs">{formatPhone(a.customer.phone)}</div>
                       </td>
                       <td className="px-4 py-3 text-gray-600 text-sm">{a.service.name}</td>
                       <td className="px-4 py-3 text-gray-500 text-sm hidden md:table-cell">{a.staff?.name ?? "—"}</td>
