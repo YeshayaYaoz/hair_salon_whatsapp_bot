@@ -231,7 +231,7 @@ function WeekCalendar({
 }
 
 export default function AppointmentsPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [filter, setFilter] = useState<Filter>("upcoming");
   const [search, setSearch] = useState("");
@@ -241,6 +241,11 @@ export default function AppointmentsPage() {
   const [tz, setTz] = useState("Asia/Jerusalem");
   const [showNew, setShowNew] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkCancelling, setBulkCancelling] = useState(false);
+
+  // Selections are tied to what's currently visible — clear them when the visible set changes filters.
+  useEffect(() => { setSelected(new Set()); }, [filter, search]);
 
   async function load() {
     setAppointments(await apiFetch<Appointment[]>("/api/business/appointments"));
@@ -275,6 +280,36 @@ export default function AppointmentsPage() {
     }
   }
 
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll(ids: string[]) {
+    setSelected((prev) => (prev.size === ids.length ? new Set() : new Set(ids)));
+  }
+
+  async function bulkCancel() {
+    const count = selected.size;
+    if (count === 0) return;
+    const confirmMsg = lang === "he" ? `לבטל ${count} תורים נבחרים?` : `Cancel ${count} selected appointments?`;
+    if (!confirm(confirmMsg)) return;
+    setBulkCancelling(true);
+    try {
+      await Promise.all(
+        Array.from(selected).map((id) => apiFetch(`/api/business/appointments/${id}/cancel`, { method: "PATCH" }))
+      );
+      setSelected(new Set());
+      await load();
+    } finally {
+      setBulkCancelling(false);
+    }
+  }
+
   const filtered = useMemo(() => {
     const now = new Date();
     return appointments
@@ -291,6 +326,11 @@ export default function AppointmentsPage() {
       })
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
   }, [appointments, filter, search]);
+
+  const cancellableIds = useMemo(
+    () => filtered.filter((a) => a.status === "confirmed" && new Date(a.startTime) >= new Date()).map((a) => a.id),
+    [filtered]
+  );
 
   const FILTERS: { key: Filter; label: string }[] = [
     { key: "upcoming", label: t.upcoming },
@@ -428,6 +468,20 @@ export default function AppointmentsPage() {
               onChange={(e) => setSearch(e.target.value)}
               className="w-52 text-sm"
             />
+            {selected.size > 0 && (
+              <div className="flex items-center gap-2 ms-auto">
+                <span className="text-xs text-gray-500">
+                  {lang === "he" ? `${selected.size} נבחרו` : `${selected.size} selected`}
+                </span>
+                <button
+                  onClick={bulkCancel}
+                  disabled={bulkCancelling}
+                  className="text-xs font-medium text-red-600 hover:text-white hover:bg-red-600 disabled:opacity-50 transition border border-red-200 px-3 py-1.5 rounded-lg"
+                >
+                  {bulkCancelling ? "…" : (lang === "he" ? "בטל נבחרים" : "Cancel selected")}
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden animate-fade-up stagger-3">
@@ -441,7 +495,15 @@ export default function AppointmentsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    <th className="text-start px-4 py-3 text-gray-500 font-medium">{t.when}</th>
+                    <th className="ps-4 pe-1 py-3 w-8">
+                      <input
+                        type="checkbox"
+                        checked={selected.size > 0 && selected.size === cancellableIds.length}
+                        onChange={() => toggleSelectAll(cancellableIds)}
+                        aria-label={lang === "he" ? "בחר הכל" : "Select all"}
+                      />
+                    </th>
+                    <th className="text-start px-2 py-3 text-gray-500 font-medium">{t.when}</th>
                     <th className="text-start px-4 py-3 text-gray-500 font-medium">{t.customer}</th>
                     <th className="text-start px-4 py-3 text-gray-500 font-medium">{t.service}</th>
                     <th className="text-start px-4 py-3 text-gray-500 font-medium hidden md:table-cell">{t.staff}</th>
@@ -450,9 +512,19 @@ export default function AppointmentsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((a, i) => (
+                  {filtered.map((a, i) => {
+                    const cancellable = a.status === "confirmed" && new Date(a.startTime) >= new Date();
+                    return (
                     <tr key={a.id} className={i !== filtered.length - 1 ? "border-b border-gray-200/50" : ""}>
-                      <td className="px-4 py-3 text-gray-700 whitespace-nowrap text-xs">
+                      <td className="ps-4 pe-1 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(a.id)}
+                          onChange={() => toggleSelect(a.id)}
+                          disabled={!cancellable}
+                        />
+                      </td>
+                      <td className="px-2 py-3 text-gray-700 whitespace-nowrap text-xs">
                         {formatDateTimeInTz(a.startTime, tz)}
                       </td>
                       <td className="px-4 py-3">
@@ -485,7 +557,7 @@ export default function AppointmentsPage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  );})}
                 </tbody>
               </table>
             )}

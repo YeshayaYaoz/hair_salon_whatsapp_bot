@@ -152,11 +152,81 @@ function ConversationPanel({ customer, onClose }: { customer: Customer; onClose:
   );
 }
 
+function BulkMessageModal({ customers, onClose, onSent }: { customers: Customer[]; onClose: () => void; onSent: () => void }) {
+  const { t, lang } = useLanguage();
+  const he = lang === "he";
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  async function send(e: React.FormEvent) {
+    e.preventDefault();
+    const body = text.trim();
+    if (!body) return;
+    setSending(true);
+    setError(null);
+    setProgress(0);
+    try {
+      for (const c of customers) {
+        await apiFetch(`/api/business/customers/${c.id}/message`, { method: "POST", body: JSON.stringify({ text: body }) });
+        setProgress((p) => p + 1);
+        await new Promise((r) => setTimeout(r, 400)); // pace sends rather than firing all at once
+      }
+      onSent();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)" }} onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900">{he ? "הודעה קבוצתית" : "Bulk message"}</h2>
+            <p className="text-xs text-gray-400">{he ? `אל ${customers.length} לקוחות` : `To ${customers.length} customers`}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <form onSubmit={send} className="flex flex-col gap-3">
+          <textarea
+            rows={3}
+            placeholder={t.messagePlaceholder}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            required
+            disabled={sending}
+            className="w-full"
+          />
+          {error && <p className="text-red-600 text-xs">{error}</p>}
+          <button
+            type="submit"
+            disabled={sending}
+            className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold py-2.5 rounded-lg transition"
+          >
+            {sending ? `${progress}/${customers.length}...` : (he ? `שלח ל-${customers.length} לקוחות` : `Send to ${customers.length} customers`)}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function CustomersPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const he = lang === "he";
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState<Customer | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [showBulkModal, setShowBulkModal] = useState(false);
 
   const [loaded, setLoaded] = useState(false);
 
@@ -170,21 +240,59 @@ export default function CustomersPage() {
       (c.name ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
+  useEffect(() => {
+    setSelected(new Set());
+  }, [search]);
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelected((prev) =>
+      prev.size === filtered.length ? new Set() : new Set(filtered.map((c) => c.id))
+    );
+  }
+
+  const selectedCustomers = customers.filter((c) => selected.has(c.id));
+
   return (
     <div className="animate-fade-in">
       {open && <ConversationPanel customer={open} onClose={() => setOpen(null)} />}
+      {showBulkModal && (
+        <BulkMessageModal
+          customers={selectedCustomers}
+          onClose={() => setShowBulkModal(false)}
+          onSent={() => { setShowBulkModal(false); setSelected(new Set()); }}
+        />
+      )}
 
       <div className="mb-4 flex items-center justify-between flex-wrap gap-3 animate-fade-up">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{t.customersTitle}</h1>
           <p className="text-gray-500 text-sm mt-1">{customers.length} {t.totalCustomers}</p>
         </div>
-        <input
-          placeholder={t.searchPlaceholder}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-64"
-        />
+        <div className="flex items-center gap-3">
+          {selected.size > 0 && (
+            <button
+              onClick={() => setShowBulkModal(true)}
+              className="bg-[#1B7FA0] hover:bg-[#2A9BBF] text-white text-xs font-semibold px-3 py-2 rounded-lg transition ms-auto"
+            >
+              {he ? `שלח הודעה ל-${selected.size} נבחרים` : `Message ${selected.size} selected`}
+            </button>
+          )}
+          <input
+            placeholder={t.searchPlaceholder}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-64"
+          />
+        </div>
       </div>
 
       <div className="flex items-center gap-2.5 mb-4 px-4 py-2.5 rounded-lg bg-[#1B7FA0]/8 border border-[#1B7FA0]/20 animate-fade-up stagger-1">
@@ -207,6 +315,14 @@ export default function CustomersPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200">
+                <th className="ps-3 pe-1 py-3">
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && selected.size === filtered.length}
+                    onChange={toggleSelectAll}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </th>
                 <th className="text-start px-4 py-3 text-gray-500 font-medium">{t.customer}</th>
                 <th className="text-start px-4 py-3 text-gray-500 font-medium">{t.when}</th>
                 <th className="text-start px-4 py-3 text-gray-500 font-medium text-end">{t.totalBookings}</th>
@@ -221,6 +337,14 @@ export default function CustomersPage() {
                   onClick={() => setOpen(c)}
                   className={`cursor-pointer hover:bg-gray-50 transition ${i !== filtered.length - 1 ? "border-b border-gray-200/50" : ""}`}
                 >
+                  <td className="ps-3 pe-1 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(c.id)}
+                      onChange={() => toggleSelect(c.id)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-[#1B7FA0]/20 border border-[#145F78]/40 flex items-center justify-center text-[#5BB8D4] font-semibold text-sm shrink-0">
