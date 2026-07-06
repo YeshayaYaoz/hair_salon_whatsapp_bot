@@ -19,7 +19,7 @@ businessRouter.use(requireAuth);
 // /me and /me/whatsapp stay reachable even with a lapsed subscription so a business can see its
 // status and the billing UI can still load; everything else requires an active subscription.
 businessRouter.use((req, res, next) => {
-  if (req.path === "/me" || req.path === "/me/whatsapp") return next();
+  if (req.path === "/me" || req.path === "/me/whatsapp" || req.path === "/admin/businesses") return next();
   requireActiveSubscription(req, res, next);
 });
 
@@ -38,8 +38,38 @@ businessRouter.get("/me", async (req: AuthedRequest, res) => {
         : business.invoiceProvider === "tori_managed"
           ? true
           : Boolean(invoiceApiKey),
+    isSuperAdmin: isSuperAdminEmail(business.email),
   });
   // (whatsappTokenValid is included in ...safe)
+});
+
+// --- Super-admin: lists every registered business (salon) using Tori. Gated by email match
+// against SUPER_ADMIN_EMAIL rather than a separate role system, since there's currently exactly
+// one operator account and adding a full RBAC system for that would be overkill. ---
+
+function isSuperAdminEmail(email: string): boolean {
+  const adminEmail = process.env.SUPER_ADMIN_EMAIL;
+  return Boolean(adminEmail) && email.toLowerCase() === adminEmail!.toLowerCase();
+}
+
+async function requireSuperAdmin(req: AuthedRequest, res: import("express").Response, next: import("express").NextFunction) {
+  const business = await prisma.business.findUnique({ where: { id: req.businessId! }, select: { email: true } });
+  if (!business || !isSuperAdminEmail(business.email)) return res.status(403).json({ error: "Not authorized" });
+  next();
+}
+
+businessRouter.get("/admin/businesses", requireSuperAdmin, async (_req: AuthedRequest, res) => {
+  const businesses = await prisma.business.findMany({
+    select: {
+      id: true, name: true, email: true, createdAt: true,
+      subscriptionStatus: true, subscriptionPlan: true, billingCycle: true,
+      whatsappPhoneNumberId: true, whatsappTokenValid: true,
+      paymentProvider: true, invoiceProvider: true,
+      _count: { select: { appointments: true, customers: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  res.json(businesses.map((b) => ({ ...b, whatsappConnected: Boolean(b.whatsappPhoneNumberId) })));
 });
 
 // Global background job health (reminders/reviews/digest/retention) — same info for every

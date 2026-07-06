@@ -56,6 +56,11 @@ const BOTTOM_TAB_ITEMS = NAV_ITEMS.slice(0, 5);
 function SidebarContent({ pathname }: { pathname: string }) {
   const router = useRouter();
   const { lang, setLang, t } = useLanguage();
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  useEffect(() => {
+    apiFetch<{ isSuperAdmin?: boolean }>("/api/business/me").then((me) => setIsSuperAdmin(Boolean(me.isSuperAdmin))).catch(() => {});
+  }, []);
 
   function logout() {
     clearToken();
@@ -129,6 +134,19 @@ function SidebarContent({ pathname }: { pathname: string }) {
             </button>
           ))}
         </div>
+
+        {isSuperAdmin && (
+          <Link
+            href="/dashboard/admin"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition"
+            style={pathname === "/dashboard/admin" ? { background: "rgba(192,138,0,0.18)", color: "#E8B84B" } : { color: "rgba(255,255,255,0.3)" }}
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Admin
+          </Link>
+        )}
 
         <button
           onClick={logout}
