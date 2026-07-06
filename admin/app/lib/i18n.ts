@@ -67,6 +67,8 @@ const translations = {
 
     // Customers
     customersTitle: "Customers", totalCustomers: "total customers", totalBookings: "Total bookings",
+    customersHint: "Click any customer to view their WhatsApp conversation with the bot and send messages.",
+    viewConversation: "View conversation",
     noCustomers: "No customers yet — they'll appear here after their first booking.",
 
     // Waitlist
@@ -193,6 +195,8 @@ const translations = {
 
     // Customers
     customersTitle: "לקוחות", totalCustomers: "לקוחות בסה\"כ", totalBookings: "סה\"כ הזמנות",
+    customersHint: "לחץ על כל לקוח כדי לצפות בשיחת הוואטסאפ שלו עם הבוט ולשלוח הודעות.",
+    viewConversation: "צפה בשיחה",
     noCustomers: "אין לקוחות עדיין — הם יופיעו כאן לאחר ההזמנה הראשונה.",
 
     // Waitlist

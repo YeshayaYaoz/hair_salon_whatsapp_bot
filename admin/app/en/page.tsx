@@ -543,6 +543,8 @@ export default function LandingPageEN() {
         .lp-footer-col a:hover { color: #fff; }
         .lp-footer-bottom { max-width: 1080px; margin: 0 auto; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 24px; }
         .lp-footer-copy { font-size: 12px; color: rgba(255,255,255,0.25); }
+        .lp-footer-copy-link { color: rgba(255,255,255,0.5); text-decoration: underline; text-underline-offset: 2px; }
+        .lp-footer-copy-link:hover { color: #25D366; }
 
         /* Premium */
         .lp-premium { padding: 100px 40px; background: #0A0A0A; }
@@ -1200,7 +1202,7 @@ export default function LandingPageEN() {
             </div>
           </div>
           <div className="lp-footer-bottom">
-            <span className="lp-footer-copy">© 2026 torionline.com · All rights reserved</span>
+            <span className="lp-footer-copy">© 2026 torionline.com · All rights reserved · <a href="/privacy" className="lp-footer-copy-link">Privacy Policy</a></span>
             <span className="lp-footer-copy">Made with ❤️ for small business owners</span>
           </div>
         </footer>

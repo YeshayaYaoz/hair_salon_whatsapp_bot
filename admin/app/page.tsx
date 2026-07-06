@@ -727,6 +727,8 @@ export default function LandingPage() {
         .lp-footer-suitable { display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; }
         .lp-footer-bottom { display: flex; align-items: center; justify-content: space-between; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08); flex-wrap: wrap; gap: 12px; }
         .lp-footer-copy { font-size: 12.5px; color: rgba(255,255,255,0.45); }
+        .lp-footer-copy-link { color: rgba(255,255,255,0.65); text-decoration: underline; text-underline-offset: 2px; }
+        .lp-footer-copy-link:hover { color: #25D366; }
 
         /* ANIMATIONS */
         @keyframes fadeUp { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
@@ -1723,7 +1725,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="lp-footer-bottom">
-            <span className="lp-footer-copy">© 2026 torionline.com · כל הזכויות שמורות</span>
+            <span className="lp-footer-copy">© 2026 torionline.com · כל הזכויות שמורות · <a href="/privacy" className="lp-footer-copy-link">מדיניות פרטיות</a></span>
             <span className="lp-footer-copy">עשוי באהבה לבעלי עסקים קטנים 🇮🇱</span>
           </div>
         </footer>

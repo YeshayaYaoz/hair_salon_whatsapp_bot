@@ -167,7 +167,7 @@ export default function CustomersPage() {
     <div className="animate-fade-in">
       {open && <ConversationPanel customer={open} onClose={() => setOpen(null)} />}
 
-      <div className="mb-6 flex items-center justify-between flex-wrap gap-3 animate-fade-up">
+      <div className="mb-4 flex items-center justify-between flex-wrap gap-3 animate-fade-up">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{t.customersTitle}</h1>
           <p className="text-gray-500 text-sm mt-1">{customers.length} {t.totalCustomers}</p>
@@ -178,6 +178,13 @@ export default function CustomersPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="w-64"
         />
+      </div>
+
+      <div className="flex items-center gap-2.5 mb-4 px-4 py-2.5 rounded-lg bg-[#1B7FA0]/8 border border-[#1B7FA0]/20 animate-fade-up stagger-1">
+        <svg className="w-4 h-4 text-[#1B7FA0] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.9 9.9 0 01-4.29-.98L3 20l1.3-3.9C3.47 15.03 3 13.57 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+        <p className="text-xs text-[#145F78] font-medium">{t.customersHint}</p>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden animate-fade-up stagger-2">
@@ -193,6 +200,7 @@ export default function CustomersPage() {
                 <th className="text-start px-4 py-3 text-gray-500 font-medium">{t.when}</th>
                 <th className="text-start px-4 py-3 text-gray-500 font-medium text-end">{t.totalBookings}</th>
                 <th className="px-4 py-3" />
+                <th className="ps-1 pe-3" />
               </tr>
             </thead>
             <tbody>
@@ -219,13 +227,18 @@ export default function CustomersPage() {
                   <td className="px-4 py-3 text-end">
                     <button
                       onClick={(e) => { e.stopPropagation(); setOpen(c); }}
-                      className="text-xs text-gray-400 hover:text-[#1B7FA0] transition border border-gray-200 hover:border-[#8DD4E8] px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5"
+                      className="text-xs text-[#1B7FA0] hover:text-white bg-[#1B7FA0]/10 hover:bg-[#1B7FA0] transition border border-[#1B7FA0]/30 px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 font-medium"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.9 9.9 0 01-4.29-.98L3 20l1.3-3.9C3.47 15.03 3 13.57 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                       </svg>
-                      {t.sendMessage}
+                      {t.viewConversation}
                     </button>
+                  </td>
+                  <td className="ps-1 pe-3">
+                    <svg className="w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
                   </td>
                 </tr>
               ))}
