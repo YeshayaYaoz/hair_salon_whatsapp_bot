@@ -11,14 +11,58 @@ type PaymentProviderName = (typeof PAYMENT_PROVIDERS)[number];
 const INVOICE_PROVIDERS = ["greeninvoice", "icount", "payplus-invoice"] as const;
 type InvoiceProviderName = (typeof INVOICE_PROVIDERS)[number];
 
-const PAYMENT_LABELS: Record<PaymentProviderName, string> = { payplus: "PayPlus", tranzila: "Tranzila", cardcom: "Cardcom" };
-const INVOICE_LABELS: Record<InvoiceProviderName, string> = {
-  greeninvoice: "חשבונית ירוקה (Green Invoice)",
-  icount: "iCount",
-  "payplus-invoice": "PayPlus חשבונית+",
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+
+const PAYMENT_META: Record<PaymentProviderName, { label: string; color: string; instructions: { he: string; en: string } }> = {
+  payplus: {
+    label: "PayPlus",
+    color: "#0F62FE",
+    instructions: {
+      he: "היכנס לחשבון PayPlus ← הגדרות ← מפתחות API, והעתק את ה-API Key וה-Secret Key.",
+      en: "Log into PayPlus → Settings → API Keys, and copy your API Key and Secret Key.",
+    },
+  },
+  tranzila: {
+    label: "Tranzila",
+    color: "#E4572E",
+    instructions: {
+      he: "שם המסוף (Terminal) שלך ב-Tranzila משמש כ-API Key. הסיסמה/מפתח ה-API נמצאים תחת הגדרות ← אבטחה.",
+      en: "Your Tranzila terminal name is used as the API Key. The API password/secret is under Settings → Security.",
+    },
+  },
+  cardcom: {
+    label: "Cardcom",
+    color: "#8E44AD",
+    instructions: {
+      he: "היכנס לחשבון Cardcom ← הגדרות טרמינל, והעתק את מספר הטרמינל (TerminalNumber) ואת שם ה-API (ApiName).",
+      en: "Log into Cardcom → Terminal Settings, and copy your TerminalNumber and ApiName.",
+    },
+  },
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+const INVOICE_META: Record<InvoiceProviderName, { label: string; color: string; instructions: { he: string; en: string } | null }> = {
+  greeninvoice: {
+    label: "חשבונית ירוקה",
+    color: "#00A651",
+    instructions: {
+      he: "היכנס לחשבונית ירוקה ← הגדרות ← API, וצור זוג מפתחות (Key ו-Secret) חדש.",
+      en: "Log into Green Invoice → Settings → API, and generate a new Key/Secret pair.",
+    },
+  },
+  icount: {
+    label: "iCount",
+    color: "#F5A623",
+    instructions: {
+      he: "מזהה החברה (cid) נמצא בכתובת ה-URL של החשבון. את ה-API Token מייצרים תחת הגדרות ← API.",
+      en: "Your company id (cid) is in your account's URL. Generate an API Token under Settings → API.",
+    },
+  },
+  "payplus-invoice": {
+    label: "PayPlus חשבונית+",
+    color: "#0F62FE",
+    instructions: null, // reuses payment credentials — no separate setup
+  },
+};
 
 interface Me {
   id: string;
@@ -28,7 +72,20 @@ interface Me {
   invoiceProvider?: string | null;
 }
 
-function ConnectedBadge({ connected, connectedText, notConnectedText }: { connected: boolean; connectedText: string; notConnectedText: string }) {
+function ProviderIcon({ color }: { color: string }) {
+  return (
+    <span
+      className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-white font-bold text-sm"
+      style={{ backgroundColor: color }}
+    >
+      <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+      </svg>
+    </span>
+  );
+}
+
+function ConnectedPill({ connected, he }: { connected: boolean; he: boolean }) {
   return (
     <span
       className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${
@@ -36,8 +93,174 @@ function ConnectedBadge({ connected, connectedText, notConnectedText }: { connec
       }`}
     >
       <span className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-green-400" : "bg-gray-300"}`} />
-      {connected ? connectedText : notConnectedText}
+      {connected ? (he ? "מחובר" : "Connected") : (he ? "לא מחובר" : "Not connected")}
     </span>
+  );
+}
+
+function ProviderCard<T extends string>({
+  he,
+  title,
+  options,
+  meta,
+  selected,
+  onSelect,
+  connected,
+  connectedProvider,
+  onConnect,
+  onDisconnect,
+  needsCredentials,
+  requirementNote,
+}: {
+  he: boolean;
+  title: string;
+  options: readonly T[];
+  meta: Record<T, { label: string; color: string; instructions: { he: string; en: string } | null }>;
+  selected: T;
+  onSelect: (v: T) => void;
+  connected: boolean;
+  connectedProvider?: string | null;
+  onConnect: (apiKey: string, apiSecret: string) => Promise<void>;
+  onDisconnect: () => Promise<void>;
+  needsCredentials: boolean;
+  requirementNote?: string;
+}) {
+  const [apiKey, setApiKey] = useState("");
+  const [apiSecret, setApiSecret] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  const info = meta[selected];
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      await onConnect(apiKey, apiSecret);
+      setApiKey(""); setApiSecret("");
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to connect");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+        <ProviderIcon color={info.color} />
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
+          <p className="text-xs text-gray-400 truncate">{info.label}</p>
+        </div>
+        <ConnectedPill connected={connected} he={he} />
+        {saved && <SavedBadge text={he ? "נשמר" : "Saved"} />}
+      </div>
+
+      <div className="p-5">
+        {/* Provider tabs */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {options.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => onSelect(p)}
+              className={`text-xs font-semibold px-3 py-2 rounded-lg border transition ${
+                selected === p
+                  ? "text-white border-transparent"
+                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+              }`}
+              style={selected === p ? { backgroundColor: meta[p].color } : undefined}
+            >
+              {meta[p].label}
+              {connectedProvider === p && connected && " ✓"}
+            </button>
+          ))}
+        </div>
+
+        {info.instructions && (
+          <div className="flex gap-2.5 bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-3 mb-4">
+            <svg className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-xs text-gray-500 leading-relaxed">{he ? info.instructions.he : info.instructions.en}</p>
+          </div>
+        )}
+
+        {requirementNote ? (
+          <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3.5 py-2.5 mb-1">{requirementNote}</p>
+        ) : needsCredentials ? (
+          <form onSubmit={submit} className="flex flex-col gap-3">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">API Key</label>
+                <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="API Key" required className="w-full" dir="ltr" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">API Secret</label>
+                <input value={apiSecret} onChange={(e) => setApiSecret(e.target.value)} placeholder="API Secret" required className="w-full" dir="ltr" type="password" />
+              </div>
+            </div>
+            {error && <p className="text-red-600 text-xs">{error}</p>}
+            <div className="flex items-center gap-3 mt-1">
+              <button
+                type="submit"
+                disabled={saving}
+                className="text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition disabled:opacity-50"
+                style={{ backgroundColor: info.color }}
+              >
+                {saving ? (he ? "מתחבר..." : "Connecting...") : (he ? "חבר" : "Connect")}
+              </button>
+              {connected && (
+                <button
+                  type="button"
+                  disabled={disconnecting}
+                  onClick={async () => {
+                    if (!confirm(he ? "לנתק?" : "Disconnect?")) return;
+                    setDisconnecting(true);
+                    try { await onDisconnect(); setSaved(false); } finally { setDisconnecting(false); }
+                  }}
+                  className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50 transition"
+                >
+                  {he ? "נתק" : "Disconnect"}
+                </button>
+              )}
+            </div>
+          </form>
+        ) : (
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => submit({ preventDefault: () => {} } as React.FormEvent)}
+              className="text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition disabled:opacity-50"
+              style={{ backgroundColor: info.color }}
+            >
+              {saving ? (he ? "מתחבר..." : "Connecting...") : (he ? "חבר" : "Connect")}
+            </button>
+            {connected && (
+              <button
+                type="button"
+                disabled={disconnecting}
+                onClick={async () => {
+                  if (!confirm(he ? "לנתק?" : "Disconnect?")) return;
+                  setDisconnecting(true);
+                  try { await onDisconnect(); setSaved(false); } finally { setDisconnecting(false); }
+                }}
+                className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50 transition"
+              >
+                {he ? "נתק" : "Disconnect"}
+              </button>
+            )}
+            {error && <p className="text-red-600 text-xs">{error}</p>}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -45,20 +268,8 @@ export default function PaymentsPage() {
   const { lang } = useLanguage();
   const he = lang === "he";
   const [me, setMe] = useState<Me | null>(null);
-
   const [paymentProvider, setPaymentProvider] = useState<PaymentProviderName>("payplus");
-  const [paymentApiKey, setPaymentApiKey] = useState("");
-  const [paymentApiSecret, setPaymentApiSecret] = useState("");
-  const [savingPayment, setSavingPayment] = useState(false);
-  const [paymentSaved, setPaymentSaved] = useState(false);
-  const [paymentError, setPaymentError] = useState<string | null>(null);
-
   const [invoiceProvider, setInvoiceProvider] = useState<InvoiceProviderName>("greeninvoice");
-  const [invoiceApiKey, setInvoiceApiKey] = useState("");
-  const [invoiceApiSecret, setInvoiceApiSecret] = useState("");
-  const [savingInvoice, setSavingInvoice] = useState(false);
-  const [invoiceSaved, setInvoiceSaved] = useState(false);
-  const [invoiceError, setInvoiceError] = useState<string | null>(null);
 
   async function load() {
     const data = await apiFetch<Me>("/api/business/me");
@@ -71,186 +282,86 @@ export default function PaymentsPage() {
     load();
   }, []);
 
-  async function connectPayment(e: React.FormEvent) {
-    e.preventDefault();
-    setSavingPayment(true);
-    setPaymentError(null);
-    try {
-      await apiFetch("/api/business/me/payment-provider", {
-        method: "PUT",
-        body: JSON.stringify({ provider: paymentProvider, apiKey: paymentApiKey, apiSecret: paymentApiSecret }),
-      });
-      setPaymentApiKey(""); setPaymentApiSecret("");
-      setPaymentSaved(true);
-      await load();
-    } catch (err) {
-      setPaymentError(err instanceof Error ? err.message : "Failed to connect");
-    } finally {
-      setSavingPayment(false);
-    }
-  }
-
-  async function disconnectPayment() {
-    if (!confirm(he ? "לנתק את ספק הסליקה?" : "Disconnect the payment provider?")) return;
-    await apiFetch("/api/business/me/payment-provider", { method: "DELETE" });
-    setPaymentSaved(false);
-    await load();
-  }
-
-  async function connectInvoice(e: React.FormEvent) {
-    e.preventDefault();
-    setSavingInvoice(true);
-    setInvoiceError(null);
-    try {
-      await apiFetch("/api/business/me/invoice-provider", {
-        method: "PUT",
-        body:
-          invoiceProvider === "payplus-invoice"
-            ? JSON.stringify({ provider: invoiceProvider })
-            : JSON.stringify({ provider: invoiceProvider, apiKey: invoiceApiKey, apiSecret: invoiceApiSecret }),
-      });
-      setInvoiceApiKey(""); setInvoiceApiSecret("");
-      setInvoiceSaved(true);
-      await load();
-    } catch (err) {
-      setInvoiceError(err instanceof Error ? err.message : "Failed to connect");
-    } finally {
-      setSavingInvoice(false);
-    }
-  }
-
-  async function disconnectInvoice() {
-    if (!confirm(he ? "לנתק את ספק החשבוניות?" : "Disconnect the invoice provider?")) return;
-    await apiFetch("/api/business/me/invoice-provider", { method: "DELETE" });
-    setInvoiceSaved(false);
-    await load();
-  }
-
   const canUsePayplusInvoice = me?.paymentProvider === "payplus" && me?.paymentConnected;
 
   return (
     <div className="animate-fade-in">
       <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-gray-900">{he ? "סליקה וחשבוניות" : "Payments & Invoicing"}</h1>
-        <p className="text-gray-500 text-sm mt-1">
+        <p className="text-gray-500 text-sm mt-1 max-w-xl">
           {he
-            ? "חבר את חשבון הסליקה וחשבון החשבוניות שלך — הכסף עובר ישירות אליך, אנחנו רק מתאמים בין הצדדים."
-            : "Connect your own payment and invoicing accounts — money goes straight to you, we just orchestrate between them."}
+            ? "חבר את חשבון הסליקה וחשבון החשבוניות שכבר יש לך — הכסף עובר ישירות אליך, אנחנו רק מתאמים בין הצדדים ומפיקים קבלות אוטומטית."
+            : "Connect the payment and invoicing accounts you already have — money goes straight to you, we just orchestrate between them and issue receipts automatically."}
         </p>
       </div>
 
-      {/* Payment provider */}
-      <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-gray-900">{he ? "ספק סליקה" : "Payment provider"}</h2>
-          <div className="flex items-center gap-2">
-            <ConnectedBadge
-              connected={Boolean(me?.paymentConnected)}
-              connectedText={he ? "מחובר" : "Connected"}
-              notConnectedText={he ? "לא מחובר" : "Not connected"}
-            />
-            {paymentSaved && <SavedBadge text={he ? "נשמר" : "Saved"} />}
-          </div>
-        </div>
+      <div className="grid gap-5 lg:grid-cols-2 items-start animate-fade-up stagger-1">
+        <ProviderCard
+          he={he}
+          title={he ? "ספק סליקה" : "Payment provider"}
+          options={PAYMENT_PROVIDERS}
+          meta={PAYMENT_META}
+          selected={paymentProvider}
+          onSelect={setPaymentProvider}
+          connected={Boolean(me?.paymentConnected)}
+          connectedProvider={me?.paymentProvider}
+          needsCredentials
+          onConnect={async (apiKey, apiSecret) => {
+            await apiFetch("/api/business/me/payment-provider", {
+              method: "PUT",
+              body: JSON.stringify({ provider: paymentProvider, apiKey, apiSecret }),
+            });
+            await load();
+          }}
+          onDisconnect={async () => {
+            await apiFetch("/api/business/me/payment-provider", { method: "DELETE" });
+            await load();
+          }}
+        />
 
-        <form onSubmit={connectPayment} className="flex flex-col gap-3">
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">{he ? "ספק" : "Provider"}</label>
-            <select value={paymentProvider} onChange={(e) => setPaymentProvider(e.target.value as PaymentProviderName)} className="w-full">
-              {PAYMENT_PROVIDERS.map((p) => (
-                <option key={p} value={p}>{PAYMENT_LABELS[p]}</option>
-              ))}
-            </select>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">API Key</label>
-              <input value={paymentApiKey} onChange={(e) => setPaymentApiKey(e.target.value)} placeholder="API Key" required className="w-full" dir="ltr" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">API Secret</label>
-              <input value={paymentApiSecret} onChange={(e) => setPaymentApiSecret(e.target.value)} placeholder="API Secret" required className="w-full" dir="ltr" type="password" />
-            </div>
-          </div>
-          {paymentError && <p className="text-red-600 text-xs">{paymentError}</p>}
-          <div className="flex items-center gap-3 mt-1">
-            <button type="submit" disabled={savingPayment} className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition">
-              {savingPayment ? (he ? "מתחבר..." : "Connecting...") : (he ? "חבר" : "Connect")}
-            </button>
-            {me?.paymentConnected && (
-              <button type="button" onClick={disconnectPayment} className="text-xs text-red-500 hover:text-red-600 transition">
-                {he ? "נתק" : "Disconnect"}
-              </button>
-            )}
-          </div>
-        </form>
-      </div>
-
-      {/* Invoice provider */}
-      <div className="bg-white border border-gray-200 rounded-xl p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-gray-900">{he ? "ספק חשבוניות" : "Invoice provider"}</h2>
-          <div className="flex items-center gap-2">
-            <ConnectedBadge
-              connected={Boolean(me?.invoiceConnected)}
-              connectedText={he ? "מחובר" : "Connected"}
-              notConnectedText={he ? "לא מחובר" : "Not connected"}
-            />
-            {invoiceSaved && <SavedBadge text={he ? "נשמר" : "Saved"} />}
-          </div>
-        </div>
-
-        <form onSubmit={connectInvoice} className="flex flex-col gap-3">
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">{he ? "ספק" : "Provider"}</label>
-            <select value={invoiceProvider} onChange={(e) => setInvoiceProvider(e.target.value as InvoiceProviderName)} className="w-full">
-              {INVOICE_PROVIDERS.map((p) => (
-                <option key={p} value={p} disabled={p === "payplus-invoice" && !canUsePayplusInvoice}>
-                  {INVOICE_LABELS[p]}{p === "payplus-invoice" && !canUsePayplusInvoice ? (he ? " (דורש חיבור PayPlus)" : " (requires PayPlus connected)") : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {invoiceProvider === "payplus-invoice" ? (
-            <p className="text-xs text-gray-500">
-              {he
-                ? "ישתמש באותם פרטי ההתחברות של PayPlus שכבר חיברת — אין צורך במפתחות נוספים."
-                : "Uses the same PayPlus credentials you already connected above — no extra keys needed."}
-            </p>
-          ) : (
-            <div className="grid sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">API Key</label>
-                <input value={invoiceApiKey} onChange={(e) => setInvoiceApiKey(e.target.value)} placeholder="API Key" required className="w-full" dir="ltr" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">API Secret</label>
-                <input value={invoiceApiSecret} onChange={(e) => setInvoiceApiSecret(e.target.value)} placeholder="API Secret" required className="w-full" dir="ltr" type="password" />
-              </div>
-            </div>
-          )}
-
-          {invoiceError && <p className="text-red-600 text-xs">{invoiceError}</p>}
-          <div className="flex items-center gap-3 mt-1">
-            <button type="submit" disabled={savingInvoice} className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition">
-              {savingInvoice ? (he ? "מתחבר..." : "Connecting...") : (he ? "חבר" : "Connect")}
-            </button>
-            {me?.invoiceConnected && (
-              <button type="button" onClick={disconnectInvoice} className="text-xs text-red-500 hover:text-red-600 transition">
-                {he ? "נתק" : "Disconnect"}
-              </button>
-            )}
-          </div>
-        </form>
+        <ProviderCard
+          he={he}
+          title={he ? "ספק חשבוניות" : "Invoice provider"}
+          options={INVOICE_PROVIDERS}
+          meta={INVOICE_META}
+          selected={invoiceProvider}
+          onSelect={setInvoiceProvider}
+          connected={Boolean(me?.invoiceConnected)}
+          connectedProvider={me?.invoiceProvider}
+          needsCredentials={invoiceProvider !== "payplus-invoice"}
+          requirementNote={
+            invoiceProvider === "payplus-invoice" && !canUsePayplusInvoice
+              ? he
+                ? "חבר קודם את PayPlus כספק הסליקה שלך כדי להשתמש ב-חשבונית+ (משתמש באותם פרטי התחברות, ללא מפתחות נוספים)."
+                : "Connect PayPlus as your payment provider first to use Invoice+ (it reuses the same credentials, no extra keys)."
+              : undefined
+          }
+          onConnect={async (apiKey, apiSecret) => {
+            await apiFetch("/api/business/me/invoice-provider", {
+              method: "PUT",
+              body:
+                invoiceProvider === "payplus-invoice"
+                  ? JSON.stringify({ provider: invoiceProvider })
+                  : JSON.stringify({ provider: invoiceProvider, apiKey, apiSecret }),
+            });
+            await load();
+          }}
+          onDisconnect={async () => {
+            await apiFetch("/api/business/me/invoice-provider", { method: "DELETE" });
+            await load();
+          }}
+        />
       </div>
 
       {me?.paymentConnected && me.paymentProvider && (
-        <div className="mt-4">
-          <p className="text-xs text-gray-400 mb-1.5">
+        <div className="mt-5 bg-white border border-gray-200 rounded-2xl px-5 py-4 animate-fade-up stagger-2">
+          <p className="text-xs font-semibold text-gray-700 mb-1.5">
+            {he ? "כתובת Webhook — להגדרה בממשק הספק" : "Webhook URL — set this in your provider's dashboard"}
+          </p>
+          <p className="text-xs text-gray-400 mb-2.5">
             {he
-              ? "הגדר את כתובת ה-Webhook הבאה בממשק ה-" + PAYMENT_LABELS[me.paymentProvider as PaymentProviderName] + " שלך כדי שקבלות יופקו אוטומטית לאחר תשלום מוצלח:"
-              : `Set the following webhook URL in your ${PAYMENT_LABELS[me.paymentProvider as PaymentProviderName]} dashboard so receipts are issued automatically on successful payment:`}
+              ? "כדי שקבלות יופקו אוטומטית לאחר תשלום מוצלח, הדבק כתובת זו בהגדרות ה-Webhook/Notify של " + PAYMENT_META[me.paymentProvider as PaymentProviderName].label + "."
+              : `So receipts get issued automatically on a successful payment, paste this into ${PAYMENT_META[me.paymentProvider as PaymentProviderName].label}'s Webhook/Notify settings.`}
           </p>
           <code className="block text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-600 break-all" dir="ltr">
             {`${API_URL}/webhook/payments/${me.paymentProvider}/${me.id}`}
