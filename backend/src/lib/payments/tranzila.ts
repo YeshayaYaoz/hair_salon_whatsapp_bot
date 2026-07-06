@@ -1,4 +1,4 @@
-import type { PaymentProvider, PaymentCredentials, CreatePaymentLinkParams, PaymentLinkResult } from "./types.js";
+import type { PaymentProvider, PaymentCredentials, CreatePaymentLinkParams, PaymentLinkResult, VerifyResult } from "./types.js";
 
 // Tranzila hosted-fields payment link. apiKey = terminal name (e.g. "mystore"),
 // apiSecret is not needed for a plain iframe/link (Tranzila auth for links is terminal-based);
@@ -22,5 +22,14 @@ export const tranzilaProvider: PaymentProvider = {
     // Tranzila's hosted iframe doesn't return a server-side transaction id until the customer
     // actually pays (delivered via the notify webhook) — referenceId is the correlation key until then.
     return { paymentUrl, providerTransactionId: params.referenceId };
+  },
+
+  // Tranzila's hosted link doesn't call out to their API at creation time (it's just a URL), so
+  // there's no server-side call to verify against without risking a real transaction attempt —
+  // we only confirm the terminal name is non-empty here. A genuinely bad terminal name will only
+  // surface once a customer actually tries to pay; flagged for the same reason in the UI copy.
+  async verifyCredentials(creds: PaymentCredentials): Promise<VerifyResult> {
+    if (!creds.apiKey.trim()) return { valid: false, error: "Terminal name is required" };
+    return { valid: true };
   },
 };

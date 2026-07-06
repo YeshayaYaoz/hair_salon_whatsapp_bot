@@ -7,6 +7,8 @@ import {
   BILLING_PERIOD_DAYS,
   LOYALTY_DISCOUNT_AFTER_CYCLES,
   LOYALTY_DISCOUNT_ILS,
+  MANAGED_PAYMENT_SURCHARGE_ILS,
+  MANAGED_INVOICE_SURCHARGE_ILS,
 } from "./payplusSubscription.js";
 
 const FRONTEND_URL = process.env.FRONTEND_URL?.split(",")[0]?.trim() ?? "https://torionline.com";
@@ -39,7 +41,7 @@ export async function runSubscriptionBillingJob(): Promise<void> {
     },
     select: {
       id: true, name: true, subscriptionToken: true, subscriptionPlan: true, billingCycle: true,
-      billingCyclesCompleted: true, loyaltyDiscountIls: true,
+      billingCyclesCompleted: true, loyaltyDiscountIls: true, paymentProvider: true, invoiceProvider: true,
       notificationPhone: true, whatsappPhoneNumberId: true, whatsappAccessToken: true,
     },
   });
@@ -51,7 +53,11 @@ export async function runSubscriptionBillingJob(): Promise<void> {
       continue;
     }
     const periodDays = BILLING_PERIOD_DAYS[business.billingCycle] ?? 30;
-    const fullAmount = business.billingCycle === "annual" ? basePrice * 10 : basePrice;
+    const periodMultiplier = business.billingCycle === "annual" ? 10 : 1;
+    const managedSurcharge =
+      (business.paymentProvider === "tori_managed" ? MANAGED_PAYMENT_SURCHARGE_ILS : 0) +
+      (business.invoiceProvider === "tori_managed" ? MANAGED_INVOICE_SURCHARGE_ILS : 0);
+    const fullAmount = basePrice * periodMultiplier + managedSurcharge * periodMultiplier;
     const amountIls = Math.max(0, fullAmount - business.loyaltyDiscountIls);
 
     const token = decryptSecret(business.subscriptionToken!);

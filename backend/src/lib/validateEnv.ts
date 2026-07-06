@@ -25,6 +25,10 @@ const RECOMMENDED: RequiredVar[] = [
   { name: "WHATSAPP_VERIFY_TOKEN", description: "required for Meta to verify the webhook URL" },
   { name: "PAYPLUS_API_KEY", description: "Tori's own PayPlus account — recurring subscription billing" },
   { name: "PAYPLUS_SECRET_KEY", description: "Tori's own PayPlus account — recurring subscription billing" },
+  { name: "TORI_MANAGED_PAYMENT_API_KEY", description: "\"Managed\" payment option for salons without their own merchant account" },
+  { name: "TORI_MANAGED_PAYMENT_SECRET_KEY", description: "\"Managed\" payment option for salons without their own merchant account" },
+  { name: "TORI_MANAGED_INVOICE_API_KEY", description: "\"Managed\" invoicing option for salons without their own Green Invoice account" },
+  { name: "TORI_MANAGED_INVOICE_SECRET_KEY", description: "\"Managed\" invoicing option for salons without their own Green Invoice account" },
   { name: "RESEND_API_KEY", description: "transactional emails (welcome, password reset)" },
   { name: "OPENAI_API_KEY", description: "voice-note transcription in the WhatsApp bot (Whisper)" },
 ];

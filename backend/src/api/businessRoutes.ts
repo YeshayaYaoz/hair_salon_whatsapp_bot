@@ -32,7 +32,12 @@ businessRouter.get("/me", async (req: AuthedRequest, res) => {
     ...safe,
     whatsappConnected: Boolean(whatsappAccessToken),
     paymentConnected: Boolean(paymentApiKey),
-    invoiceConnected: business.invoiceProvider === "payplus-invoice" ? business.paymentProvider === "payplus" : Boolean(invoiceApiKey),
+    invoiceConnected:
+      business.invoiceProvider === "payplus-invoice"
+        ? business.paymentProvider === "payplus"
+        : business.invoiceProvider === "tori_managed"
+          ? true
+          : Boolean(invoiceApiKey),
   });
   // (whatsappTokenValid is included in ...safe)
 });
@@ -93,24 +98,35 @@ businessRouter.delete("/me/whatsapp", async (req: AuthedRequest, res) => {
   res.json({ ok: true });
 });
 
-// --- Payment provider (PayPlus / Tranzila / Cardcom) — the business's own merchant account ---
+// --- Payment provider (PayPlus / Tranzila / Cardcom / Grow / Tori-managed) — the business's own
+// merchant account, except "tori_managed" which uses Tori's own account for a surcharge ---
 
-const paymentConnectSchema = z.object({
-  provider: z.enum(PAYMENT_PROVIDERS),
-  apiKey: z.string().min(1),
-  apiSecret: z.string().min(1),
-});
+// "tori_managed" needs no business-supplied credentials — Tori's own account handles it.
+const paymentConnectSchema = z
+  .object({
+    provider: z.enum(PAYMENT_PROVIDERS),
+    apiKey: z.string().min(1).optional(),
+    apiSecret: z.string().min(1).optional(),
+  })
+  .refine((v) => v.provider === "tori_managed" || (v.apiKey && v.apiSecret), {
+    message: "apiKey and apiSecret are required for this provider",
+  });
 
 businessRouter.put("/me/payment-provider", async (req: AuthedRequest, res) => {
   const parsed = paymentConnectSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
+  const provider = getPaymentProvider(parsed.data.provider);
+  const creds = { apiKey: parsed.data.apiKey ?? "", apiSecret: parsed.data.apiSecret ?? "" };
+  const verification = await provider.verifyCredentials(creds);
+  if (!verification.valid) return res.status(400).json({ error: verification.error ?? "Invalid credentials" });
+
   await prisma.business.update({
     where: { id: req.businessId! },
     data: {
       paymentProvider: parsed.data.provider,
-      paymentApiKey: encryptSecret(parsed.data.apiKey),
-      paymentApiSecret: encryptSecret(parsed.data.apiSecret),
+      paymentApiKey: parsed.data.provider === "tori_managed" ? "managed" : encryptSecret(parsed.data.apiKey!),
+      paymentApiSecret: parsed.data.provider === "tori_managed" ? "managed" : encryptSecret(parsed.data.apiSecret!),
     },
   });
   res.json({ ok: true });
@@ -124,17 +140,19 @@ businessRouter.delete("/me/payment-provider", async (req: AuthedRequest, res) =>
   res.json({ ok: true });
 });
 
-// --- Invoice provider (Green Invoice / iCount / PayPlus Invoice+) — issues the actual חשבונית/קבלה ---
+// --- Invoice provider (Green Invoice / iCount / PayPlus Invoice+ / Tori-managed) — issues the
+// actual חשבונית/קבלה ---
 
-// "payplus-invoice" reuses the business's own PayPlus payment credentials (same account, same
-// keys, different PayPlus product) — no separate apiKey/apiSecret needed for it.
+// "payplus-invoice" and "tori_managed" don't need a business-supplied apiKey/apiSecret — the
+// former reuses the PayPlus payment credentials, the latter uses Tori's own account.
+const NO_KEYS_NEEDED = new Set(["payplus-invoice", "tori_managed"]);
 const invoiceConnectSchema = z
   .object({
     provider: z.enum(INVOICE_PROVIDERS),
     apiKey: z.string().min(1).optional(),
     apiSecret: z.string().min(1).optional(),
   })
-  .refine((v) => v.provider === "payplus-invoice" || (v.apiKey && v.apiSecret), {
+  .refine((v) => NO_KEYS_NEEDED.has(v.provider) || (v.apiKey && v.apiSecret), {
     message: "apiKey and apiSecret are required for this provider",
   });
 
@@ -153,6 +171,21 @@ businessRouter.put("/me/invoice-provider", async (req: AuthedRequest, res) => {
     });
     return res.json({ ok: true });
   }
+
+  if (parsed.data.provider === "tori_managed") {
+    const provider = getInvoiceProvider("tori_managed");
+    const verification = await provider.verifyCredentials({ apiKey: "", apiSecret: "" });
+    if (!verification.valid) return res.status(400).json({ error: verification.error ?? "Managed invoicing isn't available right now" });
+    await prisma.business.update({
+      where: { id: req.businessId! },
+      data: { invoiceProvider: "tori_managed", invoiceApiKey: null, invoiceApiSecret: null },
+    });
+    return res.json({ ok: true });
+  }
+
+  const provider = getInvoiceProvider(parsed.data.provider);
+  const verification = await provider.verifyCredentials({ apiKey: parsed.data.apiKey!, apiSecret: parsed.data.apiSecret! });
+  if (!verification.valid) return res.status(400).json({ error: verification.error ?? "Invalid credentials" });
 
   await prisma.business.update({
     where: { id: req.businessId! },
@@ -191,10 +224,12 @@ businessRouter.post("/payments/link", async (req: AuthedRequest, res) => {
 
   try {
     const provider = getPaymentProvider(business.paymentProvider);
-    const result = await provider.createPaymentLink(
-      { apiKey: decryptSecret(business.paymentApiKey), apiSecret: decryptSecret(business.paymentApiSecret) },
-      parsed.data
-    );
+    // "tori_managed" ignores whatever creds are passed and uses Tori's own env-configured account.
+    const creds =
+      business.paymentProvider === "tori_managed"
+        ? { apiKey: "", apiSecret: "" }
+        : { apiKey: decryptSecret(business.paymentApiKey), apiSecret: decryptSecret(business.paymentApiSecret) };
+    const result = await provider.createPaymentLink(creds, parsed.data);
     res.json(result);
   } catch (err) {
     if (err instanceof UnknownPaymentProviderError) return res.status(400).json({ error: err.message });

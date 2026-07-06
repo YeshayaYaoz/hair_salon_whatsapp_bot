@@ -1,4 +1,4 @@
-import type { PaymentProvider, PaymentCredentials, CreatePaymentLinkParams, PaymentLinkResult } from "./types.js";
+import type { PaymentProvider, PaymentCredentials, CreatePaymentLinkParams, PaymentLinkResult, VerifyResult } from "./types.js";
 
 // Grow (by Meshulam) hosted payment page. apiKey = user id (userId), apiSecret = page/API key.
 // Docs: https://grow.link/api-docs — createPaymentProcess.
@@ -26,5 +26,16 @@ export const growProvider: PaymentProvider = {
     if (body.status !== 1) throw new Error(`Grow rejected the request: ${body.err?.message ?? "unknown error"}`);
     if (!body.data?.url || !body.data?.processId) throw new Error("Grow response missing url");
     return { paymentUrl: body.data.url, providerTransactionId: body.data.processId };
+  },
+
+  // Reuses the real createPaymentProcess call with a trivial ₪1 amount — no financial side effect
+  // until a customer actually completes the resulting payment page.
+  async verifyCredentials(creds: PaymentCredentials): Promise<VerifyResult> {
+    try {
+      await growProvider.createPaymentLink(creds, { amountIls: 1, description: "Tori — בדיקת חיבור", referenceId: "verify" });
+      return { valid: true };
+    } catch (err) {
+      return { valid: false, error: err instanceof Error ? err.message : "Network error" };
+    }
   },
 };

@@ -1,4 +1,4 @@
-import type { InvoiceProvider, InvoiceCredentials, CreateReceiptParams, ReceiptResult } from "./types.js";
+import type { InvoiceProvider, InvoiceCredentials, CreateReceiptParams, ReceiptResult, VerifyResult } from "./types.js";
 
 // Green Invoice (חשבונית ירוקה) API. apiKey/apiSecret authenticate a short-lived JWT, then
 // documents are created against that token. Docs: https://www.greeninvoice.co.il/api-docs
@@ -36,5 +36,16 @@ export const greenInvoiceProvider: InvoiceProvider = {
     const body = (await res.json()) as { id: string; url?: { origin?: string } };
     if (!body.url?.origin) throw new Error("Green Invoice response missing document URL");
     return { documentUrl: body.url.origin, providerDocumentId: body.id };
+  },
+
+  // Authenticating alone has no side effects (no document is created) — a clean way to confirm
+  // the key/secret pair works.
+  async verifyCredentials(creds: InvoiceCredentials): Promise<VerifyResult> {
+    try {
+      await authenticate(creds);
+      return { valid: true };
+    } catch (err) {
+      return { valid: false, error: err instanceof Error ? err.message : "Network error" };
+    }
   },
 };

@@ -5,11 +5,14 @@ import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SavedBadge } from "../../lib/SavedBadge";
 
-const PAYMENT_PROVIDERS = ["payplus", "tranzila", "cardcom", "grow"] as const;
+const PAYMENT_PROVIDERS = ["payplus", "tranzila", "cardcom", "grow", "tori_managed"] as const;
 type PaymentProviderName = (typeof PAYMENT_PROVIDERS)[number];
 
-const INVOICE_PROVIDERS = ["greeninvoice", "icount", "payplus-invoice"] as const;
+const INVOICE_PROVIDERS = ["greeninvoice", "icount", "payplus-invoice", "tori_managed"] as const;
 type InvoiceProviderName = (typeof INVOICE_PROVIDERS)[number];
+
+const MANAGED_PAYMENT_SURCHARGE_ILS = 49;
+const MANAGED_INVOICE_SURCHARGE_ILS = 39;
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -57,6 +60,15 @@ const PAYMENT_META: Record<PaymentProviderName, ProviderMeta> = {
       en: "Log into Grow → Settings → API, and copy your userId and pageCode.",
     },
   },
+  tori_managed: {
+    label: "תורי — סליקה מנוהלת",
+    color: "#C08A00",
+    monogram: "TM",
+    instructions: {
+      he: `אין לך ספק סליקה משלך? תורי תעבד עבורך את התשלומים דרך החשבון שלנו, תמורת ₪${MANAGED_PAYMENT_SURCHARGE_ILS} נוספים בחודש שיתווספו למנוי.`,
+      en: `Don't have your own payment provider? Tori will process payments through our own account instead, for an extra ₪${MANAGED_PAYMENT_SURCHARGE_ILS}/month added to your subscription.`,
+    },
+  },
 };
 
 const INVOICE_META: Record<InvoiceProviderName, ProviderMeta> = {
@@ -83,6 +95,15 @@ const INVOICE_META: Record<InvoiceProviderName, ProviderMeta> = {
     color: "#0F62FE",
     monogram: "P+",
     instructions: null, // reuses payment credentials — no separate setup
+  },
+  tori_managed: {
+    label: "תורי — חשבוניות מנוהלות",
+    color: "#C08A00",
+    monogram: "TM",
+    instructions: {
+      he: `אין לך ספק חשבוניות משלך? תורי תפיק עבורך את הקבלות דרך המערכת שלנו, תמורת ₪${MANAGED_INVOICE_SURCHARGE_ILS} נוספים בחודש. שימו לב: המסמכים יונפקו תחת העסק "תורי" ולא תחת מספר העוסק שלך — לא מתאים כתחליף להנהלת חשבונות עצמאית.`,
+      en: `Don't have your own invoicing provider? Tori will issue receipts through our own system instead, for an extra ₪${MANAGED_INVOICE_SURCHARGE_ILS}/month. Note: documents will be issued under Tori's business, not your own tax ID — not a substitute for independent bookkeeping.`,
+    },
   },
 };
 
@@ -328,11 +349,14 @@ export default function PaymentsPage() {
           onSelect={setPaymentProvider}
           connected={Boolean(me?.paymentConnected)}
           connectedProvider={me?.paymentProvider}
-          needsCredentials
+          needsCredentials={paymentProvider !== "tori_managed"}
           onConnect={async (apiKey, apiSecret) => {
             await apiFetch("/api/business/me/payment-provider", {
               method: "PUT",
-              body: JSON.stringify({ provider: paymentProvider, apiKey, apiSecret }),
+              body:
+                paymentProvider === "tori_managed"
+                  ? JSON.stringify({ provider: paymentProvider })
+                  : JSON.stringify({ provider: paymentProvider, apiKey, apiSecret }),
             });
             await load();
           }}
@@ -351,7 +375,7 @@ export default function PaymentsPage() {
           onSelect={setInvoiceProvider}
           connected={Boolean(me?.invoiceConnected)}
           connectedProvider={me?.invoiceProvider}
-          needsCredentials={invoiceProvider !== "payplus-invoice"}
+          needsCredentials={invoiceProvider !== "payplus-invoice" && invoiceProvider !== "tori_managed"}
           requirementNote={
             invoiceProvider === "payplus-invoice" && !canUsePayplusInvoice
               ? he
@@ -363,7 +387,7 @@ export default function PaymentsPage() {
             await apiFetch("/api/business/me/invoice-provider", {
               method: "PUT",
               body:
-                invoiceProvider === "payplus-invoice"
+                invoiceProvider === "payplus-invoice" || invoiceProvider === "tori_managed"
                   ? JSON.stringify({ provider: invoiceProvider })
                   : JSON.stringify({ provider: invoiceProvider, apiKey, apiSecret }),
             });
@@ -376,7 +400,7 @@ export default function PaymentsPage() {
         />
       </div>
 
-      {me?.paymentConnected && me.paymentProvider && (
+      {me?.paymentConnected && me.paymentProvider && me.paymentProvider !== "tori_managed" && (
         <div className="mt-5 bg-white border border-gray-200 rounded-2xl px-5 py-4 animate-fade-up stagger-2">
           <p className="text-xs font-semibold text-gray-700 mb-1.5">
             {he ? "כתובת Webhook — להגדרה בממשק הספק" : "Webhook URL — set this in your provider's dashboard"}

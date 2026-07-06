@@ -1,4 +1,5 @@
-import type { InvoiceProvider, InvoiceCredentials, CreateReceiptParams, ReceiptResult } from "./types.js";
+import type { InvoiceProvider, InvoiceCredentials, CreateReceiptParams, ReceiptResult, VerifyResult } from "./types.js";
+import { payplusProvider } from "../payments/payplus.js";
 
 // PayPlus's own bundled invoicing add-on ("חשבונית+" / Invoice+). Only usable by businesses that
 // are also PayPlus payment customers — it reuses the same PayPlus API key/secret pair rather than
@@ -34,5 +35,10 @@ export const payplusInvoiceProvider: InvoiceProvider = {
       throw new Error("PayPlus Invoice+ response missing invoice_url");
     }
     return { documentUrl: body.data.invoice_url, providerDocumentId: body.data.invoice_uid };
+  },
+
+  // Same PayPlus account/credentials as the payment side — reuse its (side-effect-free) check.
+  async verifyCredentials(creds: InvoiceCredentials): Promise<VerifyResult> {
+    return payplusProvider.verifyCredentials(creds);
   },
 };

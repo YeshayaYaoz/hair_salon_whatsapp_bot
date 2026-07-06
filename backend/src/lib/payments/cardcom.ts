@@ -1,4 +1,4 @@
-import type { PaymentProvider, PaymentCredentials, CreatePaymentLinkParams, PaymentLinkResult } from "./types.js";
+import type { PaymentProvider, PaymentCredentials, CreatePaymentLinkParams, PaymentLinkResult, VerifyResult } from "./types.js";
 
 // Cardcom LowProfile payment page. apiKey = TerminalNumber, apiSecret = ApiName/API password.
 // Docs: https://www.cardcom.solutions/API/ — CreateLowProfile.
@@ -28,5 +28,16 @@ export const cardcomProvider: PaymentProvider = {
     }
     if (!body.Url || !body.LowProfileId) throw new Error("Cardcom response missing Url");
     return { paymentUrl: body.Url, providerTransactionId: body.LowProfileId };
+  },
+
+  // Reuses the real CreateLowProfile call with a trivial ₪1 amount — creating a low-profile
+  // payment session has no financial side effect until a customer actually pays through it.
+  async verifyCredentials(creds: PaymentCredentials): Promise<VerifyResult> {
+    try {
+      await cardcomProvider.createPaymentLink(creds, { amountIls: 1, description: "Tori — בדיקת חיבור", referenceId: "verify" });
+      return { valid: true };
+    } catch (err) {
+      return { valid: false, error: err instanceof Error ? err.message : "Network error" };
+    }
   },
 };

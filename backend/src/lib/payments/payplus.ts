@@ -1,4 +1,4 @@
-import type { PaymentProvider, PaymentCredentials, CreatePaymentLinkParams, PaymentLinkResult } from "./types.js";
+import type { PaymentProvider, PaymentCredentials, CreatePaymentLinkParams, PaymentLinkResult, VerifyResult } from "./types.js";
 
 // PayPlus "Generate Payment Link" API. apiKey = PayPlus API Key, apiSecret = PayPlus Secret Key.
 // Docs: https://restapidoc.payplus.co.il (PaymentPages/generateLink)
@@ -38,5 +38,17 @@ export const payplusProvider: PaymentProvider = {
       throw new Error("PayPlus response missing payment_page_link");
     }
     return { paymentUrl: body.data.payment_page_link, providerTransactionId: body.data.page_request_uid };
+  },
+
+  // Reuses the real generateLink call with a trivial ₪1 amount — creating a payment page/link has
+  // no financial side effect (nobody is charged unless a customer actually completes it), so this
+  // exercises the exact same auth path as a real charge instead of guessing at a separate endpoint.
+  async verifyCredentials(creds: PaymentCredentials): Promise<VerifyResult> {
+    try {
+      await payplusProvider.createPaymentLink(creds, { amountIls: 1, description: "Tori — בדיקת חיבור", referenceId: "verify" });
+      return { valid: true };
+    } catch (err) {
+      return { valid: false, error: err instanceof Error ? err.message : "Network error" };
+    }
   },
 };

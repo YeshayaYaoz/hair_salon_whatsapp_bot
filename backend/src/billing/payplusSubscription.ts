@@ -20,6 +20,12 @@ export const BILLING_PERIOD_DAYS: Record<string, number> = { monthly: 30, annual
 export const LOYALTY_DISCOUNT_AFTER_CYCLES = 6;
 export const LOYALTY_DISCOUNT_ILS = 50;
 
+// Surcharge added to the monthly/annual subscription charge for businesses using Tori's own
+// managed payment/invoice account instead of connecting their own (see lib/payments/toriManaged.ts
+// and lib/invoices/toriManaged.ts) — covers the extra processing/accounting overhead.
+export const MANAGED_PAYMENT_SURCHARGE_ILS = 49;
+export const MANAGED_INVOICE_SURCHARGE_ILS = 39;
+
 export function planPriceForCycle(plan: string, cycle: string): number {
   const base = PLAN_PRICES_ILS[plan];
   if (!base) throw new Error(`Unknown plan: ${plan}`);

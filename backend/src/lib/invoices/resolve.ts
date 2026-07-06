@@ -12,11 +12,17 @@ interface BusinessInvoiceFields {
 
 /** Resolves which invoice provider a business should use and its decrypted credentials.
  * "payplus-invoice" is special-cased: it's the same PayPlus account as the payment connection,
- * not a separate credential pair, so it borrows the payment provider's keys instead. */
+ * not a separate credential pair, so it borrows the payment provider's keys instead.
+ * "tori_managed" needs no business-supplied credentials at all — the adapter uses Tori's own
+ * Green Invoice account, so a placeholder credential pair is returned just to satisfy the shape. */
 export function resolveInvoiceCredentials(
   business: BusinessInvoiceFields
 ): { provider: string; credentials: InvoiceCredentials } | null {
   if (!business.invoiceProvider) return null;
+
+  if (business.invoiceProvider === "tori_managed") {
+    return { provider: "tori_managed", credentials: { apiKey: "", apiSecret: "" } };
+  }
 
   if (business.invoiceProvider === "payplus-invoice") {
     if (business.paymentProvider !== "payplus" || !business.paymentApiKey || !business.paymentApiSecret) return null;
