@@ -1,12 +1,15 @@
 import type { InvoiceProvider, InvoiceProviderName } from "./types.js";
 import { greenInvoiceProvider } from "./greenInvoice.js";
 import { icountProvider } from "./icount.js";
+import { payplusInvoiceProvider } from "./payplusInvoice.js";
 
 export * from "./types.js";
+export { resolveInvoiceCredentials } from "./resolve.js";
 
 const PROVIDERS: Record<InvoiceProviderName, InvoiceProvider> = {
   greeninvoice: greenInvoiceProvider,
   icount: icountProvider,
+  "payplus-invoice": payplusInvoiceProvider,
 };
 
 export class UnknownInvoiceProviderError extends Error {

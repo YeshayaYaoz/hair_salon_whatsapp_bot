@@ -1,4 +1,4 @@
-export const INVOICE_PROVIDERS = ["greeninvoice", "icount"] as const;
+export const INVOICE_PROVIDERS = ["greeninvoice", "icount", "payplus-invoice"] as const;
 export type InvoiceProviderName = (typeof INVOICE_PROVIDERS)[number];
 
 export interface InvoiceCredentials {

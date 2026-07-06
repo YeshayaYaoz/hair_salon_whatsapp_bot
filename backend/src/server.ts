@@ -8,6 +8,7 @@ import { businessRouter } from "./api/businessRoutes.js";
 import { whatsappRouter } from "./webhook/whatsappRoutes.js";
 import { billingRouter, stripeWebhookRouter } from "./billing/billingRoutes.js";
 import { publicRouter } from "./api/publicRoutes.js";
+import { paymentWebhookRouter } from "./webhook/paymentWebhooks.js";
 import { runRetentionJob } from "./lib/retentionJob.js";
 import { runReminderJob, runReviewJob, runDigestJob } from "./lib/scheduledMessages.js";
 import { runTrackedJob } from "./lib/jobStatus.js";
@@ -39,6 +40,9 @@ app.use("/api/billing/webhook", stripeWebhookRouter);
 app.use("/webhook/whatsapp", whatsappRouter);
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // Tranzila's notify webhook posts form-encoded, not JSON
+
+app.use("/webhook/payments", paymentWebhookRouter);
 
 app.use("/api/auth", authRouter);
 app.use("/api/public", publicRouter);

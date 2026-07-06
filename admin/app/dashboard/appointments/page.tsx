@@ -209,7 +209,7 @@ function WeekCalendar({
                       title={`${a.customer.name ?? formatPhone(a.customer.phone)} · ${a.service.name}`}
                     >
                       <div className="font-semibold truncate">{formatTimeInTz(a.startTime, tz)}</div>
-                      <div className="truncate opacity-80">{a.customer.name ?? formatPhone(a.customer.phone)}</div>
+                      <div className="truncate opacity-80">{a.customer.name ?? <span dir="ltr">{formatPhone(a.customer.phone)}</span>}</div>
                       <div className="truncate opacity-70">{a.service.name}</div>
                       {new Date(a.startTime) >= new Date() && (
                         <button
@@ -530,7 +530,7 @@ export default function AppointmentsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-gray-700 font-medium text-sm">{a.customer.name ?? "—"}</div>
-                        <div className="text-gray-400 text-xs">{formatPhone(a.customer.phone)}</div>
+                        <div className="text-gray-400 text-xs" dir="ltr">{formatPhone(a.customer.phone)}</div>
                       </td>
                       <td className="px-4 py-3 text-gray-600 text-sm">{a.service.name}</td>
                       <td className="px-4 py-3 text-gray-500 text-sm hidden md:table-cell">{a.staff?.name ?? "—"}</td>

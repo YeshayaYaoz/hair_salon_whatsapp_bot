@@ -6,7 +6,7 @@ const translations = {
       analytics: "Analytics", appointments: "Appointments", customers: "Customers",
       waitlist: "Waitlist", services: "Services", staff: "Staff", hours: "Schedule",
       blocked: "Time off", conversations: "Conversations",
-      whatsapp: "WhatsApp", faq: "FAQ", settings: "Settings", billing: "Billing", logout: "Log out",
+      whatsapp: "WhatsApp", payments: "Payments", faq: "FAQ", settings: "Settings", billing: "Billing", logout: "Log out",
     },
     days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
     daysShort: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
@@ -67,6 +67,7 @@ const translations = {
 
     // Customers
     customersTitle: "Customers", totalCustomers: "total customers", totalBookings: "Total bookings",
+    customerPhoneCol: "Phone", customerIdCol: "ID",
     customersHint: "Click any customer to view their WhatsApp conversation with the bot and send messages.",
     viewConversation: "View conversation",
     noCustomers: "No customers yet — they'll appear here after their first booking.",
@@ -134,7 +135,7 @@ const translations = {
       analytics: "סטטיסטיקות", appointments: "תורים", customers: "לקוחות",
       waitlist: "רשימת המתנה", services: "שירותים", staff: "צוות", hours: "לוח זמנים",
       blocked: "חופשות", conversations: "שיחות",
-      whatsapp: "וואטסאפ", faq: "שאלות נפוצות", settings: "הגדרות", billing: "תשלום", logout: "התנתקות",
+      whatsapp: "וואטסאפ", payments: "סליקה וחשבוניות", faq: "שאלות נפוצות", settings: "הגדרות", billing: "תשלום", logout: "התנתקות",
     },
     days: ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"],
     daysShort: ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"],
@@ -195,6 +196,7 @@ const translations = {
 
     // Customers
     customersTitle: "לקוחות", totalCustomers: "לקוחות בסה\"כ", totalBookings: "סה\"כ הזמנות",
+    customerPhoneCol: "טלפון", customerIdCol: "מזהה",
     customersHint: "לחץ על כל לקוח כדי לצפות בשיחת הוואטסאפ שלו עם הבוט ולשלוח הודעות.",
     viewConversation: "צפה בשיחה",
     noCustomers: "אין לקוחות עדיין — הם יופיעו כאן לאחר ההזמנה הראשונה.",

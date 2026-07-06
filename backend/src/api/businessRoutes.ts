@@ -11,7 +11,7 @@ import { createAppointment, OutsideBusinessHoursError, SlotUnavailableError } fr
 import { parseBookingTime } from "../lib/timezone.js";
 import { getJobStatuses } from "../lib/jobStatus.js";
 import { getPaymentProvider, PAYMENT_PROVIDERS, UnknownPaymentProviderError } from "../lib/payments/index.js";
-import { getInvoiceProvider, INVOICE_PROVIDERS, UnknownInvoiceProviderError } from "../lib/invoices/index.js";
+import { getInvoiceProvider, INVOICE_PROVIDERS, UnknownInvoiceProviderError, resolveInvoiceCredentials } from "../lib/invoices/index.js";
 
 export const businessRouter = Router();
 businessRouter.use(requireAuth);
@@ -32,7 +32,7 @@ businessRouter.get("/me", async (req: AuthedRequest, res) => {
     ...safe,
     whatsappConnected: Boolean(whatsappAccessToken),
     paymentConnected: Boolean(paymentApiKey),
-    invoiceConnected: Boolean(invoiceApiKey),
+    invoiceConnected: business.invoiceProvider === "payplus-invoice" ? business.paymentProvider === "payplus" : Boolean(invoiceApiKey),
   });
   // (whatsappTokenValid is included in ...safe)
 });
@@ -124,24 +124,42 @@ businessRouter.delete("/me/payment-provider", async (req: AuthedRequest, res) =>
   res.json({ ok: true });
 });
 
-// --- Invoice provider (Green Invoice / iCount) — issues the actual חשבונית/קבלה ---
+// --- Invoice provider (Green Invoice / iCount / PayPlus Invoice+) — issues the actual חשבונית/קבלה ---
 
-const invoiceConnectSchema = z.object({
-  provider: z.enum(INVOICE_PROVIDERS),
-  apiKey: z.string().min(1),
-  apiSecret: z.string().min(1),
-});
+// "payplus-invoice" reuses the business's own PayPlus payment credentials (same account, same
+// keys, different PayPlus product) — no separate apiKey/apiSecret needed for it.
+const invoiceConnectSchema = z
+  .object({
+    provider: z.enum(INVOICE_PROVIDERS),
+    apiKey: z.string().min(1).optional(),
+    apiSecret: z.string().min(1).optional(),
+  })
+  .refine((v) => v.provider === "payplus-invoice" || (v.apiKey && v.apiSecret), {
+    message: "apiKey and apiSecret are required for this provider",
+  });
 
 businessRouter.put("/me/invoice-provider", async (req: AuthedRequest, res) => {
   const parsed = invoiceConnectSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
+  if (parsed.data.provider === "payplus-invoice") {
+    const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! }, select: { paymentProvider: true } });
+    if (business.paymentProvider !== "payplus") {
+      return res.status(400).json({ error: "Connect PayPlus as your payment provider first to use Invoice+" });
+    }
+    await prisma.business.update({
+      where: { id: req.businessId! },
+      data: { invoiceProvider: "payplus-invoice", invoiceApiKey: null, invoiceApiSecret: null },
+    });
+    return res.json({ ok: true });
+  }
+
   await prisma.business.update({
     where: { id: req.businessId! },
     data: {
       invoiceProvider: parsed.data.provider,
-      invoiceApiKey: encryptSecret(parsed.data.apiKey),
-      invoiceApiSecret: encryptSecret(parsed.data.apiSecret),
+      invoiceApiKey: encryptSecret(parsed.data.apiKey!),
+      invoiceApiSecret: encryptSecret(parsed.data.apiSecret!),
     },
   });
   res.json({ ok: true });
@@ -195,18 +213,14 @@ businessRouter.post("/invoices/receipt", async (req: AuthedRequest, res) => {
 
   const business = await prisma.business.findUniqueOrThrow({
     where: { id: req.businessId! },
-    select: { invoiceProvider: true, invoiceApiKey: true, invoiceApiSecret: true },
+    select: { invoiceProvider: true, invoiceApiKey: true, invoiceApiSecret: true, paymentProvider: true, paymentApiKey: true, paymentApiSecret: true },
   });
-  if (!business.invoiceProvider || !business.invoiceApiKey || !business.invoiceApiSecret) {
-    return res.status(400).json({ error: "No invoice provider connected" });
-  }
+  const resolved = resolveInvoiceCredentials(business);
+  if (!resolved) return res.status(400).json({ error: "No invoice provider connected" });
 
   try {
-    const provider = getInvoiceProvider(business.invoiceProvider);
-    const result = await provider.createReceipt(
-      { apiKey: decryptSecret(business.invoiceApiKey), apiSecret: decryptSecret(business.invoiceApiSecret) },
-      parsed.data
-    );
+    const provider = getInvoiceProvider(resolved.provider);
+    const result = await provider.createReceipt(resolved.credentials, parsed.data);
     res.json(result);
   } catch (err) {
     if (err instanceof UnknownInvoiceProviderError) return res.status(400).json({ error: err.message });

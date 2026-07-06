@@ -6,6 +6,12 @@ import { useLanguage } from "../../lib/LanguageContext";
 import { SkeletonBlock, SkeletonRow } from "../../lib/Skeleton";
 import { formatPhone } from "../../lib/formatPhone";
 
+// Short, stable, human-recognizable reference for a customer (there's no business-facing
+// numeric id in the system) — derived from the DB id so it never changes.
+function customerDisplayId(id: string): string {
+  return `#${id.slice(-6).toUpperCase()}`;
+}
+
 interface Customer {
   id: string;
   name?: string;
@@ -113,7 +119,7 @@ function ConversationPanel({ customer, onClose, onNotesSaved }: { customer: Cust
             </div>
             <div className="min-w-0">
               <div className="text-sm font-semibold text-gray-900 truncate">{customer.name ?? formatPhone(customer.phone)}</div>
-              <div className="text-xs text-gray-400 font-mono">{formatPhone(customer.phone)}</div>
+              <div className="text-xs text-gray-400 font-mono" dir="ltr">{formatPhone(customer.phone)}</div>
             </div>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition p-1">
@@ -370,8 +376,9 @@ export default function CustomersPage() {
                     onClick={(e) => e.stopPropagation()}
                   />
                 </th>
+                <th className="text-start px-4 py-3 text-gray-500 font-medium">{t.customerIdCol}</th>
                 <th className="text-start px-4 py-3 text-gray-500 font-medium">{t.customer}</th>
-                <th className="text-start px-4 py-3 text-gray-500 font-medium">{t.when}</th>
+                <th className="text-start px-4 py-3 text-gray-500 font-medium">{t.customerPhoneCol}</th>
                 <th className="text-start px-4 py-3 text-gray-500 font-medium text-end">{t.totalBookings}</th>
                 <th className="px-4 py-3" />
                 <th className="ps-1 pe-3" />
@@ -392,6 +399,7 @@ export default function CustomersPage() {
                       onClick={(e) => e.stopPropagation()}
                     />
                   </td>
+                  <td className="px-4 py-3 text-gray-400 font-mono text-xs" dir="ltr">{customerDisplayId(c.id)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-[#1B7FA0]/20 border border-[#145F78]/40 flex items-center justify-center text-[#5BB8D4] font-semibold text-sm shrink-0">
@@ -400,7 +408,7 @@ export default function CustomersPage() {
                       <span className="text-gray-700 font-medium">{c.name ?? <span className="text-gray-400 italic">—</span>}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-gray-500 font-mono text-xs">{formatPhone(c.phone)}</td>
+                  <td className="px-4 py-3 text-gray-500 font-mono text-xs" dir="ltr">{formatPhone(c.phone)}</td>
                   <td className="px-4 py-3 text-end">
                     <span className="inline-flex items-center justify-center min-w-[2rem] px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
                       {c._count.appointments}

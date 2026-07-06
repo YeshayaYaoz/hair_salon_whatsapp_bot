@@ -72,7 +72,7 @@ export default function WaitlistPage() {
                       </div>
                       <div>
                         <div className="text-gray-700 text-sm font-medium">{e.customer.name ?? <span className="text-gray-400 italic">—</span>}</div>
-                        <div className="text-gray-400 text-xs">{formatPhone(e.customer.phone)} · {e.service.name}</div>
+                        <div className="text-gray-400 text-xs"><span dir="ltr">{formatPhone(e.customer.phone)}</span> · {e.service.name}</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -109,8 +109,8 @@ export default function WaitlistPage() {
                         {(e.customer.name ?? e.customer.phone).charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <div className="text-gray-500 text-sm">{e.customer.name ?? formatPhone(e.customer.phone)}</div>
-                        <div className="text-zinc-600 text-xs">{formatPhone(e.customer.phone)} · {e.service.name}</div>
+                        <div className="text-gray-500 text-sm">{e.customer.name ?? <span dir="ltr">{formatPhone(e.customer.phone)}</span>}</div>
+                        <div className="text-zinc-600 text-xs"><span dir="ltr">{formatPhone(e.customer.phone)}</span> · {e.service.name}</div>
                       </div>
                     </div>
                     <button
