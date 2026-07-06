@@ -184,7 +184,21 @@ async function runTool(
     const heDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
     const { year, month, day } = parseDateString(input.date as string);
     const dow = dayOfWeekForDate(year, month, day);
-    return JSON.stringify({ date: input.date, dayOfWeek: `יום ${heDays[dow]}`, slots: lastOfferedSlots.value });
+    const biz = await prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { timezone: true } });
+    const tz = biz.timezone || "Asia/Jerusalem";
+    // Slot startTime/endTime are UTC ISO strings — converting those to a local HH:MM display is
+    // exactly the kind of timezone arithmetic the model tends to get wrong (e.g. inventing times
+    // like "24:30"). Pre-compute the local time label here so the model only ever has to echo it.
+    const slotsWithLocalTime = lastOfferedSlots.value.map((s) => ({
+      ...s,
+      localTime: new Date(s.startTime).toLocaleTimeString("he-IL", { timeZone: tz, hour: "2-digit", minute: "2-digit" }),
+    }));
+    return JSON.stringify({
+      date: input.date,
+      dayOfWeek: `יום ${heDays[dow]}`,
+      slots: slotsWithLocalTime,
+      note: "השתמש אך ורק בערך localTime המצורף לכל slot כדי להציג את השעה ללקוח — אל תחשב או תמיר שעות בעצמך.",
+    });
   }
 
   if (name === "book_appointment") {
