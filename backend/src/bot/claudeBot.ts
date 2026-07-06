@@ -429,6 +429,10 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
 
   const lastOfferedSlots: { value?: AvailableSlot[] } = {};
   let hadToolError = false;
+  // Tracks whether the most recent book/reschedule attempt actually failed and hasn't since
+  // been followed by a success — guards against the model claiming "booked!" in its final
+  // reply when the underlying tool call actually errored out (e.g. slot taken in the meantime).
+  let unconfirmedBookingFailure: string | null = null;
   let model = chooseModel(messageText, false);
 
   console.log(`[bot] model=${model} business=${businessId} phone=${customerPhone} msg="${messageText.slice(0, 80)}"`);
@@ -468,6 +472,10 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
         console.log(`[bot] tool error detected — escalating to ${MODEL_SMART}`);
       }
 
+      if (block.name === "book_appointment" || block.name === "reschedule_appointment") {
+        unconfirmedBookingFailure = result.includes('"error"') ? result : null;
+      }
+
       toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
     }
 
@@ -489,6 +497,30 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     .map((b) => b.text)
     .join("\n")
     .trim();
+
+  // The model can (rarely) generate a confident "booked!" reply even though the last
+  // book/reschedule tool call actually returned an error — e.g. the slot was taken in the
+  // instant between offering it and confirming. Force one corrective round so the customer is
+  // never told a booking succeeded when nothing was actually saved.
+  if (unconfirmedBookingFailure) {
+    console.warn("[bot] Booking attempt failed but wasn't retried — forcing an honest reply");
+    messages.push({ role: "assistant", content: response.content });
+    messages.push({
+      role: "user",
+      content: `(מערכתי: ניסיון הקביעה/שינוי האחרון נכשל בפועל (${unconfirmedBookingFailure}) — שום תור לא נשמר. אל תגיד ללקוח שהתור נקבע. הסבר לו בקצרה שהמועד לא זמין/קרתה תקלה, והצע לבדוק זמינות אחרת או לנסות שוב.)`,
+    });
+    try {
+      const corrected = await makeApiCall(model, system, messages);
+      const correctedText = corrected.content
+        .filter((b): b is Anthropic.TextBlock => b.type === "text")
+        .map((b) => b.text)
+        .join("\n")
+        .trim();
+      if (correctedText) replyText = correctedText;
+    } catch (err) {
+      console.error("Corrective booking-failure call failed:", err);
+    }
+  }
 
   // Claude sometimes ends a tool-use turn with no accompanying text (e.g. right after a
   // successful booking). An empty reply here is doubly bad: the customer sees nothing, AND
