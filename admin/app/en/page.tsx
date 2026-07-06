@@ -283,7 +283,7 @@ export default function LandingPageEN() {
         .phone-status-icons { display: flex; align-items: center; gap: 5px; }
         .phone-status-icons svg { display: block; }
         .phone-status-icon { font-size: 10px; color: #111; font-weight: 600; }
-        .phone-wa-avatar { width: 34px; height: 34px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 0 0 2px rgba(37,211,102,0.2); }
+        .phone-wa-avatar { width: 44px; height: 44px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 0 0 2px rgba(37,211,102,0.2); }
         .phone-wa-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
         .phone-wa-info { flex: 1; }
         .phone-wa-name { font-size: 12.5px; font-weight: 700; color: #111; }
@@ -536,7 +536,7 @@ export default function LandingPageEN() {
         .lp-footer-top { max-width: 1080px; margin: 0 auto 40px; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 40px; }
         @media (max-width: 700px) { .lp-footer-top { grid-template-columns: 1fr; } }
         .lp-footer-logo-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-        .lp-footer-logo-row img { width: 28px; height: 28px; border-radius: 6px; }
+        .lp-footer-logo-row img { width: 42px; height: 42px; border-radius: 10px; }
         .lp-footer-brand { font-size: 15px; font-weight: 700; color: #fff; }
         .lp-footer-tagline { font-size: 13px; color: rgba(255,255,255,0.35); line-height: 1.6; max-width: 280px; }
         .lp-footer-col { display: flex; flex-direction: column; gap: 10px; }
@@ -570,7 +570,7 @@ export default function LandingPageEN() {
         @media (max-width: 768px) {
           .hamburger-btn { display: flex; }
           .lp-nav-links, .lp-nav-cta { display: none; }
-          .lp-hero { grid-template-columns: 1fr; padding: 80px 24px 40px; }
+          .lp-hero { grid-template-columns: 1fr; padding: 76px 20px 20px; }
           .lp-hero-phone { display: none; }
           .lp-stats-band-inner { grid-template-columns: repeat(2,1fr); }
           .lp-feats-grid { grid-template-columns: 1fr; }
@@ -605,7 +605,7 @@ export default function LandingPageEN() {
         {/* NAV */}
         <nav className="lp-nav">
           <a className="lp-nav-logo" href="/en">
-            <img src="/tori_logo_transparent.png" alt="Tori" style={{ width: 32, height: 32, borderRadius: 8 }} />
+            <img src="/tori_logo_transparent.png" alt="Tori" style={{ width: 42, height: 42, borderRadius: 10 }} />
             <span>Tori</span>
           </a>
           <div className="lp-nav-links">

@@ -285,8 +285,8 @@ export default function LandingPage() {
           display: flex; align-items: center; justify-content: space-between; padding: 0 44px;
         }
         .lp-nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; animation: fadeDown 0.5s ease 0.1s both; }
-        .lp-nav-logo img { width: 30px; height: 30px; border-radius: 7px; }
-        .lp-nav-logo span { font-size: 16px; font-weight: 700; color: #111; letter-spacing: -0.3px; }
+        .lp-nav-logo img { width: 42px; height: 42px; border-radius: 10px; }
+        .lp-nav-logo span { font-size: 17px; font-weight: 700; color: #111; letter-spacing: -0.3px; }
         .lp-nav-links { display: flex; align-items: center; gap: 4px; animation: fadeDown 0.5s ease 0.15s both; }
         .lp-nav-link { font-size: 13px; font-weight: 500; color: #555; text-decoration: none; padding: 7px 14px; border-radius: 7px; transition: background 0.15s, color 0.15s; }
         .lp-nav-link:hover { background: #F5F5F5; color: #111; }
@@ -355,7 +355,7 @@ export default function LandingPage() {
         /* WhatsApp header */
         .phone-wa-bar { background: #fff; padding: 10px 14px 10px; display: flex; align-items: center; gap: 9px; border-bottom: 1px solid #F0F0F0; }
         .phone-wa-back { color: #128C7E; font-size: 18px; font-weight: 300; line-height: 1; flex-shrink: 0; }
-        .phone-wa-avatar { width: 34px; height: 34px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 0 0 2px rgba(37,211,102,0.2); }
+        .phone-wa-avatar { width: 44px; height: 44px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 0 0 2px rgba(37,211,102,0.2); }
         .phone-wa-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
         .phone-wa-info { flex: 1; min-width: 0; }
         .phone-wa-name { font-size: 12.5px; font-weight: 700; color: #111; line-height: 1.2; }
@@ -719,7 +719,7 @@ export default function LandingPage() {
         .lp-footer-top { display: grid; grid-template-columns: 1.7fr 1fr 1fr 1.5fr; gap: 48px; margin-bottom: 44px; align-items: start; max-width: 1200px; }
         .lp-footer-brand-block { max-width: 300px; }
         .lp-footer-logo-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
-        .lp-footer-logo-row img { width: 30px; height: 30px; border-radius: 7px; opacity: 0.95; }
+        .lp-footer-logo-row img { width: 42px; height: 42px; border-radius: 10px; opacity: 0.95; }
         .lp-footer-brand { font-size: 16px; font-weight: 700; color: #fff; }
         .lp-footer-tagline { font-size: 14px; color: rgba(255,255,255,0.62); line-height: 1.7; }
         .lp-footer-col h4 { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.4); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 16px; }
@@ -742,9 +742,9 @@ export default function LandingPage() {
 
         /* RESPONSIVE */
         @media (max-width: 1000px) {
-          .lp-hero { grid-template-columns: 1fr; text-align: center; padding: 40px 24px 0; justify-items: center; }
-          .lp-hero-text { padding: 60px 0 20px; }
-          .lp-h1 { max-width: 100%; }
+          .lp-hero { grid-template-columns: 1fr; text-align: center; padding: 24px 20px 0; justify-items: center; min-height: auto; }
+          .lp-hero-text { padding: 28px 0 12px; }
+          .lp-h1 { max-width: 100%; margin-bottom: 14px; }
           .lp-hero-sub { max-width: 100%; }
           .lp-hero-ctas { justify-content: center; }
           .lp-hero-phone { display: none; }
@@ -757,31 +757,31 @@ export default function LandingPage() {
           #hero-toast { display: none; }
           .mock-body { grid-template-columns: 1fr; }
           .mock-sidebar { display: none; }
-          .lp-steps { padding: 72px 20px; }
+          .lp-steps { padding: 44px 20px; }
           .lp-steps-grid { grid-template-columns: 1fr; }
           .lp-step { border-left: none; border-bottom: 1px solid #EBEBEB; }
           .lp-step:last-child { border-bottom: none; }
-          .lp-features { padding: 72px 20px; }
+          .lp-features { padding: 44px 20px; }
           .lp-feats-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
-          .lp-testi { padding: 72px 20px; }
+          .lp-testi { padding: 44px 20px; }
           .lp-testi-grid { grid-template-columns: 1fr; }
-          .lp-ba { padding: 72px 20px; }
+          .lp-ba { padding: 44px 20px; }
           .lp-ba-grid { grid-template-columns: 1fr; }
-          .lp-premium { padding: 72px 20px; }
-          .lp-premium-inner { grid-template-columns: 1fr; gap: 48px; }
-          .lp-pricing { padding: 72px 20px; }
+          .lp-premium { padding: 44px 20px; }
+          .lp-premium-inner { grid-template-columns: 1fr; gap: 32px; }
+          .lp-pricing { padding: 44px 20px; }
           .lp-pricing-grid { grid-template-columns: 1fr; }
-          .lp-faq { padding: 72px 20px; }
-          .lp-cta { padding: 72px 20px; }
-          .lp-footer { padding: 32px 20px; }
-          .lp-footer-top { grid-template-columns: 1fr 1fr; gap: 32px; }
+          .lp-faq { padding: 44px 20px; }
+          .lp-cta { padding: 44px 20px; }
+          .lp-footer { padding: 28px 20px; }
+          .lp-footer-top { grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
           .lp-footer-brand-block { grid-column: 1 / -1; }
-          .lp-stats-band { padding: 40px 20px; }
+          .lp-stats-band { padding: 28px 20px; }
           .lp-stats-band-inner { grid-template-columns: 1fr 1fr; }
-          .lp-flow { padding: 72px 20px; }
+          .lp-flow { padding: 44px 20px; }
           .lp-flow-steps { gap: 0; }
           .lp-flow-arrow { width: 20px; font-size: 16px; }
-          .lp-roi { padding: 72px 20px; }
+          .lp-roi { padding: 44px 20px; }
           .lp-roi-grid { grid-template-columns: 1fr; }
         }
         @media (max-width: 540px) {
@@ -789,6 +789,8 @@ export default function LandingPage() {
           .lp-stats-band-inner { grid-template-columns: 1fr 1fr; }
           .lp-flow-steps { flex-direction: column; gap: 16px; }
           .lp-flow-arrow { transform: rotate(90deg); padding: 0; width: 40px; }
+          .lp-h1 { letter-spacing: -1.2px; }
+          .lp-hero-sub { font-size: 15px; line-height: 1.5; }
         }
         @media (prefers-reduced-motion: reduce) {
           *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
