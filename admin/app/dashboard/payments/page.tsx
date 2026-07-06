@@ -5,10 +5,10 @@ import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SavedBadge } from "../../lib/SavedBadge";
 
-const PAYMENT_PROVIDERS = ["payplus", "tranzila", "cardcom", "grow", "tori_managed"] as const;
+const PAYMENT_PROVIDERS = ["payplus", "tranzila", "cardcom", "grow"] as const;
 type PaymentProviderName = (typeof PAYMENT_PROVIDERS)[number];
 
-const INVOICE_PROVIDERS = ["greeninvoice", "icount", "payplus-invoice", "tori_managed"] as const;
+const INVOICE_PROVIDERS = ["greeninvoice", "icount", "payplus-invoice"] as const;
 type InvoiceProviderName = (typeof INVOICE_PROVIDERS)[number];
 
 const MANAGED_PAYMENT_SURCHARGE_ILS = 49;
@@ -60,15 +60,6 @@ const PAYMENT_META: Record<PaymentProviderName, ProviderMeta> = {
       en: "Log into Grow → Settings → API, and copy your userId and pageCode.",
     },
   },
-  tori_managed: {
-    label: "תורי — סליקה מנוהלת",
-    color: "#C08A00",
-    monogram: "TM",
-    instructions: {
-      he: `אין לך ספק סליקה משלך? תורי תעבד עבורך את התשלומים דרך החשבון שלנו, תמורת ₪${MANAGED_PAYMENT_SURCHARGE_ILS} נוספים בחודש שיתווספו למנוי.`,
-      en: `Don't have your own payment provider? Tori will process payments through our own account instead, for an extra ₪${MANAGED_PAYMENT_SURCHARGE_ILS}/month added to your subscription.`,
-    },
-  },
 };
 
 const INVOICE_META: Record<InvoiceProviderName, ProviderMeta> = {
@@ -95,15 +86,6 @@ const INVOICE_META: Record<InvoiceProviderName, ProviderMeta> = {
     color: "#0F62FE",
     monogram: "P+",
     instructions: null, // reuses payment credentials — no separate setup
-  },
-  tori_managed: {
-    label: "תורי — חשבוניות מנוהלות",
-    color: "#C08A00",
-    monogram: "TM",
-    instructions: {
-      he: `אין לך ספק חשבוניות משלך? תורי תפיק עבורך את הקבלות דרך המערכת שלנו, תמורת ₪${MANAGED_INVOICE_SURCHARGE_ILS} נוספים בחודש. שימו לב: המסמכים יונפקו תחת העסק "תורי" ולא תחת מספר העוסק שלך — לא מתאים כתחליף להנהלת חשבונות עצמאית.`,
-      en: `Don't have your own invoicing provider? Tori will issue receipts through our own system instead, for an extra ₪${MANAGED_INVOICE_SURCHARGE_ILS}/month. Note: documents will be issued under Tori's business, not your own tax ID — not a substitute for independent bookkeeping.`,
-    },
   },
 };
 
@@ -308,6 +290,97 @@ function ProviderCard<T extends string>({
   );
 }
 
+/** Distinct from ProviderCard on purpose — this isn't "one more provider to pick from", it's Tori
+ * itself stepping in as a fallback, so it gets its own visual identity (dashed gold border,
+ * no tabs, just a single toggle) instead of living as a tab inside the provider list. */
+function ManagedCard({
+  he,
+  kind,
+  active,
+  surchargeIls,
+  description,
+  legalNote,
+  onEnable,
+  onDisable,
+}: {
+  he: boolean;
+  kind: "payment" | "invoice";
+  active: boolean;
+  surchargeIls: number;
+  description: string;
+  legalNote?: string;
+  onEnable: () => Promise<void>;
+  onDisable: () => Promise<void>;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function toggle() {
+    setError(null);
+    setLoading(true);
+    try {
+      if (active) await onDisable();
+      else await onEnable();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div
+      className="rounded-2xl overflow-hidden border-2 border-dashed"
+      style={{ borderColor: "#C08A00", background: "linear-gradient(180deg, #FFFBEF 0%, #FFFFFF 55%)" }}
+    >
+      <div className="flex items-center gap-3 px-5 py-4">
+        <span className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-white font-bold text-xs shadow-sm" style={{ backgroundColor: "#C08A00" }} dir="ltr">
+          T
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-semibold text-gray-900">
+            {kind === "payment"
+              ? (he ? "אין לך ספק סליקה? תורי תעבד עבורך" : "No payment provider? Let Tori handle it")
+              : (he ? "אין לך ספק חשבוניות? תורי תפיק עבורך" : "No invoicing provider? Let Tori handle it")}
+          </h2>
+          <p className="text-xs mt-0.5" style={{ color: "#8A6400" }}>
+            {he ? `תוספת ₪${surchargeIls}/חודש` : `+₪${surchargeIls}/month`}
+          </p>
+        </div>
+        {active && (
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-green-50 text-green-700 border border-green-200 shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+            {he ? "פעיל" : "Active"}
+          </span>
+        )}
+      </div>
+
+      <div className="px-5 pb-5">
+        <p className="text-xs text-gray-500 leading-relaxed mb-3">{description}</p>
+        {legalNote && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3.5 py-2.5 leading-relaxed mb-3">{legalNote}</p>
+        )}
+        {error && <p className="text-red-600 text-xs mb-2">{error}</p>}
+        <button
+          type="button"
+          onClick={toggle}
+          disabled={loading}
+          className={`text-sm font-semibold px-5 py-2.5 rounded-lg transition disabled:opacity-50 ${
+            active ? "bg-white text-red-600 border border-red-200 hover:bg-red-50" : "text-white"
+          }`}
+          style={active ? undefined : { backgroundColor: "#C08A00" }}
+        >
+          {loading
+            ? (he ? "מעדכן..." : "Updating...")
+            : active
+              ? (he ? "בטל שירות מנוהל" : "Disable managed service")
+              : (he ? "הפעל שירות מנוהל" : "Enable managed service")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function PaymentsPage() {
   const { lang } = useLanguage();
   const he = lang === "he";
@@ -318,8 +391,12 @@ export default function PaymentsPage() {
   async function load() {
     const data = await apiFetch<Me>("/api/business/me");
     setMe(data);
-    if (data.paymentProvider) setPaymentProvider(data.paymentProvider as PaymentProviderName);
-    if (data.invoiceProvider) setInvoiceProvider(data.invoiceProvider as InvoiceProviderName);
+    if ((PAYMENT_PROVIDERS as readonly string[]).includes(data.paymentProvider ?? "")) {
+      setPaymentProvider(data.paymentProvider as PaymentProviderName);
+    }
+    if ((INVOICE_PROVIDERS as readonly string[]).includes(data.invoiceProvider ?? "")) {
+      setInvoiceProvider(data.invoiceProvider as InvoiceProviderName);
+    }
   }
 
   useEffect(() => {
@@ -347,16 +424,13 @@ export default function PaymentsPage() {
           meta={PAYMENT_META}
           selected={paymentProvider}
           onSelect={setPaymentProvider}
-          connected={Boolean(me?.paymentConnected)}
+          connected={Boolean(me?.paymentConnected) && me?.paymentProvider !== "tori_managed"}
           connectedProvider={me?.paymentProvider}
-          needsCredentials={paymentProvider !== "tori_managed"}
+          needsCredentials
           onConnect={async (apiKey, apiSecret) => {
             await apiFetch("/api/business/me/payment-provider", {
               method: "PUT",
-              body:
-                paymentProvider === "tori_managed"
-                  ? JSON.stringify({ provider: paymentProvider })
-                  : JSON.stringify({ provider: paymentProvider, apiKey, apiSecret }),
+              body: JSON.stringify({ provider: paymentProvider, apiKey, apiSecret }),
             });
             await load();
           }}
@@ -373,9 +447,9 @@ export default function PaymentsPage() {
           meta={INVOICE_META}
           selected={invoiceProvider}
           onSelect={setInvoiceProvider}
-          connected={Boolean(me?.invoiceConnected)}
+          connected={Boolean(me?.invoiceConnected) && me?.invoiceProvider !== "tori_managed"}
           connectedProvider={me?.invoiceProvider}
-          needsCredentials={invoiceProvider !== "payplus-invoice" && invoiceProvider !== "tori_managed"}
+          needsCredentials={invoiceProvider !== "payplus-invoice"}
           requirementNote={
             invoiceProvider === "payplus-invoice" && !canUsePayplusInvoice
               ? he
@@ -387,13 +461,60 @@ export default function PaymentsPage() {
             await apiFetch("/api/business/me/invoice-provider", {
               method: "PUT",
               body:
-                invoiceProvider === "payplus-invoice" || invoiceProvider === "tori_managed"
+                invoiceProvider === "payplus-invoice"
                   ? JSON.stringify({ provider: invoiceProvider })
                   : JSON.stringify({ provider: invoiceProvider, apiKey, apiSecret }),
             });
             await load();
           }}
           onDisconnect={async () => {
+            await apiFetch("/api/business/me/invoice-provider", { method: "DELETE" });
+            await load();
+          }}
+        />
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2 items-start mt-5 animate-fade-up stagger-2">
+        <ManagedCard
+          he={he}
+          kind="payment"
+          active={me?.paymentProvider === "tori_managed"}
+          surchargeIls={MANAGED_PAYMENT_SURCHARGE_ILS}
+          description={
+            he
+              ? "אין לך חשבון סליקה משלך? תורי תעבד את התשלומים דרך החשבון שלנו במקומך — אין צורך במפתחות API."
+              : "Don't have your own payment account? Tori will process payments through our own account for you — no API keys needed."
+          }
+          onEnable={async () => {
+            await apiFetch("/api/business/me/payment-provider", { method: "PUT", body: JSON.stringify({ provider: "tori_managed" }) });
+            await load();
+          }}
+          onDisable={async () => {
+            await apiFetch("/api/business/me/payment-provider", { method: "DELETE" });
+            await load();
+          }}
+        />
+
+        <ManagedCard
+          he={he}
+          kind="invoice"
+          active={me?.invoiceProvider === "tori_managed"}
+          surchargeIls={MANAGED_INVOICE_SURCHARGE_ILS}
+          description={
+            he
+              ? "אין לך ספק חשבוניות משלך? תורי תפיק עבורך קבלות דרך המערכת שלנו — אין צורך במפתחות API."
+              : "Don't have your own invoicing provider? Tori will issue receipts through our own system for you — no API keys needed."
+          }
+          legalNote={
+            he
+              ? 'שימו לב: המסמכים יונפקו תחת העסק "תורי" ולא תחת מספר העוסק שלכם — לא מתאים כתחליף להנהלת חשבונות עצמאית.'
+              : "Note: documents will be issued under Tori's business, not your own tax ID — not a substitute for independent bookkeeping."
+          }
+          onEnable={async () => {
+            await apiFetch("/api/business/me/invoice-provider", { method: "PUT", body: JSON.stringify({ provider: "tori_managed" }) });
+            await load();
+          }}
+          onDisable={async () => {
             await apiFetch("/api/business/me/invoice-provider", { method: "DELETE" });
             await load();
           }}
