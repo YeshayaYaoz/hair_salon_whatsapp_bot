@@ -1706,6 +1706,7 @@ export default function LandingPage() {
               <a href="#faq">שאלות נפוצות</a>
               <a href="/login">כניסה לדשבורד</a>
               <a href="/privacy">מדיניות פרטיות</a>
+              <a href="/terms">תנאי שימוש</a>
               <a href="/en">English</a>
             </div>
             <div className="lp-footer-col">

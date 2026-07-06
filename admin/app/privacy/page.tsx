@@ -10,6 +10,7 @@ const SECTIONS = [
   { id: "google-api", title: "Google API Limited Use" },
   { id: "retention", title: "Data Retention" },
   { id: "security", title: "Security" },
+  { id: "cookies", title: "Cookies & Local Storage" },
   { id: "rights", title: "Your Rights" },
   { id: "children", title: "Children's Privacy" },
   { id: "transfers", title: "International Transfers" },
@@ -56,6 +57,9 @@ export default function PrivacyPolicy() {
               </li>
             ))}
           </ul>
+          <Link href="/terms" className="block text-xs text-[#1B7FA0] hover:underline mt-4 pt-4 border-t border-gray-100">
+            View Terms of Service →
+          </Link>
         </nav>
 
         {/* Content */}
@@ -150,7 +154,15 @@ export default function PrivacyPolicy() {
             <p>Passwords are hashed and never stored in plain text. WhatsApp access tokens, Google OAuth tokens, and other credentials are encrypted at rest. All traffic to our dashboard and API is served over HTTPS. Webhook requests from Meta are verified using HMAC signatures to prevent spoofing.</p>
           </Section>
 
-          <Section id="rights" title="9. Your Rights">
+          <Section id="cookies" title="9. Cookies & Local Storage">
+            <p>
+              Tori does not use tracking cookies or third-party advertising/analytics scripts. Our dashboard
+              stores a session token in your browser's local storage to keep you signed in — this token never
+              leaves your device except to authenticate requests to our own API, and is cleared when you log out.
+            </p>
+          </Section>
+
+          <Section id="rights" title="10. Your Rights">
             <p>
               <strong>Business owners</strong> can access, correct, or export their data from the dashboard at any
               time, and can request full account deletion by contacting us below.
@@ -163,19 +175,19 @@ export default function PrivacyPolicy() {
             </p>
           </Section>
 
-          <Section id="children" title="10. Children's Privacy">
+          <Section id="children" title="11. Children's Privacy">
             <p>Tori is intended for business use and is not directed at children under 16. We do not knowingly collect personal data from children. If you believe a child has provided us data, contact us and we will delete it.</p>
           </Section>
 
-          <Section id="transfers" title="11. International Data Transfers">
+          <Section id="transfers" title="12. International Data Transfers">
             <p>Tori operates from Israel and uses infrastructure providers that may process data in other countries (including the United States). By using our services, you consent to your data being transferred and processed outside your country of residence where applicable, with appropriate safeguards in place.</p>
           </Section>
 
-          <Section id="changes" title="12. Changes to This Policy">
+          <Section id="changes" title="13. Changes to This Policy">
             <p>We may update this Privacy Policy from time to time. Material changes will be reflected by updating the "Last updated" date above. Continued use of Tori after changes take effect constitutes acceptance of the revised policy.</p>
           </Section>
 
-          <Section id="contact" title="13. Contact Us">
+          <Section id="contact" title="14. Contact Us">
             <p>Questions about this policy or your data? Reach out at <a href="mailto:y28112000@gmail.com" className="text-[#1B7FA0] underline underline-offset-2 font-medium">y28112000@gmail.com</a>.</p>
           </Section>
         </main>
