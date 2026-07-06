@@ -354,9 +354,11 @@ businessRouter.get("/conversations/:phone", async (req: AuthedRequest, res) => {
 businessRouter.get("/customers", async (req: AuthedRequest, res) => {
   const customers = await prisma.customer.findMany({
     where: { businessId: req.businessId! },
-    include: { _count: { select: { appointments: true } } },
-    orderBy: { appointments: { _count: "desc" } },
+    // Count only confirmed bookings — cancelled appointments shouldn't inflate "total bookings".
+    include: { _count: { select: { appointments: { where: { status: "confirmed" } } } } },
+    orderBy: { name: "asc" },
   });
+  customers.sort((a, b) => b._count.appointments - a._count.appointments);
   res.json(customers);
 });
 

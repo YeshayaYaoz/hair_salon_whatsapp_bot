@@ -87,7 +87,7 @@ function SidebarContent({ pathname }: { pathname: string }) {
         <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", color: "rgba(255,255,255,0.18)", textTransform: "uppercase" }}>ניהול</span>
       </div>
 
-      <nav className="flex flex-col gap-0.5 flex-1 overflow-y-auto">
+      <nav className="flex flex-col gap-0.5 flex-1 overflow-y-auto sidebar-scroll">
         {NAV_ITEMS.map((item) => {
           const active = pathname === item.href;
           return (
