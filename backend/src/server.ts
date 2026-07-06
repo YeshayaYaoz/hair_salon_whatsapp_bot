@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import { validateEnv } from "./lib/validateEnv.js";
 import { authRouter } from "./api/authRoutes.js";
 import { businessRouter } from "./api/businessRoutes.js";
 import { whatsappRouter } from "./webhook/whatsappRoutes.js";
@@ -8,6 +9,8 @@ import { billingRouter, stripeWebhookRouter } from "./billing/billingRoutes.js";
 import { publicRouter } from "./api/publicRoutes.js";
 import { runRetentionJob } from "./lib/retentionJob.js";
 import { runReminderJob, runReviewJob, runDigestJob } from "./lib/scheduledMessages.js";
+
+validateEnv(); // exits the process before anything binds to a port if required config is missing
 
 const app = express();
 const allowedOrigins = (process.env.FRONTEND_URL ?? "*").split(",").map(o => o.trim());
