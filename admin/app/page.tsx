@@ -792,6 +792,12 @@ export default function LandingPage() {
           .lp-h1 { letter-spacing: -1.2px; }
           .lp-hero-sub { font-size: 15px; line-height: 1.5; }
         }
+        /* Shorter copy on mobile without touching desktop text — render both, toggle via CSS. */
+        .only-mobile { display: none; }
+        @media (max-width: 900px) {
+          .only-mobile { display: inline; }
+          .only-desktop { display: none; }
+        }
         @media (prefers-reduced-motion: reduce) {
           *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
           .lp-3d-inner { transform: none !important; opacity: 1 !important; }
@@ -933,7 +939,8 @@ export default function LandingPage() {
                 <span className="green">גם כשאתה ישן.</span>
               </h1>
               <p className="lp-hero-sub">
-                בוט AI עונה ללקוחות בוואטסאפ, קובע תורים ומסנכרן הכל לגוגל קלנדר — בלי שנגעת בטלפון. בכלל.
+                <span className="only-desktop">בוט AI עונה ללקוחות בוואטסאפ, קובע תורים ומסנכרן הכל לגוגל קלנדר — בלי שנגעת בטלפון. בכלל.</span>
+                <span className="only-mobile">בוט AI עונה, קובע תורים ומסנכרן לגוגל קלנדר — בלי שתיגע בטלפון.</span>
               </p>
               <div className="lp-hero-ctas">
                 <a className="btn-green" href="/login">נסה חינם — 14 יום</a>
@@ -1306,17 +1313,26 @@ export default function LandingPage() {
               <div className="lp-step reveal d1">
                 <div className="lp-step-num">01</div>
                 <div className="lp-step-title">לקוח שולח הודעה ב-WhatsApp</div>
-                <div className="lp-step-desc">הלקוח כותב כמו שהוא כותב — "רוצה תספורת ביום חמישי". הבוט מבין ועונה תוך שנייה, בעברית רגילה.</div>
+                <div className="lp-step-desc">
+                  <span className="only-desktop">הלקוח כותב כמו שהוא כותב — "רוצה תספורת ביום חמישי". הבוט מבין ועונה תוך שנייה, בעברית רגילה.</span>
+                  <span className="only-mobile">הלקוח כותב חופשי, הבוט מבין ועונה מיד.</span>
+                </div>
               </div>
               <div className="lp-step reveal d2">
                 <div className="lp-step-num">02</div>
                 <div className="lp-step-title">הבוט מציע זמנים ומאשר</div>
-                <div className="lp-step-desc">הבוט בודק את היומן הפנוי, מציע מועדים, מקבל אישור וקובע את התור — בלי שנגעת בטלפון.</div>
+                <div className="lp-step-desc">
+                  <span className="only-desktop">הבוט בודק את היומן הפנוי, מציע מועדים, מקבל אישור וקובע את התור — בלי שנגעת בטלפון.</span>
+                  <span className="only-mobile">בודק זמינות, מציע מועדים וקובע תור לבד.</span>
+                </div>
               </div>
               <div className="lp-step reveal d3">
                 <div className="lp-step-num">03</div>
                 <div className="lp-step-title">גוגל קלנדר מתעדכן אוטומטית</div>
-                <div className="lp-step-desc">כל תור מופיע מיידית בגוגל קלנדר שלך עם שם הלקוח, השירות, ושעת הסיום. חיבור חד-פעמי.</div>
+                <div className="lp-step-desc">
+                  <span className="only-desktop">כל תור מופיע מיידית בגוגל קלנדר שלך עם שם הלקוח, השירות, ושעת הסיום. חיבור חד-פעמי.</span>
+                  <span className="only-mobile">כל תור נכנס ליומן שלך אוטומטית.</span>
+                </div>
               </div>
             </div>
           </div>
@@ -1329,17 +1345,20 @@ export default function LandingPage() {
             <div className="lp-title reveal">כל הכלים שהעסק שלך צריך — ואפס כלים שלא.</div>
             <div className="lp-feats-grid">
               {[
-                { icon: "💬", title: "בוט WhatsApp בעברית", desc: "מבין שפה טבעית, עונה ב-24/7, ומנהל שיחה מתחילה ועד אישור התור.", d: "d1" },
-                { icon: "📅", title: "סנכרון גוגל קלנדר", desc: "חיבור חד-פעמי. כל תור שנקבע נכנס ליומן אוטומטית עם כל הפרטים.", d: "d2" },
-                { icon: "🔔", title: "תזכורות אוטומטיות", desc: "הבוט שולח תזכורת ללקוח לפני כל תור. פחות no-shows, פחות שיחות.", d: "d3" },
-                { icon: "📊", title: "דשבורד ניהול", desc: "הכנסות, תורים, לקוחות ושירותים פופולריים — הכל במסך אחד, בזמן אמת.", d: "d4" },
-                { icon: "⏰", title: "שעות פתיחה גמישות", desc: "הגדר ימים ושעות לכל שירות וצוות. הבוט לא יציע זמנים שלא מתאימים.", d: "d5" },
-                { icon: "📋", title: "רשימת המתנה", desc: "אין זמינות? הבוט מוסיף לרשימת המתנה ומיידע אותך כשמשהו מתפנה.", d: "d6" },
+                { icon: "💬", title: "בוט WhatsApp בעברית", desc: "מבין שפה טבעית, עונה ב-24/7, ומנהל שיחה מתחילה ועד אישור התור.", descShort: "מבין עברית, עונה 24/7, סוגר תור לבד.", d: "d1" },
+                { icon: "📅", title: "סנכרון גוגל קלנדר", desc: "חיבור חד-פעמי. כל תור שנקבע נכנס ליומן אוטומטית עם כל הפרטים.", descShort: "חיבור חד-פעמי, כל תור נכנס ליומן לבד.", d: "d2" },
+                { icon: "🔔", title: "תזכורות אוטומטיות", desc: "הבוט שולח תזכורת ללקוח לפני כל תור. פחות no-shows, פחות שיחות.", descShort: "תזכורת אוטומטית לפני כל תור.", d: "d3" },
+                { icon: "📊", title: "דשבורד ניהול", desc: "הכנסות, תורים, לקוחות ושירותים פופולריים — הכל במסך אחד, בזמן אמת.", descShort: "הכנסות, תורים ולקוחות במסך אחד.", d: "d4" },
+                { icon: "⏰", title: "שעות פתיחה גמישות", desc: "הגדר ימים ושעות לכל שירות וצוות. הבוט לא יציע זמנים שלא מתאימים.", descShort: "שעות מותאמות לכל שירות וצוות.", d: "d5" },
+                { icon: "📋", title: "רשימת המתנה", desc: "אין זמינות? הבוט מוסיף לרשימת המתנה ומיידע אותך כשמשהו מתפנה.", descShort: "ממלא מקומות פנויים מרשימת המתנה.", d: "d6" },
               ].map((f) => (
                 <div key={f.title} className={`lp-feat reveal ${f.d}`}>
                   <div className="lp-feat-icon">{f.icon}</div>
                   <div className="lp-feat-title">{f.title}</div>
-                  <div className="lp-feat-desc">{f.desc}</div>
+                  <div className="lp-feat-desc">
+                    <span className="only-desktop">{f.desc}</span>
+                    <span className="only-mobile">{f.descShort}</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1417,13 +1436,16 @@ export default function LandingPage() {
             <div className="lp-title reveal">בעלי עסקים שכבר עושים את זה עם תורי.</div>
             <div className="lp-testi-grid">
               {[
-                { quote: "לפני תורי הייתי מפספסת הודעות כל הזמן. עכשיו הבוט עונה מיידית ואני מקבלת התראה רק על תורים שנקבעו. חסכתי שעתיים ביום.", name: "דנה כ.", role: "סלון שיער, תל אביב", color: "#2A9BBF", initial: "ד" },
-                { quote: "הלקוחות שלי מתפעלים שהבוט עונה ב-2 בלילה. כמה מהם אמרו שזה גרם להם לבחור בי על פני סלון אחר.", name: "מיכל ל.", role: "קליניקת יופי, ירושלים", color: "#EC4899", initial: "מ" },
-                { quote: "ניסיתי כמה מערכות לניהול תורים — זו הכי פשוטה להתקנה. 10 דקות ואני חי. הגוגל קלנדר מתעדכן לבד, זה שינה לי את החיים.", name: "יוסי ה.", role: "ברבר, חיפה", color: "#F59E0B", initial: "י" },
+                { quote: "לפני תורי הייתי מפספסת הודעות כל הזמן. עכשיו הבוט עונה מיידית ואני מקבלת התראה רק על תורים שנקבעו. חסכתי שעתיים ביום.", quoteShort: "הבוט עונה מיידית, וחסכתי שעתיים ביום.", name: "דנה כ.", role: "סלון שיער, תל אביב", color: "#2A9BBF", initial: "ד" },
+                { quote: "הלקוחות שלי מתפעלים שהבוט עונה ב-2 בלילה. כמה מהם אמרו שזה גרם להם לבחור בי על פני סלון אחר.", quoteShort: "לקוחות מתפעלים שהבוט עונה גם ב-2 בלילה.", name: "מיכל ל.", role: "קליניקת יופי, ירושלים", color: "#EC4899", initial: "מ" },
+                { quote: "ניסיתי כמה מערכות לניהול תורים — זו הכי פשוטה להתקנה. 10 דקות ואני חי. הגוגל קלנדר מתעדכן לבד, זה שינה לי את החיים.", quoteShort: "הכי פשוטה להתקנה — 10 דקות ואני חי.", name: "יוסי ה.", role: "ברבר, חיפה", color: "#F59E0B", initial: "י" },
               ].map((t) => (
                 <div key={t.name} className="lp-testi-card reveal">
                   <div className="lp-testi-stars">{[1,2,3,4,5].map((s) => <span key={s} className="lp-testi-star">★</span>)}</div>
-                  <div className="lp-testi-quote">&ldquo;{t.quote}&rdquo;</div>
+                  <div className="lp-testi-quote">
+                    <span className="only-desktop">&ldquo;{t.quote}&rdquo;</span>
+                    <span className="only-mobile">&ldquo;{t.quoteShort}&rdquo;</span>
+                  </div>
                   <div className="lp-testi-footer">
                     <div className="lp-testi-avatar" style={{ background: t.color }}>{t.initial}</div>
                     <div>
