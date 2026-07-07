@@ -165,10 +165,30 @@ function SidebarContent({ pathname }: { pathname: string }) {
   );
 }
 
+const MORE_ITEMS = NAV_ITEMS.slice(5);
+
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { t } = useLanguage();
   const activeItem = NAV_ITEMS.find((item) => item.href === pathname);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  useEffect(() => {
+    apiFetch<{ isSuperAdmin?: boolean }>("/api/business/me").then((me) => setIsSuperAdmin(Boolean(me.isSuperAdmin))).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setMoreOpen(false); // close the sheet on navigation
+  }, [pathname]);
+
+  function logout() {
+    clearToken();
+    router.push("/login");
+  }
+
+  const moreActive = MORE_ITEMS.some((i) => i.href === pathname) || pathname === "/dashboard/admin";
 
   return (
     <AuthGuard>
@@ -234,17 +254,67 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           );
         })}
 
-        <Link
-          href="/dashboard/staff"
+        <button
+          type="button"
+          onClick={() => setMoreOpen((v) => !v)}
           className="flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition"
-          style={{ color: !BOTTOM_TAB_ITEMS.find(i => i.href === pathname) && pathname !== "/" ? "#1B7FA0" : "#9CA3AF" }}
+          style={{ color: moreOpen || moreActive ? "#1B7FA0" : "#9CA3AF" }}
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
           <span>עוד</span>
-        </Link>
+        </button>
       </nav>
+
+      {/* "More" bottom sheet — remaining nav items that don't fit the 5-tab bar */}
+      {moreOpen && (
+        <div className="md:hidden fixed inset-0 z-40" onClick={() => setMoreOpen(false)}>
+          <div className="absolute inset-0 bg-black/30" />
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute bottom-16 start-0 end-0 bg-white rounded-t-2xl shadow-2xl p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] max-h-[70vh] overflow-y-auto"
+          >
+            <div className="w-9 h-1 rounded-full bg-gray-200 mx-auto mb-2" />
+            {MORE_ITEMS.map((item) => {
+              const active = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition ${active ? "bg-[#1B7FA0]/10 text-[#1B7FA0]" : "text-gray-700"}`}
+                >
+                  <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={item.icon} />
+                  </svg>
+                  {t.nav[item.key]}
+                </Link>
+              );
+            })}
+            {isSuperAdmin && (
+              <Link
+                href="/dashboard/admin"
+                className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition ${pathname === "/dashboard/admin" ? "bg-amber-50 text-amber-700" : "text-gray-700"}`}
+              >
+                <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Admin
+              </Link>
+            )}
+            <div className="h-px bg-gray-100 my-2" />
+            <button
+              onClick={logout}
+              className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-gray-500 transition"
+            >
+              <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              {t.nav.logout}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
     </AuthGuard>
   );
