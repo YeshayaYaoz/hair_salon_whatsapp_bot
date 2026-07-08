@@ -48,7 +48,7 @@ export default function LoginPage() {
           grid-template-columns: 1fr 1fr;
           background: #F0F8FB;
           direction: rtl;
-          font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+          font-family: var(--font-heebo), 'Segoe UI', system-ui, -apple-system, sans-serif;
         }
         @media (max-width: 820px) {
           .login-root { grid-template-columns: 1fr; }
