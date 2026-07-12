@@ -1567,8 +1567,8 @@ export default function LandingPage() {
               // supporting stats always agree with each other (previously each of 4 cards
               // computed its own thing inline, several combining metrics in ways that were
               // hard to trace back to the slider).
-              const monthlyAppts = Math.round(appts * 4.33); // the slider is weekly, everything below is monthly — bridge the two explicitly
-              const savedBookings = Math.round(appts * 0.15 * 0.8); // recovered from reminders/24-7 answering
+              const monthlyAppts = appts * 4; // the slider is weekly — everything below is monthly, on a simple ×4
+              const savedBookings = Math.round(monthlyAppts * 0.15 * 0.8); // recovered from reminders/24-7 answering, out of the MONTHLY total
               const monthlyRevenue = savedBookings * 180; // avg service price
               const hoursPerWeek = Math.round((appts * 4 / 60) * 10) / 10;
               const roiMultiple = Math.max(1, Math.round(monthlyRevenue / 149));
