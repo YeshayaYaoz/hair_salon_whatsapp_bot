@@ -670,18 +670,23 @@ export default function LandingPage() {
         @media (max-width: 900px) { .lp-demo { padding: 72px 20px; } }
 
         .lp-roi { padding: 100px 40px; background: #0A0A0A; }
-        .lp-roi-inner { max-width: 700px; margin: 0 auto; text-align: center; }
+        .lp-roi-inner { max-width: 640px; margin: 0 auto; text-align: center; }
         .lp-roi .lp-label { color: #F59E0B; }
         .lp-roi .lp-title { color: #fff; margin-bottom: 16px; }
         .lp-roi-sub { font-size: 16px; color: rgba(255,255,255,0.65); margin-bottom: 48px; }
-        .lp-roi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 36px; }
-        .lp-roi-cell { padding: 28px 20px; background: #141414; border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; text-align: center; }
-        .lp-roi-n { font-size: 36px; font-weight: 800; letter-spacing: -2px; color: #fff; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+        /* One clear headline number the slider drives, instead of four competing stat cards. */
+        .lp-roi-headline { margin: 40px 0 8px; }
+        .lp-roi-headline-label { font-size: 14px; color: rgba(255,255,255,0.55); margin-bottom: 6px; }
+        .lp-roi-headline-num { font-size: clamp(44px, 7vw, 68px); font-weight: 800; letter-spacing: -3px; color: #25D366; font-variant-numeric: tabular-nums; line-height: 1; }
+        .lp-roi-headline-sub { font-size: 14px; color: rgba(255,255,255,0.5); margin-top: 10px; }
+        .lp-roi-headline-sub strong { color: #fff; }
+        .lp-roi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 36px 0; }
+        .lp-roi-cell { padding: 22px 18px; background: #141414; border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; text-align: center; }
+        .lp-roi-n { font-size: 28px; font-weight: 800; letter-spacing: -1.5px; color: #fff; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
         .lp-roi-n .accent { color: #25D366; }
-        .lp-roi-n .amber { color: #F59E0B; }
-        .lp-roi-l { font-size: 13.5px; color: rgba(255,255,255,0.72); line-height: 1.5; }
-        .lp-roi-note { font-size: 14px; color: rgba(255,255,255,0.6); }
-        .lp-roi-note strong { color: #fff; }
+        .lp-roi-l { font-size: 13px; color: rgba(255,255,255,0.6); line-height: 1.4; }
+        .lp-roi-note { font-size: 13.5px; color: rgba(255,255,255,0.45); line-height: 1.6; }
+        .lp-roi-note strong { color: rgba(255,255,255,0.75); }
 
         /* FAQ */
         .lp-faq { padding: 100px 40px; background: #F8F8F8; }
@@ -1536,7 +1541,7 @@ export default function LandingPage() {
           <div className="lp-roi-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>מחשבון חיסכון</div>
             <div className="lp-title reveal" style={{ color: "#fff", textAlign: "center" }}>כמה תורי חוסך לך?</div>
-            <div className="lp-roi-sub reveal">גרור את הסליידר לפי מספר התורים השבועי שלך</div>
+            <div className="lp-roi-sub reveal">גרור לפי מספר התורים שיש לך בשבוע — התוצאה מתעדכנת מיד</div>
 
             <div className="lp-roi-slider-wrap reveal">
               <div className="roi-slider-label">
@@ -1547,6 +1552,7 @@ export default function LandingPage() {
                 <input
                   type="range" min={5} max={150} step={5} value={appts}
                   className="roi-slider"
+                  aria-label="תורים בשבוע"
                   style={{ background: `linear-gradient(to right, #25D366 0%, #25D366 ${((appts - 5) / 145) * 100}%, rgba(255,255,255,0.15) ${((appts - 5) / 145) * 100}%, rgba(255,255,255,0.15) 100%)` }}
                   onChange={e => setAppts(Number(e.target.value))}
                 />
@@ -1556,42 +1562,42 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="lp-roi-grid reveal">
-              <div className="lp-roi-cell">
-                <div className="lp-roi-n">
-                  <span className="accent">{(Math.round(appts * 4 / 60 * 10) / 10).toFixed(1)}</span>
-                  <span style={{ fontSize: 20, color: "#25D366", paddingBottom: 4 }}> שע׳</span>
-                </div>
-                <div className="lp-roi-l">שעות חסוכות בשבוע על תיאום ידני</div>
-              </div>
-              <div className="lp-roi-cell">
-                <div className="lp-roi-n">
-                  <span className="accent">{Math.round(appts * 0.15 * 0.8)}</span>
-                  <span style={{ fontSize: 20, color: "#25D366", paddingBottom: 4 }}> ביטולים</span>
-                </div>
-                <div className="lp-roi-l">no-shows פחות בחודש עם תזכורות אוטומטיות</div>
-              </div>
-              <div className="lp-roi-cell">
-                <div className="lp-roi-n">
-                  <span className="amber">₪</span>
-                  <span style={{ color: "#fff" }}>{(Math.round(appts * 0.15 * 0.8) * 180).toLocaleString("he-IL")}</span>
-                </div>
-                <div className="lp-roi-l">הכנסה נוספת ממוצעת בחודש מתורים שנשמרו</div>
-              </div>
-              <div className="lp-roi-cell" style={{ position: "relative", overflow: "hidden", border: "1px solid rgba(245,158,11,0.3)", background: "rgba(245,158,11,0.06)" }}>
-                <div style={{ position: "absolute", top: 8, left: 10, background: "rgba(245,158,11,0.2)", border: "1px solid rgba(245,158,11,0.4)", borderRadius: 6, padding: "2px 7px", fontSize: 9, color: "#F59E0B", fontWeight: 700, letterSpacing: "0.06em" }}>פרמיום</div>
-                <div className="lp-roi-n">
-                  <span style={{ color: "#F59E0B" }}>₪</span>
-                  <span style={{ color: "#fff" }}>{(Math.round(appts * 0.15 * 0.8) * 180 + Math.round(appts * 5 / 60 * 4.3 * 38)).toLocaleString("he-IL")}</span>
-                </div>
-                <div className="lp-roi-l">סה"כ חיסכון + הכנסה בפרמיום (כולל עובד טלפון)</div>
-              </div>
-            </div>
-            <div className="lp-roi-note reveal">
-              המחיר: <strong>₪149/חודש</strong> · ROI: כ-<strong>
-                {appts > 10 ? `${Math.round((Math.round(appts * 0.15 * 0.8) * 180) / 149)}x` : "1x"}
-              </strong> תוך החודש הראשון.
-            </div>
+            {(() => {
+              // Single source of truth for every number below, so the headline and the two
+              // supporting stats always agree with each other (previously each of 4 cards
+              // computed its own thing inline, several combining metrics in ways that were
+              // hard to trace back to the slider).
+              const savedBookings = Math.round(appts * 0.15 * 0.8); // recovered from reminders/24-7 answering
+              const monthlyRevenue = savedBookings * 180; // avg service price
+              const hoursPerWeek = Math.round((appts * 4 / 60) * 10) / 10;
+              const roiMultiple = Math.max(1, Math.round(monthlyRevenue / 149));
+              return (
+                <>
+                  <div className="lp-roi-headline reveal">
+                    <div className="lp-roi-headline-label">הכנסה נוספת משוערת בחודש</div>
+                    <div className="lp-roi-headline-num">₪{monthlyRevenue.toLocaleString("he-IL")}</div>
+                    <div className="lp-roi-headline-sub">
+                      מול עלות של <strong>₪149/חודש</strong> — כלומר תורי מחזירה את עצמה כ-<strong>{roiMultiple}x</strong>
+                    </div>
+                  </div>
+
+                  <div className="lp-roi-grid reveal">
+                    <div className="lp-roi-cell">
+                      <div className="lp-roi-n"><span className="accent">{hoursPerWeek}</span></div>
+                      <div className="lp-roi-l">שעות פנויות בשבוע, שלא מוקדשות לתיאום תורים בטלפון</div>
+                    </div>
+                    <div className="lp-roi-cell">
+                      <div className="lp-roi-n"><span className="accent">{savedBookings}</span></div>
+                      <div className="lp-roi-l">תורים נוספים בחודש שנשמרים בזכות תזכורות ומענה 24/7</div>
+                    </div>
+                  </div>
+
+                  <div className="lp-roi-note reveal">
+                    ההערכה מבוססת על 20% מהתורים שהיו הולכים לאיבוד (ביטולים/פספוסים), במחיר ממוצע של ₪180 לתור. במסלול Premium, מענה טלפוני אוטומטי מוסיף חיסכון נוסף מעבר לזה.
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </section>
 
