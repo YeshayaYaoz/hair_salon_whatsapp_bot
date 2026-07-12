@@ -1567,6 +1567,7 @@ export default function LandingPage() {
               // supporting stats always agree with each other (previously each of 4 cards
               // computed its own thing inline, several combining metrics in ways that were
               // hard to trace back to the slider).
+              const monthlyAppts = Math.round(appts * 4.33); // the slider is weekly, everything below is monthly — bridge the two explicitly
               const savedBookings = Math.round(appts * 0.15 * 0.8); // recovered from reminders/24-7 answering
               const monthlyRevenue = savedBookings * 180; // avg service price
               const hoursPerWeek = Math.round((appts * 4 / 60) * 10) / 10;
@@ -1574,10 +1575,12 @@ export default function LandingPage() {
               return (
                 <>
                   <div className="lp-roi-headline reveal">
-                    <div className="lp-roi-headline-label">הכנסה נוספת משוערת בחודש</div>
+                    <div className="lp-roi-headline-label">
+                      על בסיס כ-{monthlyAppts} תורים בחודש ({appts} בשבוע) — הכנסה נוספת משוערת:
+                    </div>
                     <div className="lp-roi-headline-num">₪{monthlyRevenue.toLocaleString("he-IL")}</div>
                     <div className="lp-roi-headline-sub">
-                      מול עלות של <strong>₪149/חודש</strong> — כלומר תורי מחזירה את עצמה כ-<strong>{roiMultiple}x</strong>
+                      לחודש, מול עלות של <strong>₪149/חודש</strong> — כלומר תורי מחזירה את עצמה כ-<strong>{roiMultiple}x</strong>
                     </div>
                   </div>
 
