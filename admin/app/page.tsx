@@ -14,6 +14,7 @@ export default function LandingPage() {
     { role: "bot", text: "היי! 👋 אני תורי, העוזר של סלון דנה. אפשר לקבוע לך תור — נסה לכתוב לי משהו כמו \"רוצה תספורת מחר\"" },
   ]);
   const [demoInput, setDemoInput] = useState("");
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
   const demoScrollRef = useRef<HTMLDivElement>(null);
 
   function demoReply(msg: string): string {
@@ -110,21 +111,6 @@ export default function LandingPage() {
     };
     window.addEventListener("scroll", tick, { passive: true });
     return () => window.removeEventListener("scroll", tick);
-  }, []);
-
-  // FAQ accordion
-  useEffect(() => {
-    document.querySelectorAll<HTMLElement>(".faq-q").forEach((q) => {
-      q.addEventListener("click", () => {
-        const item = q.closest<HTMLElement>(".faq-item");
-        const ans = item?.querySelector<HTMLElement>(".faq-a");
-        const icon = item?.querySelector<HTMLElement>(".faq-icon");
-        if (!item || !ans || !icon) return;
-        const open = item.classList.toggle("open");
-        ans.style.maxHeight = open ? ans.scrollHeight + "px" : "0";
-        icon.style.transform = open ? "rotate(45deg)" : "rotate(0deg)";
-      });
-    });
   }, []);
 
   // Live booking notification toast
@@ -258,6 +244,10 @@ export default function LandingPage() {
       <noscript><style>{`.phone-chat > * { display: flex !important; }`}</style></noscript>
       <style>{`
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        /* Offset in-page anchor scrolling for the 62px fixed nav, so section headings aren't
+           hidden behind it when clicking links like #pricing / #faq. */
+        html { scroll-padding-top: 76px; scroll-behavior: smooth; }
+        @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
         .lp {
           background: #fff; color: #111;
           font-family: var(--font-heebo), 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
@@ -699,10 +689,11 @@ export default function LandingPage() {
         .lp-faq-list { display: flex; flex-direction: column; gap: 0; margin-top: 52px; border: 1px solid #E8E8E8; border-radius: 14px; overflow: hidden; }
         .faq-item { background: #fff; border-bottom: 1px solid #EBEBEB; }
         .faq-item:last-child { border-bottom: none; }
-        .faq-q { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 24px; cursor: pointer; font-size: 16px; font-weight: 600; color: #111; transition: background 0.15s; user-select: none; }
+        .faq-q { width: 100%; background: none; border: none; text-align: start; font-family: inherit; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 24px; cursor: pointer; font-size: 16px; font-weight: 600; color: #111; transition: background 0.15s; user-select: none; }
         .faq-q:hover { background: #FAFAFA; }
+        .faq-q:focus-visible { outline: 2px solid #1B7FA0; outline-offset: -2px; }
         .faq-icon { width: 20px; height: 20px; border-radius: 50%; background: #F0F0F0; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #555; flex-shrink: 0; transition: transform 0.25s ease, background 0.15s; font-style: normal; }
-        .faq-item.open .faq-icon { background: #25D366; color: #fff; }
+        .faq-item.open .faq-icon { background: #25D366; color: #fff; transform: rotate(45deg); }
         .faq-a { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
         .faq-a-inner { padding: 0 24px 20px; font-size: 16px; color: #555; line-height: 1.75; }
 
@@ -725,8 +716,11 @@ export default function LandingPage() {
         .lp-footer-col h4 { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.4); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 16px; }
         .lp-footer-col a { display: block; font-size: 14px; color: rgba(255,255,255,0.65); text-decoration: none; margin-bottom: 11px; transition: color 0.15s; }
         .lp-footer-col a:hover { color: #25D366; }
-        /* "Suitable for" uses a compact 2-column list so the many business types stay tidy */
+        /* "Suitable for" uses a compact 2-column list so the many business types stay tidy.
+           These are informational tags (no dedicated page per vertical), so they render as
+           plain text rather than dead "#" links that would jump to the top of the page. */
         .lp-footer-suitable { display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; }
+        .lp-footer-suitable span { display: block; font-size: 14px; color: rgba(255,255,255,0.65); margin-bottom: 11px; }
         .lp-footer-bottom { display: flex; align-items: center; justify-content: space-between; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08); flex-wrap: wrap; gap: 12px; }
         .lp-footer-copy { font-size: 12.5px; color: rgba(255,255,255,0.45); }
         .lp-footer-copy-link { color: rgba(255,255,255,0.65); text-decoration: underline; text-underline-offset: 2px; }
@@ -1664,17 +1658,33 @@ export default function LandingPage() {
                 { q: "מה קורה אם לקוח רוצה שירות שאין ברשימה?", a: "הבוט יגיד ללקוח שהשירות הזה אינו זמין להזמנה אוטומטית ויציע ליצור קשר ישיר. ניתן גם להוסיף תשובות FAQ מותאמות אישית לשאלות נפוצות." },
                 { q: "האם צריך להתקין אפליקציה כלשהי?", a: "לא. הכל עובד דרך הדפדפן — הדשבורד נגיש מכל מכשיר. הלקוחות שולחים הודעות דרך WhatsApp הרגיל שלהם." },
                 { q: "האם ניתן לבטל בכל עת?", a: "כן. אין חוזים ואין דמי ביטול. מבטלים בלחיצה אחת מהדשבורד." },
-              ].map((item) => (
-                <div key={item.q} className="faq-item">
-                  <div className="faq-q">
-                    <span>{item.q}</span>
-                    <span className="faq-icon">+</span>
+              ].map((item, i) => {
+                const open = openFaq === i;
+                return (
+                  <div key={item.q} className={`faq-item${open ? " open" : ""}`}>
+                    <button
+                      type="button"
+                      className="faq-q"
+                      aria-expanded={open}
+                      aria-controls={`faq-a-${i}`}
+                      id={`faq-q-${i}`}
+                      onClick={() => setOpenFaq(open ? null : i)}
+                    >
+                      <span>{item.q}</span>
+                      <span className="faq-icon" aria-hidden="true">+</span>
+                    </button>
+                    <div
+                      className="faq-a"
+                      id={`faq-a-${i}`}
+                      role="region"
+                      aria-labelledby={`faq-q-${i}`}
+                      style={{ maxHeight: open ? 320 : 0 }}
+                    >
+                      <div className="faq-a-inner">{item.a}</div>
+                    </div>
                   </div>
-                  <div className="faq-a">
-                    <div className="faq-a-inner">{item.a}</div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>
@@ -1738,16 +1748,16 @@ export default function LandingPage() {
             <div className="lp-footer-col">
               <h4>מתאים ל</h4>
               <div className="lp-footer-suitable">
-                <a href="#">סלוני שיער</a>
-                <a href="#">מספרות</a>
-                <a href="#">ציפורניים</a>
-                <a href="#">קוסמטיקה</a>
-                <a href="#">עיסוי וספא</a>
-                <a href="#">קליניקות</a>
-                <a href="#">מרפאות שיניים</a>
-                <a href="#">סטודיו כושר</a>
-                <a href="#">צימרים</a>
-                <a href="#">וטרינרים</a>
+                <span>סלוני שיער</span>
+                <span>מספרות</span>
+                <span>ציפורניים</span>
+                <span>קוסמטיקה</span>
+                <span>עיסוי וספא</span>
+                <span>קליניקות</span>
+                <span>מרפאות שיניים</span>
+                <span>סטודיו כושר</span>
+                <span>צימרים</span>
+                <span>וטרינרים</span>
               </div>
             </div>
           </div>
