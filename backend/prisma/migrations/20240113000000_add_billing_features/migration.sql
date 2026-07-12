@@ -1,8 +1,8 @@
 -- AlterTable
 ALTER TABLE "Business"
-  ADD COLUMN "billingCycle" TEXT NOT NULL DEFAULT 'monthly',
-  ADD COLUMN "billingCyclesCompleted" INTEGER NOT NULL DEFAULT 0,
-  ADD COLUMN "loyaltyDiscountIls" INTEGER NOT NULL DEFAULT 0,
-  ADD COLUMN "lastBillingReminderSentAt" TIMESTAMP(3),
-  ADD COLUMN "walletBalanceIls" INTEGER NOT NULL DEFAULT 0,
-  ADD COLUMN "pendingYieldCampaign" JSONB;
+  ADD COLUMN IF NOT EXISTS "billingCycle" TEXT NOT NULL DEFAULT 'monthly',
+  ADD COLUMN IF NOT EXISTS "billingCyclesCompleted" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS "loyaltyDiscountIls" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS "lastBillingReminderSentAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "walletBalanceIls" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS "pendingYieldCampaign" JSONB;

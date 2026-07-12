@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "Business" ADD COLUMN "lastRoiReportSentAt" TIMESTAMP(3);
+ALTER TABLE "Business" ADD COLUMN IF NOT EXISTS "lastRoiReportSentAt" TIMESTAMP(3);

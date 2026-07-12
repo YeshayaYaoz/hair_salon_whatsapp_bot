@@ -3,7 +3,7 @@ ALTER TABLE "Business" ADD COLUMN IF NOT EXISTS "referralText" TEXT;
 ALTER TABLE "Business" ADD COLUMN IF NOT EXISTS "digestEnabled" BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE "Business" ADD COLUMN IF NOT EXISTS "lastDigestSentAt" TIMESTAMP(3);
 
-CREATE TABLE "BlockedTime" (
+CREATE TABLE IF NOT EXISTS "BlockedTime" (
     "id" TEXT NOT NULL,
     "businessId" TEXT NOT NULL,
     "startTime" TIMESTAMP(3) NOT NULL,
@@ -14,4 +14,4 @@ CREATE TABLE "BlockedTime" (
     CONSTRAINT "BlockedTime_businessId_fkey" FOREIGN KEY ("businessId") REFERENCES "Business"("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
-CREATE INDEX "BlockedTime_businessId_startTime_idx" ON "BlockedTime"("businessId", "startTime");
+CREATE INDEX IF NOT EXISTS "BlockedTime_businessId_startTime_idx" ON "BlockedTime"("businessId", "startTime");

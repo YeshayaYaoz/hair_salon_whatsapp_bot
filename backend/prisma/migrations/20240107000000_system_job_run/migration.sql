@@ -1,4 +1,4 @@
-CREATE TABLE "SystemJobRun" (
+CREATE TABLE IF NOT EXISTS "SystemJobRun" (
     "jobName" TEXT NOT NULL,
     "lastRunAt" TIMESTAMP(3) NOT NULL,
     "lastStatus" TEXT NOT NULL,

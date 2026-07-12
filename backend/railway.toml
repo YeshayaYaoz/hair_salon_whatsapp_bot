@@ -2,7 +2,10 @@
 builder = "nixpacks"
 
 [deploy]
-preDeployCommand = "npx prisma db push --skip-generate"
+# Runs `prisma migrate deploy` (applies committed migration files forward) — NEVER `db push`,
+# which force-syncs the DB to the schema and will DROP columns/tables and destroy data. The
+# script baselines the existing db-push-origin database on first run; see scripts/db-deploy.sh.
+preDeployCommand = "sh scripts/db-deploy.sh"
 startCommand = "node dist/server.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 30
