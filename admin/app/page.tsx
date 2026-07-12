@@ -675,18 +675,20 @@ export default function LandingPage() {
         .lp-roi .lp-title { color: #fff; margin-bottom: 16px; }
         .lp-roi-sub { font-size: 16px; color: rgba(255,255,255,0.65); margin-bottom: 48px; }
         /* One clear headline number the slider drives, instead of four competing stat cards. */
-        .lp-roi-headline { margin: 40px 0 8px; }
-        .lp-roi-headline-label { font-size: 14px; color: rgba(255,255,255,0.55); margin-bottom: 6px; }
-        .lp-roi-headline-num { font-size: clamp(44px, 7vw, 68px); font-weight: 800; letter-spacing: -3px; color: #25D366; font-variant-numeric: tabular-nums; line-height: 1; }
-        .lp-roi-headline-sub { font-size: 14px; color: rgba(255,255,255,0.5); margin-top: 10px; }
-        .lp-roi-headline-sub strong { color: #fff; }
-        .lp-roi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 36px 0; }
-        .lp-roi-cell { padding: 22px 18px; background: #141414; border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; text-align: center; }
+        .lp-roi-headline { text-align: center; padding: 8px 0 4px; }
+        .lp-roi-headline-label { font-size: 13.5px; color: rgba(255,255,255,0.5); margin-bottom: 10px; line-height: 1.5; }
+        .lp-roi-headline-num { font-size: clamp(46px, 7vw, 72px); font-weight: 800; letter-spacing: -3px; color: #25D366; font-variant-numeric: tabular-nums; line-height: 1; text-shadow: 0 0 60px rgba(37,211,102,0.25); }
+        .lp-roi-headline-sub { font-size: 14px; color: rgba(255,255,255,0.5); margin-top: 12px; }
+        .lp-roi-headline-sub strong { color: #fff; font-weight: 700; }
+        .lp-roi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 32px 0 4px; }
+        .lp-roi-cell { padding: 22px 18px; background: #161616; border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; text-align: center; transition: border-color 0.2s; }
+        .lp-roi-cell:hover { border-color: rgba(37,211,102,0.25); }
+        .lp-roi-icon { font-size: 20px; margin-bottom: 8px; opacity: 0.85; }
         .lp-roi-n { font-size: 28px; font-weight: 800; letter-spacing: -1.5px; color: #fff; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
         .lp-roi-n .accent { color: #25D366; }
-        .lp-roi-l { font-size: 13px; color: rgba(255,255,255,0.6); line-height: 1.4; }
-        .lp-roi-note { font-size: 13.5px; color: rgba(255,255,255,0.45); line-height: 1.6; }
-        .lp-roi-note strong { color: rgba(255,255,255,0.75); }
+        .lp-roi-l { font-size: 12.5px; color: rgba(255,255,255,0.55); line-height: 1.45; }
+        .lp-roi-note { font-size: 13px; color: rgba(255,255,255,0.42); line-height: 1.65; text-align: center; max-width: 480px; margin: 0 auto; }
+        .lp-roi-note strong { color: rgba(255,255,255,0.7); }
 
         /* FAQ */
         .lp-faq { padding: 100px 40px; background: #F8F8F8; }
@@ -781,6 +783,7 @@ export default function LandingPage() {
           .lp-flow-steps { gap: 0; }
           .lp-flow-arrow { width: 20px; font-size: 16px; }
           .lp-roi { padding: 44px 20px; }
+          .lp-roi-card { padding: 28px 20px; }
           .lp-roi-grid { grid-template-columns: 1fr; }
         }
         @media (max-width: 540px) {
@@ -866,17 +869,28 @@ export default function LandingPage() {
         .cmp-partial { color: #D97706; font-size: 14px; font-weight: 600; }
 
         /* INTERACTIVE ROI SLIDER */
-        .lp-roi-slider-wrap { margin: 40px 0 36px; }
-        .roi-slider-label { font-size: 14px; color: rgba(255,255,255,0.7); margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
-        .roi-slider-val { font-size: 22px; font-weight: 800; color: #25D366; letter-spacing: -1px; }
+        .lp-roi-card {
+          background: linear-gradient(180deg, #131313 0%, #0F0F0F 100%);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 24px;
+          padding: 44px 40px;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+        }
+        .lp-roi-slider-wrap { margin: 36px 0 8px; }
+        .roi-slider-label { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+        .roi-slider-val { font-size: 22px; font-weight: 800; color: #25D366; letter-spacing: -1px; text-transform: none; }
         .roi-slider {
-          -webkit-appearance: none; appearance: none; width: 100%; height: 5px;
+          -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
           border-radius: 4px; outline: none; cursor: pointer;
           background: rgba(255,255,255,0.12);
         }
-        .roi-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #25D366; box-shadow: 0 2px 8px rgba(37,211,102,0.4); cursor: pointer; transition: transform 0.15s; }
+        .roi-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #25D366; border: 3px solid #0F0F0F; box-shadow: 0 2px 8px rgba(37,211,102,0.5); cursor: pointer; transition: transform 0.15s; }
         .roi-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
-        .roi-slider::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: #25D366; border: none; cursor: pointer; }
+        .roi-slider::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: #25D366; border: 3px solid #0F0F0F; cursor: pointer; }
+        .roi-slider:focus-visible::-webkit-slider-thumb { outline: 2px solid #25D366; outline-offset: 3px; }
+        .lp-roi-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 8px 0 32px; }
+        .lp-roi-source { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.06); }
+        .lp-roi-source svg { flex-shrink: 0; opacity: 0.6; }
       `}</style>
 
 
@@ -1543,7 +1557,8 @@ export default function LandingPage() {
             <div className="lp-title reveal" style={{ color: "#fff", textAlign: "center" }}>כמה תורי חוסך לך?</div>
             <div className="lp-roi-sub reveal">גרור לפי מספר התורים שיש לך בשבוע — התוצאה מתעדכנת מיד</div>
 
-            <div className="lp-roi-slider-wrap reveal">
+            <div className="lp-roi-card reveal">
+            <div className="lp-roi-slider-wrap">
               <div className="roi-slider-label">
                 <span>תורים בשבוע</span>
                 <span className="roi-slider-val">{appts}</span>
@@ -1561,6 +1576,8 @@ export default function LandingPage() {
                 <span>5</span><span>150</span>
               </div>
             </div>
+
+            <div className="lp-roi-divider" />
 
             {(() => {
               // Single source of truth for every number below, so the headline and the two
@@ -1584,23 +1601,31 @@ export default function LandingPage() {
                     </div>
                   </div>
 
-                  <div className="lp-roi-grid reveal">
+                  <div className="lp-roi-grid">
                     <div className="lp-roi-cell">
+                      <div className="lp-roi-icon">🕐</div>
                       <div className="lp-roi-n"><span className="accent">{hoursPerWeek}</span></div>
                       <div className="lp-roi-l">שעות פנויות בשבוע, שלא מוקדשות לתיאום תורים בטלפון</div>
                     </div>
                     <div className="lp-roi-cell">
+                      <div className="lp-roi-icon">📅</div>
                       <div className="lp-roi-n"><span className="accent">{savedBookings}</span></div>
                       <div className="lp-roi-l">תורים נוספים בחודש שנשמרים בזכות תזכורות ומענה 24/7</div>
                     </div>
                   </div>
 
-                  <div className="lp-roi-note reveal">
+                  <div className="lp-roi-note">
                     ההערכה מבוססת על כ-12% מהתורים שהיו הולכים לאיבוד (ביטולים/פספוסים) שנשמרים בזכות תזכורות ומענה 24/7, במחיר ממוצע של ₪180 לתור. במסלול Premium, מענה טלפוני אוטומטי מוסיף חיסכון נוסף מעבר לזה.
+                  </div>
+
+                  <div className="lp-roi-source" style={{ justifyContent: "center", width: "100%" }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                    <span>מבוסס על נתוני תעשייה: שיעורי ביטול/פספוס ממוצעים של 10–20% בסלוני יופי, וירידה של עד 50% עם תזכורות אוטומטיות.</span>
                   </div>
                 </>
               );
             })()}
+            </div>
           </div>
         </section>
 
