@@ -21,6 +21,7 @@ interface ProviderMeta {
   color: string;
   monogram: string;
   instructions: { he: string; en: string } | null;
+  instructionsUrl?: string;
 }
 
 const PAYMENT_META: Record<PaymentProviderName, ProviderMeta> = {
@@ -71,6 +72,7 @@ const INVOICE_META: Record<InvoiceProviderName, ProviderMeta> = {
       he: "היכנס לחשבונית ירוקה ← הגדרות ← API, וצור זוג מפתחות (Key ו-Secret) חדש.",
       en: "Log into Green Invoice → Settings → API, and generate a new Key/Secret pair.",
     },
+    instructionsUrl: "https://app.greeninvoice.co.il/",
   },
   icount: {
     label: "iCount",
@@ -213,7 +215,17 @@ function ProviderCard<T extends string>({
             <svg className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <p className="text-xs text-gray-500 leading-relaxed">{he ? info.instructions.he : info.instructions.en}</p>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              {he ? info.instructions.he : info.instructions.en}
+              {info.instructionsUrl && (
+                <>
+                  {" "}
+                  <a href={info.instructionsUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    {he ? "מעבר לחשבון" : "Go to account"}
+                  </a>
+                </>
+              )}
+            </p>
           </div>
         )}
 
