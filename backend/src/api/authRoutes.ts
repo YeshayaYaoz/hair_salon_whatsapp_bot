@@ -111,6 +111,13 @@ const GOOGLE_LOGIN_REDIRECT_URI = process.env.GOOGLE_LOGIN_REDIRECT_URI;
 const GOOGLE_LOGIN_SCOPE = "openid email profile https://www.googleapis.com/auth/calendar.events";
 
 authRouter.get("/google/url", (_req, res) => {
+  // Fail loudly rather than silently falling back to GOOGLE_REDIRECT_URI (getAuthUrl's default) —
+  // that redirect URI points at the authenticated Settings-page callback, which would reject an
+  // unauthenticated sign-in attempt with a confusing "Missing bearer token" instead of a clear
+  // "not configured" error.
+  if (!GOOGLE_LOGIN_REDIRECT_URI) {
+    return res.status(503).json({ error: "התחברות עם גוגל אינה מוגדרת בשרת (GOOGLE_LOGIN_REDIRECT_URI חסר). פנה לתמיכה." });
+  }
   try {
     const state = crypto.randomBytes(16).toString("hex");
     const url = getAuthUrl(state, { redirectUri: GOOGLE_LOGIN_REDIRECT_URI, scope: GOOGLE_LOGIN_SCOPE });
