@@ -43,7 +43,7 @@ const PAYMENT_META: Record<PaymentProviderName, ProviderMeta> = {
       he: "שם המסוף (Terminal) שלך ב-Tranzila משמש כ-API Key. הסיסמה/מפתח ה-API נמצאים תחת הגדרות ← אבטחה.",
       en: "Your Tranzila terminal name is used as the API Key. The API password/secret is under Settings → Security.",
     },
-    instructionsUrl: "https://www.tranzila.com/",
+    instructionsUrl: "https://web.tranzila.com/",
   },
   cardcom: {
     label: "Cardcom",
@@ -76,7 +76,7 @@ const INVOICE_META: Record<InvoiceProviderName, ProviderMeta> = {
       he: "היכנס לחשבונית ירוקה ← הגדרות ← API, וצור זוג מפתחות (Key ו-Secret) חדש.",
       en: "Log into Green Invoice → Settings → API, and generate a new Key/Secret pair.",
     },
-    instructionsUrl: "https://app.greeninvoice.co.il/",
+    instructionsUrl: "https://app.greeninvoice.co.il/api-keys",
   },
   icount: {
     label: "iCount",
