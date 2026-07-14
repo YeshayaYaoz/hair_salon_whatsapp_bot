@@ -15,6 +15,7 @@ import { runYieldCampaignJob } from "./billing/yieldCampaignJob.js";
 import { runRetentionJob } from "./lib/retentionJob.js";
 import { runReminderJob, runReviewJob, runDigestJob, runRoiReportJob } from "./lib/scheduledMessages.js";
 import { runTrackedJob } from "./lib/jobStatus.js";
+import { leadFinderRouter } from "./leadfinder/routes.js";
 
 validateEnv(); // exits the process before anything binds to a port if required config is missing
 initErrorMonitoring();
@@ -51,6 +52,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/public", publicRouter);
 app.use("/api/business", businessRouter);
 app.use("/api/billing", payplusBillingRouter);
+app.use("/api/leadfinder", leadFinderRouter);
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 

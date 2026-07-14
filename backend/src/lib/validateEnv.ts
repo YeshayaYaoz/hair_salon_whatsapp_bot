@@ -32,6 +32,7 @@ const RECOMMENDED: RequiredVar[] = [
   { name: "SUPER_ADMIN_EMAIL", description: "your account email — unlocks the /dashboard/admin businesses list" },
   { name: "RESEND_API_KEY", description: "transactional emails (welcome, password reset)" },
   { name: "OPENAI_API_KEY", description: "voice-note transcription in the WhatsApp bot (Whisper)" },
+  { name: "GOOGLE_PLACES_API_KEY", description: "Lead Finder business discovery (Google Places API) — discovery fails with a clear error if unset" },
 ];
 
 export function validateEnv(): void {

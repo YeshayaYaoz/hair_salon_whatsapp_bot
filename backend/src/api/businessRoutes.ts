@@ -52,7 +52,7 @@ function isSuperAdminEmail(email: string): boolean {
   return Boolean(adminEmail) && email.toLowerCase() === adminEmail!.toLowerCase();
 }
 
-async function requireSuperAdmin(req: AuthedRequest, res: import("express").Response, next: import("express").NextFunction) {
+export async function requireSuperAdmin(req: AuthedRequest, res: import("express").Response, next: import("express").NextFunction) {
   const business = await prisma.business.findUnique({ where: { id: req.businessId! }, select: { email: true } });
   if (!business || !isSuperAdminEmail(business.email)) return res.status(403).json({ error: "Not authorized" });
   next();

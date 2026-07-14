@@ -148,6 +148,19 @@ function SidebarContent({ pathname }: { pathname: string }) {
           </Link>
         )}
 
+        {isSuperAdmin && (
+          <Link
+            href="/dashboard/admin/leads"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition"
+            style={pathname === "/dashboard/admin/leads" ? { background: "rgba(192,138,0,0.18)", color: "#E8B84B" } : { color: "rgba(255,255,255,0.3)" }}
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+            </svg>
+            מציאת לידים
+          </Link>
+        )}
+
         <button
           onClick={logout}
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition"
@@ -300,6 +313,17 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 Admin
+              </Link>
+            )}
+            {isSuperAdmin && (
+              <Link
+                href="/dashboard/admin/leads"
+                className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition ${pathname === "/dashboard/admin/leads" ? "bg-amber-50 text-amber-700" : "text-gray-700"}`}
+              >
+                <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+                </svg>
+                מציאת לידים
               </Link>
             )}
             <div className="h-px bg-gray-100 my-2" />

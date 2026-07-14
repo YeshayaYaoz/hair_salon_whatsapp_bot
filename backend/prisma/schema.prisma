@@ -9,61 +9,61 @@ datasource db {
 }
 
 model Business {
-  id                String   @id @default(cuid())
-  name              String
-  timezone          String   @default("Asia/Jerusalem")
-  email             String   @unique
-  passwordHash      String
-  subscriptionStatus String  @default("trial") // trial | active | past_due | canceled
+  id                 String @id @default(cuid())
+  name               String
+  timezone           String @default("Asia/Jerusalem")
+  email              String @unique
+  passwordHash       String
+  subscriptionStatus String @default("trial") // trial | active | past_due | canceled
 
   // Own-account recurring billing via PayPlus tokens — charges the business (salon owner) for
   // their Tori subscription. Separate from paymentProvider/paymentApiKey above, which are the
   // salon's own merchant account for charging their customers, not this.
-  subscriptionPlan        String?   // "standard" | "premium"
-  subscriptionToken       String?   // encrypted at rest — PayPlus recurring charge token
-  nextBillingDate         DateTime?
-  lastBillingAttemptAt    DateTime?
-  billingCycle            String    @default("monthly") // "monthly" | "annual"
-  billingCyclesCompleted  Int       @default(0) // successful charges — drives the loyalty discount
-  loyaltyDiscountIls      Int       @default(0) // auto-applied recurring discount once tenure threshold is hit
+  subscriptionPlan          String? // "standard" | "premium"
+  subscriptionToken         String? // encrypted at rest — PayPlus recurring charge token
+  nextBillingDate           DateTime?
+  lastBillingAttemptAt      DateTime?
+  billingCycle              String    @default("monthly") // "monthly" | "annual"
+  billingCyclesCompleted    Int       @default(0) // successful charges — drives the loyalty discount
+  loyaltyDiscountIls        Int       @default(0) // auto-applied recurring discount once tenure threshold is hit
   lastBillingReminderSentAt DateTime? // last "charge in 2 days" heads-up, to avoid duplicates
-  walletBalanceIls        Int       @default(0) // prepaid balance for metered add-ons (extra WhatsApp/SMS sends)
-  pendingYieldCampaign    Json?     // set when the empty-slot campaign is awaiting the owner's WhatsApp confirmation
-  address           String?
-  whatsappPhoneNumberId String? @unique
-  whatsappAccessToken   String? // encrypted at rest
-  whatsappTokenValid    Boolean @default(true) // set false when Meta rejects the token (expired/revoked)
-  notificationPhone     String? // owner's personal phone for booking alerts
-  botGreeting           String? // custom greeting override
-  botPersonality        String? // tone/personality instructions for the bot
-  googleMapsUrl         String? // linked in post-visit review requests
-  remindersEnabled      Boolean  @default(true)
-  reviewsEnabled        Boolean  @default(true)
-  cancellationPolicy    String?  // shown by the bot when a customer cancels
-  referralText          String?  // appended to post-visit review messages (e.g. referral discount offer)
-  digestEnabled         Boolean  @default(true)
-  lastDigestSentAt      DateTime? // last morning-digest send, to avoid duplicates
-  lastRoiReportSentAt   DateTime? // last monthly ROI report send, to avoid duplicates
+  walletBalanceIls          Int       @default(0) // prepaid balance for metered add-ons (extra WhatsApp/SMS sends)
+  pendingYieldCampaign      Json? // set when the empty-slot campaign is awaiting the owner's WhatsApp confirmation
+  address                   String?
+  whatsappPhoneNumberId     String?   @unique
+  whatsappAccessToken       String? // encrypted at rest
+  whatsappTokenValid        Boolean   @default(true) // set false when Meta rejects the token (expired/revoked)
+  notificationPhone         String? // owner's personal phone for booking alerts
+  botGreeting               String? // custom greeting override
+  botPersonality            String? // tone/personality instructions for the bot
+  googleMapsUrl             String? // linked in post-visit review requests
+  remindersEnabled          Boolean   @default(true)
+  reviewsEnabled            Boolean   @default(true)
+  cancellationPolicy        String? // shown by the bot when a customer cancels
+  referralText              String? // appended to post-visit review messages (e.g. referral discount offer)
+  digestEnabled             Boolean   @default(true)
+  lastDigestSentAt          DateTime? // last morning-digest send, to avoid duplicates
+  lastRoiReportSentAt       DateTime? // last monthly ROI report send, to avoid duplicates
 
   // Per-business transaction (payment) provider — the salon's own merchant account, not ours.
-  paymentProvider   String? // "payplus" | "tranzila" | "cardcom"
-  paymentApiKey     String? // encrypted at rest — provider's key/terminal/username
-  paymentApiSecret  String? // encrypted at rest — provider's secret/password
+  paymentProvider  String? // "payplus" | "tranzila" | "cardcom"
+  paymentApiKey    String? // encrypted at rest — provider's key/terminal/username
+  paymentApiSecret String? // encrypted at rest — provider's secret/password
 
   // Per-business Israeli invoice/receipt provider — issues the actual חשבונית/קבלה after payment.
-  invoiceProvider   String? // "greeninvoice" | "icount"
-  invoiceApiKey     String? // encrypted at rest
-  invoiceApiSecret  String? // encrypted at rest
+  invoiceProvider  String? // "greeninvoice" | "icount"
+  invoiceApiKey    String? // encrypted at rest
+  invoiceApiSecret String? // encrypted at rest
 
-  createdAt         DateTime @default(now())
+  createdAt DateTime @default(now())
 
-  services       Service[]
-  staff          StaffMember[]
-  hours          BusinessHours[]
-  customers      Customer[]
-  appointments   Appointment[]
-  faqEntries     FaqEntry[]
-  waitlistEntries WaitlistEntry[]
+  services            Service[]
+  staff               StaffMember[]
+  hours               BusinessHours[]
+  customers           Customer[]
+  appointments        Appointment[]
+  faqEntries          FaqEntry[]
+  waitlistEntries     WaitlistEntry[]
   passwordResetTokens PasswordResetToken[]
   googleCalendar      GoogleCalendarToken?
   blockedTimes        BlockedTime[]
@@ -72,10 +72,10 @@ model Business {
 /// Tracks the last run of each global background job (reminders, reviews, digest, retention) so
 /// its health can be surfaced in the dashboard instead of living only in Railway logs.
 model SystemJobRun {
-  jobName       String   @id
-  lastRunAt     DateTime
-  lastStatus    String   // "ok" | "error"
-  lastError     String?
+  jobName        String   @id
+  lastRunAt      DateTime
+  lastStatus     String // "ok" | "error"
+  lastError      String?
   lastDurationMs Int?
 }
 
@@ -93,14 +93,14 @@ model BlockedTime {
 }
 
 model Service {
-  id          String   @id @default(cuid())
-  business    Business @relation(fields: [businessId], references: [id])
-  businessId  String
-  name        String
-  description String?
-  priceCents  Int
-  durationMin Int
-  color       String  @default("#8b5cf6")
+  id              String          @id @default(cuid())
+  business        Business        @relation(fields: [businessId], references: [id])
+  businessId      String
+  name            String
+  description     String?
+  priceCents      Int
+  durationMin     Int
+  color           String          @default("#8b5cf6")
   appointments    Appointment[]
   waitlistEntries WaitlistEntry[]
 
@@ -108,10 +108,10 @@ model Service {
 }
 
 model StaffMember {
-  id         String   @id @default(cuid())
-  business   Business @relation(fields: [businessId], references: [id])
-  businessId String
-  name       String
+  id           String        @id @default(cuid())
+  business     Business      @relation(fields: [businessId], references: [id])
+  businessId   String
+  name         String
   appointments Appointment[]
 
   @@index([businessId])
@@ -121,60 +121,60 @@ model BusinessHours {
   id         String   @id @default(cuid())
   business   Business @relation(fields: [businessId], references: [id])
   businessId String
-  dayOfWeek  Int      // 0 = Sunday ... 6 = Saturday
-  openMin    Int      // minutes from midnight
+  dayOfWeek  Int // 0 = Sunday ... 6 = Saturday
+  openMin    Int // minutes from midnight
   closeMin   Int
 
-  @@index([businessId])
   @@unique([businessId, dayOfWeek])
+  @@index([businessId])
 }
 
 model Customer {
-  id          String   @id @default(cuid())
-  business    Business @relation(fields: [businessId], references: [id])
-  businessId  String
-  phone       String
-  name        String?
-  preferredServiceId String? // most recently booked service, for CRM memory
+  id                  String          @id @default(cuid())
+  business            Business        @relation(fields: [businessId], references: [id])
+  businessId          String
+  phone               String
+  name                String?
+  preferredServiceId  String? // most recently booked service, for CRM memory
   lastRetentionSentAt DateTime? // when we last sent a re-engagement message
-  notes       String? // free-text staff note about this customer, shown next to their conversation
-  appointments    Appointment[]
-  waitlistEntries WaitlistEntry[]
+  notes               String? // free-text staff note about this customer, shown next to their conversation
+  appointments        Appointment[]
+  waitlistEntries     WaitlistEntry[]
 
-  @@index([businessId])
   @@unique([businessId, phone])
+  @@index([businessId])
 }
 
 model Appointment {
-  id          String   @id @default(cuid())
-  business    Business @relation(fields: [businessId], references: [id])
-  businessId  String
-  customer    Customer @relation(fields: [customerId], references: [id])
-  customerId  String
-  service     Service  @relation(fields: [serviceId], references: [id])
-  serviceId   String
-  staff       StaffMember? @relation(fields: [staffId], references: [id])
-  staffId     String?
-  startTime       DateTime
-  endTime         DateTime
-  status          String   @default("confirmed") // confirmed | cancelled
-  reminderSentAt  DateTime? // set when 24h reminder WhatsApp is sent
-  reviewSentAt    DateTime? // set when post-visit review request is sent
-  createdAt       DateTime @default(now())
+  id             String       @id @default(cuid())
+  business       Business     @relation(fields: [businessId], references: [id])
+  businessId     String
+  customer       Customer     @relation(fields: [customerId], references: [id])
+  customerId     String
+  service        Service      @relation(fields: [serviceId], references: [id])
+  serviceId      String
+  staff          StaffMember? @relation(fields: [staffId], references: [id])
+  staffId        String?
+  startTime      DateTime
+  endTime        DateTime
+  status         String       @default("confirmed") // confirmed | cancelled
+  reminderSentAt DateTime? // set when 24h reminder WhatsApp is sent
+  reviewSentAt   DateTime? // set when post-visit review request is sent
+  createdAt      DateTime     @default(now())
 
   @@index([businessId, startTime])
 }
 
 model WaitlistEntry {
-  id         String      @id @default(cuid())
-  business   Business    @relation(fields: [businessId], references: [id])
+  id         String   @id @default(cuid())
+  business   Business @relation(fields: [businessId], references: [id])
   businessId String
-  customer   Customer    @relation(fields: [customerId], references: [id])
+  customer   Customer @relation(fields: [customerId], references: [id])
   customerId String
-  service    Service     @relation(fields: [serviceId], references: [id])
+  service    Service  @relation(fields: [serviceId], references: [id])
   serviceId  String
-  notified   Boolean     @default(false)
-  createdAt  DateTime    @default(now())
+  notified   Boolean  @default(false)
+  createdAt  DateTime @default(now())
 
   @@index([businessId])
 }
@@ -190,21 +190,21 @@ model FaqEntry {
 }
 
 model GoogleCalendarToken {
-  id            String   @id @default(cuid())
-  business      Business @relation(fields: [businessId], references: [id])
-  businessId    String   @unique
-  accessToken   String   // encrypted
-  refreshToken  String   // encrypted
-  expiresAt     DateTime
-  calendarId    String   @default("primary")
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(cuid())
+  business     Business @relation(fields: [businessId], references: [id])
+  businessId   String   @unique
+  accessToken  String // encrypted
+  refreshToken String // encrypted
+  expiresAt    DateTime
+  calendarId   String   @default("primary")
+  updatedAt    DateTime @updatedAt
 }
 
 model ConversationMessage {
   id         String   @id @default(cuid())
   businessId String
   phone      String
-  role       String   // "user" | "assistant"
+  role       String // "user" | "assistant"
   content    String
   createdAt  DateTime @default(now())
 
@@ -220,4 +220,142 @@ model PasswordResetToken {
   used       Boolean  @default(false)
 
   @@index([businessId])
+}
+
+// --- Lead Finder (internal super-admin module: business discovery, enrichment, scoring,
+// campaign management). Outreach tables exist here as schema-only groundwork — message
+// generation/sending is explicitly out of scope for this pass. Fully isolated from the
+// Business/Customer/Appointment booking domain above. ---
+
+model LeadCampaign {
+  id            String   @id @default(cuid())
+  name          String
+  category      String
+  locationQuery String // free-text city/region/radius description, e.g. "חיפה, רדיוס 15 ק""מ"
+  status        String   @default("draft") // draft | running | paused | completed
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  runs  LeadFinderRun[]
+  leads Lead[]
+}
+
+model LeadFinderRun {
+  id            String       @id @default(cuid())
+  campaign      LeadCampaign @relation(fields: [campaignId], references: [id])
+  campaignId    String
+  status        String       @default("pending") // pending | discovering | enriching | scoring | completed | failed
+  totalFound    Int          @default(0)
+  totalEnriched Int          @default(0)
+  totalScored   Int          @default(0)
+  errorMessage  String?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime     @default(now())
+
+  @@index([campaignId])
+}
+
+model Lead {
+  id               String       @id @default(cuid())
+  campaign         LeadCampaign @relation(fields: [campaignId], references: [id])
+  campaignId       String
+  placeId          String?      @unique // Google Places place_id — dedupe key
+  name             String
+  phone            String?
+  address          String?
+  website          String?
+  category         String?
+  rating           Float?
+  reviewCount      Int?
+  businessHours    Json?
+  socialLinks      Json? // not populated by Google Places API — reserved for future enrichment sources
+  whatsappDetected Boolean      @default(false)
+  hasOnlineBooking Boolean?
+  hasContactForm   Boolean?
+  websiteStale     Boolean?
+  status           String       @default("new") // new | contacted | replied | meeting_scheduled | trial_sent | converted | not_interested
+  notes            String?      @db.Text
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  scores           LeadScore[]
+  statusEvents     LeadStatusEvent[]
+  profile          LeadProfile?
+  outreachMessages OutreachMessage[]
+  consentLogs      ConsentLog[]
+
+  @@index([campaignId])
+  @@index([campaignId, status])
+}
+
+model LeadScore {
+  id         String   @id @default(cuid())
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId     String
+  version    Int
+  totalScore Int
+  breakdown  Json // per-factor score contributions
+  createdAt  DateTime @default(now())
+
+  @@index([leadId])
+}
+
+model LeadProfile {
+  id          String   @id @default(cuid())
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId      String   @unique
+  summary     String   @db.Text
+  strengths   Json // string array
+  gaps        Json // string array
+  whyToriFits String   @db.Text
+  generatedAt DateTime
+  model       String? // which LLM generated this profile
+}
+
+model LeadStatusEvent {
+  id         String   @id @default(cuid())
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId     String
+  fromStatus String?
+  toStatus   String
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@index([leadId])
+}
+
+// Schema only for this pass — no generation/sending logic implemented yet.
+model OutreachMessage {
+  id             String    @id @default(cuid())
+  lead           Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId         String
+  channel        String // "email" | "manual_call"
+  angle          String? // "initial" | "follow_up_1" | ...
+  subject        String?
+  body           String    @db.Text
+  approvalStatus String    @default("draft") // draft | approved | rejected
+  sentAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([leadId])
+}
+
+// Required before any repeat outreach — table exists ahead of the outreach feature itself.
+model ConsentLog {
+  id        String   @id @default(cuid())
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId    String
+  event     String // "opted_out" | "consented"
+  channel   String?
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+}
+
+model LeadScoringConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique // e.g. "default"
+  weights   Json
+  updatedAt DateTime @updatedAt
 }
