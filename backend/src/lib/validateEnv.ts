@@ -33,6 +33,8 @@ const RECOMMENDED: RequiredVar[] = [
   { name: "RESEND_API_KEY", description: "transactional emails (welcome, password reset)" },
   { name: "OPENAI_API_KEY", description: "voice-note transcription in the WhatsApp bot (Whisper)" },
   { name: "GOOGLE_PLACES_API_KEY", description: "Lead Finder business discovery (Google Places API) — discovery fails with a clear error if unset" },
+  { name: "WHATSAPP_REMINDER_TEMPLATE", description: "approved template name for appointment reminders — without it, reminders to customers outside the 24h window are not delivered" },
+  { name: "WHATSAPP_REVIEW_TEMPLATE", description: "approved template name for post-visit review requests — without it, review requests outside the 24h window are not delivered" },
 ];
 
 export function validateEnv(): void {

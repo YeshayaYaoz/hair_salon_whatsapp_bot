@@ -1,7 +1,38 @@
 import { prisma } from "./prisma.js";
 import { decryptSecret } from "./crypto.js";
-import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
+import { sendWhatsAppMessage, sendWhatsAppTemplate, WhatsAppSendError, RE_ENGAGEMENT_ERROR_CODE } from "../webhook/whatsappClient.js";
+import { reminderTemplate, reviewTemplate, type TemplateConfig } from "./whatsappTemplates.js";
 import { instantPartsInTz, dayOfWeekForDate } from "./timezone.js";
+
+/**
+ * Send a free-form message, falling back to an approved template when the 24-hour customer service
+ * window is closed (Meta error 131047). Returns "sent" on success (either path), or "window_closed"
+ * when the window is shut and no template is configured to reach the customer — in which case the
+ * caller should mark the item done rather than retry forever, but knows delivery didn't happen.
+ * Any other failure is rethrown.
+ */
+async function sendWithTemplateFallback(
+  common: { phoneNumberId: string; accessToken: string; to: string },
+  text: string,
+  template: TemplateConfig | null,
+  templateParams: string[]
+): Promise<"sent" | "window_closed"> {
+  try {
+    await sendWhatsAppMessage({ ...common, text });
+    return "sent";
+  } catch (err) {
+    const windowClosed = err instanceof WhatsAppSendError && err.code === RE_ENGAGEMENT_ERROR_CODE;
+    if (!windowClosed) throw err;
+    if (!template) return "window_closed";
+    await sendWhatsAppTemplate({
+      ...common,
+      templateName: template.name,
+      languageCode: template.languageCode,
+      bodyParams: templateParams,
+    });
+    return "sent";
+  }
+}
 
 /** Send 24-hour appointment reminders. Run this job every hour. */
 export async function runReminderJob() {
@@ -34,23 +65,19 @@ export async function runReminderJob() {
     const text = `${name}! 👋 תזכורת לתור שלך ל${appt.service.name} מחר ב-${when} אצל ${appt.business.name}.${addressLine}\n\nלביטול כתוב/י "בטל תור".`;
 
     try {
-      await sendWhatsAppMessage({
-        phoneNumberId: appt.business.whatsappPhoneNumberId,
-        accessToken,
-        to: appt.customer.phone,
+      const outcome = await sendWithTemplateFallback(
+        { phoneNumberId: appt.business.whatsappPhoneNumberId, accessToken, to: appt.customer.phone },
         text,
-      });
+        reminderTemplate(),
+        [name, appt.service.name, when, appt.business.name],
+      );
+      // Mark sent even when the window was closed with no template — retrying next hour would only
+      // hit the same wall, and the appointment is <25h away regardless.
       await prisma.appointment.update({ where: { id: appt.id }, data: { reminderSentAt: new Date() } });
-      console.log(`[reminders] Sent reminder for appt ${appt.id}`);
-    } catch (err: any) {
-      const code = err?.response?.data?.error?.code ?? err?.code;
-      if (code === 131047) {
-        // Customer hasn't messaged within 24h — mark sent to avoid retry loops
-        await prisma.appointment.update({ where: { id: appt.id }, data: { reminderSentAt: new Date() } });
-        console.warn(`[reminders] Template window closed for appt ${appt.id} (131047)`);
-      } else {
-        console.error(`[reminders] Failed for appt ${appt.id}:`, err);
-      }
+      if (outcome === "sent") console.log(`[reminders] Sent reminder for appt ${appt.id}`);
+      else console.warn(`[reminders] 24h window closed and no template configured — reminder not delivered for appt ${appt.id}`);
+    } catch (err) {
+      console.error(`[reminders] Failed for appt ${appt.id}:`, err);
     }
     await new Promise((r) => setTimeout(r, 300));
   }
@@ -88,22 +115,17 @@ export async function runReviewJob() {
     const text = `${name}! 😊 תודה שביקרת ב${appt.business.name} היום.\nמקווים שנהנית מה${appt.service.name}!${reviewLine}${referralLine}`;
 
     try {
-      await sendWhatsAppMessage({
-        phoneNumberId: appt.business.whatsappPhoneNumberId,
-        accessToken,
-        to: appt.customer.phone,
+      const outcome = await sendWithTemplateFallback(
+        { phoneNumberId: appt.business.whatsappPhoneNumberId, accessToken, to: appt.customer.phone },
         text,
-      });
+        reviewTemplate(),
+        [name, appt.business.name, appt.service.name],
+      );
       await prisma.appointment.update({ where: { id: appt.id }, data: { reviewSentAt: new Date() } });
-      console.log(`[reviews] Sent review request for appt ${appt.id}`);
-    } catch (err: any) {
-      const code = err?.response?.data?.error?.code ?? err?.code;
-      if (code === 131047) {
-        await prisma.appointment.update({ where: { id: appt.id }, data: { reviewSentAt: new Date() } });
-        console.warn(`[reviews] Template window closed for appt ${appt.id} (131047)`);
-      } else {
-        console.error(`[reviews] Failed for appt ${appt.id}:`, err);
-      }
+      if (outcome === "sent") console.log(`[reviews] Sent review request for appt ${appt.id}`);
+      else console.warn(`[reviews] 24h window closed and no template configured — review request not delivered for appt ${appt.id}`);
+    } catch (err) {
+      console.error(`[reviews] Failed for appt ${appt.id}:`, err);
     }
     await new Promise((r) => setTimeout(r, 300));
   }

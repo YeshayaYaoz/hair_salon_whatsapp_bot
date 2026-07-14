@@ -14,6 +14,47 @@ export class WhatsAppAuthError extends Error {
   }
 }
 
+/**
+ * Thrown when WhatsApp rejects a send for a non-auth reason. Exposes Meta's numeric error code
+ * so callers can branch on it — most importantly 131047 ("re-engagement message"), which means
+ * the 24-hour customer service window is closed and a free-form message can't be delivered; the
+ * caller should retry with an approved template instead.
+ */
+export class WhatsAppSendError extends Error {
+  code?: number;
+  status: number;
+  constructor(message: string, status: number, code?: number) {
+    super(message);
+    this.name = "WhatsAppSendError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+/** Meta error code: recipient is outside the 24h window, free-form messages are blocked. */
+export const RE_ENGAGEMENT_ERROR_CODE = 131047;
+
+/**
+ * Send a pre-approved template message. Unlike free-form text, templates can be delivered outside
+ * the 24-hour customer service window — this is how appointment reminders/reviews reach customers
+ * who haven't messaged recently. The template (name + language + body variable order) must already
+ * be approved in the sending WABA; see whatsappTemplates.ts for the naming contract.
+ */
+export async function sendWhatsAppTemplate(
+  params: SendCommon & { templateName: string; languageCode: string; bodyParams: string[] }
+) {
+  await send(params, {
+    type: "template",
+    template: {
+      name: params.templateName,
+      language: { code: params.languageCode },
+      components: params.bodyParams.length
+        ? [{ type: "body", parameters: params.bodyParams.map((text) => ({ type: "text", text })) }]
+        : [],
+    },
+  });
+}
+
 export async function sendWhatsAppMessage(params: SendCommon & { text: string }) {
   await send(params, {
     type: "text",
@@ -78,9 +119,18 @@ async function send(params: SendCommon, payload: Record<string, unknown>) {
       throw new WhatsAppAuthError(`WhatsApp auth failed (${res.status}): ${body}`);
     }
 
+    // Pull Meta's numeric error code out of the JSON body so callers can branch on it
+    // (e.g. 131047 → 24h window closed → fall back to a template).
+    let metaCode: number | undefined;
+    try {
+      metaCode = JSON.parse(body)?.error?.code;
+    } catch {
+      /* body wasn't JSON — leave code undefined */
+    }
+
     // 429 / 5xx are transient — retry. 4xx (bad payload) are not.
     const transient = res.status === 429 || res.status >= 500;
-    lastError = new Error(`WhatsApp send failed (${res.status}): ${body}`);
+    lastError = new WhatsAppSendError(`WhatsApp send failed (${res.status}): ${body}`, res.status, metaCode);
     if (transient && attempt < MAX_ATTEMPTS) {
       await sleep(500 * 2 ** (attempt - 1));
       continue;
