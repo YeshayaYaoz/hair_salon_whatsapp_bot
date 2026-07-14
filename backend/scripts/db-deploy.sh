@@ -10,7 +10,19 @@
 # with IF [NOT] EXISTS, so this is a safe no-op for anything already present and also reconciles
 # any drift), then mark each migration as applied. Subsequent deploys just run `migrate deploy`
 # normally and apply only genuinely new migrations.
+#
+# Neon note: migrations must NOT run over Neon's pooled (`-pooler`) endpoint. `prisma migrate
+# deploy` takes a session-scoped `pg_advisory_lock`, but PgBouncer in transaction mode routes each
+# statement to a different backend, so the lock can never be held across statements and the command
+# hangs until it times out (P1002). If DIRECT_URL is set (Neon's non-pooled endpoint), we point the
+# migration process at it here. The running app keeps using the pooled DATABASE_URL — it's a
+# separate process (node dist/server.js) with its own environment, unaffected by this override.
 set -e
+
+if [ -n "$DIRECT_URL" ]; then
+  echo "[db-deploy] Using DIRECT_URL (non-pooled) for migrations."
+  export DATABASE_URL="$DIRECT_URL"
+fi
 
 err=$(mktemp)
 if npx prisma migrate deploy 2>"$err"; then

@@ -21,6 +21,7 @@ const REQUIRED: RequiredVar[] = [
 // Not required to boot, but silently degrade a feature if missing — warn so it's visible
 // in logs instead of discovered via a support ticket.
 const RECOMMENDED: RequiredVar[] = [
+  { name: "DIRECT_URL", description: "Neon's non-pooled connection string — used only for deploy-time migrations (pooled DATABASE_URL hangs on prisma migrate's advisory lock)" },
   { name: "WHATSAPP_APP_SECRET", description: "verifies WhatsApp webhook signatures (dev mode allows unsigned requests without it)" },
   { name: "WHATSAPP_VERIFY_TOKEN", description: "required for Meta to verify the webhook URL" },
   { name: "PAYPLUS_API_KEY", description: "Tori's own PayPlus account — recurring subscription billing" },
