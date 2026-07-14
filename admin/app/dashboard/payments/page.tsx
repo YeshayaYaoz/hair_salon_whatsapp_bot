@@ -33,6 +33,7 @@ const PAYMENT_META: Record<PaymentProviderName, ProviderMeta> = {
       he: "היכנס לחשבון PayPlus ← הגדרות ← מפתחות API, והעתק את ה-API Key וה-Secret Key.",
       en: "Log into PayPlus → Settings → API Keys, and copy your API Key and Secret Key.",
     },
+    instructionsUrl: "https://console.payplus.co.il/",
   },
   tranzila: {
     label: "Tranzila",
@@ -42,6 +43,7 @@ const PAYMENT_META: Record<PaymentProviderName, ProviderMeta> = {
       he: "שם המסוף (Terminal) שלך ב-Tranzila משמש כ-API Key. הסיסמה/מפתח ה-API נמצאים תחת הגדרות ← אבטחה.",
       en: "Your Tranzila terminal name is used as the API Key. The API password/secret is under Settings → Security.",
     },
+    instructionsUrl: "https://www.tranzila.com/",
   },
   cardcom: {
     label: "Cardcom",
@@ -51,6 +53,7 @@ const PAYMENT_META: Record<PaymentProviderName, ProviderMeta> = {
       he: "היכנס לחשבון Cardcom ← הגדרות טרמינל, והעתק את מספר הטרמינל (TerminalNumber) ואת שם ה-API (ApiName).",
       en: "Log into Cardcom → Terminal Settings, and copy your TerminalNumber and ApiName.",
     },
+    instructionsUrl: "https://secure.cardcom.solutions/",
   },
   grow: {
     label: "Grow",
@@ -60,6 +63,7 @@ const PAYMENT_META: Record<PaymentProviderName, ProviderMeta> = {
       he: "היכנס לחשבון Grow ← הגדרות ← API, והעתק את מזהה המשתמש (userId) ואת קוד הדף (pageCode).",
       en: "Log into Grow → Settings → API, and copy your userId and pageCode.",
     },
+    instructionsUrl: "https://meshulam.co.il/",
   },
 };
 
@@ -82,6 +86,7 @@ const INVOICE_META: Record<InvoiceProviderName, ProviderMeta> = {
       he: "מזהה החברה (cid) נמצא בכתובת ה-URL של החשבון. את ה-API Token מייצרים תחת הגדרות ← API.",
       en: "Your company id (cid) is in your account's URL. Generate an API Token under Settings → API.",
     },
+    instructionsUrl: "https://app.icount.co.il/",
   },
   "payplus-invoice": {
     label: "PayPlus חשבונית+",
