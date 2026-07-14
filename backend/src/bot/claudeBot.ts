@@ -418,7 +418,7 @@ async function makeApiCall(model: string, system: string, messages: Anthropic.Me
 const AI_UNAVAILABLE_HE = "מצטערים, הבוט אינו זמין כרגע. אנא נסו שוב בעוד כמה דקות, או צרו קשר ישיר עם העסק.";
 
 export async function handleIncomingMessage(businessId: string, customerPhone: string, messageText: string): Promise<BotResult> {
-  const systemText = await buildSystemPrompt(businessId, new Date().toISOString().slice(0, 10), customerPhone);
+  const systemText = await buildSystemPrompt(businessId, customerPhone);
   const system = systemText;
   const history = await getHistory(businessId, customerPhone);
 

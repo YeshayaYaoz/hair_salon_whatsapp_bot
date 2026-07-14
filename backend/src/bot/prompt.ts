@@ -1,8 +1,8 @@
 import type { BusinessHours, Service, StaffMember, FaqEntry } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
-import { instantPartsInTz } from "../lib/timezone.js";
+import { instantPartsInTz, zonedDateParts } from "../lib/timezone.js";
 
-export async function buildSystemPrompt(businessId: string, todayIso: string, customerPhone?: string): Promise<string> {
+export async function buildSystemPrompt(businessId: string, customerPhone?: string): Promise<string> {
   const [business, customer] = await Promise.all([
     prisma.business.findUniqueOrThrow({
       where: { id: businessId },
@@ -55,7 +55,10 @@ export async function buildSystemPrompt(businessId: string, todayIso: string, cu
 
   // Anchor the model to the real clock in the business timezone — without this it invents times.
   const tz = business.timezone || "Asia/Jerusalem";
-  const nowParts = instantPartsInTz(new Date(), tz);
+  const now = new Date();
+  const nowParts = instantPartsInTz(now, tz);
+  const dateParts = zonedDateParts(now, tz);
+  const todayIso = `${dateParts.year}-${String(dateParts.month).padStart(2, "0")}-${String(dateParts.day).padStart(2, "0")}`;
   const nowHHMM = fmtMin(nowParts.minutes);
   const todayHours = business.hours.find((h: BusinessHours) => h.dayOfWeek === nowParts.dayOfWeek);
   let openNowNote: string;
@@ -115,7 +118,7 @@ ${staffPromptNote}
 דוגמאות לשיחה תקינה:
 
 לקוח: "היי, אפשר לקבוע תור לתספורת ליום שלישי?"
-בוט: [קורא check_availability עם serviceName="תספורת" ו-date="2025-01-14"]
+בוט: [קורא check_availability עם serviceName="תספורת" ו-date בפורמט YYYY-MM-DD של יום שלישי הקרוב, לפי התאריך של היום שצוין למעלה]
 בוט: "כן! יש לי פנויים ביום שלישי:\n• 10:00\n• 12:30\n• 15:00\nאיזה מועד מתאים לך? 😊"
 
 לקוח: "12:30 בסדר"
