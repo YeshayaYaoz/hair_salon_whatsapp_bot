@@ -22,6 +22,10 @@ const REQUIRED: RequiredVar[] = [
 // in logs instead of discovered via a support ticket.
 const RECOMMENDED: RequiredVar[] = [
   { name: "DIRECT_URL", description: "Neon's non-pooled connection string — used only for deploy-time migrations (pooled DATABASE_URL hangs on prisma migrate's advisory lock)" },
+  { name: "GOOGLE_CLIENT_ID", description: "shared by Google Calendar connect and \"Sign in with Google\"" },
+  { name: "GOOGLE_CLIENT_SECRET", description: "shared by Google Calendar connect and \"Sign in with Google\"" },
+  { name: "GOOGLE_REDIRECT_URI", description: "OAuth callback for the Settings-page \"connect Calendar\" flow (an already-logged-in business)" },
+  { name: "GOOGLE_LOGIN_REDIRECT_URI", description: "OAuth callback for \"Sign in with Google\" on the login page (unauthenticated) — must be a separate registered redirect URI from GOOGLE_REDIRECT_URI" },
   { name: "WHATSAPP_APP_SECRET", description: "verifies WhatsApp webhook signatures (dev mode allows unsigned requests without it)" },
   { name: "WHATSAPP_VERIFY_TOKEN", description: "required for Meta to verify the webhook URL" },
   { name: "PAYPLUS_API_KEY", description: "Tori's own PayPlus account — recurring subscription billing" },

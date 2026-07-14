@@ -14,11 +14,24 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 60);
     return () => clearTimeout(t);
   }, []);
+
+  async function signInWithGoogle() {
+    setGoogleLoading(true);
+    setError(null);
+    try {
+      const { url } = await apiFetch<{ url: string }>("/api/auth/google/url");
+      window.location.href = url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Google sign-in is unavailable");
+      setGoogleLoading(false);
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -333,6 +346,29 @@ export default function LoginPage() {
           margin-bottom: 14px;
         }
 
+        .login-google-btn {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          background: #fff;
+          color: #3C4043;
+          font-size: 14px;
+          font-weight: 600;
+          border: 1px solid #E5E5F0;
+          border-radius: 10px;
+          padding: 12px;
+          cursor: pointer;
+          transition: background 0.15s, box-shadow 0.15s;
+          font-family: inherit;
+        }
+        .login-google-btn:hover:not(:disabled) {
+          background: #F8F9FA;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .login-google-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
         .login-submit {
           width: 100%;
           background: #1B7FA0;
@@ -480,6 +516,27 @@ export default function LoginPage() {
                 ? "הכנס לחשבון שלך כדי לנהל את התורים"
                 : "הצטרף לאלפי עסקים שמשתמשים בתורי"}
             </p>
+
+            <button
+              type="button"
+              onClick={signInWithGoogle}
+              disabled={googleLoading}
+              className="login-google-btn"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47a5.54 5.54 0 01-2.4 3.63v3h3.89c2.27-2.09 3.56-5.17 3.56-8.82z"/>
+                <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.9l-3.89-3.02c-1.08.72-2.46 1.15-4.06 1.15-3.12 0-5.77-2.11-6.71-4.94H1.28v3.11A11.998 11.998 0 0012 24z"/>
+                <path fill="#FBBC05" d="M5.29 14.29A7.2 7.2 0 014.9 12c0-.8.14-1.57.39-2.29V6.6H1.28A11.998 11.998 0 000 12c0 1.94.46 3.77 1.28 5.4l4.01-3.11z"/>
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.69 1.28 6.6l4.01 3.11C6.23 6.86 8.88 4.75 12 4.75z"/>
+              </svg>
+              {googleLoading ? "רגע..." : "המשך עם Google"}
+            </button>
+
+            <div className="login-divider">
+              <div className="login-divider-line" />
+              <span className="login-divider-text">או</span>
+              <div className="login-divider-line" />
+            </div>
 
             <form onSubmit={submit}>
               {mode === "signup" && (

@@ -127,7 +127,10 @@ export default function WhatsAppPage() {
         config_id: META_CONFIG_ID,
         response_type: "token",
         override_default_response_type: true,
-        scope: "business_management,whatsapp_business_management,whatsapp_business_messaging",
+        // No `scope` here — with config_id-based Embedded Signup, permissions come from the login
+        // configuration itself (set in Meta App Dashboard → Facebook Login → Configurations), and
+        // passing an explicit scope alongside config_id is invalid (Meta logs "Invalid Scopes" and
+        // ignores it for end users, but it's a real misconfiguration worth not shipping).
         extras: { setup: {}, featureType: "", sessionInfoVersion: "3" },
       }
     );

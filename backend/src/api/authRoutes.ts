@@ -6,6 +6,13 @@ import { prisma } from "../lib/prisma.js";
 import { signBusinessToken } from "../lib/auth.js";
 import { rateLimit } from "../lib/rateLimit.js";
 import { APP_URL, sendPasswordResetEmail, sendWelcomeEmail } from "../lib/email.js";
+import {
+  getAuthUrl,
+  exchangeCode,
+  fetchGoogleUserInfo,
+  saveGoogleTokensFromResponse,
+  GoogleCalendarNotConfiguredError,
+} from "../lib/googleCalendar.js";
 
 export const authRouter = Router();
 
@@ -88,5 +95,64 @@ authRouter.post("/reset-password", authLimiter, async (req, res) => {
   } catch (err) {
     console.error("reset-password error:", err);
     res.status(500).json({ error: "Server error" });
+  }
+});
+
+// --- Sign in with Google ---
+//
+// Requests identity (email/profile) and the Calendar scope in the SAME consent screen, so a new
+// business gets its Google Calendar connected automatically as part of signing up, rather than
+// needing a second separate connection step later in Settings. Uses its own redirect URI
+// (GOOGLE_LOGIN_REDIRECT_URI) distinct from the Settings-page "connect Calendar" flow
+// (GOOGLE_REDIRECT_URI), since this callback runs unauthenticated (no business session yet) and
+// does different work (find-or-create the account) than reconnecting an existing business's
+// calendar. Both flows share the same Google Cloud OAuth client (GOOGLE_CLIENT_ID/SECRET).
+const GOOGLE_LOGIN_REDIRECT_URI = process.env.GOOGLE_LOGIN_REDIRECT_URI;
+const GOOGLE_LOGIN_SCOPE = "openid email profile https://www.googleapis.com/auth/calendar.events";
+
+authRouter.get("/google/url", (_req, res) => {
+  try {
+    const state = crypto.randomBytes(16).toString("hex");
+    const url = getAuthUrl(state, { redirectUri: GOOGLE_LOGIN_REDIRECT_URI, scope: GOOGLE_LOGIN_SCOPE });
+    res.json({ url });
+  } catch (err) {
+    if (err instanceof GoogleCalendarNotConfiguredError) {
+      return res.status(503).json({ error: "התחברות עם גוגל אינה מוגדרת בשרת. פנה לתמיכה." });
+    }
+    throw err;
+  }
+});
+
+authRouter.post("/google/callback", authLimiter, async (req, res) => {
+  try {
+    const { code } = z.object({ code: z.string() }).parse(req.body);
+    const tokens = await exchangeCode(code, GOOGLE_LOGIN_REDIRECT_URI);
+    const profile = await fetchGoogleUserInfo(tokens.access_token);
+    if (!profile.verified_email) return res.status(400).json({ error: "Google email is not verified" });
+
+    let business = await prisma.business.findUnique({ where: { email: profile.email } });
+    let isNewAccount = false;
+    if (!business) {
+      isNewAccount = true;
+      // Google-authenticated accounts don't set a password — store an unguessable placeholder
+      // hash so password login simply fails "invalid credentials" rather than the field being
+      // nullable (which would touch every other code path that assumes passwordHash exists).
+      const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
+      business = await prisma.business.create({
+        data: { name: profile.name || profile.email, email: profile.email, passwordHash },
+      });
+    }
+
+    // Save the Calendar connection using the tokens already in hand — the authorization code was
+    // already consumed above, so a second exchangeCode call (what saveGoogleTokens does) would
+    // fail. refresh_token is only present when the user actually granted the calendar scope.
+    await saveGoogleTokensFromResponse(business.id, tokens);
+
+    if (isNewAccount) sendWelcomeEmail(profile.email, business.name).catch((err) => console.error("Welcome email failed:", err));
+
+    res.json({ token: signBusinessToken(business.id) });
+  } catch (err) {
+    console.error("google/callback error:", err);
+    res.status(500).json({ error: err instanceof Error ? err.message : "Google sign-in failed" });
   }
 });

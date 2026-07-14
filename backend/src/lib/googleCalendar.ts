@@ -12,16 +12,17 @@ export class GoogleCalendarNotConfiguredError extends Error {
   }
 }
 
-export function getAuthUrl(state: string): string {
+export function getAuthUrl(state: string, opts?: { redirectUri?: string; scope?: string }): string {
   // Guard against building a malformed URL (client_id=undefined) that makes Google return a raw 400.
-  if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI) {
+  const redirectUri = opts?.redirectUri ?? REDIRECT_URI;
+  if (!CLIENT_ID || !CLIENT_SECRET || !redirectUri) {
     throw new GoogleCalendarNotConfiguredError();
   }
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
-    redirect_uri: REDIRECT_URI,
+    redirect_uri: redirectUri,
     response_type: "code",
-    scope: "https://www.googleapis.com/auth/calendar.events",
+    scope: opts?.scope ?? "https://www.googleapis.com/auth/calendar.events",
     access_type: "offline",
     prompt: "consent",
     state,
@@ -29,17 +30,20 @@ export function getAuthUrl(state: string): string {
   return `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
 }
 
-function requireConfig(): { clientId: string; clientSecret: string; redirectUri: string } {
-  if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI) throw new GoogleCalendarNotConfiguredError();
-  return { clientId: CLIENT_ID, clientSecret: CLIENT_SECRET, redirectUri: REDIRECT_URI };
+function requireConfig(redirectUriOverride?: string): { clientId: string; clientSecret: string; redirectUri: string } {
+  const redirectUri = redirectUriOverride ?? REDIRECT_URI;
+  if (!CLIENT_ID || !CLIENT_SECRET || !redirectUri) throw new GoogleCalendarNotConfiguredError();
+  return { clientId: CLIENT_ID, clientSecret: CLIENT_SECRET, redirectUri };
 }
 
-async function exchangeCode(code: string): Promise<{
+export interface GoogleTokenResponse {
   access_token: string;
-  refresh_token: string;
+  refresh_token?: string; // only present on first consent (access_type=offline + prompt=consent)
   expires_in: number;
-}> {
-  const { clientId, clientSecret, redirectUri } = requireConfig();
+}
+
+export async function exchangeCode(code: string, redirectUriOverride?: string): Promise<GoogleTokenResponse> {
+  const { clientId, clientSecret, redirectUri } = requireConfig(redirectUriOverride);
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -54,6 +58,47 @@ async function exchangeCode(code: string): Promise<{
   const body = await res.json() as any;
   if (!res.ok) throw new Error(body.error_description ?? "OAuth exchange failed");
   return body;
+}
+
+export interface GoogleUserInfo {
+  email: string;
+  name: string;
+  verified_email: boolean;
+}
+
+/** Fetches the signed-in user's profile — used by the "Sign in with Google" flow to identify the account. */
+export async function fetchGoogleUserInfo(accessToken: string): Promise<GoogleUserInfo> {
+  const res = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const body = await res.json() as any;
+  if (!res.ok) throw new Error(body.error?.message ?? "Failed to fetch Google profile");
+  return body;
+}
+
+/**
+ * Saves already-exchanged tokens as this business's Google Calendar connection. Used by the
+ * "Sign in with Google" flow, which requests the calendar scope alongside identity during the
+ * same consent screen and so already has tokens in hand — avoids a second exchangeCode call
+ * against an already-consumed authorization code (Google rejects reuse).
+ */
+export async function saveGoogleTokensFromResponse(businessId: string, tokens: GoogleTokenResponse) {
+  if (!tokens.refresh_token) return; // no calendar consent was granted (or already connected previously)
+  const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
+  await prisma.googleCalendarToken.upsert({
+    where: { businessId },
+    create: {
+      businessId,
+      accessToken: encryptSecret(tokens.access_token),
+      refreshToken: encryptSecret(tokens.refresh_token),
+      expiresAt,
+    },
+    update: {
+      accessToken: encryptSecret(tokens.access_token),
+      refreshToken: encryptSecret(tokens.refresh_token),
+      expiresAt,
+    },
+  });
 }
 
 async function refreshAccessToken(refreshToken: string): Promise<{ access_token: string; expires_in: number }> {
@@ -75,6 +120,7 @@ async function refreshAccessToken(refreshToken: string): Promise<{ access_token:
 
 export async function saveGoogleTokens(businessId: string, code: string) {
   const tokens = await exchangeCode(code);
+  if (!tokens.refresh_token) throw new Error("Google did not return a refresh token — try reconnecting");
   const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
   await prisma.googleCalendarToken.upsert({
     where: { businessId },
