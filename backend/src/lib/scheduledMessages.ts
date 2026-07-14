@@ -2,35 +2,45 @@ import { prisma } from "./prisma.js";
 import { decryptSecret } from "./crypto.js";
 import { sendWhatsAppMessage, sendWhatsAppTemplate, WhatsAppSendError, RE_ENGAGEMENT_ERROR_CODE } from "../webhook/whatsappClient.js";
 import { reminderTemplate, reviewTemplate, type TemplateConfig } from "./whatsappTemplates.js";
+import { meterOutboundMessage } from "./wallet.js";
 import { instantPartsInTz, dayOfWeekForDate } from "./timezone.js";
 
 /**
  * Send a free-form message, falling back to an approved template when the 24-hour customer service
  * window is closed (Meta error 131047). Returns "sent" on success (either path), or "window_closed"
- * when the window is shut and no template is configured to reach the customer — in which case the
- * caller should mark the item done rather than retry forever, but knows delivery didn't happen.
- * Any other failure is rethrown.
+ * when the window is shut and the template send also failed (e.g. not yet approved by Meta, or the
+ * business hasn't created it in their WABA) — in which case the caller marks the item done rather
+ * than retrying forever, since retrying the same customer won't reopen their 24h window regardless.
+ * Any other (non-window) failure from the free-form attempt is rethrown. A successful send is
+ * metered against the business's plan quota — see wallet.ts.
  */
 async function sendWithTemplateFallback(
+  businessId: string,
   common: { phoneNumberId: string; accessToken: string; to: string },
   text: string,
-  template: TemplateConfig | null,
+  template: TemplateConfig,
   templateParams: string[]
 ): Promise<"sent" | "window_closed"> {
   try {
     await sendWhatsAppMessage({ ...common, text });
+    await meterOutboundMessage(businessId);
     return "sent";
   } catch (err) {
     const windowClosed = err instanceof WhatsAppSendError && err.code === RE_ENGAGEMENT_ERROR_CODE;
     if (!windowClosed) throw err;
-    if (!template) return "window_closed";
-    await sendWhatsAppTemplate({
-      ...common,
-      templateName: template.name,
-      languageCode: template.languageCode,
-      bodyParams: templateParams,
-    });
-    return "sent";
+    try {
+      await sendWhatsAppTemplate({
+        ...common,
+        templateName: template.name,
+        languageCode: template.languageCode,
+        bodyParams: templateParams,
+      });
+      await meterOutboundMessage(businessId);
+      return "sent";
+    } catch (templateErr) {
+      console.warn(`[scheduledMessages] Template send also failed (template not approved/created yet?):`, templateErr);
+      return "window_closed";
+    }
   }
 }
 
@@ -66,6 +76,7 @@ export async function runReminderJob() {
 
     try {
       const outcome = await sendWithTemplateFallback(
+        appt.businessId,
         { phoneNumberId: appt.business.whatsappPhoneNumberId, accessToken, to: appt.customer.phone },
         text,
         reminderTemplate(),
@@ -116,6 +127,7 @@ export async function runReviewJob() {
 
     try {
       const outcome = await sendWithTemplateFallback(
+        appt.businessId,
         { phoneNumberId: appt.business.whatsappPhoneNumberId, accessToken, to: appt.customer.phone },
         text,
         reviewTemplate(),
@@ -186,6 +198,7 @@ export async function runDigestJob() {
     try {
       const accessToken = decryptSecret(biz.whatsappAccessToken!);
       await sendWhatsAppMessage({ phoneNumberId: biz.whatsappPhoneNumberId!, accessToken, to: biz.notificationPhone!, text });
+      await meterOutboundMessage(biz.id);
       await prisma.business.update({ where: { id: biz.id }, data: { lastDigestSentAt: now } });
       console.log(`[digest] Sent morning digest to business ${biz.id}`);
     } catch (err) {
@@ -253,6 +266,7 @@ export async function runRoiReportJob() {
     try {
       const accessToken = decryptSecret(biz.whatsappAccessToken!);
       await sendWhatsAppMessage({ phoneNumberId: biz.whatsappPhoneNumberId!, accessToken, to: biz.notificationPhone!, text });
+      await meterOutboundMessage(biz.id);
       await prisma.business.update({ where: { id: biz.id }, data: { lastRoiReportSentAt: now } });
       console.log(`[roiReport] Sent monthly ROI report to business ${biz.id}`);
     } catch (err) {

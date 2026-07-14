@@ -148,7 +148,7 @@ export default function BillingPage() {
   const [currentPlan, setCurrentPlan] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<string>("monthly");
   const [loyaltyDiscountIls, setLoyaltyDiscountIls] = useState(0);
-  const [walletBalanceIls, setWalletBalanceIls] = useState(0);
+  const [walletBalanceAgorot, setWalletBalanceAgorot] = useState(0);
   const [annualLoading, setAnnualLoading] = useState(false);
   const [topupAmount, setTopupAmount] = useState(50);
   const [topupLoading, setTopupLoading] = useState(false);
@@ -156,7 +156,7 @@ export default function BillingPage() {
   async function load() {
     const me = await apiFetch<{
       subscriptionStatus: string; whatsappConnected: boolean; createdAt: string;
-      subscriptionPlan?: string | null; billingCycle?: string; loyaltyDiscountIls?: number; walletBalanceIls?: number;
+      subscriptionPlan?: string | null; billingCycle?: string; loyaltyDiscountIls?: number; walletBalanceAgorot?: number;
     }>("/api/business/me");
     setStatus(me.subscriptionStatus);
     setWhatsappConnected(me.whatsappConnected);
@@ -165,7 +165,7 @@ export default function BillingPage() {
     if (me.subscriptionPlan === "premium" || me.subscriptionPlan === "standard") setPlan(me.subscriptionPlan);
     setBillingCycle(me.billingCycle ?? "monthly");
     setLoyaltyDiscountIls(me.loyaltyDiscountIls ?? 0);
-    setWalletBalanceIls(me.walletBalanceIls ?? 0);
+    setWalletBalanceAgorot(me.walletBalanceAgorot ?? 0);
   }
 
   useEffect(() => {
@@ -189,11 +189,11 @@ export default function BillingPage() {
     setError(null);
     setTopupLoading(true);
     try {
-      const result = await apiFetch<{ walletBalanceIls: number }>("/api/billing/payplus/wallet/topup", {
+      const result = await apiFetch<{ walletBalanceAgorot: number }>("/api/billing/payplus/wallet/topup", {
         method: "POST",
         body: JSON.stringify({ amountIls: topupAmount }),
       });
-      setWalletBalanceIls(result.walletBalanceIls);
+      setWalletBalanceAgorot(result.walletBalanceAgorot);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not top up wallet");
     } finally {
@@ -420,7 +420,9 @@ export default function BillingPage() {
                 <span className="w-8 h-8 rounded-lg bg-[#1B7FA0]/10 flex items-center justify-center text-base flex-shrink-0">💳</span>
                 <h2 className="text-sm font-semibold text-gray-900">{lang === "he" ? "ארנק הודעות" : "Message wallet"}</h2>
               </div>
-              <span className="text-sm font-bold text-[#1B7FA0] tabular-nums">₪{walletBalanceIls}</span>
+              <span className={`text-sm font-bold tabular-nums ${walletBalanceAgorot < 0 ? "text-red-600" : "text-[#1B7FA0]"}`}>
+                ₪{(walletBalanceAgorot / 100).toFixed(2)}
+              </span>
             </div>
             <p className="text-xs text-gray-500 mt-1 mb-4">
               {lang === "he" ? "יתרה לשימוש עתידי בהודעות/SMS נוספים מעבר למכסת המנוי." : "Prepaid balance for future extra WhatsApp/SMS sends beyond your plan quota."}

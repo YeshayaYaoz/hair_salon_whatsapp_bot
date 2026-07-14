@@ -5,7 +5,8 @@ import { requireAuth, type AuthedRequest } from "../lib/auth.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import { requireActiveSubscription } from "../lib/subscriptionGate.js";
 import { getAuthUrl, saveGoogleTokens, disconnectGoogleCalendar, GoogleCalendarNotConfiguredError } from "../lib/googleCalendar.js";
-import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
+import { sendWhatsAppMessage, getWabaId, createMessageTemplate, type CreateTemplateResult } from "../webhook/whatsappClient.js";
+import { reminderTemplate, reviewTemplate, REMINDER_TEMPLATE_BODY, REVIEW_TEMPLATE_BODY } from "../lib/whatsappTemplates.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
 import { createAppointment, OutsideBusinessHoursError, SlotUnavailableError } from "../booking/availability.js";
 import { parseBookingTime } from "../lib/timezone.js";
@@ -65,6 +66,7 @@ businessRouter.get("/admin/businesses", requireSuperAdmin, async (_req: AuthedRe
       subscriptionStatus: true, subscriptionPlan: true, billingCycle: true,
       whatsappPhoneNumberId: true, whatsappTokenValid: true,
       paymentProvider: true, invoiceProvider: true,
+      walletBalanceAgorot: true, messagesUsedThisCycle: true,
       _count: { select: { appointments: true, customers: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -126,6 +128,35 @@ businessRouter.delete("/me/whatsapp", async (req: AuthedRequest, res) => {
     data: { whatsappPhoneNumberId: null, whatsappAccessToken: null },
   });
   res.json({ ok: true });
+});
+
+/**
+ * Submits the reminder + review message templates for approval to this business's own WABA, so
+ * the owner doesn't have to hand-create them in Meta Business Manager. Templates take up to ~24h
+ * for Meta to review; this only submits the request. Safe to call repeatedly (existing templates
+ * are reported as already-created, not an error) — e.g. if approval is rejected and resubmitted.
+ */
+businessRouter.post("/me/whatsapp/create-templates", async (req: AuthedRequest, res) => {
+  const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! } });
+  if (!business.whatsappPhoneNumberId || !business.whatsappAccessToken) {
+    return res.status(400).json({ error: "Connect a WhatsApp number first" });
+  }
+
+  const accessToken = decryptSecret(business.whatsappAccessToken);
+  let wabaId: string;
+  try {
+    wabaId = await getWabaId(business.whatsappPhoneNumberId, accessToken);
+  } catch (err) {
+    return res.status(502).json({ error: err instanceof Error ? err.message : "Could not resolve WhatsApp Business Account" });
+  }
+
+  const reminder = reminderTemplate();
+  const review = reviewTemplate();
+  const results: CreateTemplateResult[] = await Promise.all([
+    createMessageTemplate(wabaId, accessToken, { name: reminder.name, languageCode: reminder.languageCode, bodyText: REMINDER_TEMPLATE_BODY }),
+    createMessageTemplate(wabaId, accessToken, { name: review.name, languageCode: review.languageCode, bodyText: REVIEW_TEMPLATE_BODY }),
+  ]);
+  res.json({ results });
 });
 
 // --- Payment provider (PayPlus / Tranzila / Cardcom / Grow / Tori-managed) — the business's own

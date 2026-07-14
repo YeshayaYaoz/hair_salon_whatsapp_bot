@@ -27,7 +27,8 @@ model Business {
   billingCyclesCompleted    Int       @default(0) // successful charges — drives the loyalty discount
   loyaltyDiscountIls        Int       @default(0) // auto-applied recurring discount once tenure threshold is hit
   lastBillingReminderSentAt DateTime? // last "charge in 2 days" heads-up, to avoid duplicates
-  walletBalanceIls          Int       @default(0) // prepaid balance for metered add-ons (extra WhatsApp/SMS sends)
+  walletBalanceAgorot       Int       @default(0) // prepaid balance in agorot (1/100 ILS) — funds metered add-ons once the plan's monthly message quota is exceeded
+  messagesUsedThisCycle     Int       @default(0) // proactive WhatsApp sends (reminders/reviews/digests/etc.) counted against the plan quota this billing cycle; reset on each successful charge
   pendingYieldCampaign      Json? // set when the empty-slot campaign is awaiting the owner's WhatsApp confirmation
   address                   String?
   whatsappPhoneNumberId     String?   @unique

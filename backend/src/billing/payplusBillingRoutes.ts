@@ -70,9 +70,9 @@ payplusBillingRouter.post("/payplus/wallet/topup", requireAuth, async (req: Auth
 
   const updated = await prisma.business.update({
     where: { id: business.id },
-    data: { walletBalanceIls: { increment: parsed.data.amountIls } },
+    data: { walletBalanceAgorot: { increment: parsed.data.amountIls * 100 } },
   });
-  res.json({ ok: true, walletBalanceIls: updated.walletBalanceIls });
+  res.json({ ok: true, walletBalanceAgorot: updated.walletBalanceAgorot });
 });
 
 /** Upgrades/downgrades the plan and charges a prorated top-up immediately for the remainder of

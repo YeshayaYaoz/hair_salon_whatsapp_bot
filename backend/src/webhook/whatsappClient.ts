@@ -85,6 +85,59 @@ export async function sendWhatsAppList(
   });
 }
 
+/**
+ * Looks up the WhatsApp Business Account (WABA) ID that owns a phone number — needed to call the
+ * message-template management endpoints, which are scoped to the WABA rather than the phone number.
+ */
+export async function getWabaId(phoneNumberId: string, accessToken: string): Promise<string> {
+  const url = `https://graph.facebook.com/${GRAPH_VERSION}/${phoneNumberId}?fields=whatsapp_business_account`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const body = (await res.json()) as { whatsapp_business_account?: { id: string }; error?: { message?: string } };
+  if (!res.ok || !body.whatsapp_business_account?.id) {
+    throw new Error(`Could not resolve WhatsApp Business Account for this number: ${body.error?.message ?? "unknown error"}`);
+  }
+  return body.whatsapp_business_account.id;
+}
+
+export interface CreateTemplateResult {
+  name: string;
+  submitted: boolean;
+  status?: string; // Meta's initial status, typically "PENDING" pending review
+  error?: string;
+}
+
+/**
+ * Submits a message template for approval to a business's own WABA. Templates take up to ~24h
+ * for Meta to review; this only submits the request, it does not wait for approval. Existing
+ * templates with the same name+language are reported as an error by Meta ("already exists") —
+ * treated as a benign no-op here since it means the template is already set up.
+ */
+export async function createMessageTemplate(
+  wabaId: string,
+  accessToken: string,
+  params: { name: string; languageCode: string; bodyText: string; category?: "UTILITY" | "MARKETING" }
+): Promise<CreateTemplateResult> {
+  const url = `https://graph.facebook.com/${GRAPH_VERSION}/${wabaId}/message_templates`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: params.name,
+      language: params.languageCode,
+      category: params.category ?? "UTILITY",
+      components: [{ type: "BODY", text: params.bodyText }],
+    }),
+  });
+  const body = (await res.json()) as { id?: string; status?: string; error?: { message?: string; error_user_msg?: string } };
+  if (res.ok) return { name: params.name, submitted: true, status: body.status };
+
+  const message = body.error?.error_user_msg ?? body.error?.message ?? "Unknown error";
+  // Meta reports duplicates as an error rather than idempotently succeeding — treat "already
+  // exists" as success from the caller's point of view, since the desired state is achieved.
+  if (/already exists/i.test(message)) return { name: params.name, submitted: true, status: "EXISTING" };
+  return { name: params.name, submitted: false, error: message };
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function send(params: SendCommon, payload: Record<string, unknown>) {

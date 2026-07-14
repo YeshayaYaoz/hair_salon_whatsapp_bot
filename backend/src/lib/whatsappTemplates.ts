@@ -32,15 +32,26 @@ export interface TemplateConfig {
 }
 
 const DEFAULT_LANG = process.env.WHATSAPP_TEMPLATE_LANG || "he";
+const DEFAULT_REMINDER_NAME = "tori_appointment_reminder";
+const DEFAULT_REVIEW_NAME = "tori_review_request";
 
-/** Returns the reminder template config, or null if no template name is configured. */
-export function reminderTemplate(): TemplateConfig | null {
-  const name = process.env.WHATSAPP_REMINDER_TEMPLATE;
-  return name ? { name, languageCode: DEFAULT_LANG } : null;
+/** Returns the reminder template config. Falls back to the default name if not overridden via env. */
+export function reminderTemplate(): TemplateConfig {
+  return { name: process.env.WHATSAPP_REMINDER_TEMPLATE || DEFAULT_REMINDER_NAME, languageCode: DEFAULT_LANG };
 }
 
-/** Returns the review-request template config, or null if no template name is configured. */
-export function reviewTemplate(): TemplateConfig | null {
-  const name = process.env.WHATSAPP_REVIEW_TEMPLATE;
-  return name ? { name, languageCode: DEFAULT_LANG } : null;
+/** Returns the review-request template config. Falls back to the default name if not overridden via env. */
+export function reviewTemplate(): TemplateConfig {
+  return { name: process.env.WHATSAPP_REVIEW_TEMPLATE || DEFAULT_REVIEW_NAME, languageCode: DEFAULT_LANG };
 }
+
+/**
+ * The literal template bodies submitted to Meta for approval — must stay in sync with the
+ * {{n}} variable order documented above and with the bodyParams arrays passed by
+ * scheduledMessages.ts. Category UTILITY (not MARKETING) since these are transactional
+ * appointment notices, which face much less restrictive delivery/opt-in rules under Meta's
+ * policy and Israeli marketing-communications law alike.
+ */
+export const REMINDER_TEMPLATE_BODY =
+  'שלום {{1}}! תזכורת לתור שלך ל{{2}} ב-{{3}} אצל {{4}}. לביטול השב/י "בטל תור".';
+export const REVIEW_TEMPLATE_BODY = "{{1}}, תודה שביקרת ב{{2}} היום! מקווים שנהנית מה{{3}}.";

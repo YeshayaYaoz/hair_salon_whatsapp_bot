@@ -26,6 +26,25 @@ export default function WhatsAppPage() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templateResults, setTemplateResults] = useState<{ name: string; submitted: boolean; status?: string; error?: string }[] | null>(null);
+
+  async function createTemplates() {
+    setTemplatesLoading(true);
+    setTemplateResults(null);
+    setError(null);
+    try {
+      const { results } = await apiFetch<{ results: { name: string; submitted: boolean; status?: string; error?: string }[] }>(
+        "/api/business/me/whatsapp/create-templates",
+        { method: "POST" }
+      );
+      setTemplateResults(results);
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to submit templates");
+    } finally {
+      setTemplatesLoading(false);
+    }
+  }
 
   async function disconnect() {
     if (!confirm(lang === "he" ? "לנתק את חיבור הוואטסאפ?" : "Disconnect WhatsApp?")) return;
@@ -181,6 +200,48 @@ export default function WhatsAppPage() {
           </button>
         )}
       </div>
+
+      {/* Message templates — needed to reach customers outside the 24h reply window */}
+      {connected && tokenValid && (
+        <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">
+                {lang === "he" ? "תבניות הודעות לתזכורות וביקורות" : "Reminder & review message templates"}
+              </h3>
+              <p className="text-xs text-gray-500 leading-relaxed max-w-md">
+                {lang === "he"
+                  ? "וואטסאפ מאפשר לשלוח הודעה חופשית רק אם הלקוח כתב ב-24 השעות האחרונות. כדי שתזכורות תורים ובקשות ביקורת יגיעו גם מעבר לזה, יש לאשר תבניות הודעה מול מטא. לחיצה כאן שולחת אותן לאישור (עד כ-24 שעות)."
+                  : "WhatsApp only allows free-form messages within 24h of the customer's last reply. To reach customers beyond that for reminders/reviews, message templates must be approved by Meta. This submits them for approval (can take up to ~24h)."}
+              </p>
+            </div>
+            <button
+              onClick={createTemplates}
+              disabled={templatesLoading}
+              className="bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-800 text-sm font-semibold px-4 py-2 rounded-lg transition whitespace-nowrap"
+            >
+              {templatesLoading ? (lang === "he" ? "שולח..." : "Submitting...") : (lang === "he" ? "שלח תבניות לאישור" : "Submit templates")}
+            </button>
+          </div>
+          {templateResults && (
+            <div className="mt-4 flex flex-col gap-1.5">
+              {templateResults.map((r) => (
+                <div key={r.name} className="flex items-center gap-2 text-xs">
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${r.submitted ? "bg-green-400" : "bg-red-400"}`} />
+                  <span className="font-mono text-gray-600" dir="ltr">{r.name}</span>
+                  <span className={r.submitted ? "text-green-700" : "text-red-600"}>
+                    {r.submitted
+                      ? r.status === "EXISTING"
+                        ? (lang === "he" ? "כבר קיימת" : "already exists")
+                        : (lang === "he" ? `נשלחה (${r.status ?? "PENDING"})` : `submitted (${r.status ?? "PENDING"})`)
+                      : r.error}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Embedded Signup button */}
       {META_APP_ID && !showManual && (

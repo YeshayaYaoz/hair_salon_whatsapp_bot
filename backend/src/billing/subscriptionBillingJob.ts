@@ -79,6 +79,7 @@ export async function runSubscriptionBillingJob(): Promise<void> {
           nextBillingDate: new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1000),
           lastBillingAttemptAt: now,
           billingCyclesCompleted: cyclesCompleted,
+          messagesUsedThisCycle: 0, // new cycle paid for — reset the plan's message quota
           ...(justEarnedDiscount ? { loyaltyDiscountIls: LOYALTY_DISCOUNT_ILS } : {}),
         },
       });

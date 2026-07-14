@@ -17,8 +17,13 @@ interface AdminBusiness {
   whatsappTokenValid: boolean;
   paymentProvider: string | null;
   invoiceProvider: string | null;
+  walletBalanceAgorot: number;
+  messagesUsedThisCycle: number;
   _count: { appointments: number; customers: number };
 }
+
+// Must match MESSAGE_QUOTA_BY_PLAN in backend/src/lib/wallet.ts — display-only, not authoritative.
+const MESSAGE_QUOTA_BY_PLAN: Record<string, number> = { standard: 300, premium: 1000 };
 
 const STATUS_COLORS: Record<string, string> = {
   trial: "bg-amber-50 text-amber-700 border-amber-200",
@@ -71,11 +76,11 @@ export default function AdminBusinessesPage() {
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
         {businesses === null ? (
-          <div>{Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} cols={5} />)}</div>
+          <div>{Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} cols={6} />)}</div>
         ) : filtered.length === 0 ? (
           <div className="px-6 py-12 text-center text-gray-400 text-sm">{he ? "לא נמצאו עסקים" : "No businesses found"}</div>
         ) : (
-          <table className="w-full text-sm min-w-[900px]">
+          <table className="w-full text-sm min-w-[1020px]">
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="text-start px-4 py-3 text-gray-500 font-medium">{he ? "עסק" : "Business"}</th>
@@ -84,6 +89,7 @@ export default function AdminBusinessesPage() {
                 <th className="text-start px-4 py-3 text-gray-500 font-medium">WhatsApp</th>
                 <th className="text-start px-4 py-3 text-gray-500 font-medium">{he ? "סליקה" : "Payment"}</th>
                 <th className="text-start px-4 py-3 text-gray-500 font-medium">{he ? "חשבוניות" : "Invoicing"}</th>
+                <th className="text-start px-4 py-3 text-gray-500 font-medium">{he ? "ארנק / שימוש" : "Wallet / usage"}</th>
                 <th className="text-end px-4 py-3 text-gray-500 font-medium">{he ? "תורים" : "Bookings"}</th>
                 <th className="text-end px-4 py-3 text-gray-500 font-medium">{he ? "לקוחות" : "Customers"}</th>
               </tr>
@@ -118,6 +124,14 @@ export default function AdminBusinessesPage() {
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{b.paymentProvider ?? "—"}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{b.invoiceProvider ?? "—"}</td>
+                  <td className="px-4 py-3 text-xs whitespace-nowrap">
+                    <span className={`font-medium tabular-nums ${b.walletBalanceAgorot < 0 ? "text-red-600" : "text-gray-700"}`}>
+                      ₪{(b.walletBalanceAgorot / 100).toFixed(2)}
+                    </span>
+                    <span className="text-gray-400 ms-1.5 tabular-nums">
+                      · {b.messagesUsedThisCycle}/{MESSAGE_QUOTA_BY_PLAN[b.subscriptionPlan ?? ""] ?? MESSAGE_QUOTA_BY_PLAN.standard}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-end tabular-nums text-gray-700">{b._count.appointments}</td>
                   <td className="px-4 py-3 text-end tabular-nums text-gray-700">{b._count.customers}</td>
                 </tr>
