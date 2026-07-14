@@ -449,7 +449,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
 
   let toolLoopCount = 0;
   while (response.stop_reason === "tool_use") {
-    if (++toolLoopCount > 6) break; // safety guard
+    if (++toolLoopCount > 8) break; // safety guard — raised slightly since open-ended availability requests now scan multiple days
 
     const toolResults: Anthropic.ToolResultBlockParam[] = [];
     for (const block of response.content) {
