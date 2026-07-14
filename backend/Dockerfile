@@ -16,6 +16,7 @@ RUN npm install --omit=dev
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/scripts ./scripts
 EXPOSE 8080
 ENV PORT=8080
-CMD ["sh", "-c", "npx prisma db push && node dist/server.js"]
+CMD ["node", "dist/server.js"]
