@@ -187,12 +187,7 @@ export default function ServicesPage() {
                 </div>
               ) : (
                 <div key={s.id} className="flex items-center gap-3 px-4 py-3.5 group">
-                  <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ background: `${s.color ?? "#1B7FA0"}17`, border: `1px solid ${s.color ?? "#1B7FA0"}35` }}
-                  >
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: s.color ?? "#1B7FA0" }} />
-                  </div>
+                  <div className="w-2 h-9 rounded-full shrink-0" style={{ backgroundColor: s.color ?? "#1B7FA0" }} />
                   <div className="flex-1 min-w-0">
                     <div className="text-gray-800 font-medium text-sm">{s.name}</div>
                     {s.description && <div className="text-gray-400 text-xs truncate mt-0.5">{s.description}</div>}

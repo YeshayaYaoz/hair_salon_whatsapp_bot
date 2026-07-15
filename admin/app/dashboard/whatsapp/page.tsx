@@ -23,6 +23,11 @@ export default function WhatsAppPage() {
   const [sdkReady, setSdkReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const codeUsedRef = useRef(false);
+  // Meta sends the WABA + phone number IDs via postMessage during the Embedded Signup flow
+  // (the "WA_EMBEDDED_SIGNUP" event) — this is the documented, reliable source for them. Trying
+  // to reconstruct them afterward via Graph API (me/businesses, debug_token scopes) is what broke
+  // before: those paths depend on permissions/scopes the login config doesn't always grant.
+  const signupDataRef = useRef<{ wabaId?: string; phoneNumberId?: string }>({});
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -74,6 +79,32 @@ export default function WhatsAppPage() {
     });
   }, []);
 
+  // Listen for Meta's Embedded Signup postMessage — carries waba_id/phone_number_id directly,
+  // sent while the signup popup is open (independent of the FB.login() callback/access token).
+  useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      if (!event.origin.endsWith("facebook.com")) return;
+      let data: any;
+      try {
+        data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+      } catch {
+        return; // not a JSON message we care about
+      }
+      if (data?.type !== "WA_EMBEDDED_SIGNUP") return;
+      console.log("[whatsapp] WA_EMBEDDED_SIGNUP event:", data.event, data.data);
+      if (data.event === "FINISH" || data.event === "FINISH_ONLY_WABA") {
+        signupDataRef.current = {
+          wabaId: data.data?.waba_id ?? signupDataRef.current.wabaId,
+          phoneNumberId: data.data?.phone_number_id ?? signupDataRef.current.phoneNumberId,
+        };
+      } else if (data.event === "ERROR") {
+        setError(data.data?.error_message ?? "WhatsApp connection failed during setup.");
+      }
+    }
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
   // Load Facebook JS SDK
   useEffect(() => {
     if (!META_APP_ID) return;
@@ -98,6 +129,7 @@ export default function WhatsAppPage() {
     }
     setError(null);
     codeUsedRef.current = false;
+    signupDataRef.current = {}; // clear any IDs left over from a previous attempt
     console.log("Launching FB.login with config_id:", META_CONFIG_ID, "app:", META_APP_ID);
     window.FB.login(
       (response: any) => {
@@ -108,7 +140,14 @@ export default function WhatsAppPage() {
           setLoading(true);
           apiFetch<{ ok: boolean; phoneNumber: string }>(
             "/api/business/me/whatsapp/embedded-signup",
-            { method: "POST", body: JSON.stringify({ accessToken: response.authResponse.accessToken }) }
+            {
+              method: "POST",
+              body: JSON.stringify({
+                accessToken: response.authResponse.accessToken,
+                wabaId: signupDataRef.current.wabaId,
+                phoneNumberId: signupDataRef.current.phoneNumberId,
+              }),
+            }
           ).then((result) => {
             setConnected(true);
             setTokenValid(true);

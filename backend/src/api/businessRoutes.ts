@@ -328,7 +328,9 @@ businessRouter.post("/invoices/receipt", async (req: AuthedRequest, res) => {
 // Embedded Signup: receive the access token from FB.login (response_type: "token"),
 // then fetch the phone number ID from the WABA and save everything.
 businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, res) => {
-  const parsed = z.object({ accessToken: z.string().min(1) }).safeParse(req.body);
+  const parsed = z
+    .object({ accessToken: z.string().min(1), wabaId: z.string().optional(), phoneNumberId: z.string().optional() })
+    .safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Missing accessToken" });
 
   const userToken: string = parsed.data.accessToken;
@@ -337,36 +339,51 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
   let wabaId: string | undefined;
   const debugTrail: Record<string, unknown> = {};
 
-  // Primary path: debug_token → granular_scopes. This is the documented way to discover which
-  // WABAs the user actually granted during Embedded Signup — the whatsapp_business_management
-  // scope entry carries the granted WABA IDs in target_ids. Unlike me/businesses (needs the
-  // business_management permission, which the login config deliberately doesn't request) or
-  // me/whatsapp_business_accounts (not a field that exists on a User node — both old paths
-  // produced (#100) errors), this works with exactly the permissions Embedded Signup grants.
-  const debugRes = await fetch(
-    `https://graph.facebook.com/v20.0/debug_token?input_token=${encodeURIComponent(userToken)}&access_token=${encodeURIComponent(userToken)}`
-  );
-  const debugData = await debugRes.json() as any;
-  debugTrail.debugToken = debugData?.error ?? "ok";
-  const granted: { scope: string; target_ids?: string[] }[] = debugData?.data?.granular_scopes ?? [];
-  const wabaIds: string[] =
-    granted.find((s) => s.scope === "whatsapp_business_management")?.target_ids ??
-    granted.find((s) => s.scope === "whatsapp_business_messaging")?.target_ids ?? [];
-
-  for (const id of wabaIds) {
+  // Primary path: the waba_id/phone_number_id Meta posts to the frontend via the
+  // WA_EMBEDDED_SIGNUP postMessage event during the signup flow itself — the documented,
+  // reliable source. Prefer these over any Graph API reconstruction attempted afterward, which
+  // depends on permissions/scopes that turned out not to be consistently granted.
+  if (parsed.data.phoneNumberId) {
     const phoneRes = await fetch(
-      `https://graph.facebook.com/v20.0/${id}/phone_numbers?fields=id,display_phone_number&access_token=${encodeURIComponent(userToken)}`
+      `https://graph.facebook.com/v20.0/${parsed.data.phoneNumberId}?fields=id,display_phone_number&access_token=${encodeURIComponent(userToken)}`
     );
     const phoneData = await phoneRes.json() as any;
-    debugTrail[`waba_${id}`] = phoneData?.error ?? `found ${phoneData?.data?.length ?? 0} numbers`;
-    if (phoneData?.data?.[0]?.id) {
-      phone = phoneData.data[0];
-      wabaId = id;
-      break;
+    debugTrail.postMessagePhone = phoneData?.error ?? "ok";
+    if (phoneData?.id) {
+      phone = { id: phoneData.id, display_phone_number: phoneData.display_phone_number };
+      wabaId = parsed.data.wabaId;
     }
   }
 
-  // Fallback: me/businesses (works only if the token also has business_management — kept for
+  // Fallback 1: debug_token → granular_scopes. Discovers which WABAs the user granted during
+  // signup without needing business_management — works when the postMessage above didn't fire
+  // (e.g. an ad/popup blocker interfering) but the login itself still succeeded.
+  if (!phone) {
+    const debugRes = await fetch(
+      `https://graph.facebook.com/v20.0/debug_token?input_token=${encodeURIComponent(userToken)}&access_token=${encodeURIComponent(userToken)}`
+    );
+    const debugData = await debugRes.json() as any;
+    debugTrail.debugToken = debugData?.error ?? "ok";
+    const granted: { scope: string; target_ids?: string[] }[] = debugData?.data?.granular_scopes ?? [];
+    const wabaIds: string[] =
+      granted.find((s) => s.scope === "whatsapp_business_management")?.target_ids ??
+      granted.find((s) => s.scope === "whatsapp_business_messaging")?.target_ids ?? [];
+
+    for (const id of wabaIds) {
+      const phoneRes = await fetch(
+        `https://graph.facebook.com/v20.0/${id}/phone_numbers?fields=id,display_phone_number&access_token=${encodeURIComponent(userToken)}`
+      );
+      const phoneData = await phoneRes.json() as any;
+      debugTrail[`waba_${id}`] = phoneData?.error ?? `found ${phoneData?.data?.length ?? 0} numbers`;
+      if (phoneData?.data?.[0]?.id) {
+        phone = phoneData.data[0];
+        wabaId = id;
+        break;
+      }
+    }
+  }
+
+  // Fallback 2: me/businesses (works only if the token also has business_management — kept for
   // manually-created tokens pasted through this endpoint, not the Embedded Signup flow).
   if (!phone) {
     const bizRes = await fetch(
