@@ -14,6 +14,7 @@ import { runBillingReminderJob } from "./billing/billingReminderJob.js";
 import { runYieldCampaignJob } from "./billing/yieldCampaignJob.js";
 import { runRetentionJob } from "./lib/retentionJob.js";
 import { runReminderJob, runReviewJob, runDigestJob, runRoiReportJob } from "./lib/scheduledMessages.js";
+import { runDepositExpiryJob } from "./lib/depositExpiryJob.js";
 import { runTrackedJob } from "./lib/jobStatus.js";
 import { leadFinderRouter } from "./leadfinder/routes.js";
 
@@ -108,3 +109,9 @@ runTrackedJob("billingReminder", runBillingReminderJob);
 // this just needs to fire hourly and let it self-select the right businesses each day.
 setInterval(() => runTrackedJob("yieldCampaign", runYieldCampaignJob), ONE_HOUR);
 runTrackedJob("yieldCampaign", runYieldCampaignJob);
+
+// Deposit holds are short-lived (default 30 min) — check often so a slot isn't stuck blocked
+// long after the customer abandoned the payment link.
+const FIVE_MINUTES = 5 * 60 * 1000;
+setInterval(() => runTrackedJob("depositExpiry", runDepositExpiryJob), FIVE_MINUTES);
+runTrackedJob("depositExpiry", runDepositExpiryJob);

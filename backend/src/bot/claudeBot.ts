@@ -2,7 +2,8 @@ import Anthropic, { APIError } from "@anthropic-ai/sdk";
 import { prisma } from "../lib/prisma.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { appendTurn, getHistory, type Turn } from "./conversationStore.js";
-import { findAvailableSlots, createAppointment, SlotUnavailableError, OutsideBusinessHoursError, type AvailableSlot } from "../booking/availability.js";
+import { findAvailableSlots, createAppointment, attachDepositPaymentLink, SlotUnavailableError, OutsideBusinessHoursError, type AvailableSlot } from "../booking/availability.js";
+import { getPaymentProvider } from "../lib/payments/index.js";
 import { parseBookingTime, parseDateString, dayOfWeekForDate, instantPartsInTz } from "../lib/timezone.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
 import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
@@ -44,7 +45,7 @@ const tools: Anthropic.Tool[] = [
   },
   {
     name: "book_appointment",
-    description: "Book a confirmed slot. Only call this after the customer has explicitly chosen a specific time from check_availability results AND you know their name (ask for it first if not already known from CRM context).",
+    description: "Book a slot. Only call this after the customer has explicitly chosen a specific time from check_availability results AND you know their name (ask for it first if not already known from CRM context). If the business requires a deposit, this does NOT confirm the booking — it returns depositRequired:true with a paymentUrl; the slot is held but the customer must pay within holdMinutes or it's released.",
     input_schema: {
       type: "object",
       properties: {
@@ -209,7 +210,14 @@ async function runTool(
       const all = await prisma.service.findMany({ where: { businessId }, select: { name: true } });
       return JSON.stringify({ error: "Unknown service", availableServices: all.map((s) => s.name) });
     }
-    const biz = await prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { timezone: true } });
+    const biz = await prisma.business.findUniqueOrThrow({
+      where: { id: businessId },
+      select: {
+        timezone: true, name: true,
+        depositEnabled: true, depositAmountIls: true, depositHoldMinutes: true,
+        paymentProvider: true, paymentApiKey: true, paymentApiSecret: true,
+      },
+    });
 
     // Fall back to the customer's saved CRM name if the model didn't pass one (e.g. a
     // returning customer) — only block on missing name for genuinely new customers.
@@ -225,6 +233,13 @@ async function runTool(
     const staffResolution = await resolveStaffId(businessId, input.staffName as string | undefined);
     if (staffResolution.error) return staffResolution.error;
 
+    // A deposit is required only if the owner opted in AND actually has a connected merchant
+    // account to charge through — an enabled toggle with no provider must not silently block
+    // every booking, so it's treated the same as deposits being off.
+    const depositRequired = Boolean(
+      biz.depositEnabled && biz.depositAmountIls > 0 && biz.paymentProvider && biz.paymentApiKey && biz.paymentApiSecret
+    );
+
     let appointment;
     try {
       appointment = await createAppointment({
@@ -235,6 +250,13 @@ async function runTool(
         startTime: parseBookingTime(input.startTime as string, biz.timezone || "Asia/Jerusalem"),
         overrideDurationMin: input.durationMin as number | undefined,
         staffId: staffResolution.staffId ?? null,
+        ...(depositRequired
+          ? {
+              status: "pending_payment" as const,
+              depositAmountIls: biz.depositAmountIls,
+              depositExpiresAt: new Date(Date.now() + biz.depositHoldMinutes * 60_000),
+            }
+          : {}),
       });
     } catch (err) {
       if (err instanceof SlotUnavailableError) {
@@ -262,6 +284,50 @@ async function runTool(
     const localTime = new Date(appointment.startTime).toLocaleTimeString("he-IL", { timeZone: tz, hour: "2-digit", minute: "2-digit" });
     const customerLabel = `${customerName} (${customerPhone})`;
     const staffLine = input.staffName ? `\nעם: ${input.staffName as string}` : "";
+
+    if (depositRequired) {
+      // Hold created — generate the payment link and give the model everything it needs to send
+      // it. The appointment is NOT confirmed, calendar-synced, or announced to the owner as a real
+      // booking yet; that all happens once the deposit webhook marks it paid (see whatsappRoutes.ts
+      // deposit webhook handler / the expiry job that releases unpaid holds).
+      try {
+        const provider = getPaymentProvider(biz.paymentProvider!);
+        const creds =
+          biz.paymentProvider === "tori_managed"
+            ? { apiKey: "", apiSecret: "" }
+            : { apiKey: decryptSecret(biz.paymentApiKey!), apiSecret: decryptSecret(biz.paymentApiSecret!) };
+        const link = await provider.createPaymentLink(creds, {
+          amountIls: biz.depositAmountIls,
+          description: `מקדמה לתור — ${service.name}, ${biz.name}`,
+          customerName,
+          customerPhone,
+          referenceId: appointment.id,
+        });
+        await attachDepositPaymentLink(appointment.id, {
+          provider: biz.paymentProvider!,
+          paymentUrl: link.paymentUrl,
+          providerRef: link.providerTransactionId,
+        });
+        return JSON.stringify({
+          booked: false,
+          depositRequired: true,
+          depositAmountIls: biz.depositAmountIls,
+          paymentUrl: link.paymentUrl,
+          holdMinutes: biz.depositHoldMinutes,
+          dayOfWeek: weekdayHe,
+          localTime,
+          staffName: input.staffName ?? undefined,
+        });
+      } catch (err) {
+        // Payment link generation failed — release the hold immediately rather than leaving a
+        // dead pending_payment row blocking the slot for depositHoldMinutes with no way to pay it.
+        console.error("Deposit payment link creation failed:", err);
+        captureError(err, { businessId, phase: "deposit_link" });
+        await prisma.appointment.delete({ where: { id: appointment.id } }).catch(() => {});
+        return JSON.stringify({ error: "Could not generate a payment link right now. Apologize to the customer and offer to try again in a moment, or suggest they call the business directly." });
+      }
+    }
+
     notifyOwner(businessId, `📅 הזמנה חדשה!\nלקוח: ${customerLabel}\nשירות: ${service.name}\nמועד: ${weekdayHe} ${when}${staffLine}`);
 
     syncAppointmentToCalendar(businessId, {

@@ -17,6 +17,8 @@ interface Appointment {
   startTime: string;
   endTime: string;
   status: string;
+  depositAmountIls?: number | null;
+  depositStatus?: string | null;
   customer: { name?: string; phone: string };
   service: { name: string };
   staff?: { name: string } | null;
@@ -26,6 +28,7 @@ const STATUS_STYLES: Record<string, string> = {
   confirmed: "bg-green-50 text-green-700 border-green-200",
   cancelled: "bg-red-950/50 text-red-600 border-red-200",
   pending: "bg-yellow-950/50 text-yellow-400 border-yellow-800",
+  pending_payment: "bg-amber-50 text-amber-700 border-amber-200",
 };
 
 type Filter = "upcoming" | "past" | "cancelled" | "all";
@@ -521,7 +524,7 @@ export default function AppointmentsPage() {
                 </thead>
                 <tbody>
                   {filtered.map((a, i) => {
-                    const cancellable = a.status === "confirmed" && new Date(a.startTime) >= new Date();
+                    const cancellable = (a.status === "confirmed" || a.status === "pending_payment") && new Date(a.startTime) >= new Date();
                     return (
                     <tr key={a.id} className={i !== filtered.length - 1 ? "border-b border-gray-200/50" : ""}>
                       <td className="ps-4 pe-1 py-3">
@@ -549,8 +552,11 @@ export default function AppointmentsPage() {
                       <td className="px-4 py-3 text-gray-600 text-sm">{a.service.name}</td>
                       <td className="px-4 py-3 text-gray-500 text-sm hidden md:table-cell">{a.staff?.name ?? "—"}</td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex text-xs font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLES[a.status] ?? "bg-gray-100 text-gray-500 border-gray-200"}`}>
-                          {a.status === "confirmed" ? (lang === "he" ? "מאושר" : "Confirmed") : a.status === "cancelled" ? (lang === "he" ? "בוטל" : "Cancelled") : a.status}
+                        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLES[a.status] ?? "bg-gray-100 text-gray-500 border-gray-200"}`}>
+                          {a.status === "confirmed" ? (lang === "he" ? "מאושר" : "Confirmed")
+                            : a.status === "cancelled" ? (lang === "he" ? "בוטל" : "Cancelled")
+                            : a.status === "pending_payment" ? `⏳ ${lang === "he" ? "ממתין למקדמה" : "Awaiting deposit"}${a.depositAmountIls ? ` ₪${a.depositAmountIls}` : ""}`
+                            : a.status}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-end">

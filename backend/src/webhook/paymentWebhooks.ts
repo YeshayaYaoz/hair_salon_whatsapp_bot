@@ -2,6 +2,9 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { getInvoiceProvider, resolveInvoiceCredentials } from "../lib/invoices/index.js";
 import { captureError } from "../lib/errorMonitoring.js";
+import { decryptSecret } from "../lib/crypto.js";
+import { sendWhatsAppMessage } from "./whatsappClient.js";
+import { syncAppointmentToCalendar } from "../lib/googleCalendar.js";
 
 export const paymentWebhookRouter = Router();
 
@@ -86,17 +89,61 @@ paymentWebhookRouter.post("/:provider/:businessId", async (req, res) => {
     const business = await prisma.business.findUnique({
       where: { id: businessId },
       select: {
+        name: true,
+        timezone: true,
         paymentProvider: true,
         invoiceProvider: true,
         invoiceApiKey: true,
         invoiceApiSecret: true,
         paymentApiKey: true,
         paymentApiSecret: true,
+        whatsappPhoneNumberId: true,
+        whatsappAccessToken: true,
       },
     });
     if (!business || business.paymentProvider !== provider) {
       console.warn(`[payments webhook] Unrecognized business/provider combo: ${businessId}/${provider}`);
       return;
+    }
+
+    // Deposit-before-booking: the payment link's referenceId is the appointment's own id (see
+    // claudeBot.ts book_appointment). If this event matches a still-pending hold, confirm it —
+    // this is what actually turns a "pending_payment" hold into a real booking, across every
+    // provider, since each already has its own event parser above keyed by referenceId.
+    if (event.referenceId) {
+      const pending = await prisma.appointment.findFirst({
+        where: { id: event.referenceId, businessId, status: "pending_payment", depositStatus: "pending" },
+        include: { service: true, customer: true },
+      });
+      if (pending) {
+        await prisma.appointment.update({
+          where: { id: pending.id },
+          data: { status: "confirmed", depositStatus: "paid", depositPaidAt: new Date() },
+        });
+        console.log(`[payments webhook] Deposit paid — confirmed appointment ${pending.id} (${provider}/${businessId})`);
+
+        syncAppointmentToCalendar(businessId, {
+          startTime: pending.startTime,
+          endTime: pending.endTime,
+          serviceName: pending.service.name,
+          customerName: pending.customer.name ?? undefined,
+          customerPhone: pending.customer.phone,
+        }).catch((err) => console.error("Calendar sync failed:", err));
+
+        if (business.whatsappPhoneNumberId && business.whatsappAccessToken) {
+          const tz = business.timezone || "Asia/Jerusalem";
+          const when = pending.startTime.toLocaleString("he-IL", {
+            timeZone: tz, weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit",
+          });
+          const accessToken = decryptSecret(business.whatsappAccessToken);
+          sendWhatsAppMessage({
+            phoneNumberId: business.whatsappPhoneNumberId,
+            accessToken,
+            to: pending.customer.phone,
+            text: `✅ המקדמה התקבלה! התור שלך ל${pending.service.name} ב-${when} אצל ${business.name} מאושר סופית. מחכים לך!`,
+          }).catch((err) => console.error("[payments webhook] Deposit confirmation message failed:", err));
+        }
+      }
     }
 
     const resolved = resolveInvoiceCredentials(business);

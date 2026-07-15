@@ -105,6 +105,10 @@ interface BusinessProfile {
   cancellationPolicy?: string;
   referralText?: string;
   digestEnabled?: boolean;
+  depositEnabled?: boolean;
+  depositAmountIls?: number;
+  depositHoldMinutes?: number;
+  paymentConnected?: boolean;
 }
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
@@ -224,6 +228,7 @@ export default function SettingsPage() {
     notificationPhone: "", botGreeting: "", botPersonality: "", googleMapsUrl: "",
     remindersEnabled: true, reviewsEnabled: true,
     cancellationPolicy: "", referralText: "", digestEnabled: true,
+    depositEnabled: false, depositAmountIls: 0, depositHoldMinutes: 30, paymentConnected: false,
   });
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -246,12 +251,16 @@ export default function SettingsPage() {
         cancellationPolicy: me.cancellationPolicy ?? "",
         referralText: me.referralText ?? "",
         digestEnabled: me.digestEnabled ?? true,
+        depositEnabled: me.depositEnabled ?? false,
+        depositAmountIls: me.depositAmountIls ?? 0,
+        depositHoldMinutes: me.depositHoldMinutes ?? 30,
+        paymentConnected: me.paymentConnected ?? false,
       });
       setLoaded(true);
     });
   }, []);
 
-  function set(key: keyof BusinessProfile, value: string | boolean) {
+  function set(key: keyof BusinessProfile, value: string | boolean | number) {
     setFields((f) => ({ ...f, [key]: value }));
   }
 
@@ -275,6 +284,9 @@ export default function SettingsPage() {
           cancellationPolicy: fields.cancellationPolicy,
           referralText: fields.referralText,
           digestEnabled: fields.digestEnabled,
+          depositEnabled: fields.depositEnabled,
+          depositAmountIls: fields.depositAmountIls,
+          depositHoldMinutes: fields.depositHoldMinutes,
         }),
       });
       setSaved(true);
@@ -359,6 +371,57 @@ export default function SettingsPage() {
             <span className="text-xs text-gray-700">{he ? "סיכום יומי בבוקר (וואטסאפ)" : "Morning daily digest (WhatsApp)"}</span>
             <Toggle checked={fields.digestEnabled ?? true} onChange={(v) => set("digestEnabled", v)} />
           </label>
+        </Section>
+
+        <Section
+          title={he ? "מקדמה לפני תור" : "Deposit before booking"}
+          description={
+            he
+              ? "כשמופעל, הבוט שולח ללקוח קישור תשלום למקדמה במקום לאשר תור מיידית — התור מאושר סופית רק אחרי שהתשלום מתקבל."
+              : "When enabled, the bot sends a deposit payment link instead of confirming instantly — the booking is only finalized once the deposit is paid."
+          }
+        >
+          {!fields.paymentConnected ? (
+            <div className="bg-gray-50 border border-gray-200 text-gray-500 text-xs rounded-lg px-3 py-2.5">
+              {he
+                ? "יש לחבר קודם ספק סליקה בעמוד סליקה וחשבוניות כדי להפעיל מקדמות."
+                : "Connect a payment provider on the Payments page first to enable deposits."}
+            </div>
+          ) : (
+            <>
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-xs text-gray-700">{he ? "דרוש מקדמה לכל תור" : "Require a deposit for every booking"}</span>
+                <Toggle checked={fields.depositEnabled ?? false} onChange={(v) => set("depositEnabled", v)} />
+              </label>
+              {fields.depositEnabled && (
+                <>
+                  <Field label={he ? "סכום המקדמה (₪)" : "Deposit amount (₪)"}>
+                    <input
+                      type="number"
+                      min={1}
+                      value={fields.depositAmountIls || ""}
+                      onChange={(e) => set("depositAmountIls", Number(e.target.value) || 0)}
+                      placeholder="50"
+                      className="w-32"
+                    />
+                  </Field>
+                  <Field
+                    label={he ? "זמן להחזקת המועד (דקות)" : "Hold time before releasing the slot (minutes)"}
+                    hint={he ? "אם הלקוח לא ישלם תוך זמן זה, המועד ישוחרר ללקוח אחר" : "If unpaid within this window, the slot is released back to other customers"}
+                  >
+                    <input
+                      type="number"
+                      min={5}
+                      value={fields.depositHoldMinutes || ""}
+                      onChange={(e) => set("depositHoldMinutes", Number(e.target.value) || 0)}
+                      placeholder="30"
+                      className="w-32"
+                    />
+                  </Field>
+                </>
+              )}
+            </>
+          )}
         </Section>
 
         <Section

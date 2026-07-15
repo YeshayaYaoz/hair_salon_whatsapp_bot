@@ -4,6 +4,10 @@ import { zonedWallTimeToUtc, parseDateString, dayOfWeekForDate, instantPartsInTz
 
 const SLOT_STEP_MIN = 30;
 
+// A "pending_payment" hold (awaiting a deposit) blocks the slot exactly like a confirmed booking
+// — otherwise two customers could be sent overlapping payment links for the same slot.
+const SLOT_BLOCKING_STATUSES = ["confirmed", "pending_payment"];
+
 export interface AvailableSlot {
   startTime: string; // ISO (UTC)
   endTime: string;
@@ -52,7 +56,7 @@ export async function findAvailableSlots(
 
   const [dayAppointments, dayBlocks] = await Promise.all([
     prisma.appointment.findMany({
-      where: { businessId, status: "confirmed", startTime: { gte: dayStartUtc, lt: dayEndUtc } },
+      where: { businessId, status: { in: SLOT_BLOCKING_STATUSES }, startTime: { gte: dayStartUtc, lt: dayEndUtc } },
     }),
     prisma.blockedTime.findMany({
       where: { businessId, startTime: { lt: dayEndUtc }, endTime: { gt: dayStartUtc } },
@@ -102,6 +106,12 @@ export async function createAppointment(params: {
   startTime: Date;
   staffId?: string | null;
   overrideDurationMin?: number;
+  // Deposit-hold fields — set together when creating a "pending_payment" hold instead of an
+  // outright confirmed booking. The payment link itself is generated afterward (it needs this
+  // appointment's own id as its reference) and attached with attachDepositPaymentLink below.
+  status?: "confirmed" | "pending_payment";
+  depositAmountIls?: number;
+  depositExpiresAt?: Date;
 }) {
   const service = await prisma.service.findUniqueOrThrow({ where: { id: params.serviceId } });
   const durationMin = params.overrideDurationMin ?? service.durationMin;
@@ -136,7 +146,7 @@ export async function createAppointment(params: {
   const overlap = await prisma.appointment.findFirst({
     where: {
       businessId: params.businessId,
-      status: "confirmed",
+      status: { in: SLOT_BLOCKING_STATUSES },
       ...(params.staffId ? { staffId: params.staffId } : {}),
       startTime: { lt: endTime },
       endTime: { gt: params.startTime },
@@ -152,6 +162,20 @@ export async function createAppointment(params: {
       staffId: params.staffId ?? null,
       startTime: params.startTime,
       endTime,
+      ...(params.status ? { status: params.status } : {}),
+      ...(params.depositAmountIls !== undefined ? { depositAmountIls: params.depositAmountIls, depositStatus: "pending" } : {}),
+      ...(params.depositExpiresAt ? { depositExpiresAt: params.depositExpiresAt } : {}),
     },
+  });
+}
+
+/** Attaches the generated payment link to a pending-deposit appointment, once we have it. */
+export async function attachDepositPaymentLink(
+  appointmentId: string,
+  params: { provider: string; paymentUrl: string; providerRef: string }
+) {
+  await prisma.appointment.update({
+    where: { id: appointmentId },
+    data: { depositProvider: params.provider, depositPaymentUrl: params.paymentUrl, depositProviderRef: params.providerRef },
   });
 }

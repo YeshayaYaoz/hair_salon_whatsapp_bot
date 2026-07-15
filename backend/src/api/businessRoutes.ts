@@ -99,6 +99,9 @@ const profileSchema = z.object({
   cancellationPolicy: z.string().max(500).optional(),
   referralText: z.string().max(500).optional(),
   digestEnabled: z.boolean().optional(),
+  depositEnabled: z.boolean().optional(),
+  depositAmountIls: z.number().int().nonnegative().max(100000).optional(),
+  depositHoldMinutes: z.number().int().min(5).max(1440).optional(),
 });
 
 businessRouter.put("/me", async (req: AuthedRequest, res) => {
