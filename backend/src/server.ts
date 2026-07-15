@@ -15,6 +15,7 @@ import { runYieldCampaignJob } from "./billing/yieldCampaignJob.js";
 import { runRetentionJob } from "./lib/retentionJob.js";
 import { runReminderJob, runReviewJob, runDigestJob, runRoiReportJob } from "./lib/scheduledMessages.js";
 import { runDepositExpiryJob } from "./lib/depositExpiryJob.js";
+import { runMetricSnapshotJob } from "./billing/metricSnapshotJob.js";
 import { runTrackedJob } from "./lib/jobStatus.js";
 import { leadFinderRouter } from "./leadfinder/routes.js";
 
@@ -115,3 +116,7 @@ runTrackedJob("yieldCampaign", runYieldCampaignJob);
 const FIVE_MINUTES = 5 * 60 * 1000;
 setInterval(() => runTrackedJob("depositExpiry", runDepositExpiryJob), FIVE_MINUTES);
 runTrackedJob("depositExpiry", runDepositExpiryJob);
+
+const ONE_DAY = 24 * 60 * 60 * 1000;
+setInterval(() => runTrackedJob("metricSnapshot", runMetricSnapshotJob), ONE_DAY);
+runTrackedJob("metricSnapshot", runMetricSnapshotJob);

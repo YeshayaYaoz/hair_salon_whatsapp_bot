@@ -262,6 +262,36 @@ model ApiUsageEvent {
   @@index([businessId, kind, createdAt])
 }
 
+// Records every super-admin action taken on a business (block/unblock/plan change/delete/
+// impersonate) — not tied to Business via a relation (targetBusinessId is a plain string, not a
+// foreign key) so the log entry survives even if the business itself is later deleted, which is
+// exactly the action most worth having a durable record of.
+model AdminAuditLog {
+  id               String   @id @default(cuid())
+  actorEmail       String
+  action           String // "block" | "unblock" | "set_plan" | "delete" | "impersonate"
+  targetBusinessId String
+  targetBusinessName String
+  details          String? // free-text context, e.g. block reason or old/new plan
+  createdAt        DateTime @default(now())
+
+  @@index([targetBusinessId, createdAt])
+  @@index([createdAt])
+}
+
+// Daily snapshot of fleet-wide business metrics, so the super-admin panel can show a real MRR/
+// churn trend instead of only today's point-in-time numbers.
+model BusinessMetricSnapshot {
+  id             String   @id @default(cuid())
+  date           DateTime @unique @db.Date
+  mrrIls         Int
+  activeCount    Int
+  trialCount     Int
+  pastDueCount   Int
+  canceledCount  Int
+  createdAt      DateTime @default(now())
+}
+
 model PasswordResetToken {
   id         String   @id @default(cuid())
   business   Business @relation(fields: [businessId], references: [id])

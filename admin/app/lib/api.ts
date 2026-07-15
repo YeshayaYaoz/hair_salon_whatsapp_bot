@@ -13,6 +13,36 @@ export function clearToken() {
   window.localStorage.removeItem("token");
 }
 
+/** Decodes the JWT payload client-side (no signature check — just for UI, the server is the
+ * actual authority). Used to detect an impersonation token's `impersonatedBy` claim. */
+export function decodeToken(): { businessId?: string; impersonatedBy?: string } | null {
+  const token = getToken();
+  if (!token) return null;
+  try {
+    const payload = token.split(".")[1];
+    return JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+  } catch {
+    return null;
+  }
+}
+
+/** Enters impersonation: stashes the admin's own token so it can be restored, then swaps in the
+ * short-lived impersonation token. */
+export function startImpersonation(impersonationToken: string) {
+  const adminToken = getToken();
+  if (adminToken) window.sessionStorage.setItem("adminToken", adminToken);
+  setToken(impersonationToken);
+}
+
+/** Restores the admin's own token after impersonating a business, if one was stashed. */
+export function exitImpersonation(): boolean {
+  const adminToken = window.sessionStorage.getItem("adminToken");
+  if (!adminToken) return false;
+  setToken(adminToken);
+  window.sessionStorage.removeItem("adminToken");
+  return true;
+}
+
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const res = await fetch(`${API_URL}${path}`, {

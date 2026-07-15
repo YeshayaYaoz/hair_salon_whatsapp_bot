@@ -49,6 +49,39 @@ export async function sendWhatsAppTokenExpiredEmail(to: string, businessName: st
   });
 }
 
+/** Fire-and-forget signal to the operator (SUPER_ADMIN_EMAIL) — new signups and churn events,
+ * so they don't have to keep the admin panel open to notice either. */
+export async function sendAdminAlertEmail(subject: string, bodyHtml: string) {
+  const adminEmail = process.env.SUPER_ADMIN_EMAIL;
+  if (!adminEmail) return; // no admin configured — nothing to alert
+  await resendSend({
+    from: "תורי <noreply@torionline.com>",
+    to: adminEmail,
+    subject,
+    html: `
+      <div dir="rtl" style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#09090b;color:#e4e4e7;border-radius:12px;">
+        ${bodyHtml}
+        <a href="${APP_URL}/dashboard/admin" style="display:inline-block;margin-top:20px;background:#1B7FA0;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-weight:600;font-size:13px;">פתיחת פאנל הניהול</a>
+      </div>
+    `,
+  });
+}
+
+/** One-off notice from the operator to a specific business's own email — used when the super
+ * admin panel's "send message" action has no WhatsApp number to fall back to. */
+export async function sendBusinessNoticeEmail(to: string, businessName: string, text: string) {
+  await resendSend({
+    from: "תורי <noreply@torionline.com>",
+    to,
+    subject: `הודעה מ-Tori עבור ${businessName}`,
+    html: `
+      <div dir="rtl" style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#09090b;color:#e4e4e7;border-radius:12px;">
+        <p style="color:#e4e4e7;line-height:1.7;">${text}</p>
+      </div>
+    `,
+  });
+}
+
 export async function sendWelcomeEmail(to: string, name: string) {
   await resendSend({
     from: "תורי <noreply@torionline.com>",

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch } from "../../lib/api";
+import { apiFetch, startImpersonation } from "../../lib/api";
+import { useRouter } from "next/navigation";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SkeletonRow } from "../../lib/Skeleton";
 
@@ -39,6 +40,27 @@ interface PhoneUsageRow {
   whatsappByCategory: Record<string, number>;
 }
 
+interface AuditLogEntry {
+  id: string;
+  actorEmail: string;
+  action: string;
+  targetBusinessId: string;
+  targetBusinessName: string;
+  details: string | null;
+  createdAt: string;
+}
+
+interface MrrSnapshot {
+  date: string;
+  mrrIls: number;
+  activeCount: number;
+  trialCount: number;
+  pastDueCount: number;
+  canceledCount: number;
+}
+
+type StatusFilter = "all" | "trial" | "active" | "past_due" | "canceled" | "blocked" | "attention";
+
 // Must match MESSAGE_QUOTA_BY_PLAN in backend/src/lib/wallet.ts — display-only, not authoritative.
 const MESSAGE_QUOTA_BY_PLAN: Record<string, number> = { standard: 300, premium: 1000 };
 // Must match PLAN_PRICES_ILS in backend/src/billing/payplusSubscription.ts.
@@ -61,16 +83,23 @@ const STATUS_COLORS: Record<string, string> = {
 export default function AdminBusinessesPage() {
   const { lang } = useLanguage();
   const he = lang === "he";
+  const router = useRouter();
   const [businesses, setBusinesses] = useState<AdminBusiness[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [drilldown, setDrilldown] = useState<AdminBusiness | null>(null);
   const [phoneRows, setPhoneRows] = useState<PhoneUsageRow[] | null>(null);
+  const [bizAuditLog, setBizAuditLog] = useState<AuditLogEntry[] | null>(null);
   const [blockReason, setBlockReason] = useState("");
   const [planChoice, setPlanChoice] = useState<"standard" | "premium">("standard");
   const [confirmDeleteName, setConfirmDeleteName] = useState("");
+  const [messageText, setMessageText] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
+  const [mrrHistory, setMrrHistory] = useState<MrrSnapshot[] | null>(null);
+  const [showAuditLog, setShowAuditLog] = useState(false);
+  const [globalAuditLog, setGlobalAuditLog] = useState<AuditLogEntry[] | null>(null);
 
   function reload() {
     return apiFetch<AdminBusiness[]>("/api/business/admin/businesses")
@@ -80,6 +109,7 @@ export default function AdminBusinessesPage() {
 
   useEffect(() => {
     reload();
+    apiFetch<MrrSnapshot[]>("/api/business/admin/mrr-history").then(setMrrHistory).catch(() => setMrrHistory([]));
   }, []);
 
   function openDrilldown(b: AdminBusiness) {
@@ -87,19 +117,37 @@ export default function AdminBusinessesPage() {
     setBlockReason("");
     setPlanChoice((b.subscriptionPlan as "standard" | "premium") ?? "standard");
     setConfirmDeleteName("");
+    setMessageText("");
     setActionError(null);
+    setBizAuditLog(null);
+    apiFetch<AuditLogEntry[]>(`/api/business/admin/audit-log?businessId=${b.id}`)
+      .then(setBizAuditLog)
+      .catch(() => setBizAuditLog([]));
   }
 
-  async function runAction(fn: () => Promise<unknown>) {
+  async function runAction(fn: () => Promise<unknown>, keepOpen = false) {
     setActionBusy(true);
     setActionError(null);
     try {
       await fn();
       await reload();
-      setDrilldown(null);
+      if (!keepOpen) setDrilldown(null);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Failed");
     } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function impersonate(b: AdminBusiness) {
+    setActionBusy(true);
+    setActionError(null);
+    try {
+      const { token } = await apiFetch<{ token: string }>(`/api/business/admin/businesses/${b.id}/impersonate`, { method: "POST" });
+      startImpersonation(token);
+      router.push("/dashboard/analytics");
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed");
       setActionBusy(false);
     }
   }
@@ -112,9 +160,50 @@ export default function AdminBusinessesPage() {
       .catch(() => setPhoneRows([]));
   }, [drilldown]);
 
-  const filtered = (businesses ?? []).filter(
-    (b) => b.name.toLowerCase().includes(search.toLowerCase()) || b.email.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    if (!showAuditLog || globalAuditLog) return;
+    apiFetch<AuditLogEntry[]>("/api/business/admin/audit-log")
+      .then(setGlobalAuditLog)
+      .catch(() => setGlobalAuditLog([]));
+  }, [showAuditLog, globalAuditLog]);
+
+  const filtered = (businesses ?? [])
+    .filter((b) => b.name.toLowerCase().includes(search.toLowerCase()) || b.email.toLowerCase().includes(search.toLowerCase()))
+    .filter((b) => {
+      if (statusFilter === "all") return true;
+      if (statusFilter === "blocked") return Boolean(b.blockedAt);
+      if (statusFilter === "attention") {
+        return b.subscriptionStatus === "past_due" || (b.whatsappConnected && !b.whatsappTokenValid) || b.walletBalanceAgorot < 0;
+      }
+      return b.subscriptionStatus === statusFilter;
+    });
+
+  function exportCsv() {
+    const rows = businesses ?? [];
+    const header = [
+      "name", "email", "createdAt", "subscriptionStatus", "subscriptionPlan", "billingCycle",
+      "blocked", "whatsappConnected", "paymentProvider", "invoiceProvider", "walletBalanceIls",
+      "claudeCost30dIls", "appointments", "customers",
+    ];
+    const lines = rows.map((b) =>
+      [
+        b.name, b.email, b.createdAt, b.subscriptionStatus, b.subscriptionPlan ?? "", b.billingCycle,
+        b.blockedAt ? "yes" : "no", b.whatsappConnected ? "yes" : "no", b.paymentProvider ?? "", b.invoiceProvider ?? "",
+        (b.walletBalanceAgorot / 100).toFixed(2), (b.realClaudeCostAgorot30d / 100).toFixed(2),
+        b._count.appointments, b._count.customers,
+      ]
+        .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+        .join(",")
+    );
+    const csv = [header.join(","), ...lines].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `tori-businesses-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   function fmtDate(iso: string) {
     return new Date(iso).toLocaleDateString(he ? "he-IL" : "en-US", { day: "numeric", month: "short", year: "numeric" });
@@ -145,16 +234,65 @@ export default function AdminBusinessesPage() {
             {businesses ? (he ? `${businesses.length} עסקים רשומים` : `${businesses.length} registered businesses`) : "…"}
           </p>
         </div>
-        <input
-          placeholder={he ? "חיפוש לפי שם או אימייל" : "Search by name or email"}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-64"
-        />
+        <div className="flex items-center gap-2 flex-wrap">
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusFilter)} className="text-sm">
+            <option value="all">{he ? "כל הסטטוסים" : "All statuses"}</option>
+            <option value="trial">{he ? "בניסיון" : "Trial"}</option>
+            <option value="active">{he ? "פעיל" : "Active"}</option>
+            <option value="past_due">{he ? "בפיגור" : "Past due"}</option>
+            <option value="canceled">{he ? "בוטל" : "Canceled"}</option>
+            <option value="blocked">{he ? "חסום" : "Blocked"}</option>
+            <option value="attention">{he ? "דורש תשומת לב" : "Needs attention"}</option>
+          </select>
+          <input
+            placeholder={he ? "חיפוש לפי שם או אימייל" : "Search by name or email"}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-56"
+          />
+          <button onClick={exportCsv} className="text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-700">
+            {he ? "⬇ ייצוא CSV" : "⬇ Export CSV"}
+          </button>
+          <button
+            onClick={() => setShowAuditLog((v) => !v)}
+            className="text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-700"
+          >
+            {he ? "📋 יומן פעולות" : "📋 Audit log"}
+          </button>
+        </div>
       </div>
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3 mb-4">{error}</div>
+      )}
+
+      {showAuditLog && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4 animate-fade-up max-h-72 overflow-y-auto">
+          <h2 className="text-sm font-semibold text-gray-800 mb-2">{he ? "פעולות אדמין אחרונות" : "Recent admin actions"}</h2>
+          {globalAuditLog === null ? (
+            <div className="text-xs text-gray-400 py-4 text-center">…</div>
+          ) : globalAuditLog.length === 0 ? (
+            <div className="text-xs text-gray-400 py-4 text-center">{he ? "אין פעולות עדיין" : "No actions yet"}</div>
+          ) : (
+            <ul className="text-xs text-gray-600 space-y-1.5">
+              {globalAuditLog.map((entry) => (
+                <li key={entry.id} className="flex items-center gap-2 flex-wrap">
+                  <span className="text-gray-400 tabular-nums">{new Date(entry.createdAt).toLocaleString(he ? "he-IL" : "en-US")}</span>
+                  <span className="font-semibold text-gray-800">{entry.action}</span>
+                  <span>{entry.targetBusinessName}</span>
+                  {entry.details && <span className="text-gray-400">— {entry.details}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {mrrHistory && mrrHistory.length > 1 && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4 animate-fade-up">
+          <h2 className="text-sm font-semibold text-gray-800 mb-3">{he ? "מגמת MRR (יומי)" : "MRR trend (daily)"}</h2>
+          <MrrSparkline snapshots={mrrHistory} he={he} />
+        </div>
       )}
 
       {businesses && (
@@ -326,6 +464,41 @@ export default function AdminBusinessesPage() {
             <div className="border border-gray-200 rounded-lg p-3.5 mb-4 space-y-3">
               {actionError && <div className="bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg px-3 py-2">{actionError}</div>}
 
+              {/* Impersonate + send message */}
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={actionBusy}
+                  onClick={() => impersonate(drilldown)}
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 disabled:opacity-50"
+                >
+                  {he ? "👁️ צפה כעסק זה" : "👁️ View as this business"}
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  placeholder={he ? "הודעה לעסק (WhatsApp אם מחובר, אחרת מייל)" : "Message to business (WhatsApp if connected, else email)"}
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  className="flex-1 text-xs"
+                />
+                <button
+                  disabled={actionBusy || !messageText.trim()}
+                  onClick={() =>
+                    runAction(
+                      () =>
+                        apiFetch(`/api/business/admin/businesses/${drilldown.id}/message`, {
+                          method: "POST",
+                          body: JSON.stringify({ text: messageText }),
+                        }),
+                      true
+                    ).then(() => setMessageText(""))
+                  }
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {he ? "שלח" : "Send"}
+                </button>
+              </div>
+
               {/* Block / unblock */}
               {drilldown.blockedAt ? (
                 <div className="flex items-center justify-between gap-3">
@@ -418,6 +591,22 @@ export default function AdminBusinessesPage() {
               </div>
             </div>
 
+            {bizAuditLog && bizAuditLog.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-xs font-semibold text-gray-700 mb-1.5">{he ? "היסטוריית פעולות אדמין" : "Admin action history"}</h3>
+                <ul className="text-xs text-gray-500 space-y-1">
+                  {bizAuditLog.map((entry) => (
+                    <li key={entry.id}>
+                      <span className="tabular-nums text-gray-400">{new Date(entry.createdAt).toLocaleString(he ? "he-IL" : "en-US")}</span>
+                      {" · "}
+                      <span className="font-medium text-gray-700">{entry.action}</span>
+                      {entry.details && <span> — {entry.details}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <p className="text-xs text-gray-500 mb-4">
               {he ? "עלות בפועל, לפי מספר טלפון, 30 יום אחרונים" : "Real usage by phone number, last 30 days"}
             </p>
@@ -456,6 +645,43 @@ export default function AdminBusinessesPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function MrrSparkline({ snapshots, he }: { snapshots: MrrSnapshot[]; he: boolean }) {
+  const width = 720;
+  const height = 90;
+  const pad = 4;
+  const max = Math.max(...snapshots.map((s) => s.mrrIls), 1);
+  const min = Math.min(...snapshots.map((s) => s.mrrIls), 0);
+  const range = max - min || 1;
+  const stepX = (width - pad * 2) / Math.max(snapshots.length - 1, 1);
+
+  const points = snapshots.map((s, i) => {
+    const x = pad + i * stepX;
+    const y = height - pad - ((s.mrrIls - min) / range) * (height - pad * 2);
+    return { x, y, s };
+  });
+  const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const areaD = `${pathD} L${points[points.length - 1].x.toFixed(1)},${height - pad} L${points[0].x.toFixed(1)},${height - pad} Z`;
+  const first = snapshots[0];
+  const last = snapshots[snapshots.length - 1];
+  const deltaPct = first.mrrIls > 0 ? Math.round(((last.mrrIls - first.mrrIls) / first.mrrIls) * 100) : 0;
+
+  return (
+    <div>
+      <div className="flex items-baseline gap-2 mb-2">
+        <span className="text-lg font-bold text-gray-900 tabular-nums">₪{last.mrrIls.toLocaleString()}</span>
+        <span className={`text-xs font-semibold ${deltaPct >= 0 ? "text-green-600" : "text-red-600"}`}>
+          {deltaPct >= 0 ? "▲" : "▼"} {Math.abs(deltaPct)}% {he ? `לאורך ${snapshots.length} ימים` : `over ${snapshots.length}d`}
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-24" preserveAspectRatio="none">
+        <path d={areaD} fill="#1B7FA0" opacity="0.08" />
+        <path d={pathD} fill="none" stroke="#1B7FA0" strokeWidth="2" />
+        <circle cx={points[points.length - 1].x} cy={points[points.length - 1].y} r="3" fill="#1B7FA0" />
+      </svg>
     </div>
   );
 }

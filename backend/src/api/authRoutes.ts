@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { signBusinessToken } from "../lib/auth.js";
 import { rateLimit } from "../lib/rateLimit.js";
-import { APP_URL, sendPasswordResetEmail, sendWelcomeEmail } from "../lib/email.js";
+import { APP_URL, sendPasswordResetEmail, sendWelcomeEmail, sendAdminAlertEmail } from "../lib/email.js";
 import {
   getAuthUrl,
   exchangeCode,
@@ -42,6 +42,10 @@ authRouter.post("/signup", authLimiter, async (req, res) => {
 
   // Send welcome email (non-fatal)
   sendWelcomeEmail(email, name).catch((err) => console.error("Welcome email failed:", err));
+  sendAdminAlertEmail(
+    `🎉 עסק חדש נרשם — ${name}`,
+    `<h2 style="color:#fff;margin-bottom:8px;">${name} נרשם/ה לתורי</h2><p style="color:#a1a1aa;">${email}</p>`
+  ).catch((err) => console.error("New-signup admin alert failed:", err));
 
   res.status(201).json({ token: signBusinessToken(business.id) });
 });
@@ -163,7 +167,13 @@ authRouter.post("/google/callback", authLimiter, async (req, res) => {
 
     await saveGoogleTokensFromResponse(business.id, tokens);
 
-    if (isNewAccount) sendWelcomeEmail(profile.email, business.name).catch((err) => console.error("Welcome email failed:", err));
+    if (isNewAccount) {
+      sendWelcomeEmail(profile.email, business.name).catch((err) => console.error("Welcome email failed:", err));
+      sendAdminAlertEmail(
+        `🎉 עסק חדש נרשם — ${business.name}`,
+        `<h2 style="color:#fff;margin-bottom:8px;">${business.name} נרשם/ה לתורי (Google)</h2><p style="color:#a1a1aa;">${profile.email}</p>`
+      ).catch((err) => console.error("New-signup admin alert failed:", err));
+    }
 
     res.json({ token: signBusinessToken(business.id) });
   } catch (err) {

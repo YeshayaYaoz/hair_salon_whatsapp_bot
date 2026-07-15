@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { clearToken, apiFetch } from "../lib/api";
+import { clearToken, apiFetch, decodeToken, exitImpersonation } from "../lib/api";
 import { useLanguage } from "../lib/LanguageContext";
 import { AuthGuard } from "../lib/AuthGuard";
 
@@ -53,6 +53,29 @@ const NAV_GROUPS: { titleKey: keyof ReturnType<typeof useLanguage>["t"]["navGrou
 const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 const BOTTOM_TAB_ITEMS = NAV_ITEMS.slice(0, 5);
 const MORE_ITEMS = NAV_ITEMS.slice(5);
+
+function ImpersonationBanner() {
+  const router = useRouter();
+  const { lang } = useLanguage();
+  const he = lang === "he";
+  const claim = decodeToken();
+  if (!claim?.impersonatedBy) return null;
+
+  return (
+    <div className="mb-4 bg-amber-500 text-white text-sm font-medium rounded-xl px-4 py-2.5 flex items-center justify-between gap-3">
+      <span>👁️ {he ? "צופה כעסק זה (מצב תמיכה)" : "Viewing as this business (support mode)"}</span>
+      <button
+        onClick={() => {
+          if (exitImpersonation()) router.push("/dashboard/admin");
+          else router.push("/login");
+        }}
+        className="bg-white/20 hover:bg-white/30 rounded-lg px-3 py-1 text-xs font-semibold"
+      >
+        {he ? "יציאה" : "Exit"}
+      </button>
+    </div>
+  );
+}
 
 function TrialBanner({ status, createdAt }: { status: string | null; createdAt: string | null }) {
   const { t } = useLanguage();
@@ -282,6 +305,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
       {/* Main content */}
       <main className="flex-1 md:ms-64 p-4 pt-[4.5rem] pb-24 md:p-8 md:pt-8 md:pb-8 overflow-auto">
+        <ImpersonationBanner />
         <TrialBanner status={trial?.status ?? null} createdAt={trial?.createdAt ?? null} />
         {children}
       </main>

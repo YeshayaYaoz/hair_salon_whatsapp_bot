@@ -1,7 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
-import { requireAuth, type AuthedRequest } from "../lib/auth.js";
+import { requireAuth, signImpersonationToken, type AuthedRequest } from "../lib/auth.js";
+import { logAdminAction } from "../lib/adminAudit.js";
+import { sendAdminAlertEmail, sendBusinessNoticeEmail } from "../lib/email.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import { requireActiveSubscription } from "../lib/subscriptionGate.js";
 import { getAuthUrl, saveGoogleTokens, disconnectGoogleCalendar, deleteCalendarEvent, GoogleCalendarNotConfiguredError } from "../lib/googleCalendar.js";
@@ -153,11 +155,24 @@ businessRouter.post("/admin/businesses/:id/block", requireSuperAdmin, async (req
     where: { id: req.params.id },
     data: { blockedAt: new Date(), blockedReason: parsed.data.reason ?? null },
   });
+  await logAdminAction({
+    actorEmail: process.env.SUPER_ADMIN_EMAIL!,
+    action: "block",
+    targetBusinessId: business.id,
+    targetBusinessName: business.name,
+    details: parsed.data.reason,
+  });
   res.json({ ok: true, blockedAt: business.blockedAt });
 });
 
 businessRouter.post("/admin/businesses/:id/unblock", requireSuperAdmin, async (req: AuthedRequest, res) => {
-  await prisma.business.update({ where: { id: req.params.id }, data: { blockedAt: null, blockedReason: null } });
+  const business = await prisma.business.update({ where: { id: req.params.id }, data: { blockedAt: null, blockedReason: null } });
+  await logAdminAction({
+    actorEmail: process.env.SUPER_ADMIN_EMAIL!,
+    action: "unblock",
+    targetBusinessId: business.id,
+    targetBusinessName: business.name,
+  });
   res.json({ ok: true });
 });
 
@@ -173,6 +188,7 @@ const planSchema = z.object({
 businessRouter.post("/admin/businesses/:id/plan", requireSuperAdmin, async (req: AuthedRequest, res) => {
   const parsed = planSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const before = await prisma.business.findUnique({ where: { id: req.params.id }, select: { subscriptionPlan: true, subscriptionStatus: true } });
   const business = await prisma.business.update({
     where: { id: req.params.id },
     data: {
@@ -181,6 +197,21 @@ businessRouter.post("/admin/businesses/:id/plan", requireSuperAdmin, async (req:
       subscriptionStatus: parsed.data.subscriptionStatus ?? "active",
     },
   });
+  await logAdminAction({
+    actorEmail: process.env.SUPER_ADMIN_EMAIL!,
+    action: "set_plan",
+    targetBusinessId: business.id,
+    targetBusinessName: business.name,
+    details: `${before?.subscriptionPlan ?? "none"}/${before?.subscriptionStatus} → ${business.subscriptionPlan}/${business.subscriptionStatus}`,
+  });
+
+  if (before?.subscriptionStatus !== "canceled" && business.subscriptionStatus === "canceled") {
+    sendAdminAlertEmail(
+      `📉 עסק בוטל — ${business.name}`,
+      `<h2 style="color:#fff;margin-bottom:8px;">${business.name} עבר לסטטוס "בוטל"</h2><p style="color:#a1a1aa;">שונה ידנית דרך פאנל הניהול.</p>`
+    ).catch((err) => console.error("[admin] Churn alert email failed:", err));
+  }
+
   res.json({ ok: true, subscriptionPlan: business.subscriptionPlan, subscriptionStatus: business.subscriptionStatus });
 });
 
@@ -218,7 +249,80 @@ businessRouter.delete("/admin/businesses/:id", requireSuperAdmin, async (req: Au
     prisma.business.delete({ where: { id: businessId } }),
   ]);
   console.log(`[admin] Business ${businessId} (${business.name}) permanently deleted by super admin`);
+  await logAdminAction({
+    actorEmail: process.env.SUPER_ADMIN_EMAIL!,
+    action: "delete",
+    targetBusinessId: businessId,
+    targetBusinessName: business.name,
+  });
   res.json({ ok: true });
+});
+
+// Support impersonation: a short-lived token (1h) that logs the admin panel's client straight
+// into a business's own dashboard, exactly as they see it, without knowing their password.
+businessRouter.post("/admin/businesses/:id/impersonate", requireSuperAdmin, async (req: AuthedRequest, res) => {
+  const business = await prisma.business.findUnique({ where: { id: req.params.id }, select: { id: true, name: true } });
+  if (!business) return res.status(404).json({ error: "Not found" });
+
+  const adminEmail = process.env.SUPER_ADMIN_EMAIL!;
+  const token = signImpersonationToken(business.id, adminEmail);
+  await logAdminAction({
+    actorEmail: adminEmail,
+    action: "impersonate",
+    targetBusinessId: business.id,
+    targetBusinessName: business.name,
+  });
+  res.json({ token });
+});
+
+// Recent admin actions across all businesses — the audit trail for block/unblock/plan/delete/
+// impersonate. Not scoped by businessId by default so it reads as one operator timeline; pass
+// ?businessId= to see just one business's history.
+businessRouter.get("/admin/audit-log", requireSuperAdmin, async (req: AuthedRequest, res) => {
+  const businessId = req.query.businessId as string | undefined;
+  const entries = await prisma.adminAuditLog.findMany({
+    where: businessId ? { targetBusinessId: businessId } : undefined,
+    orderBy: { createdAt: "desc" },
+    take: 200,
+  });
+  res.json(entries);
+});
+
+// Daily MRR/status-count history for the trend chart — populated by metricSnapshotJob.ts.
+businessRouter.get("/admin/mrr-history", requireSuperAdmin, async (_req: AuthedRequest, res) => {
+  const snapshots = await prisma.businessMetricSnapshot.findMany({
+    orderBy: { date: "asc" },
+    take: 90,
+  });
+  res.json(snapshots);
+});
+
+// Sends a one-off WhatsApp warning/notice to the business's own registered number (not their
+// customers) — e.g. "please update billing" before actually blocking the account.
+const adminMessageSchema = z.object({ text: z.string().min(1).max(1000) });
+businessRouter.post("/admin/businesses/:id/message", requireSuperAdmin, async (req: AuthedRequest, res) => {
+  const parsed = adminMessageSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const business = await prisma.business.findUnique({
+    where: { id: req.params.id },
+    select: { name: true, email: true, whatsappPhoneNumberId: true, whatsappAccessToken: true, notificationPhone: true },
+  });
+  if (!business) return res.status(404).json({ error: "Not found" });
+
+  if (business.whatsappPhoneNumberId && business.whatsappAccessToken && business.notificationPhone) {
+    const accessToken = decryptSecret(business.whatsappAccessToken);
+    await sendWhatsAppMessage({
+      phoneNumberId: business.whatsappPhoneNumberId,
+      accessToken,
+      to: business.notificationPhone,
+      text: parsed.data.text,
+    });
+    return res.json({ ok: true, channel: "whatsapp" });
+  }
+
+  await sendBusinessNoticeEmail(business.email, business.name, parsed.data.text);
+  res.json({ ok: true, channel: "email" });
 });
 
 // Global background job health (reminders/reviews/digest/retention) — same info for every

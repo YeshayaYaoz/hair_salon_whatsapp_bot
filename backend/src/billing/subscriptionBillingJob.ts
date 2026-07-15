@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
+import { sendAdminAlertEmail } from "../lib/email.js";
 import {
   chargeSubscriptionToken,
   PLAN_PRICES_ILS,
@@ -104,6 +105,10 @@ export async function runSubscriptionBillingJob(): Promise<void> {
         business,
         `⚠️ החיוב החודשי עבור תורי (₪${amountIls}) נכשל. כדי למנוע עצירת הבוט, אנא עדכן/י את אמצעי התשלום בדשבורד: ${FRONTEND_URL}/dashboard/billing`
       );
+      sendAdminAlertEmail(
+        `⚠️ חיוב נכשל — ${business.name}`,
+        `<h2 style="color:#fff;margin-bottom:8px;">${business.name} עבר ל-past_due</h2><p style="color:#a1a1aa;">חיוב של ₪${amountIls} נכשל: ${result.error}</p>`
+      ).catch((err) => console.error("[subscriptionBilling] Churn-risk admin alert failed:", err));
     }
   }
 }
