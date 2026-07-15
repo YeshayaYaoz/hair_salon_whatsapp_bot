@@ -536,14 +536,21 @@ export default function AppointmentsPage() {
                         {formatDateTimeInTz(a.startTime, tz)}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="text-gray-700 font-medium text-sm">{a.customer.name ?? "—"}</div>
-                        <div className="text-gray-400 text-xs" dir="ltr">{formatPhone(a.customer.phone)}</div>
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-[#1B7FA0]/10 text-[#1B7FA0] flex items-center justify-center text-xs font-bold shrink-0">
+                            {(a.customer.name ?? "?").trim().charAt(0) || "?"}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-gray-700 font-medium text-sm truncate">{a.customer.name ?? "—"}</div>
+                            <div className="text-gray-400 text-xs" dir="ltr">{formatPhone(a.customer.phone)}</div>
+                          </div>
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-gray-600 text-sm">{a.service.name}</td>
                       <td className="px-4 py-3 text-gray-500 text-sm hidden md:table-cell">{a.staff?.name ?? "—"}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex text-xs font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLES[a.status] ?? "bg-gray-100 text-gray-500 border-gray-200"}`}>
-                          {a.status}
+                          {a.status === "confirmed" ? (lang === "he" ? "מאושר" : "Confirmed") : a.status === "cancelled" ? (lang === "he" ? "בוטל" : "Cancelled") : a.status}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-end">

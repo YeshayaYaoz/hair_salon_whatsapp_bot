@@ -686,7 +686,11 @@ businessRouter.get("/analytics", async (req: AuthedRequest, res) => {
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
   sevenDaysAgo.setHours(0, 0, 0, 0);
 
-  const [monthAppts, weekAppts, topServices, newCustomers, allTimeCount] = await Promise.all([
+  // Start of the 7-day window *before* the current one — used for the week-over-week trend.
+  const fourteenDaysAgo = new Date(sevenDaysAgo);
+  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 7);
+
+  const [monthAppts, weekAppts, prevWeekCount, topServices, newCustomers, allTimeCount] = await Promise.all([
     prisma.appointment.findMany({
       where: { businessId: bizId, startTime: { gte: startOfMonth } },
       include: { service: { select: { priceCents: true } } },
@@ -694,6 +698,9 @@ businessRouter.get("/analytics", async (req: AuthedRequest, res) => {
     prisma.appointment.findMany({
       where: { businessId: bizId, startTime: { gte: sevenDaysAgo }, status: "confirmed" },
       select: { startTime: true },
+    }),
+    prisma.appointment.count({
+      where: { businessId: bizId, status: "confirmed", startTime: { gte: fourteenDaysAgo, lt: sevenDaysAgo } },
     }),
     prisma.appointment.groupBy({
       by: ["serviceId"],
@@ -744,6 +751,7 @@ businessRouter.get("/analytics", async (req: AuthedRequest, res) => {
     newCustomersThisMonth: newCustomers,
     allTimeConfirmed: allTimeCount,
     dailyThisWeek,
+    prevWeekConfirmed: prevWeekCount,
     topServices: topServicesList,
   });
 });

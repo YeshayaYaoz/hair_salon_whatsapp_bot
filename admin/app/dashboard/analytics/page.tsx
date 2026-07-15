@@ -15,6 +15,7 @@ interface Analytics {
   newCustomersThisMonth: number;
   allTimeConfirmed: number;
   dailyThisWeek: { date: string; count: number }[];
+  prevWeekConfirmed?: number;
   topServices: { name: string; count: number }[];
 }
 
@@ -325,7 +326,28 @@ export default function AnalyticsPage() {
           className="rounded-2xl p-6 animate-fade-up stagger-5"
           style={{ background: "#FFFFFF", border: "1px solid #E5E5F0" }}
         >
-          <h2 className="text-sm font-semibold text-gray-900 mb-5">{t.last7Days}</h2>
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-sm font-semibold text-gray-900">{t.last7Days}</h2>
+            {(() => {
+              // Week-over-week trend chip: this week's confirmed bookings vs the 7 days before.
+              const thisWeek = data.dailyThisWeek.reduce((s, d) => s + d.count, 0);
+              const prev = data.prevWeekConfirmed ?? 0;
+              if (prev === 0 && thisWeek === 0) return null;
+              const pct = prev === 0 ? 100 : Math.round(((thisWeek - prev) / prev) * 100);
+              const up = pct >= 0;
+              return (
+                <span
+                  className="text-xs font-bold px-2 py-1 rounded-full tabular-nums"
+                  style={up
+                    ? { background: "rgba(22,163,74,0.1)", color: "#16A34A" }
+                    : { background: "rgba(220,38,38,0.08)", color: "#DC2626" }}
+                  title={lang === "he" ? "לעומת 7 הימים הקודמים" : "vs. the previous 7 days"}
+                >
+                  {up ? "↑" : "↓"} {Math.abs(pct)}%
+                </span>
+              );
+            })()}
+          </div>
           <div className="flex items-end gap-2" style={{ height: 128 }}>
             {data.dailyThisWeek.map(({ date, count }, i) => {
               const heightPct = maxDaily > 0 ? (count / maxDaily) * 100 : 0;

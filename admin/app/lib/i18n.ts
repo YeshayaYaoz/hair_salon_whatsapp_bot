@@ -145,21 +145,21 @@ const translations = {
     daysShort: ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"],
 
     // Analytics
-    analyticsTitle: "סטטיסטיקות", analyticsSubtitle: "סקירת ביצועי הסלון שלך",
+    analyticsTitle: "סטטיסטיקות", analyticsSubtitle: "מה קורה בעסק — במבט אחד",
     thisMonth: "החודש", revenue: "הכנסות החודש",
-    newCustomers: "לקוחות חדשים", allTime: "סה\"כ הזמנות",
-    last7Days: "7 הימים האחרונים", topServices: "שירותים מובילים",
-    setupChecklist: "מתחילים להגדיר", setupSubtitle: "השלם את השלבים הבאים כדי להתחיל:",
-    stepServices: "הוסף שירותים", stepServicesHint: "הכנס את השירותים שלך עם מחירים ומשכים",
-    stepHours: "הגדר שעות פעילות", stepHoursHint: "הבוט לא יקבע תורים מחוץ לשעות הפעילות",
-    stepWhatsapp: "חבר וואטסאפ", stepWhatsappHint: "חיבור בלחיצה אחת דרך מטא — לוקח 2 דקות",
-    stepBilling: "הפעל מנוי", stepBillingHint: "שמור על הבוט פעיל לאחר תקופת הניסיון",
+    newCustomers: "לקוחות חדשים", allTime: "סה\"כ תורים",
+    last7Days: "7 הימים האחרונים", topServices: "השירותים הכי מבוקשים",
+    setupChecklist: "יאללה, מתחילים 🚀", setupSubtitle: "עוד כמה צעדים קטנים והבוט באוויר:",
+    stepServices: "הוסיפו שירותים", stepServicesHint: "מה אתם מציעים, כמה זה עולה וכמה זמן זה לוקח",
+    stepHours: "הגדירו שעות פעילות", stepHoursHint: "שהבוט ידע מתי אתם פתוחים — הוא לא יקבע כשאתם סגורים",
+    stepWhatsapp: "חברו וואטסאפ", stepWhatsappHint: "חיבור בלחיצה אחת דרך מטא — לוקח 2 דקות",
+    stepBilling: "הפעילו מנוי", stepBillingHint: "כדי שהבוט לא ייעצר כשתקופת הניסיון נגמרת",
 
     // Appointments
-    appointmentsTitle: "תורים", appointmentsSubtitle: "הזמנות שנקבעו דרך וואטסאפ",
-    upcoming: "קרובים", past: "עבר", cancelled: "בוטלו", all: "הכל",
+    appointmentsTitle: "תורים", appointmentsSubtitle: "כל התורים שנקבעו בוואטסאפ — במקום אחד",
+    upcoming: "קרובים", past: "היסטוריה", cancelled: "בוטלו", all: "הכל",
     when: "מועד", customer: "לקוח", service: "שירות", staff: "עובד", status: "סטטוס",
-    noAppointments: "לא נמצאו תורים.", searchPlaceholder: "חיפוש לפי שם או טלפון…",
+    noAppointments: "עדיין אין פה תורים", searchPlaceholder: "חפשו שם או טלפון…",
     exportCsv: "ייצוא CSV",
 
     // Analytics stat subtitles
@@ -167,24 +167,24 @@ const translations = {
     subNewCustomers: "הזמינו החודש", subAllTime: "סה\"כ מאושרות",
 
     // Services
-    servicesTitle: "שירותים", addService: "הוסף שירות",
+    servicesTitle: "שירותים", addService: "הוספת שירות",
     serviceName: "שם השירות", price: "מחיר (₪)", duration: "משך (דקות)",
-    descriptionOptional: "תיאור (אופציונלי)",
-    noServices: "אין שירותים עדיין. הוסף אחד למטה.",
-    servicesSubtitle: "הוסף את השירותים שהסלון שלך מציע.",
+    descriptionOptional: "תיאור (לא חובה)",
+    noServices: "עוד לא הוספתם שירותים — זה השלב הראשון, יאללה 👇",
+    servicesSubtitle: "מה אתם מציעים? תספורת, צבע, טיפול פנים — הכל נכנס לפה.",
 
     // Staff
     staffTitle: "צוות",
-    staffSubtitle: "הוסף את אנשי הצוות בסלון. לקוחות יכולים לבחור ספר/ית מועדפ/ת בעת ההזמנה.",
-    addStaffMember: "הוסף איש/ת צוות", staffName: "שם",
-    noStaff: "אין אנשי צוות עדיין. הוסף למטה.", remove: "הסר",
+    staffSubtitle: "מי עובד אצלכם? לקוחות יוכלו לבקש מישהו ספציפי כשהם קובעים תור.",
+    addStaffMember: "הוספת איש/ת צוות", staffName: "שם",
+    noStaff: "עוד אין אנשי צוות. מוסיפים למטה 👇", remove: "הסרה",
 
     // Hours
-    hoursTitle: "שעות פעילות", hoursSubtitle: "הגדר מתי הסלון פתוח לקביעת תורים",
-    saveHours: "שמור שעות", to: "עד",
+    hoursTitle: "שעות פעילות", hoursSubtitle: "מתי אתם פתוחים? הבוט יקבע תורים רק בשעות האלה.",
+    saveHours: "שמירת שעות", to: "עד",
 
     // WhatsApp
-    whatsappTitle: "וואטסאפ", whatsappSubtitle: "חבר את מספר הוואטסאפ העסקי שלך",
+    whatsappTitle: "וואטסאפ", whatsappSubtitle: "מחברים את הוואטסאפ של העסק — ומכאן הבוט עונה בשבילכם",
     connected: "מחובר", notConnected: "לא מחובר",
     phoneNumberId: "מזהה מספר הטלפון", accessToken: "טוקן גישה",
     phoneNumberIdPlaceholder: "לדוג׳ 123456789012345",
@@ -193,22 +193,22 @@ const translations = {
 
     // FAQ
     faqTitle: "שאלות נפוצות",
-    faqSubtitle: "שאלות ותשובות שהבוט ישתמש בהן כדי לענות ללקוחות (לדוג׳ חניה, תשלום, מדיניות ביטול).",
-    addFaqEntry: "הוסף שאלה", question: "שאלה", answer: "תשובה",
-    noFaq: "אין שאלות נפוצות עדיין. הוסף למטה.",
-    questionPlaceholder: "שאלה (לדוג׳ האם יש חניה?)", answerPlaceholder: "תשובה",
+    faqSubtitle: "שאלות שחוזרות על עצמן? תנו לבוט תשובות מוכנות והוא יענה לבד (חניה, ביטולים, אמצעי תשלום…).",
+    addFaqEntry: "הוספת שאלה", question: "שאלה", answer: "תשובה",
+    noFaq: "עוד אין שאלות. מוסיפים למטה 👇",
+    questionPlaceholder: "שאלה (למשל: יש חניה?)", answerPlaceholder: "תשובה",
 
     // Customers
-    customersTitle: "לקוחות", totalCustomers: "לקוחות בסה\"כ", totalBookings: "סה\"כ הזמנות",
+    customersTitle: "לקוחות", totalCustomers: "לקוחות בסה\"כ", totalBookings: "סה\"כ תורים",
     customerPhoneCol: "טלפון", customerIdCol: "מזהה",
-    customersHint: "לחץ על כל לקוח כדי לצפות בשיחת הוואטסאפ שלו עם הבוט ולשלוח הודעות.",
-    viewConversation: "צפה בשיחה",
-    noCustomers: "אין לקוחות עדיין — הם יופיעו כאן לאחר ההזמנה הראשונה.",
+    customersHint: "לוחצים על לקוח כדי לראות את השיחה שלו עם הבוט ולשלוח לו הודעה.",
+    viewConversation: "לשיחה",
+    noCustomers: "עדיין אין לקוחות — ברגע שמישהו יכתוב לבוט, הוא יופיע כאן.",
 
     // Waitlist
-    waitlistTitle: "רשימת המתנה", waitlistSubtitle: "לקוחות שממתינים למועד פנוי",
+    waitlistTitle: "רשימת המתנה", waitlistSubtitle: "לקוחות שמחכים שיתפנה מקום",
     pendingWaitlist: "ממתינים", notifiedWaitlist: "עודכנו",
-    markNotified: "סמן כמעודכן", noWaitlist: "אין ממתינים ברשימה.",
+    markNotified: "סימון כעודכן", noWaitlist: "אין כרגע ממתינים",
 
     // Settings
     settingsTitle: "הגדרות", settingsSubtitle: "פרופיל הסלון והגדרות הבוט",
@@ -216,7 +216,7 @@ const translations = {
     bookingNotifications: "התראות הזמנה",
     bookingNotificationsDesc: "קבל הודעת וואטסאפ בכל פעם שלקוח קובע תור.",
     botPersonalityTitle: "אישיות הבוט",
-    botPersonalityDesc: "התאם כיצד הבוט מציג את עצמו ומדבר עם לקוחות.",
+    botPersonalityDesc: "איך הבוט מדבר? רשמי, קליל, עם אימוג׳ים — אתם קובעים.",
     salonName: "שם הסלון", address: "כתובת", timezone: "אזור זמן", loginEmail: "אימייל כניסה",
     notifPhone: "מספר הוואטסאפ שלך", notifPhoneHint: "כולל קידומת מדינה, לדוג׳ 972501234567.",
     googleMapsUrl: "קישור לביקורת Google Maps", googleMapsUrlHint: "יישלח עם הודעות תודה לאחר הביקור. מצא אותו בפרופיל העסק Google ← שתף ← העתק קישור.",
@@ -233,10 +233,10 @@ const translations = {
     newAppointment: "תור חדש",
 
     // Trial banner
-    trialBanner: (days: number) => `תקופת הניסיון שלך מסתיימת בעוד ${days} יום${days !== 1 ? "ים" : ""}. הירשם כדי להמשיך.`,
-    trialDaysLeft: (days: number) => `נותרו ${days} ימים בתקופת הניסיון החינמית`,
-    trialBannerNudge: "הירשמו עכשיו כדי שהבוט ימשיך לענות ללקוחות בוואטסאפ.",
-    trialBannerExpired: "תקופת הניסיון הסתיימה — הירשמו כדי להפעיל מחדש את הבוט.",
+    trialBanner: (days: number) => `תקופת הניסיון נגמרת בעוד ${days === 1 ? "יום" : days === 2 ? "יומיים" : `${days} ימים`}. הירשמו כדי להמשיך.`,
+    trialDaysLeft: (days: number) => days === 1 ? "נשאר יום אחד לתקופת הניסיון" : days === 2 ? "נשארו יומיים לתקופת הניסיון" : `נשארו ${days} ימים לתקופת הניסיון`,
+    trialBannerNudge: "הירשמו עכשיו כדי שהבוט ימשיך לענות ללקוחות בוואטסאפ בלי הפסקה.",
+    trialBannerExpired: "תקופת הניסיון נגמרה — הירשמו והבוט חוזר לעבוד תוך דקה.",
     subscribeCta: "להרשמה",
 
     // Settings: reminders / reviews toggles + template warning
@@ -246,17 +246,17 @@ const translations = {
     templateWarning: "וואטסאפ מאפשר הודעות יזומות רק ללקוחות שכתבו לכם ב-24 השעות האחרונות. תזכורות ובקשות ביקורת עלולות להיחסם בשקט עבור לקוחות אחרים.",
 
     // Billing
-    billingTitle: "תשלום", billingSubtitle: "נהל את המנוי שלך",
+    billingTitle: "תשלום", billingSubtitle: "המנוי, התשלומים והארנק — הכל פה",
     subscriptionStatus: "סטטוס מנוי",
-    subscribeNow: "הירשם עכשיו", reactivate: "הפעל מנוי מחדש",
-    manageBilling: "נהל חיוב וחשבוניות",
-    redirecting: "מפנה…",
-    whatsappWarning: "חבר את מספר הוואטסאפ לפני ההרשמה — הבוט לא יעלה לאוויר בלי זה.",
+    subscribeNow: "להרשמה עכשיו", reactivate: "הפעלת המנוי מחדש",
+    manageBilling: "ניהול חיוב וחשבוניות",
+    redirecting: "רגע…",
+    whatsappWarning: "רגע! קודם מחברים וואטסאפ — בלי זה הבוט לא באוויר.",
     billingStatuses: {
-      trial: { label: "ניסיון", description: "אתה בתקופת ניסיון חינמית. הירשם כדי להמשיך." },
-      active: { label: "פעיל", description: "המנוי שלך פעיל. הבוט עובד." },
-      past_due: { label: "חוב", description: "התשלום נכשל. עדכן את אמצעי התשלום לשחזור הגישה." },
-      canceled: { label: "בוטל", description: "המנוי שלך בוטל." },
+      trial: { label: "ניסיון", description: "אתם בתקופת ניסיון חינם. שווה להירשם לפני שהיא נגמרת." },
+      active: { label: "פעיל", description: "הכל טוב — המנוי פעיל והבוט עובד. 💪" },
+      past_due: { label: "חוב", description: "החיוב האחרון לא עבר. עדכנו אמצעי תשלום כדי שהבוט ימשיך לעבוד." },
+      canceled: { label: "בוטל", description: "המנוי בוטל. אפשר לחדש מתי שרוצים." },
     },
 
     // Common
