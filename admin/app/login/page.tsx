@@ -138,15 +138,6 @@ export default function LoginPage() {
           -webkit-mask-image: radial-gradient(ellipse 90% 80% at 50% 40%, black 30%, transparent 100%);
         }
 
-        .login-left-brand { display: flex; align-items: center; gap: 13px; position: relative; z-index: 1; }
-        .login-left-brand-name { font-size: 24px; font-weight: 800; color: #fff; letter-spacing: -0.5px; line-height: 1.1; }
-        .login-left-golden {
-          font-size: 12.5px; font-weight: 600; letter-spacing: 0.02em; margin-top: 3px;
-          background: linear-gradient(90deg, #F5D77A 0%, #E0A93B 60%, #F5D77A 100%);
-          -webkit-background-clip: text; background-clip: text;
-          -webkit-text-fill-color: transparent; color: #E0A93B;
-        }
-
         .login-left-mid { position: relative; z-index: 1; }
         .login-left-tag {
           display: inline-flex; align-items: center; gap: 7px;
@@ -296,9 +287,18 @@ export default function LoginPage() {
           .login-card { padding: 32px 22px 26px; border-radius: 20px; }
         }
 
-        .login-form-brand { display: flex; justify-content: center; margin-bottom: 14px; }
+        .login-form-brand {
+          display: flex; flex-direction: column; align-items: center; gap: 8px;
+          margin-bottom: 20px;
+        }
         .login-form-brand img {
           box-shadow: 0 8px 24px rgba(27,127,160,0.18);
+        }
+        .login-form-golden {
+          font-size: 12.5px; font-weight: 700; letter-spacing: 0.02em;
+          background: linear-gradient(90deg, #C9962E 0%, #A97A1F 60%, #C9962E 100%);
+          -webkit-background-clip: text; background-clip: text;
+          -webkit-text-fill-color: transparent; color: #A97A1F;
         }
 
         .login-form-heading {
@@ -470,16 +470,6 @@ export default function LoginPage() {
           <div className="login-aurora" />
           <div className="login-left-grid" />
 
-          <div style={{ position: "relative", zIndex: 1 }}>
-            <div className="login-left-brand">
-              <Image src="/tori_logo_transparent.png" alt="תורי" width={52} height={52} style={{ flexShrink: 0, borderRadius: 13 }} />
-              <div>
-                <div className="login-left-brand-name">תורי</div>
-                <div className="login-left-golden">תור הזהב של העסק שלך</div>
-              </div>
-            </div>
-          </div>
-
           <div className="login-left-mid">
             <div className="login-left-tag">
               <span className="login-left-tag-dot" />
@@ -545,6 +535,7 @@ export default function LoginPage() {
                 form itself needs one for the page to feel branded on phones too. */}
             <div className="login-form-brand">
               <Image src="/tori_logo_transparent.png" alt="תורי" width={60} height={60} style={{ borderRadius: 15 }} />
+              <div className="login-form-golden">תור הזהב של העסק שלך</div>
             </div>
 
             {/* Signup step indicator */}
