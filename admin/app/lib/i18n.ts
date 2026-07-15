@@ -8,6 +8,7 @@ const translations = {
       blocked: "Time off", conversations: "Conversations",
       whatsapp: "WhatsApp", payments: "Payments", faq: "FAQ", settings: "Settings", billing: "Billing", logout: "Log out",
     },
+    navGroups: { overview: "Overview", operations: "Day-to-day", business: "Business setup", integrations: "Integrations", account: "Account" },
     days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
     daysShort: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
 
@@ -101,8 +102,10 @@ const translations = {
 
     // Trial banner
     trialBanner: (days: number) => `Your free trial ends in ${days} day${days !== 1 ? "s" : ""}. Subscribe to keep the bot running.`,
-    trialBannerExpired: "Your free trial has ended. Subscribe now to keep the bot running.",
-    subscribeCta: "Subscribe →",
+    trialDaysLeft: (days: number) => `${days} day${days !== 1 ? "s" : ""} left in your free trial`,
+    trialBannerNudge: "Subscribe now to keep your WhatsApp bot answering customers.",
+    trialBannerExpired: "Your free trial has ended — subscribe to reactivate your bot.",
+    subscribeCta: "Subscribe",
 
     // Settings: reminders / reviews toggles + template warning
     automatedMessages: "Automated messages", automatedMessagesDesc: "Control which WhatsApp messages the bot sends automatically.",
@@ -137,6 +140,7 @@ const translations = {
       blocked: "חופשות", conversations: "שיחות",
       whatsapp: "וואטסאפ", payments: "סליקה וחשבוניות", faq: "שאלות נפוצות", settings: "הגדרות", billing: "תשלום", logout: "התנתקות",
     },
+    navGroups: { overview: "סקירה", operations: "ניהול יומי", business: "הגדרות העסק", integrations: "חיבורים", account: "חשבון" },
     days: ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"],
     daysShort: ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"],
 
@@ -230,8 +234,10 @@ const translations = {
 
     // Trial banner
     trialBanner: (days: number) => `תקופת הניסיון שלך מסתיימת בעוד ${days} יום${days !== 1 ? "ים" : ""}. הירשם כדי להמשיך.`,
-    trialBannerExpired: "תקופת הניסיון שלך הסתיימה. הירשם עכשיו כדי להמשיך.",
-    subscribeCta: "הרשמה ←",
+    trialDaysLeft: (days: number) => `נותרו ${days} ימים בתקופת הניסיון החינמית`,
+    trialBannerNudge: "הירשמו עכשיו כדי שהבוט ימשיך לענות ללקוחות בוואטסאפ.",
+    trialBannerExpired: "תקופת הניסיון הסתיימה — הירשמו כדי להפעיל מחדש את הבוט.",
+    subscribeCta: "להרשמה",
 
     // Settings: reminders / reviews toggles + template warning
     automatedMessages: "הודעות אוטומטיות", automatedMessagesDesc: "שלוט אילו הודעות הבוט שולח אוטומטית.",

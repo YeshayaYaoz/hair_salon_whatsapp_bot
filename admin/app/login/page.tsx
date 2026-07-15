@@ -9,6 +9,7 @@ import { apiFetch, setToken } from "../lib/api";
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "signup">("login");
+  const [signupStep, setSignupStep] = useState<1 | 2>(1); // guided 2-step signup: credentials → business
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,6 +21,28 @@ export default function LoginPage() {
     const t = setTimeout(() => setMounted(true), 60);
     return () => clearTimeout(t);
   }, []);
+
+  function switchMode(next: "login" | "signup") {
+    setMode(next);
+    setSignupStep(1);
+    setError(null);
+  }
+
+  // Step 1 → 2: validate credentials client-side before advancing so the user doesn't fill in
+  // business details only to bounce back on a bad email/short password.
+  function continueToBusinessStep(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError("כתובת אימייל לא תקינה");
+      return;
+    }
+    if (password.length < 8) {
+      setError("הסיסמה חייבת להכיל לפחות 8 תווים");
+      return;
+    }
+    setSignupStep(2);
+  }
 
   async function signInWithGoogle() {
     setGoogleLoading(true);
@@ -346,6 +369,31 @@ export default function LoginPage() {
           margin-bottom: 14px;
         }
 
+        /* Signup step indicator */
+        .login-steps { display: flex; align-items: center; gap: 8px; margin-bottom: 22px; }
+        .login-step { display: flex; align-items: center; gap: 8px; }
+        .login-step-dot {
+          width: 26px; height: 26px; border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 12px; font-weight: 700;
+          background: #EAECF2; color: #9CA3AF;
+          transition: background 0.25s, color 0.25s; flex-shrink: 0;
+        }
+        .login-step.active .login-step-dot { background: #1B7FA0; color: #fff; }
+        .login-step-label { font-size: 12px; font-weight: 600; color: #9CA3AF; transition: color 0.25s; white-space: nowrap; }
+        .login-step.active .login-step-label { color: #1B2A38; }
+        .login-step-line { flex: 1; height: 2px; border-radius: 2px; background: #EAECF2; transition: background 0.25s; }
+        .login-step-line.active { background: #1B7FA0; }
+
+        .login-field-hint { font-size: 11.5px; color: #9CA3AF; margin-top: 6px; }
+
+        .login-back-btn {
+          width: 100%; background: none; border: none; color: #9CA3AF;
+          font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;
+          padding: 10px; margin-top: 4px; transition: color 0.15s;
+        }
+        .login-back-btn:hover { color: #1B7FA0; }
+
         .login-google-btn {
           width: 100%;
           display: flex;
@@ -508,81 +556,121 @@ export default function LoginPage() {
         <div className="login-right">
           <div className={`login-form-wrap ${mounted ? "show" : ""}`}>
 
+            {/* Signup step indicator */}
+            {mode === "signup" && (
+              <div className="login-steps">
+                <div className={`login-step ${signupStep >= 1 ? "active" : ""}`}>
+                  <span className="login-step-dot">1</span>
+                  <span className="login-step-label">פרטי חשבון</span>
+                </div>
+                <div className={`login-step-line ${signupStep >= 2 ? "active" : ""}`} />
+                <div className={`login-step ${signupStep >= 2 ? "active" : ""}`}>
+                  <span className="login-step-dot">2</span>
+                  <span className="login-step-label">פרטי העסק</span>
+                </div>
+              </div>
+            )}
+
             <h1 className="login-form-heading">
-              {mode === "login" ? "ברוך הבא" : "יצירת חשבון חדש"}
+              {mode === "login" ? "ברוך הבא" : signupStep === 1 ? "יצירת חשבון חדש" : "כמעט סיימנו!"}
             </h1>
             <p className="login-form-sub">
               {mode === "login"
                 ? "הכנס לחשבון שלך כדי לנהל את התורים"
-                : "הצטרף לאלפי עסקים שמשתמשים בתורי"}
+                : signupStep === 1
+                ? "הצטרף לאלפי עסקים שמשתמשים בתורי"
+                : "עוד פרט אחד ואתה מוכן להתחיל"}
             </p>
 
-            <button
-              type="button"
-              onClick={signInWithGoogle}
-              disabled={googleLoading}
-              className="login-google-btn"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47a5.54 5.54 0 01-2.4 3.63v3h3.89c2.27-2.09 3.56-5.17 3.56-8.82z"/>
-                <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.9l-3.89-3.02c-1.08.72-2.46 1.15-4.06 1.15-3.12 0-5.77-2.11-6.71-4.94H1.28v3.11A11.998 11.998 0 0012 24z"/>
-                <path fill="#FBBC05" d="M5.29 14.29A7.2 7.2 0 014.9 12c0-.8.14-1.57.39-2.29V6.6H1.28A11.998 11.998 0 000 12c0 1.94.46 3.77 1.28 5.4l4.01-3.11z"/>
-                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.69 1.28 6.6l4.01 3.11C6.23 6.86 8.88 4.75 12 4.75z"/>
-              </svg>
-              {googleLoading ? "רגע..." : "המשך עם Google"}
-            </button>
+            {/* Google + credentials only on login, or on signup step 1 */}
+            {!(mode === "signup" && signupStep === 2) && (
+              <>
+                <button
+                  type="button"
+                  onClick={signInWithGoogle}
+                  disabled={googleLoading}
+                  className="login-google-btn"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47a5.54 5.54 0 01-2.4 3.63v3h3.89c2.27-2.09 3.56-5.17 3.56-8.82z"/>
+                    <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.9l-3.89-3.02c-1.08.72-2.46 1.15-4.06 1.15-3.12 0-5.77-2.11-6.71-4.94H1.28v3.11A11.998 11.998 0 0012 24z"/>
+                    <path fill="#FBBC05" d="M5.29 14.29A7.2 7.2 0 014.9 12c0-.8.14-1.57.39-2.29V6.6H1.28A11.998 11.998 0 000 12c0 1.94.46 3.77 1.28 5.4l4.01-3.11z"/>
+                    <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.69 1.28 6.6l4.01 3.11C6.23 6.86 8.88 4.75 12 4.75z"/>
+                  </svg>
+                  {googleLoading ? "רגע..." : "המשך עם Google"}
+                </button>
 
-            <div className="login-divider">
-              <div className="login-divider-line" />
-              <span className="login-divider-text">או</span>
-              <div className="login-divider-line" />
-            </div>
+                <div className="login-divider">
+                  <div className="login-divider-line" />
+                  <span className="login-divider-text">או</span>
+                  <div className="login-divider-line" />
+                </div>
+              </>
+            )}
 
-            <form onSubmit={submit}>
-              {mode === "signup" && (
+            {/* LOGIN form, or SIGNUP step 1 (credentials) */}
+            {(mode === "login" || signupStep === 1) && (
+              <form onSubmit={mode === "login" ? submit : continueToBusinessStep}>
+                <div className="login-field">
+                  <label>כתובת אימייל</label>
+                  <input
+                    placeholder="name@example.com"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="login-field">
+                  <label>סיסמה</label>
+                  <input
+                    placeholder="••••••••"
+                    type="password"
+                    autoComplete={mode === "login" ? "current-password" : "new-password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+
+                {mode === "login" && (
+                  <Link href="/forgot-password" className="login-forgot">שכחת סיסמה?</Link>
+                )}
+
+                {error && <div className="login-error">{error}</div>}
+
+                <button type="submit" disabled={loading} className="login-submit">
+                  {mode === "login" ? (loading ? "רגע..." : "כניסה לחשבון") : "המשך ←"}
+                </button>
+              </form>
+            )}
+
+            {/* SIGNUP step 2 (business details) */}
+            {mode === "signup" && signupStep === 2 && (
+              <form onSubmit={submit}>
                 <div className="login-field">
                   <label>שם העסק</label>
                   <input
                     placeholder="מספרה / קליניקה / סטודיו..."
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    autoFocus
                     required
                   />
+                  <p className="login-field-hint">כך הבוט יציג את עצמו ללקוחות שלך</p>
                 </div>
-              )}
-              <div className="login-field">
-                <label>כתובת אימייל</label>
-                <input
-                  placeholder="name@example.com"
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="login-field">
-                <label>סיסמה</label>
-                <input
-                  placeholder="••••••••"
-                  type="password"
-                  autoComplete={mode === "login" ? "current-password" : "new-password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
 
-              {mode === "login" && (
-                <Link href="/forgot-password" className="login-forgot">שכחת סיסמה?</Link>
-              )}
+                {error && <div className="login-error">{error}</div>}
 
-              {error && <div className="login-error">{error}</div>}
-
-              <button type="submit" disabled={loading} className="login-submit">
-                {loading ? "רגע..." : mode === "login" ? "כניסה לחשבון" : "יצירת חשבון"}
-              </button>
-            </form>
+                <button type="submit" disabled={loading} className="login-submit">
+                  {loading ? "רגע..." : "יצירת חשבון וסיום"}
+                </button>
+                <button type="button" className="login-back-btn" onClick={() => { setSignupStep(1); setError(null); }}>
+                  → חזרה
+                </button>
+              </form>
+            )}
 
             <div className="login-divider">
               <div className="login-divider-line" />
@@ -593,7 +681,7 @@ export default function LoginPage() {
             </div>
 
             <div className="login-switch">
-              <button onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(null); }}>
+              <button onClick={() => switchMode(mode === "login" ? "signup" : "login")}>
                 {mode === "login" ? "הרשמה חינם →" : "כניסה לחשבון →"}
               </button>
             </div>

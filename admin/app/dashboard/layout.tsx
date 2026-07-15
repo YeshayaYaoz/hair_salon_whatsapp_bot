@@ -8,69 +8,116 @@ import { clearToken, apiFetch } from "../lib/api";
 import { useLanguage } from "../lib/LanguageContext";
 import { AuthGuard } from "../lib/AuthGuard";
 
-function TrialBanner() {
+// One nav item. Icons are Heroicons outline path data.
+type NavItem = { href: string; key: keyof ReturnType<typeof useLanguage>["t"]["nav"]; icon: string };
+
+const ICONS = {
+  analytics: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z",
+  appointments: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
+  customers: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z",
+  waitlist: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+  services: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
+  staff: "M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 100-8 4 4 0 000 8zm6 3c0-1.1-.9-2-2-2h-1m-3-1a4 4 0 11-8 0",
+  hours: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+  faq: "M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+  whatsapp: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z",
+  payments: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z",
+  settings: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z",
+  billing: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z",
+};
+
+// Grouped so the sidebar reads as a few short, scannable sections instead of one long flat list.
+const NAV_GROUPS: { titleKey: keyof ReturnType<typeof useLanguage>["t"]["navGroups"]; items: NavItem[] }[] = [
+  { titleKey: "overview", items: [{ href: "/dashboard/analytics", key: "analytics", icon: ICONS.analytics }] },
+  { titleKey: "operations", items: [
+    { href: "/dashboard/appointments", key: "appointments", icon: ICONS.appointments },
+    { href: "/dashboard/customers", key: "customers", icon: ICONS.customers },
+    { href: "/dashboard/waitlist", key: "waitlist", icon: ICONS.waitlist },
+  ] },
+  { titleKey: "business", items: [
+    { href: "/dashboard/services", key: "services", icon: ICONS.services },
+    { href: "/dashboard/staff", key: "staff", icon: ICONS.staff },
+    { href: "/dashboard/hours", key: "hours", icon: ICONS.hours },
+    { href: "/dashboard/faq", key: "faq", icon: ICONS.faq },
+  ] },
+  { titleKey: "integrations", items: [
+    { href: "/dashboard/whatsapp", key: "whatsapp", icon: ICONS.whatsapp },
+    { href: "/dashboard/payments", key: "payments", icon: ICONS.payments },
+  ] },
+  { titleKey: "account", items: [
+    { href: "/dashboard/settings", key: "settings", icon: ICONS.settings },
+    { href: "/dashboard/billing", key: "billing", icon: ICONS.billing },
+  ] },
+];
+
+const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
+const BOTTOM_TAB_ITEMS = NAV_ITEMS.slice(0, 5);
+const MORE_ITEMS = NAV_ITEMS.slice(5);
+
+function TrialBanner({ status, createdAt }: { status: string | null; createdAt: string | null }) {
   const { t } = useLanguage();
-  const [daysLeft, setDaysLeft] = useState<number | null>(null);
+  if (status !== "trial" || !createdAt) return null;
 
-  useEffect(() => {
-    apiFetch<{ subscriptionStatus: string; createdAt: string }>("/api/business/me")
-      .then((me) => {
-        if (me.subscriptionStatus !== "trial") return;
-        const trialEnd = new Date(me.createdAt).getTime() + 14 * 24 * 60 * 60 * 1000;
-        const days = Math.ceil((trialEnd - Date.now()) / (24 * 60 * 60 * 1000));
-        setDaysLeft(days);
-      })
-      .catch(() => {});
-  }, []);
-
-  if (daysLeft === null) return null;
-
+  const trialEnd = new Date(createdAt).getTime() + 14 * 24 * 60 * 60 * 1000;
+  const daysLeft = Math.ceil((trialEnd - Date.now()) / (24 * 60 * 60 * 1000));
   const expired = daysLeft <= 0;
-  if (!expired && daysLeft > 5) return null; // only show when close
+  if (!expired && daysLeft > 7) return null; // only nudge as the trial gets close
 
   return (
-    <div className={`fixed top-0 start-0 end-0 z-50 flex items-center justify-between gap-3 px-4 py-2 text-xs font-medium ${expired ? "bg-red-600 text-white" : "bg-amber-500 text-white"}`}>
-      <span>{expired ? t.trialBannerExpired : (t.trialBanner as (d: number) => string)(daysLeft)}</span>
-      <Link href="/dashboard/billing" className="shrink-0 underline underline-offset-2 hover:no-underline">{t.subscribeCta}</Link>
+    <div
+      className="relative overflow-hidden rounded-xl mb-5 px-4 py-3.5 sm:px-5 flex items-center gap-3.5"
+      style={{
+        background: expired
+          ? "linear-gradient(100deg, #B91C1C 0%, #DC2626 100%)"
+          : "linear-gradient(100deg, #B45309 0%, #D97706 55%, #F59E0B 100%)",
+        boxShadow: expired ? "0 6px 20px rgba(220,38,38,0.25)" : "0 6px 20px rgba(217,119,6,0.22)",
+      }}
+    >
+      {/* subtle decorative glow */}
+      <div className="pointer-events-none absolute -top-8 -end-8 w-32 h-32 rounded-full" style={{ background: "rgba(255,255,255,0.12)" }} />
+      <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center shrink-0 text-lg">
+        {expired ? "⚠️" : "🎁"}
+      </div>
+      <div className="flex-1 min-w-0">
+        {!expired && (
+          <div className="text-white font-bold text-sm leading-tight">
+            {t.trialDaysLeft(daysLeft)}
+          </div>
+        )}
+        <div className={`text-white/90 leading-snug ${expired ? "font-semibold text-sm" : "text-xs mt-0.5"}`}>
+          {expired ? t.trialBannerExpired : t.trialBannerNudge}
+        </div>
+      </div>
+      <Link
+        href="/dashboard/billing"
+        className="shrink-0 bg-white text-sm font-bold px-4 py-2 rounded-lg transition hover:bg-white/90"
+        style={{ color: expired ? "#DC2626" : "#B45309" }}
+      >
+        {t.subscribeCta}
+      </Link>
     </div>
   );
 }
 
-const NAV_ITEMS = [
-  { href: "/dashboard/analytics",    key: "analytics"    as const, icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" },
-  { href: "/dashboard/appointments", key: "appointments" as const, icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" },
-  { href: "/dashboard/customers",    key: "customers"    as const, icon: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" },
-  { href: "/dashboard/waitlist",     key: "waitlist"     as const, icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
-  { href: "/dashboard/services",     key: "services"     as const, icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
-  { href: "/dashboard/staff",        key: "staff"        as const, icon: "M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 100-8 4 4 0 000 8zm6 3c0-1.1-.9-2-2-2h-1m-3-1a4 4 0 11-8 0" },
-  { href: "/dashboard/hours",        key: "hours"        as const, icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
-  { href: "/dashboard/whatsapp",     key: "whatsapp"     as const, icon: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" },
-  { href: "/dashboard/payments",     key: "payments"     as const, icon: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" },
-  { href: "/dashboard/faq",          key: "faq"          as const, icon: "M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" },
-  { href: "/dashboard/settings",     key: "settings"     as const, icon: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" },
-  { href: "/dashboard/billing",      key: "billing"      as const, icon: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" },
-];
-
-const BOTTOM_TAB_ITEMS = NAV_ITEMS.slice(0, 5);
-
-function SidebarContent({ pathname }: { pathname: string }) {
+function SidebarContent({ pathname, isSuperAdmin }: { pathname: string; isSuperAdmin: boolean }) {
   const router = useRouter();
   const { lang, setLang, t } = useLanguage();
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-
-  useEffect(() => {
-    apiFetch<{ isSuperAdmin?: boolean }>("/api/business/me").then((me) => setIsSuperAdmin(Boolean(me.isSuperAdmin))).catch(() => {});
-  }, []);
 
   function logout() {
     clearToken();
     router.push("/login");
   }
 
+  function navLinkStyle(active: boolean) {
+    return active
+      ? { background: "rgba(27,127,160,0.18)", color: "#fff", boxShadow: "inset 3px 0 0 #1B7FA0" }
+      : { color: "rgba(255,255,255,0.45)" };
+  }
+
   return (
     <>
       {/* Brand */}
-      <div className="px-3 mb-8">
+      <div className="px-3 mb-6">
         <div className="flex items-center gap-3">
           <Image
             src="/tori_logo-white.jpeg"
@@ -87,39 +134,61 @@ function SidebarContent({ pathname }: { pathname: string }) {
         </div>
       </div>
 
-      {/* Section label */}
-      <div className="px-3 mb-1.5">
-        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", color: "rgba(255,255,255,0.18)", textTransform: "uppercase" }}>ניהול</span>
-      </div>
+      <nav className="flex flex-col gap-4 flex-1 overflow-y-auto sidebar-scroll pb-2">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.titleKey} className="flex flex-col gap-0.5">
+            <div className="px-3 mb-1">
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", color: "rgba(255,255,255,0.22)", textTransform: "uppercase" }}>
+                {t.navGroups[group.titleKey]}
+              </span>
+            </div>
+            {group.items.map((item) => {
+              const active = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all"
+                  style={navLinkStyle(active)}
+                  onMouseEnter={(e) => { if (!active) { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)"; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.85)"; } }}
+                  onMouseLeave={(e) => { if (!active) { (e.currentTarget as HTMLElement).style.background = ""; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.45)"; } }}
+                >
+                  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ opacity: active ? 1 : 0.7 }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.5 : 1.75} d={item.icon} />
+                  </svg>
+                  <span className="truncate">{t.nav[item.key]}</span>
+                </Link>
+              );
+            })}
+          </div>
+        ))}
 
-      <nav className="flex flex-col gap-0.5 flex-1 overflow-y-auto sidebar-scroll">
-        {NAV_ITEMS.map((item) => {
-          const active = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all"
-              style={active ? {
-                background: "rgba(27,127,160,0.18)",
-                color: "#fff",
-                boxShadow: "inset 3px 0 0 #1B7FA0",
-              } : {
-                color: "rgba(255,255,255,0.45)",
-              }}
-              onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)"; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.85)"; } }}
-              onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLElement).style.background = ""; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.45)"; } }}
-            >
-              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ opacity: active ? 1 : 0.7 }}>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.5 : 1.75} d={item.icon} />
-              </svg>
-              <span className="truncate">{t.nav[item.key]}</span>
-            </Link>
-          );
-        })}
+        {isSuperAdmin && (
+          <div className="flex flex-col gap-0.5">
+            <div className="px-3 mb-1">
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", color: "rgba(232,184,75,0.5)", textTransform: "uppercase" }}>Admin</span>
+            </div>
+            {[
+              { href: "/dashboard/admin", label: "Admin", icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" },
+              { href: "/dashboard/admin/leads", label: "מציאת לידים", icon: "M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" },
+            ].map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition"
+                style={pathname === item.href ? { background: "rgba(192,138,0,0.18)", color: "#E8B84B" } : { color: "rgba(255,255,255,0.3)" }}
+              >
+                <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={item.icon} />
+                </svg>
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        )}
       </nav>
 
-      <div className="mt-4 pt-4 flex flex-col gap-1" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+      <div className="mt-3 pt-3 flex flex-col gap-1" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
         {/* Language toggle */}
         <div className="flex items-center gap-1 px-3 py-1.5">
           <span className="text-xs me-1" style={{ color: "rgba(255,255,255,0.2)" }}>🌐</span>
@@ -135,38 +204,12 @@ function SidebarContent({ pathname }: { pathname: string }) {
           ))}
         </div>
 
-        {isSuperAdmin && (
-          <Link
-            href="/dashboard/admin"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition"
-            style={pathname === "/dashboard/admin" ? { background: "rgba(192,138,0,0.18)", color: "#E8B84B" } : { color: "rgba(255,255,255,0.3)" }}
-          >
-            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Admin
-          </Link>
-        )}
-
-        {isSuperAdmin && (
-          <Link
-            href="/dashboard/admin/leads"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition"
-            style={pathname === "/dashboard/admin/leads" ? { background: "rgba(192,138,0,0.18)", color: "#E8B84B" } : { color: "rgba(255,255,255,0.3)" }}
-          >
-            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
-            </svg>
-            מציאת לידים
-          </Link>
-        )}
-
         <button
           onClick={logout}
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition"
           style={{ color: "rgba(255,255,255,0.3)" }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.75)"; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = ""; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.3)"; }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.05)"; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.75)"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = ""; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.3)"; }}
         >
           <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -178,8 +221,6 @@ function SidebarContent({ pathname }: { pathname: string }) {
   );
 }
 
-const MORE_ITEMS = NAV_ITEMS.slice(5);
-
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -187,9 +228,17 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const activeItem = NAV_ITEMS.find((item) => item.href === pathname);
   const [moreOpen, setMoreOpen] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [trial, setTrial] = useState<{ status: string; createdAt: string } | null>(null);
 
+  // Single source of truth for the /me lookup — TrialBanner, the sidebar, and the mobile "More"
+  // sheet all need bits of it, so fetch once here and pass down instead of three separate calls.
   useEffect(() => {
-    apiFetch<{ isSuperAdmin?: boolean }>("/api/business/me").then((me) => setIsSuperAdmin(Boolean(me.isSuperAdmin))).catch(() => {});
+    apiFetch<{ isSuperAdmin?: boolean; subscriptionStatus: string; createdAt: string }>("/api/business/me")
+      .then((me) => {
+        setIsSuperAdmin(Boolean(me.isSuperAdmin));
+        setTrial({ status: me.subscriptionStatus, createdAt: me.createdAt });
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -201,11 +250,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     router.push("/login");
   }
 
-  const moreActive = MORE_ITEMS.some((i) => i.href === pathname) || pathname === "/dashboard/admin";
+  const moreActive = MORE_ITEMS.some((i) => i.href === pathname) || pathname.startsWith("/dashboard/admin");
 
   return (
     <AuthGuard>
-    <TrialBanner />
     <div className="flex min-h-screen" style={{ background: "#F4F6F8" }}>
       {/* Desktop sidebar */}
       <aside
@@ -216,7 +264,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           boxShadow: "4px 0 24px rgba(0,0,0,0.15)",
         }}
       >
-        <SidebarContent pathname={pathname} />
+        <SidebarContent pathname={pathname} isSuperAdmin={isSuperAdmin} />
       </aside>
 
       {/* Mobile top bar */}
@@ -234,6 +282,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
       {/* Main content */}
       <main className="flex-1 md:ms-64 p-4 pt-[4.5rem] pb-24 md:p-8 md:pt-8 md:pb-8 overflow-auto">
+        <TrialBanner status={trial?.status ?? null} createdAt={trial?.createdAt ?? null} />
         {children}
       </main>
 
@@ -305,26 +354,26 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               );
             })}
             {isSuperAdmin && (
-              <Link
-                href="/dashboard/admin"
-                className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition ${pathname === "/dashboard/admin" ? "bg-amber-50 text-amber-700" : "text-gray-700"}`}
-              >
-                <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Admin
-              </Link>
-            )}
-            {isSuperAdmin && (
-              <Link
-                href="/dashboard/admin/leads"
-                className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition ${pathname === "/dashboard/admin/leads" ? "bg-amber-50 text-amber-700" : "text-gray-700"}`}
-              >
-                <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
-                </svg>
-                מציאת לידים
-              </Link>
+              <>
+                <Link
+                  href="/dashboard/admin"
+                  className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition ${pathname === "/dashboard/admin" ? "bg-amber-50 text-amber-700" : "text-gray-700"}`}
+                >
+                  <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Admin
+                </Link>
+                <Link
+                  href="/dashboard/admin/leads"
+                  className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition ${pathname === "/dashboard/admin/leads" ? "bg-amber-50 text-amber-700" : "text-gray-700"}`}
+                >
+                  <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+                  </svg>
+                  מציאת לידים
+                </Link>
+              </>
             )}
             <div className="h-px bg-gray-100 my-2" />
             <button
