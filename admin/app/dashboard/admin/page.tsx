@@ -95,6 +95,9 @@ export default function AdminBusinessesPage() {
   const [planChoice, setPlanChoice] = useState<"standard" | "premium">("standard");
   const [confirmDeleteName, setConfirmDeleteName] = useState("");
   const [messageText, setMessageText] = useState("");
+  const [waPhoneId, setWaPhoneId] = useState("");
+  const [waToken, setWaToken] = useState("");
+  const [showWaForm, setShowWaForm] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [mrrHistory, setMrrHistory] = useState<MrrSnapshot[] | null>(null);
@@ -118,6 +121,9 @@ export default function AdminBusinessesPage() {
     setPlanChoice((b.subscriptionPlan as "standard" | "premium") ?? "standard");
     setConfirmDeleteName("");
     setMessageText("");
+    setWaPhoneId("");
+    setWaToken("");
+    setShowWaForm(false);
     setActionError(null);
     setBizAuditLog(null);
     apiFetch<AuditLogEntry[]>(`/api/business/admin/audit-log?businessId=${b.id}`)
@@ -497,6 +503,51 @@ export default function AdminBusinessesPage() {
                 >
                   {he ? "שלח" : "Send"}
                 </button>
+              </div>
+
+              {/* White-glove WhatsApp connect (for salons with no Facebook account) */}
+              <div className="pt-2 border-t border-gray-100">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-gray-600">
+                    {he ? "וואטסאפ" : "WhatsApp"}:{" "}
+                    <span className={drilldown.whatsappConnected ? "text-green-600 font-medium" : "text-gray-400"}>
+                      {drilldown.whatsappConnected
+                        ? (drilldown.whatsappTokenValid ? (he ? "מחובר" : "connected") : (he ? "נותק" : "broken"))
+                        : (he ? "לא מחובר" : "not connected")}
+                    </span>
+                  </span>
+                  <button
+                    onClick={() => setShowWaForm((v) => !v)}
+                    className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 hover:bg-green-100"
+                  >
+                    {showWaForm ? (he ? "סגור" : "Close") : (he ? "חבר עבורם" : "Connect for them")}
+                  </button>
+                </div>
+                {showWaForm && (
+                  <div className="flex flex-col gap-2 mt-2">
+                    <p className="text-[11px] text-gray-400">
+                      {he
+                        ? "לעסק ללא פייסבוק: רשום את המספר שלו תחת ה-Business Manager שלך במטא, והדבק כאן את מזהה המספר והטוקן הקבוע."
+                        : "For a business with no Facebook: register their number under your own Meta Business Manager, then paste its Phone Number ID and a permanent token here."}
+                    </p>
+                    <input placeholder="Phone Number ID" dir="ltr" value={waPhoneId} onChange={(e) => setWaPhoneId(e.target.value)} className="text-xs" />
+                    <input placeholder={he ? "טוקן גישה קבוע" : "Permanent access token"} dir="ltr" value={waToken} onChange={(e) => setWaToken(e.target.value)} className="text-xs" />
+                    <button
+                      disabled={actionBusy || !waPhoneId.trim() || !waToken.trim()}
+                      onClick={() =>
+                        runAction(() =>
+                          apiFetch(`/api/business/admin/businesses/${drilldown.id}/whatsapp`, {
+                            method: "POST",
+                            body: JSON.stringify({ phoneNumberId: waPhoneId, accessToken: waToken }),
+                          })
+                        )
+                      }
+                      className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 self-start"
+                    >
+                      {actionBusy ? (he ? "מאמת…" : "Verifying…") : (he ? "אמת וחבר" : "Verify & connect")}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Block / unblock */}

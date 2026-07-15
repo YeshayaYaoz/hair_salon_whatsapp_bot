@@ -325,6 +325,57 @@ businessRouter.post("/admin/businesses/:id/message", requireSuperAdmin, async (r
   res.json({ ok: true, channel: "email" });
 });
 
+// White-glove WhatsApp onboarding: connect a WhatsApp number to a business ON THEIR BEHALF, for
+// salon owners who have no Facebook account (WhatsApp's Cloud API always needs a Meta Business
+// Account somewhere in the chain, but it doesn't have to be theirs — you register the number
+// under a Tori-controlled Business Manager and paste the resulting phoneNumberId + permanent
+// token here). Validates against Meta before saving so a bad token surfaces immediately instead
+// of silently at the first message send.
+const adminWhatsappSchema = z.object({
+  phoneNumberId: z.string().min(1),
+  accessToken: z.string().min(1),
+});
+businessRouter.post("/admin/businesses/:id/whatsapp", requireSuperAdmin, async (req: AuthedRequest, res) => {
+  const parsed = adminWhatsappSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const business = await prisma.business.findUnique({ where: { id: req.params.id }, select: { id: true, name: true } });
+  if (!business) return res.status(404).json({ error: "Not found" });
+
+  // Verify the token can actually read this phone number before persisting — catches a typo'd id,
+  // an expired token, or a token scoped to a different WABA.
+  let displayNumber: string | undefined;
+  try {
+    const verifyRes = await fetch(
+      `https://graph.facebook.com/v20.0/${parsed.data.phoneNumberId}?fields=display_phone_number&access_token=${encodeURIComponent(parsed.data.accessToken)}`
+    );
+    const verifyData = (await verifyRes.json()) as any;
+    if (verifyData?.error) {
+      return res.status(400).json({ error: `Meta rejected these credentials: ${verifyData.error.message}` });
+    }
+    displayNumber = verifyData?.display_phone_number;
+  } catch (err) {
+    return res.status(502).json({ error: "Could not reach Meta to verify credentials — try again." });
+  }
+
+  await prisma.business.update({
+    where: { id: business.id },
+    data: {
+      whatsappPhoneNumberId: parsed.data.phoneNumberId,
+      whatsappAccessToken: encryptSecret(parsed.data.accessToken),
+      whatsappTokenValid: true,
+    },
+  });
+  await logAdminAction({
+    actorEmail: process.env.SUPER_ADMIN_EMAIL!,
+    action: "connect_whatsapp",
+    targetBusinessId: business.id,
+    targetBusinessName: business.name,
+    details: `Connected WhatsApp on their behalf (${displayNumber ?? parsed.data.phoneNumberId})`,
+  });
+  res.json({ ok: true, displayNumber });
+});
+
 // Global background job health (reminders/reviews/digest/retention) — same info for every
 // business, since these jobs run once for the whole system rather than per-tenant.
 businessRouter.get("/system-status", async (_req: AuthedRequest, res) => {
