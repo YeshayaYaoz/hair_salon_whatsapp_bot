@@ -333,39 +333,63 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
 
   const userToken: string = parsed.data.accessToken;
 
-  // Try to find the phone number via two different Graph API paths
   let phone: { id: string; display_phone_number: string } | undefined;
   let wabaId: string | undefined;
+  const debugTrail: Record<string, unknown> = {};
 
-  // Path 1: me/businesses (requires business_management)
-  const bizRes = await fetch(
-    `https://graph.facebook.com/v19.0/me/businesses?fields=owned_whatsapp_business_accounts{id,phone_numbers{id,display_phone_number}}&access_token=${userToken}`
+  // Primary path: debug_token → granular_scopes. This is the documented way to discover which
+  // WABAs the user actually granted during Embedded Signup — the whatsapp_business_management
+  // scope entry carries the granted WABA IDs in target_ids. Unlike me/businesses (needs the
+  // business_management permission, which the login config deliberately doesn't request) or
+  // me/whatsapp_business_accounts (not a field that exists on a User node — both old paths
+  // produced (#100) errors), this works with exactly the permissions Embedded Signup grants.
+  const debugRes = await fetch(
+    `https://graph.facebook.com/v20.0/debug_token?input_token=${encodeURIComponent(userToken)}&access_token=${encodeURIComponent(userToken)}`
   );
-  const bizData = await bizRes.json() as any;
-  const waba1 = bizData?.data?.[0]?.owned_whatsapp_business_accounts?.data?.[0];
-  if (waba1?.phone_numbers?.data?.[0]?.id) {
-    phone = waba1.phone_numbers.data[0];
-    wabaId = waba1.id;
+  const debugData = await debugRes.json() as any;
+  debugTrail.debugToken = debugData?.error ?? "ok";
+  const granted: { scope: string; target_ids?: string[] }[] = debugData?.data?.granular_scopes ?? [];
+  const wabaIds: string[] =
+    granted.find((s) => s.scope === "whatsapp_business_management")?.target_ids ??
+    granted.find((s) => s.scope === "whatsapp_business_messaging")?.target_ids ?? [];
+
+  for (const id of wabaIds) {
+    const phoneRes = await fetch(
+      `https://graph.facebook.com/v20.0/${id}/phone_numbers?fields=id,display_phone_number&access_token=${encodeURIComponent(userToken)}`
+    );
+    const phoneData = await phoneRes.json() as any;
+    debugTrail[`waba_${id}`] = phoneData?.error ?? `found ${phoneData?.data?.length ?? 0} numbers`;
+    if (phoneData?.data?.[0]?.id) {
+      phone = phoneData.data[0];
+      wabaId = id;
+      break;
+    }
   }
 
-  // Path 2: me/whatsapp_business_accounts (whatsapp_business_management scope)
+  // Fallback: me/businesses (works only if the token also has business_management — kept for
+  // manually-created tokens pasted through this endpoint, not the Embedded Signup flow).
   if (!phone) {
-    const wabaRes = await fetch(
-      `https://graph.facebook.com/v19.0/me/whatsapp_business_accounts?fields=id,phone_numbers{id,display_phone_number}&access_token=${userToken}`
+    const bizRes = await fetch(
+      `https://graph.facebook.com/v20.0/me/businesses?fields=owned_whatsapp_business_accounts{id,phone_numbers{id,display_phone_number}}&access_token=${encodeURIComponent(userToken)}`
     );
-    const wabaData = await wabaRes.json() as any;
-    const waba2 = wabaData?.data?.[0];
-    if (waba2?.phone_numbers?.data?.[0]?.id) {
-      phone = waba2.phone_numbers.data[0];
-      wabaId = waba2.id;
+    const bizData = await bizRes.json() as any;
+    debugTrail.meBusinesses = bizData?.error ?? "ok";
+    const waba1 = bizData?.data?.[0]?.owned_whatsapp_business_accounts?.data?.[0];
+    if (waba1?.phone_numbers?.data?.[0]?.id) {
+      phone = waba1.phone_numbers.data[0];
+      wabaId = waba1.id;
     }
-    if (!phone) {
-      console.error("Could not find phone number. Path1:", JSON.stringify(bizData), "Path2:", JSON.stringify(wabaData));
-      return res.status(400).json({ error: "No phone number found in connected account", debug: { bizData, wabaData } });
-    }
+  }
+
+  if (!phone) {
+    console.error("[embedded-signup] Could not find phone number:", JSON.stringify(debugTrail));
+    return res.status(400).json({
+      error: "לא נמצא מספר וואטסאפ בחשבון שחובר. ודאו שהשלמתם את כל שלבי החיבור של מטא (כולל בחירת מספר טלפון), ונסו שוב.",
+      debug: debugTrail,
+    });
   }
   if (wabaId) {
-    await fetch(`https://graph.facebook.com/v19.0/${wabaId}/subscribed_apps`, {
+    await fetch(`https://graph.facebook.com/v20.0/${wabaId}/subscribed_apps`, {
       method: "POST",
       headers: { Authorization: `Bearer ${userToken}` },
     });
