@@ -1662,7 +1662,7 @@ export default function LandingPage() {
                 <div className="lp-plan-per">לחודש · ללא חוזה</div>
                 <div className="lp-plan-divider" />
                 <div className="lp-plan-features">
-                  {["הכל שב-Standard","מענה לשיחות טלפון נכנסות","קול AI טבעי (ElevenLabs)","תמלול שיחות אוטומטי","סנכרון תורים משיחות לגוגל קלנדר","תמיכה מועדפת בוואטסאפ","SLA של 4 שעות"].map((f) => (
+                  {["כל מה שיש ב-Standard","מענה לשיחות טלפון נכנסות","קול AI טבעי (ElevenLabs)","תמלול שיחות אוטומטי","סנכרון תורים משיחות לגוגל קלנדר","תמיכה מועדפת בוואטסאפ","SLA של 4 שעות"].map((f) => (
                     <div key={f} className="lp-plan-feat"><span className="check">✓</span>{f}</div>
                   ))}
                 </div>
