@@ -66,7 +66,7 @@ businessRouter.get("/admin/businesses", requireSuperAdmin, async (_req: AuthedRe
       id: true, name: true, email: true, createdAt: true,
       subscriptionStatus: true, subscriptionPlan: true, billingCycle: true,
       whatsappPhoneNumberId: true, whatsappTokenValid: true,
-      paymentProvider: true, invoiceProvider: true,
+      paymentProvider: true, invoiceProvider: true, depositEnabled: true,
       walletBalanceAgorot: true, messagesUsedThisCycle: true,
       _count: { select: { appointments: true, customers: true } },
     },
