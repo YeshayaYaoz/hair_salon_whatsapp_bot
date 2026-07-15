@@ -4,13 +4,16 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 
+// A curated, muted palette instead of raw saturated primaries — tones picked to sit together
+// (similar chroma/lightness) so any combination of service tags looks intentional, not like a
+// crayon box. Named for what they read as, not by CSS keyword.
 const COLORS = [
-  { hex: "#2A9BBF", name: "violet" },
-  { hex: "#f43f5e", name: "rose" },
-  { hex: "#f59e0b", name: "amber" },
-  { hex: "#10b981", name: "emerald" },
-  { hex: "#0ea5e9", name: "sky" },
-  { hex: "#f97316", name: "orange" },
+  { hex: "#1B7FA0", name: "תכלת (ברירת מחדל)" }, // brand teal
+  { hex: "#7C6FDB", name: "לילך" },
+  { hex: "#D4708A", name: "אשכולית" },
+  { hex: "#C99A3E", name: "זהב" },
+  { hex: "#3FA98A", name: "אזמרגד" },
+  { hex: "#5B7FBF", name: "אינדיגו" },
 ];
 
 interface Service {
@@ -114,16 +117,31 @@ export default function ServicesPage() {
 
   function ColorPicker({ value, onChange }: { value: string; onChange: (hex: string) => void }) {
     return (
-      <div className="flex gap-1.5">
-        {COLORS.map((c) => (
-          <button
-            key={c.hex}
-            type="button"
-            onClick={() => onChange(c.hex)}
-            className={`w-5 h-5 rounded-full transition ring-offset-zinc-900 ${value === c.hex ? "ring-2 ring-white ring-offset-2" : "opacity-60 hover:opacity-100"}`}
-            style={{ backgroundColor: c.hex }}
-          />
-        ))}
+      <div className="flex gap-2">
+        {COLORS.map((c) => {
+          const selected = value === c.hex;
+          return (
+            <button
+              key={c.hex}
+              type="button"
+              title={c.name}
+              onClick={() => onChange(c.hex)}
+              className="relative w-7 h-7 rounded-full transition-transform hover:scale-110"
+              style={{
+                backgroundColor: c.hex,
+                boxShadow: selected
+                  ? `0 0 0 2px #fff, 0 0 0 4px ${c.hex}, 0 2px 6px ${c.hex}66`
+                  : "0 1px 2px rgba(0,0,0,0.08)",
+              }}
+            >
+              {selected && (
+                <svg className="absolute inset-0 m-auto w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </button>
+          );
+        })}
       </div>
     );
   }
@@ -168,17 +186,32 @@ export default function ServicesPage() {
                   </div>
                 </div>
               ) : (
-                <div key={s.id} className="flex items-center gap-3 px-4 py-3">
-                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: s.color ?? "#2A9BBF" }} />
+                <div key={s.id} className="flex items-center gap-3 px-4 py-3.5 group">
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: `${s.color ?? "#1B7FA0"}17`, border: `1px solid ${s.color ?? "#1B7FA0"}35` }}
+                  >
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: s.color ?? "#1B7FA0" }} />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-gray-800 font-medium text-sm">{s.name}</div>
-                    {s.description && <div className="text-gray-400 text-xs truncate">{s.description}</div>}
+                    {s.description && <div className="text-gray-400 text-xs truncate mt-0.5">{s.description}</div>}
                   </div>
-                  <div className="text-gray-500 text-sm shrink-0">₪{(s.priceCents / 100).toFixed(0)}</div>
-                  <div className="text-gray-400 text-xs shrink-0">{s.durationMin}m</div>
+                  <span
+                    className="text-xs font-bold shrink-0 tabular-nums px-2.5 py-1 rounded-full"
+                    style={{ background: `${s.color ?? "#1B7FA0"}12`, color: s.color ?? "#1B7FA0" }}
+                  >
+                    ₪{(s.priceCents / 100).toFixed(0)}
+                  </span>
+                  <span className="text-gray-400 text-xs shrink-0 flex items-center gap-1 tabular-nums">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {s.durationMin}′
+                  </span>
                   <div className="flex gap-1 shrink-0">
                     <button onClick={() => startEdit(s)} className="text-xs text-gray-400 hover:text-[#1B7FA0] transition px-2 py-1 rounded hover:bg-[#E0F5FB]">{t.edit}</button>
-                    <button onClick={() => remove(s.id)} className="text-xs text-gray-400 hover:text-red-600 transition px-2 py-1 rounded hover:bg-red-950/30">{t.delete}</button>
+                    <button onClick={() => remove(s.id)} className="text-xs text-gray-400 hover:text-red-600 transition px-2 py-1 rounded hover:bg-red-50">{t.delete}</button>
                   </div>
                 </div>
               )

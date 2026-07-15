@@ -138,7 +138,7 @@ function SidebarContent({ pathname, isSuperAdmin }: { pathname: string; isSuperA
         {NAV_GROUPS.map((group) => (
           <div key={group.titleKey} className="flex flex-col gap-0.5">
             <div className="px-3 mb-1">
-              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", color: "rgba(255,255,255,0.22)", textTransform: "uppercase" }}>
+              <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: "0.1em", color: "rgba(255,255,255,0.34)", textTransform: "uppercase" }}>
                 {t.navGroups[group.titleKey]}
               </span>
             </div>
@@ -166,7 +166,7 @@ function SidebarContent({ pathname, isSuperAdmin }: { pathname: string; isSuperA
         {isSuperAdmin && (
           <div className="flex flex-col gap-0.5">
             <div className="px-3 mb-1">
-              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", color: "rgba(232,184,75,0.5)", textTransform: "uppercase" }}>Admin</span>
+              <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: "0.1em", color: "rgba(232,184,75,0.6)", textTransform: "uppercase" }}>Admin</span>
             </div>
             {[
               { href: "/dashboard/admin", label: "Admin", icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" },
