@@ -91,6 +91,17 @@ interface BusinessSearchResult {
   subscriptionStatus: string;
 }
 
+interface SuggestedMatch {
+  leadId: string;
+  leadName: string;
+  leadPhone: string | null;
+  businessId: string;
+  businessName: string;
+  businessEmail: string;
+  businessCreatedAt: string;
+  score: number;
+}
+
 const LEAD_STATUSES = ["new", "contacted", "replied", "meeting_scheduled", "trial_sent", "converted", "not_interested"] as const;
 
 const STATUS_LABELS_HE: Record<string, string> = {
@@ -170,6 +181,77 @@ export default function LeadFinderPage() {
 
 // --- Campaign list ---
 
+function SuggestedMatchesPanel() {
+  const [matches, setMatches] = useState<SuggestedMatch[] | null>(null);
+  const [busyLeadId, setBusyLeadId] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+
+  const load = useCallback(() => {
+    apiFetch<SuggestedMatch[]>("/api/leadfinder/suggested-matches")
+      .then(setMatches)
+      .catch(() => setMatches([]));
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function confirm(m: SuggestedMatch) {
+    setBusyLeadId(m.leadId);
+    try {
+      await apiFetch(`/api/leadfinder/leads/${m.leadId}/link-business`, {
+        method: "POST",
+        body: JSON.stringify({ businessId: m.businessId }),
+      });
+      load();
+    } finally {
+      setBusyLeadId(null);
+    }
+  }
+
+  const visible = (matches ?? []).filter((m) => !dismissed.has(`${m.leadId}:${m.businessId}`));
+  if (visible.length === 0) return null;
+
+  return (
+    <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 mb-4 animate-fade-up">
+      <h2 className="text-sm font-semibold text-teal-800 mb-2">
+        💡 {visible.length} התאמות אפשריות בין לידים לעסקים שנרשמו עצמאית
+      </h2>
+      <ul className="flex flex-col gap-1.5">
+        {visible.map((m) => {
+          const key = `${m.leadId}:${m.businessId}`;
+          return (
+            <li key={key} className="flex items-center justify-between gap-3 text-xs bg-white rounded-lg px-3 py-2 border border-teal-100">
+              <span className="text-gray-700">
+                <span className="font-medium">{m.leadName}</span> ({m.leadPhone ?? "—"})
+                {" ⟷ "}
+                <span className="font-medium">{m.businessName}</span>
+                <span className="text-gray-400" dir="ltr"> ({m.businessEmail})</span>
+                <span className="text-gray-400 ms-1.5">{m.score}%</span>
+              </span>
+              <span className="flex gap-1.5 flex-shrink-0">
+                <button
+                  disabled={busyLeadId === m.leadId}
+                  onClick={() => confirm(m)}
+                  className="text-xs font-medium px-2.5 py-1 rounded-lg bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50"
+                >
+                  קשר
+                </button>
+                <button
+                  onClick={() => setDismissed((prev) => new Set(prev).add(key))}
+                  className="text-xs text-gray-400 hover:text-gray-700 px-2 py-1"
+                >
+                  התעלם
+                </button>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => void }) {
   const [campaigns, setCampaigns] = useState<Campaign[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -178,6 +260,12 @@ function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => 
   const [category, setCategory] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<Campaign | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editCategory, setEditCategory] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = useCallback(() => {
     apiFetch<Campaign[]>("/api/leadfinder/campaigns")
@@ -207,6 +295,45 @@ function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => 
       setError(err instanceof Error ? err.message : "שגיאה ביצירת קמפיין");
     } finally {
       setSaving(false);
+    }
+  }
+
+  function openEdit(c: Campaign) {
+    setEditing(c);
+    setEditName(c.name);
+    setEditCategory(c.category);
+    setEditLocation(c.locationQuery);
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    setEditSaving(true);
+    setError(null);
+    try {
+      await apiFetch(`/api/leadfinder/campaigns/${editing.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name: editName, category: editCategory, locationQuery: editLocation }),
+      });
+      setEditing(null);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "שגיאה בעדכון קמפיין");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function deleteCampaign(c: Campaign) {
+    if (!confirm(`למחוק את הקמפיין "${c.name}" וכל הלידים שלו לצמיתות?`)) return;
+    setDeletingId(c.id);
+    setError(null);
+    try {
+      await apiFetch(`/api/leadfinder/campaigns/${c.id}`, { method: "DELETE" });
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "שגיאה במחיקת קמפיין");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -248,7 +375,33 @@ function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => 
         </div>
       )}
 
+      <SuggestedMatchesPanel />
+
       {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3 mb-4">{error}</div>}
+
+      {editing && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setEditing(null)}>
+          <div className="bg-white rounded-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-gray-900 mb-4">עריכת קמפיין</h2>
+            <div className="flex flex-col gap-3">
+              <input placeholder="שם הקמפיין" value={editName} onChange={(e) => setEditName(e.target.value)} />
+              <input placeholder="קטגוריה" value={editCategory} onChange={(e) => setEditCategory(e.target.value)} />
+              <input placeholder="מיקום" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} />
+              <div className="flex gap-2 mt-2">
+                <button
+                  disabled={editSaving}
+                  onClick={saveEdit}
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50"
+                  style={{ background: "#1B7FA0" }}
+                >
+                  {editSaving ? "שומר…" : "שמור"}
+                </button>
+                <button onClick={() => setEditing(null)} className="px-4 py-2 rounded-lg text-sm text-gray-500">ביטול</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
         {campaigns === null ? (
@@ -256,7 +409,7 @@ function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => 
         ) : campaigns.length === 0 ? (
           <div className="px-6 py-12 text-center text-gray-400 text-sm">אין עדיין קמפיינים</div>
         ) : (
-          <table className="w-full text-sm min-w-[700px]">
+          <table className="w-full text-sm min-w-[820px]">
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="text-start px-4 py-3 text-gray-500 font-medium">קמפיין</th>
@@ -265,25 +418,35 @@ function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => 
                 <th className="text-start px-4 py-3 text-gray-500 font-medium">סטטוס</th>
                 <th className="text-start px-4 py-3 text-gray-500 font-medium">נוצר</th>
                 <th className="text-end px-4 py-3 text-gray-500 font-medium">לידים</th>
+                <th className="text-end px-4 py-3 text-gray-500 font-medium"></th>
               </tr>
             </thead>
             <tbody>
               {campaigns.map((c, i) => (
                 <tr
                   key={c.id}
-                  className={`cursor-pointer hover:bg-gray-50 ${i !== campaigns.length - 1 ? "border-b border-gray-200/50" : ""}`}
-                  onClick={() => onOpenCampaign(c.id)}
+                  className={`hover:bg-gray-50 ${i !== campaigns.length - 1 ? "border-b border-gray-200/50" : ""}`}
                 >
-                  <td className="px-4 py-3 text-gray-800 font-medium">{c.name}</td>
-                  <td className="px-4 py-3 text-gray-500">{c.category}</td>
-                  <td className="px-4 py-3 text-gray-500">{c.locationQuery}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 text-gray-800 font-medium cursor-pointer" onClick={() => onOpenCampaign(c.id)}>{c.name}</td>
+                  <td className="px-4 py-3 text-gray-500 cursor-pointer" onClick={() => onOpenCampaign(c.id)}>{c.category}</td>
+                  <td className="px-4 py-3 text-gray-500 cursor-pointer" onClick={() => onOpenCampaign(c.id)}>{c.locationQuery}</td>
+                  <td className="px-4 py-3 cursor-pointer" onClick={() => onOpenCampaign(c.id)}>
                     <span className="inline-flex text-xs font-medium px-2.5 py-1 rounded-full border bg-gray-50 text-gray-600 border-gray-200">
                       {CAMPAIGN_STATUS_LABELS_HE[c.status] ?? c.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{fmtDate(c.createdAt)}</td>
-                  <td className="px-4 py-3 text-end tabular-nums text-gray-700">{c._count?.leads ?? 0}</td>
+                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap cursor-pointer" onClick={() => onOpenCampaign(c.id)}>{fmtDate(c.createdAt)}</td>
+                  <td className="px-4 py-3 text-end tabular-nums text-gray-700 cursor-pointer" onClick={() => onOpenCampaign(c.id)}>{c._count?.leads ?? 0}</td>
+                  <td className="px-4 py-3 text-end whitespace-nowrap">
+                    <button onClick={() => openEdit(c)} className="text-xs text-gray-400 hover:text-gray-700 px-2 py-1">עריכה</button>
+                    <button
+                      disabled={deletingId === c.id}
+                      onClick={() => deleteCampaign(c)}
+                      className="text-xs text-gray-400 hover:text-red-600 px-2 py-1 disabled:opacity-50"
+                    >
+                      {deletingId === c.id ? "מוחק…" : "מחיקה"}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

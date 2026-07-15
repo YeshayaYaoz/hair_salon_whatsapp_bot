@@ -617,7 +617,25 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
     }
   }
 
-  // Fallback 1: debug_token → granular_scopes. Discovers which WABAs the user granted during
+  // Fallback 1b: Meta's FINISH_ONLY_WABA postMessage event fires a waba_id with no
+  // phone_number_id when the user picked/created a WhatsApp Business Account but the popup closed
+  // before (or without) them confirming a phone number on it. Rather than immediately falling
+  // through to scope-reconstruction below, check the WABA directly — a phone number may already
+  // exist on it (added slightly after the event fired) even though this specific event didn't
+  // carry its id.
+  if (!phone && parsed.data.wabaId) {
+    const phoneRes = await fetch(
+      `https://graph.facebook.com/v20.0/${parsed.data.wabaId}/phone_numbers?fields=id,display_phone_number&access_token=${encodeURIComponent(userToken)}`
+    );
+    const phoneData = await phoneRes.json() as any;
+    debugTrail.wabaDirect = phoneData?.error ?? `found ${phoneData?.data?.length ?? 0} numbers`;
+    if (phoneData?.data?.[0]?.id) {
+      phone = phoneData.data[0];
+      wabaId = parsed.data.wabaId;
+    }
+  }
+
+  // Fallback 2: debug_token → granular_scopes. Discovers which WABAs the user granted during
   // signup without needing business_management — works when the postMessage above didn't fire
   // (e.g. an ad/popup blocker interfering) but the login itself still succeeded.
   if (!phone) {
@@ -645,7 +663,7 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
     }
   }
 
-  // Fallback 2: me/businesses (works only if the token also has business_management — kept for
+  // Fallback 3: me/businesses (works only if the token also has business_management — kept for
   // manually-created tokens pasted through this endpoint, not the Embedded Signup flow).
   if (!phone) {
     const bizRes = await fetch(

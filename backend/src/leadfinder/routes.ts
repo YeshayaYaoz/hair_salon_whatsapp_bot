@@ -8,6 +8,7 @@ import { requireSuperAdmin } from "../api/businessRoutes.js";
 import { executeLeadFinderRun } from "./runner.js";
 import { loadScoringWeights, DEFAULT_SCORING_CONFIG_KEY } from "./scoring.js";
 import { APP_URL, sendTrialAccountCreatedEmail } from "../lib/email.js";
+import { nameSimilarity } from "./matching.js";
 
 export const leadFinderRouter = Router();
 
@@ -66,6 +67,37 @@ leadFinderRouter.get("/campaigns/:id", async (req: AuthedRequest, res) => {
   });
   if (!campaign) return res.status(404).json({ error: "Campaign not found" });
   res.json(campaign);
+});
+
+const updateCampaignSchema = z.object({
+  name: z.string().min(1).optional(),
+  category: z.string().min(1).optional(),
+  locationQuery: z.string().min(1).optional(),
+  status: z.enum(["draft", "running", "paused", "completed"]).optional(),
+});
+leadFinderRouter.patch("/campaigns/:id", async (req: AuthedRequest, res) => {
+  const parsed = updateCampaignSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const campaign = await prisma.leadCampaign.update({ where: { id: req.params.id }, data: parsed.data }).catch(() => null);
+  if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+  res.json(campaign);
+});
+
+// Deletes a campaign and everything scoped to it. LeadScore/LeadProfile/LeadStatusEvent/
+// OutreachMessage/ConsentLog all cascade off Lead at the DB level (onDelete: Cascade), so deleting
+// the leads is enough to take those with them; LeadFinderRun and the campaign itself don't have a
+// cascade (deliberately, same reasoning as the Business delete above) so they're explicit here.
+leadFinderRouter.delete("/campaigns/:id", async (req: AuthedRequest, res) => {
+  const campaignId = req.params.id;
+  const campaign = await prisma.leadCampaign.findUnique({ where: { id: campaignId }, select: { id: true } });
+  if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+
+  await prisma.$transaction([
+    prisma.lead.deleteMany({ where: { campaignId } }),
+    prisma.leadFinderRun.deleteMany({ where: { campaignId } }),
+    prisma.leadCampaign.delete({ where: { id: campaignId } }),
+  ]);
+  res.json({ ok: true });
 });
 
 // --- Runs ---
@@ -221,6 +253,46 @@ leadFinderRouter.patch("/leads/:id/status", async (req: AuthedRequest, res) => {
   ]);
 
   res.json({ ok: true });
+});
+
+// Finds unlinked leads that probably match a business that self-signed-up (rather than being
+// created from the lead card) — by name similarity, since Lead has no email and Business doesn't
+// collect phone at signup, so name is the only signal in common at this point. Suggestions only;
+// linking still goes through POST /leads/:id/link-business so a bad match is never auto-applied.
+const MATCH_THRESHOLD = 45;
+leadFinderRouter.get("/suggested-matches", async (_req: AuthedRequest, res) => {
+  const [leads, businesses] = await Promise.all([
+    prisma.lead.findMany({
+      where: { linkedBusinessId: null, status: { not: "not_interested" } },
+      select: { id: true, name: true, phone: true, campaignId: true },
+    }),
+    prisma.business.findMany({
+      where: { linkedLeads: { none: {} } },
+      select: { id: true, name: true, email: true, createdAt: true },
+    }),
+  ]);
+
+  const suggestions: {
+    leadId: string; leadName: string; leadPhone: string | null;
+    businessId: string; businessName: string; businessEmail: string; businessCreatedAt: string;
+    score: number;
+  }[] = [];
+
+  for (const lead of leads) {
+    for (const business of businesses) {
+      const score = nameSimilarity(lead.name, business.name);
+      if (score >= MATCH_THRESHOLD) {
+        suggestions.push({
+          leadId: lead.id, leadName: lead.name, leadPhone: lead.phone,
+          businessId: business.id, businessName: business.name, businessEmail: business.email,
+          businessCreatedAt: business.createdAt.toISOString(), score,
+        });
+      }
+    }
+  }
+
+  suggestions.sort((a, b) => b.score - a.score);
+  res.json(suggestions.slice(0, 50));
 });
 
 // Lightweight business search for the "link to existing business" picker in the lead-linking UI.
