@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
 import { instantPartsInTz, zonedDateParts, zonedWallTimeToUtc } from "../lib/timezone.js";
+import { SLOT_BLOCKING_STATUSES } from "../booking/availability.js";
 
 const EMPTY_SLOT_THRESHOLD = 0.3; // trigger the campaign once >30% of tomorrow's open hours are empty
 const LAPSED_DAYS = 60; // customers with no visit in this many days are considered "lapsed"
@@ -66,7 +67,9 @@ async function scanBusiness(
   const dayStartUtc = zonedWallTimeToUtc(year, month, day, 0, tz);
   const dayEndUtc = zonedWallTimeToUtc(year, month, day, 24 * 60, tz);
   const appointments = await prisma.appointment.findMany({
-    where: { businessId: biz.id, status: "confirmed", startTime: { gte: dayStartUtc, lt: dayEndUtc } },
+    // Include pending_payment holds, not just confirmed — a slot with an outstanding deposit link
+    // is not actually empty, even though nobody has paid for it yet (see availability.ts).
+    where: { businessId: biz.id, status: { in: SLOT_BLOCKING_STATUSES }, startTime: { gte: dayStartUtc, lt: dayEndUtc } },
     select: { startTime: true, endTime: true },
   });
   const bookedMin = appointments.reduce((sum, a) => sum + (a.endTime.getTime() - a.startTime.getTime()) / 60_000, 0);
@@ -83,7 +86,9 @@ async function scanBusiness(
       businessId: biz.id,
       appointments: {
         some: { status: "confirmed", startTime: { lt: cutoff } },
-        none: { status: "confirmed", startTime: { gte: now } },
+        // Also skip anyone with a pending deposit hold, not just a confirmed booking — no point
+        // discount-campaigning someone who's already mid-checkout for an upcoming visit.
+        none: { status: { in: SLOT_BLOCKING_STATUSES }, startTime: { gte: now } },
       },
     },
     select: { id: true, appointments: { where: { status: "confirmed" }, orderBy: { startTime: "desc" }, take: 1, select: { startTime: true } } },

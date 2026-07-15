@@ -5,8 +5,10 @@ import { zonedWallTimeToUtc, parseDateString, dayOfWeekForDate, instantPartsInTz
 const SLOT_STEP_MIN = 30;
 
 // A "pending_payment" hold (awaiting a deposit) blocks the slot exactly like a confirmed booking
-// — otherwise two customers could be sent overlapping payment links for the same slot.
-const SLOT_BLOCKING_STATUSES = ["confirmed", "pending_payment"];
+// — otherwise two customers could be sent overlapping payment links for the same slot. Exported
+// so anything else that needs to know "is this slot actually occupied" (e.g. the empty-slot yield
+// campaign scan) stays consistent with availability rather than re-deriving its own status list.
+export const SLOT_BLOCKING_STATUSES = ["confirmed", "pending_payment"];
 
 export interface AvailableSlot {
   startTime: string; // ISO (UTC)

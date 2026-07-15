@@ -84,6 +84,7 @@ const tools: Anthropic.Tool[] = [
         newStartTime: { type: "string", description: "Exact new slot start time from check_availability" },
         serviceName: { type: "string", description: "Service name (defaults to the existing appointment's service if omitted)" },
         durationMin: { type: "number", description: "Optional duration override in minutes" },
+        staffName: { type: "string", description: "Only set if the customer wants a different staff member than the original booking — otherwise the original staff assignment carries over automatically." },
       },
       required: ["oldStartTime", "newStartTime"],
     },
@@ -399,6 +400,15 @@ async function runTool(
     });
     if (!service) return JSON.stringify({ error: "Unknown service" });
 
+    // Carry over the original staff assignment unless the customer explicitly asked for someone
+    // else — otherwise a reschedule would silently drop who they booked with.
+    let staffId: string | null | undefined = existing.staffId;
+    if (input.staffName) {
+      const staffResolution = await resolveStaffId(businessId, input.staffName as string);
+      if (staffResolution.error) return staffResolution.error;
+      staffId = staffResolution.staffId ?? null;
+    }
+
     // Cancel the old one first so its slot doesn't block the new booking, then book the new time.
     await prisma.appointment.update({ where: { id: existing.id }, data: { status: "cancelled" } });
     if (existing.calendarEventId) {
@@ -413,6 +423,7 @@ async function runTool(
         customerName,
         startTime: parseBookingTime(input.newStartTime as string, tz),
         overrideDurationMin: input.durationMin as number | undefined,
+        staffId,
       });
       lastOfferedSlots.value = undefined;
 

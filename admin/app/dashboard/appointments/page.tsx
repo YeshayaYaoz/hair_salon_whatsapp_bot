@@ -177,7 +177,9 @@ function WeekCalendar({
 
   function apptsByDay(day: Date) {
     const key = localDayKey(day);
-    return appointments.filter((a) => dayKeyInTz(a.startTime, tz) === key && a.status === "confirmed");
+    // Include pending_payment holds too — they block the slot exactly like a confirmed booking
+    // (see availability.ts), so hiding them here would make an occupied slot look empty.
+    return appointments.filter((a) => dayKeyInTz(a.startTime, tz) === key && (a.status === "confirmed" || a.status === "pending_payment"));
   }
 
   return (
@@ -209,12 +211,14 @@ function WeekCalendar({
                   {appts.map((a) => (
                     <div
                       key={a.id}
-                      className="bg-[#1B7FA0] text-white rounded px-1.5 py-1 text-[10px] leading-tight cursor-default hover:bg-[#2A9BBF] transition group relative"
-                      title={`${a.customer.name ?? formatPhone(a.customer.phone)} · ${a.service.name}`}
+                      className={`rounded px-1.5 py-1 text-[10px] leading-tight cursor-default transition group relative text-white ${
+                        a.status === "pending_payment" ? "bg-amber-500 hover:bg-amber-600" : "bg-[#1B7FA0] hover:bg-[#2A9BBF]"
+                      }`}
+                      title={`${a.customer.name ?? formatPhone(a.customer.phone)} · ${a.service.name}${a.status === "pending_payment" ? " · ⏳ ממתין למקדמה" : ""}`}
                     >
                       <div className="font-semibold truncate">{formatTimeInTz(a.startTime, tz)}</div>
                       <div className="truncate opacity-80">{a.customer.name ?? <span dir="ltr">{formatPhone(a.customer.phone)}</span>}</div>
-                      <div className="truncate opacity-70">{a.service.name}</div>
+                      <div className="truncate opacity-70">{a.status === "pending_payment" ? "⏳ ממתין למקדמה" : a.service.name}</div>
                       {new Date(a.startTime) >= new Date() && (
                         <button
                           onClick={() => onCancel(a.id)}
@@ -333,7 +337,7 @@ export default function AppointmentsPage() {
   }, [appointments, filter, search]);
 
   const cancellableIds = useMemo(
-    () => filtered.filter((a) => a.status === "confirmed" && new Date(a.startTime) >= new Date()).map((a) => a.id),
+    () => filtered.filter((a) => (a.status === "confirmed" || a.status === "pending_payment") && new Date(a.startTime) >= new Date()).map((a) => a.id),
     [filtered]
   );
 
