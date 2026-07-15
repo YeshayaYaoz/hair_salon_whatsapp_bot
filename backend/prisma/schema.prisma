@@ -139,6 +139,8 @@ model Customer {
   preferredServiceId  String? // most recently booked service, for CRM memory
   lastRetentionSentAt DateTime? // when we last sent a re-engagement message
   notes               String? // free-text staff note about this customer, shown next to their conversation
+  botPaused           Boolean         @default(false) // true once the owner sends a manual message — bot goes silent on this thread until resumed
+  botPausedAt         DateTime?
   appointments        Appointment[]
   waitlistEntries     WaitlistEntry[]
 

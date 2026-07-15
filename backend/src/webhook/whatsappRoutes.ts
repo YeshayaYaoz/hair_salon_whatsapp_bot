@@ -5,7 +5,7 @@ import { resolveBusinessByPhoneNumberId } from "../tenants/resolve.js";
 import { sendWhatsAppMessage, sendWhatsAppList, WhatsAppAuthError, type ListRow } from "./whatsappClient.js";
 import { sendWhatsAppTokenExpiredEmail } from "../lib/email.js";
 import { handleIncomingMessage } from "../bot/claudeBot.js";
-import { clearHistory } from "../bot/conversationStore.js";
+import { clearHistory, appendTurn } from "../bot/conversationStore.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { hasActiveSubscription } from "../lib/subscriptionGate.js";
 import { rateLimit } from "../lib/rateLimit.js";
@@ -204,6 +204,23 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
         accessToken,
         extracted.text
       );
+      return;
+    }
+
+    // If the owner has taken over this thread (sent a manual message from the dashboard), the
+    // bot stays silent so it doesn't talk over a human mid-conversation — but the customer's
+    // message is still persisted so it shows up in the transcript when the owner resumes the bot.
+    const pausedCustomer = await prisma.customer.findUnique({
+      where: { businessId_phone: { businessId: business.id, phone: customerPhone } },
+      select: { botPaused: true },
+    });
+    if (pausedCustomer?.botPaused) {
+      const preview =
+        extracted.kind === "text" ? extracted.text
+        : extracted.kind === "voiceNote" ? "[הודעה קולית]"
+        : extracted.kind === "reset" ? "[בקשת איפוס שיחה]"
+        : "[הודעה]";
+      await appendTurn(business.id, customerPhone, { role: "user", content: preview });
       return;
     }
 

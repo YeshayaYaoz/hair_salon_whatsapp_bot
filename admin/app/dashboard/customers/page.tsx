@@ -18,6 +18,7 @@ interface Customer {
   name?: string;
   phone: string;
   notes?: string | null;
+  botPaused?: boolean;
   _count: { appointments: number };
 }
 
@@ -28,7 +29,11 @@ interface Message {
   createdAt: string;
 }
 
-function ConversationPanel({ customer, onClose, onNotesSaved }: { customer: Customer; onClose: () => void; onNotesSaved: (notes: string) => void }) {
+function ConversationPanel({
+  customer, onClose, onNotesSaved, onPausedChanged,
+}: {
+  customer: Customer; onClose: () => void; onNotesSaved: (notes: string) => void; onPausedChanged: (paused: boolean) => void;
+}) {
   const { t, lang } = useLanguage();
   const he = lang === "he";
   const [messages, setMessages] = useState<Message[]>([]);
@@ -40,6 +45,24 @@ function ConversationPanel({ customer, onClose, onNotesSaved }: { customer: Cust
   const [notes, setNotes] = useState(customer.notes ?? "");
   const [savingNotes, setSavingNotes] = useState(false);
   const notesSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [botPaused, setBotPaused] = useState(Boolean(customer.botPaused));
+  const [togglingPause, setTogglingPause] = useState(false);
+
+  async function toggleBotPaused(paused: boolean) {
+    setTogglingPause(true);
+    try {
+      await apiFetch(`/api/business/customers/${customer.id}/bot-paused`, {
+        method: "PATCH",
+        body: JSON.stringify({ paused }),
+      });
+      setBotPaused(paused);
+      onPausedChanged(paused);
+    } catch {
+      // best-effort — button stays clickable to retry
+    } finally {
+      setTogglingPause(false);
+    }
+  }
 
   function scheduleNotesSave(value: string) {
     setNotes(value);
@@ -95,6 +118,9 @@ function ConversationPanel({ customer, onClose, onNotesSaved }: { customer: Cust
       // Optimistically show it, then reconcile with the server-side transcript shortly after.
       setMessages((prev) => [...prev, { id: `local-${Date.now()}`, role: "assistant", content: body, createdAt: new Date().toISOString() }]);
       setTimeout(load, 1200);
+      // Sending a manual message auto-pauses the bot on this thread (see backend) — reflect that
+      // immediately rather than waiting on a round trip.
+      if (!botPaused) { setBotPaused(true); onPausedChanged(true); }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send");
     } finally {
@@ -123,12 +149,42 @@ function ConversationPanel({ customer, onClose, onNotesSaved }: { customer: Cust
               <div className="text-xs text-gray-400 font-mono" dir="ltr">{formatPhone(customer.phone)}</div>
             </div>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition p-1">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            {!botPaused && (
+              <button
+                onClick={() => toggleBotPaused(true)}
+                disabled={togglingPause}
+                title={he ? "השתק בוט לשיחה זו" : "Mute the bot on this thread"}
+                className="text-xs font-medium text-gray-400 hover:text-amber-700 hover:bg-amber-50 disabled:opacity-50 px-2 py-1.5 rounded-lg transition"
+              >
+                {he ? "השתקת בוט" : "Mute bot"}
+              </button>
+            )}
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition p-1">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
+
+        {botPaused && (
+          <div className="flex items-center justify-between gap-3 px-5 py-2.5 border-b border-amber-200 shrink-0 bg-amber-50">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm shrink-0">🙋</span>
+              <span className="text-xs font-semibold text-amber-800 truncate">
+                {he ? "השיחה בניהול ידני — הבוט לא עונה" : "You're handling this thread — the bot is silent"}
+              </span>
+            </div>
+            <button
+              onClick={() => toggleBotPaused(false)}
+              disabled={togglingPause}
+              className="shrink-0 text-xs font-semibold text-amber-800 bg-white hover:bg-amber-100 disabled:opacity-50 border border-amber-300 px-2.5 py-1 rounded-lg transition"
+            >
+              {togglingPause ? "…" : (he ? "החזר לבוט" : "Resume bot")}
+            </button>
+          </div>
+        )}
 
         <div className="px-5 py-3 border-b border-gray-100 shrink-0 bg-amber-50/40">
           <div className="flex items-center justify-between mb-1.5">
@@ -316,6 +372,10 @@ export default function CustomersPage() {
             setCustomers((prev) => prev.map((c) => (c.id === open.id ? { ...c, notes } : c)));
             setOpen((prev) => (prev ? { ...prev, notes } : prev));
           }}
+          onPausedChanged={(botPaused) => {
+            setCustomers((prev) => prev.map((c) => (c.id === open.id ? { ...c, botPaused } : c)));
+            setOpen((prev) => (prev ? { ...prev, botPaused } : prev));
+          }}
         />
       )}
       {showBulkModal && (
@@ -411,6 +471,9 @@ export default function CustomersPage() {
                         {(c.name ?? c.phone).charAt(0).toUpperCase()}
                       </div>
                       <span className="text-gray-700 font-medium">{c.name ?? <span className="text-gray-400 italic">—</span>}</span>
+                      {c.botPaused && (
+                        <span title={lang === "he" ? "בניהול ידני" : "Manually handled"} className="text-sm shrink-0">🙋</span>
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-gray-500 font-mono text-xs" dir="ltr">{formatPhone(c.phone)}</td>

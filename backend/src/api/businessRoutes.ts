@@ -8,6 +8,7 @@ import { getAuthUrl, saveGoogleTokens, disconnectGoogleCalendar, GoogleCalendarN
 import { sendWhatsAppMessage, getWabaId, createMessageTemplate, type CreateTemplateResult } from "../webhook/whatsappClient.js";
 import { reminderTemplate, reviewTemplate, REMINDER_TEMPLATE_BODY, REVIEW_TEMPLATE_BODY } from "../lib/whatsappTemplates.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
+import { appendTurn } from "../bot/conversationStore.js";
 import { createAppointment, OutsideBusinessHoursError, SlotUnavailableError } from "../booking/availability.js";
 import { parseBookingTime } from "../lib/timezone.js";
 import { getJobStatuses } from "../lib/jobStatus.js";
@@ -689,7 +690,31 @@ businessRouter.post("/customers/:id/message", async (req: AuthedRequest, res) =>
     to: customer.phone,
     text: parsed.data.text,
   });
-  res.json({ ok: true });
+
+  // Persist to the shared transcript (previously only shown optimistically client-side and lost
+  // on reload — worse, the bot's own context via getHistory never learned this message existed).
+  // Sending a manual message also means a human is now handling this thread, so pause the bot
+  // here automatically rather than requiring a separate toggle — it can be resumed explicitly.
+  await appendTurn(req.businessId!, customer.phone, { role: "assistant", content: parsed.data.text });
+  if (!customer.botPaused) {
+    await prisma.customer.update({ where: { id: customer.id }, data: { botPaused: true, botPausedAt: new Date() } });
+  }
+
+  res.json({ ok: true, botPaused: true });
+});
+
+businessRouter.patch("/customers/:id/bot-paused", async (req: AuthedRequest, res) => {
+  const parsed = z.object({ paused: z.boolean() }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const customer = await prisma.customer.findFirst({ where: { id: req.params.id, businessId: req.businessId! } });
+  if (!customer) return res.status(404).json({ error: "Not found" });
+
+  const updated = await prisma.customer.update({
+    where: { id: customer.id },
+    data: { botPaused: parsed.data.paused, botPausedAt: parsed.data.paused ? new Date() : null },
+  });
+  res.json({ botPaused: updated.botPaused });
 });
 
 // --- Waitlist ---
