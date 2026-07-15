@@ -156,21 +156,22 @@ model Customer {
 }
 
 model Appointment {
-  id             String       @id @default(cuid())
-  business       Business     @relation(fields: [businessId], references: [id])
-  businessId     String
-  customer       Customer     @relation(fields: [customerId], references: [id])
-  customerId     String
-  service        Service      @relation(fields: [serviceId], references: [id])
-  serviceId      String
-  staff          StaffMember? @relation(fields: [staffId], references: [id])
-  staffId        String?
-  startTime      DateTime
-  endTime        DateTime
-  status         String       @default("confirmed") // confirmed | cancelled | pending_payment
-  reminderSentAt DateTime? // set when 24h reminder WhatsApp is sent
-  reviewSentAt   DateTime? // set when post-visit review request is sent
-  createdAt      DateTime     @default(now())
+  id              String       @id @default(cuid())
+  business        Business     @relation(fields: [businessId], references: [id])
+  businessId      String
+  customer        Customer     @relation(fields: [customerId], references: [id])
+  customerId      String
+  service         Service      @relation(fields: [serviceId], references: [id])
+  serviceId       String
+  staff           StaffMember? @relation(fields: [staffId], references: [id])
+  staffId         String?
+  startTime       DateTime
+  endTime         DateTime
+  status          String       @default("confirmed") // confirmed | cancelled | pending_payment
+  reminderSentAt  DateTime? // set when 24h reminder WhatsApp is sent
+  reviewSentAt    DateTime? // set when post-visit review request is sent
+  calendarEventId String? // Google Calendar event id, so cancel/reschedule can delete the actual event instead of leaving a ghost
+  createdAt       DateTime     @default(now())
 
   // Deposit tracking — only set when the appointment was created via the deposit-required flow.
   depositAmountIls   Int?

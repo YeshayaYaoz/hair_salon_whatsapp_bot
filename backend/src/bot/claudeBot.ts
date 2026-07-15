@@ -8,7 +8,7 @@ import { parseBookingTime, parseDateString, dayOfWeekForDate, instantPartsInTz }
 import { notifyWaitlist } from "../lib/waitlist.js";
 import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
 import { decryptSecret } from "../lib/crypto.js";
-import { syncAppointmentToCalendar } from "../lib/googleCalendar.js";
+import { syncAppointmentToCalendar, deleteCalendarEvent } from "../lib/googleCalendar.js";
 import { captureError } from "../lib/errorMonitoring.js";
 
 // maxRetries: 0 here because we do our own retry in makeApiCall below — that lets us log each
@@ -336,7 +336,11 @@ async function runTool(
       serviceName: service.name,
       customerName,
       customerPhone,
-    }).catch((err) => console.error("Calendar sync failed:", err));
+    })
+      .then((eventId) => {
+        if (eventId) return prisma.appointment.update({ where: { id: appointment.id }, data: { calendarEventId: eventId } });
+      })
+      .catch((err) => console.error("Calendar sync failed:", err));
 
     // Return the authoritative weekday + local time so the model's confirmation matches the real date.
     return JSON.stringify({
@@ -369,6 +373,9 @@ async function runTool(
     });
     if (!appointment) return JSON.stringify({ error: "No matching appointment found" });
     await prisma.appointment.update({ where: { id: appointment.id }, data: { status: "cancelled" } });
+    if (appointment.calendarEventId) {
+      deleteCalendarEvent(businessId, appointment.calendarEventId).catch((err) => console.error("Calendar event delete failed:", err));
+    }
     // Offer the freed slot to anyone waiting for this service.
     notifyWaitlist(businessId, appointment.serviceId, appointment.service.name, appointment.startTime).catch((err) =>
       console.error("[waitlist] Notification failed:", err)
@@ -382,7 +389,7 @@ async function runTool(
     const oldTarget = parseBookingTime(input.oldStartTime as string, tz);
     const existing = await prisma.appointment.findFirst({
       where: { businessId, status: "confirmed", customer: { phone: customerPhone }, startTime: oldTarget },
-      include: { service: true },
+      include: { service: true, customer: true },
     });
     if (!existing) return JSON.stringify({ error: "No matching appointment found to reschedule" });
 
@@ -394,16 +401,35 @@ async function runTool(
 
     // Cancel the old one first so its slot doesn't block the new booking, then book the new time.
     await prisma.appointment.update({ where: { id: existing.id }, data: { status: "cancelled" } });
+    if (existing.calendarEventId) {
+      deleteCalendarEvent(businessId, existing.calendarEventId).catch((err) => console.error("Calendar event delete failed:", err));
+    }
     try {
+      const customerName = (input.customerName as string | undefined) ?? existing.customer.name ?? undefined;
       const appointment = await createAppointment({
         businessId,
         serviceId: service.id,
         customerPhone,
-        customerName: input.customerName as string | undefined,
+        customerName,
         startTime: parseBookingTime(input.newStartTime as string, tz),
         overrideDurationMin: input.durationMin as number | undefined,
       });
       lastOfferedSlots.value = undefined;
+
+      // Same "sync then persist the event id" pattern as book_appointment — never blocks the
+      // reply on the calendar call, and previously this branch didn't sync to calendar at all.
+      syncAppointmentToCalendar(businessId, {
+        startTime: appointment.startTime,
+        endTime: appointment.endTime,
+        serviceName: service.name,
+        customerName,
+        customerPhone,
+      })
+        .then((eventId) => {
+          if (eventId) return prisma.appointment.update({ where: { id: appointment.id }, data: { calendarEventId: eventId } });
+        })
+        .catch((err) => console.error("Calendar sync failed:", err));
+
       return JSON.stringify({ rescheduled: true, startTime: appointment.startTime, endTime: appointment.endTime });
     } catch (err) {
       // New slot was taken or invalid — restore the original so the customer isn't left with nothing.

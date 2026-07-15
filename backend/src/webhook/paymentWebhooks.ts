@@ -128,7 +128,11 @@ paymentWebhookRouter.post("/:provider/:businessId", async (req, res) => {
           serviceName: pending.service.name,
           customerName: pending.customer.name ?? undefined,
           customerPhone: pending.customer.phone,
-        }).catch((err) => console.error("Calendar sync failed:", err));
+        })
+          .then((eventId) => {
+            if (eventId) return prisma.appointment.update({ where: { id: pending.id }, data: { calendarEventId: eventId } });
+          })
+          .catch((err) => console.error("Calendar sync failed:", err));
 
         if (business.whatsappPhoneNumberId && business.whatsappAccessToken) {
           const tz = business.timezone || "Asia/Jerusalem";

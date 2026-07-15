@@ -4,7 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth, type AuthedRequest } from "../lib/auth.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import { requireActiveSubscription } from "../lib/subscriptionGate.js";
-import { getAuthUrl, saveGoogleTokens, disconnectGoogleCalendar, GoogleCalendarNotConfiguredError } from "../lib/googleCalendar.js";
+import { getAuthUrl, saveGoogleTokens, disconnectGoogleCalendar, deleteCalendarEvent, GoogleCalendarNotConfiguredError } from "../lib/googleCalendar.js";
 import { sendWhatsAppMessage, getWabaId, createMessageTemplate, type CreateTemplateResult } from "../webhook/whatsappClient.js";
 import { reminderTemplate, reviewTemplate, REMINDER_TEMPLATE_BODY, REVIEW_TEMPLATE_BODY } from "../lib/whatsappTemplates.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
@@ -562,10 +562,13 @@ businessRouter.patch("/appointments/:id/cancel", async (req: AuthedRequest, res)
   await prisma.appointment.update({ where: { id: req.params.id }, data: { status: "cancelled" } });
   res.json({ ok: true });
 
-  // Notify waitlist after responding so the HTTP request isn't delayed
+  // Notify waitlist and clean up the calendar event after responding so the HTTP request isn't delayed
   notifyWaitlist(req.businessId!, appointment.serviceId, appointment.service.name, appointment.startTime).catch(
     (err) => console.error("[waitlist] Notification failed:", err)
   );
+  if (appointment.calendarEventId) {
+    deleteCalendarEvent(req.businessId!, appointment.calendarEventId).catch((err) => console.error("Calendar event delete failed:", err));
+  }
 });
 
 // --- Blocked times (vacations, breaks, holidays) ---

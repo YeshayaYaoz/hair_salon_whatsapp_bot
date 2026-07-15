@@ -157,6 +157,12 @@ async function getValidAccessToken(businessId: string): Promise<string | null> {
   return fresh.access_token;
 }
 
+/**
+ * Creates a calendar event for a new/confirmed appointment. Returns the created event's id (so
+ * the caller can persist it on the appointment — see Appointment.calendarEventId) or null if
+ * calendar isn't connected or the call failed; never throws, since a failed sync must not block
+ * the booking itself.
+ */
 export async function syncAppointmentToCalendar(
   businessId: string,
   appointment: {
@@ -166,13 +172,13 @@ export async function syncAppointmentToCalendar(
     customerName?: string;
     customerPhone: string;
   }
-) {
+): Promise<string | null> {
   try {
     const record = await prisma.googleCalendarToken.findUnique({ where: { businessId } });
-    if (!record) return; // Not connected
+    if (!record) return null; // Not connected
 
     const accessToken = await getValidAccessToken(businessId);
-    if (!accessToken) return;
+    if (!accessToken) return null;
 
     const summary = `${appointment.serviceName}${appointment.customerName ? ` — ${appointment.customerName}` : ""}`;
     const description = `לקוח: ${appointment.customerName ?? "לא ידוע"}\nטלפון: ${appointment.customerPhone}\nשירות: ${appointment.serviceName}`;
@@ -197,11 +203,40 @@ export async function syncAppointmentToCalendar(
     if (!res.ok) {
       const err = await res.json() as any;
       console.error("Google Calendar sync failed:", err);
-    } else {
-      console.log("Appointment synced to Google Calendar");
+      return null;
     }
+    const created = await res.json() as { id?: string };
+    console.log("Appointment synced to Google Calendar");
+    return created.id ?? null;
   } catch (err) {
     console.error("Google Calendar sync error (non-fatal):", err);
+    return null;
+  }
+}
+
+/**
+ * Deletes a previously-synced calendar event (on cancel/reschedule) so the owner's calendar
+ * doesn't accumulate ghost events for appointments that no longer exist. Never throws — a failed
+ * delete (e.g. token revoked, event already removed manually) must not block the cancellation.
+ */
+export async function deleteCalendarEvent(businessId: string, eventId: string): Promise<void> {
+  try {
+    const record = await prisma.googleCalendarToken.findUnique({ where: { businessId } });
+    if (!record) return;
+
+    const accessToken = await getValidAccessToken(businessId);
+    if (!accessToken) return;
+
+    const res = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(record.calendarId)}/events/${encodeURIComponent(eventId)}`,
+      { method: "DELETE", headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    // 410 Gone means it's already deleted (e.g. removed manually in Google Calendar) — not an error.
+    if (!res.ok && res.status !== 404 && res.status !== 410) {
+      console.error(`Google Calendar event delete failed (${res.status}):`, await res.text());
+    }
+  } catch (err) {
+    console.error("Google Calendar event delete error (non-fatal):", err);
   }
 }
 
