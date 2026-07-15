@@ -11,7 +11,6 @@ type PaymentProviderName = (typeof PAYMENT_PROVIDERS)[number];
 const INVOICE_PROVIDERS = ["greeninvoice", "icount", "payplus-invoice"] as const;
 type InvoiceProviderName = (typeof INVOICE_PROVIDERS)[number];
 
-const MANAGED_PAYMENT_SURCHARGE_ILS = 49;
 const MANAGED_INVOICE_SURCHARGE_ILS = 39;
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -491,27 +490,14 @@ export default function PaymentsPage() {
         />
       </div>
 
+      {/* Managed *payment* clearing was intentionally removed: processing cards for other
+          businesses through Tori's own PayPlus merchant account is third-party clearing, which
+          PayPlus's contract forbids and which carries anti-money-laundering, tax, and chargeback
+          liability for Tori. Every salon connects its own merchant account above. A real managed
+          offering would require a PayPlus Marketplace/Split-Payments contract, not this shortcut.
+          The managed *invoice* card stays — that's a separate call, and it already carries its
+          own legal disclaimer. */}
       <div className="grid gap-5 lg:grid-cols-2 items-start mt-5 animate-fade-up stagger-2">
-        <ManagedCard
-          he={he}
-          kind="payment"
-          active={me?.paymentProvider === "tori_managed"}
-          surchargeIls={MANAGED_PAYMENT_SURCHARGE_ILS}
-          description={
-            he
-              ? "אין לך חשבון סליקה משלך? תורי תעבד את התשלומים דרך החשבון שלנו במקומך — אין צורך במפתחות API."
-              : "Don't have your own payment account? Tori will process payments through our own account for you — no API keys needed."
-          }
-          onEnable={async () => {
-            await apiFetch("/api/business/me/payment-provider", { method: "PUT", body: JSON.stringify({ provider: "tori_managed" }) });
-            await load();
-          }}
-          onDisable={async () => {
-            await apiFetch("/api/business/me/payment-provider", { method: "DELETE" });
-            await load();
-          }}
-        />
-
         <ManagedCard
           he={he}
           kind="invoice"

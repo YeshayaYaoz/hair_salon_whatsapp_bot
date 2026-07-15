@@ -166,14 +166,22 @@ businessRouter.post("/me/whatsapp/create-templates", async (req: AuthedRequest, 
 // --- Payment provider (PayPlus / Tranzila / Cardcom / Grow / Tori-managed) — the business's own
 // merchant account, except "tori_managed" which uses Tori's own account for a surcharge ---
 
-// "tori_managed" needs no business-supplied credentials — Tori's own account handles it.
+// NOTE: "tori_managed" is intentionally NOT accepted for *payments*. Running card processing for
+// other businesses through Tori's own PayPlus merchant account is third-party clearing, which
+// PayPlus's contract forbids and which exposes Tori to anti-money-laundering liability, tax
+// misreporting (all volume reported under Tori's ח.פ.), and 100% of the chargeback risk. Every
+// salon must connect its own merchant account. (The tori_managed *invoice* path is a separate
+// decision handled below.) A proper managed offering would require a PayPlus Marketplace/Split
+// Payments contract with per-salon KYC — not this shared-account shortcut.
 const paymentConnectSchema = z
   .object({
-    provider: z.enum(PAYMENT_PROVIDERS),
+    provider: z.enum(PAYMENT_PROVIDERS).refine((p) => p !== "tori_managed", {
+      message: "Managed payment clearing is not available — connect your own merchant account.",
+    }),
     apiKey: z.string().min(1).optional(),
     apiSecret: z.string().min(1).optional(),
   })
-  .refine((v) => v.provider === "tori_managed" || (v.apiKey && v.apiSecret), {
+  .refine((v) => v.apiKey && v.apiSecret, {
     message: "apiKey and apiSecret are required for this provider",
   });
 
@@ -190,8 +198,8 @@ businessRouter.put("/me/payment-provider", async (req: AuthedRequest, res) => {
     where: { id: req.businessId! },
     data: {
       paymentProvider: parsed.data.provider,
-      paymentApiKey: parsed.data.provider === "tori_managed" ? "managed" : encryptSecret(parsed.data.apiKey!),
-      paymentApiSecret: parsed.data.provider === "tori_managed" ? "managed" : encryptSecret(parsed.data.apiSecret!),
+      paymentApiKey: encryptSecret(parsed.data.apiKey!),
+      paymentApiSecret: encryptSecret(parsed.data.apiSecret!),
     },
   });
   res.json({ ok: true });

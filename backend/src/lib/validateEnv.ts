@@ -30,8 +30,11 @@ const RECOMMENDED: RequiredVar[] = [
   { name: "WHATSAPP_VERIFY_TOKEN", description: "required for Meta to verify the webhook URL" },
   { name: "PAYPLUS_API_KEY", description: "Tori's own PayPlus account — recurring subscription billing" },
   { name: "PAYPLUS_SECRET_KEY", description: "Tori's own PayPlus account — recurring subscription billing" },
-  { name: "TORI_MANAGED_PAYMENT_API_KEY", description: "\"Managed\" payment option for salons without their own merchant account" },
-  { name: "TORI_MANAGED_PAYMENT_SECRET_KEY", description: "\"Managed\" payment option for salons without their own merchant account" },
+  // NOTE: managed *payment clearing* is disabled at the API layer (see businessRoutes.ts) — third-
+  // party card clearing through Tori's own merchant account is contractually/legally not allowed.
+  // These stay only for Tori's own subscription billing, not for clearing on behalf of salons.
+  { name: "TORI_MANAGED_PAYMENT_API_KEY", description: "Tori's own PayPlus account (subscription billing only — NOT salon clearing)" },
+  { name: "TORI_MANAGED_PAYMENT_SECRET_KEY", description: "Tori's own PayPlus account (subscription billing only — NOT salon clearing)" },
   { name: "TORI_MANAGED_INVOICE_API_KEY", description: "\"Managed\" invoicing option for salons without their own Green Invoice account" },
   { name: "TORI_MANAGED_INVOICE_SECRET_KEY", description: "\"Managed\" invoicing option for salons without their own Green Invoice account" },
   { name: "SUPER_ADMIN_EMAIL", description: "your account email — unlocks the /dashboard/admin businesses list" },
