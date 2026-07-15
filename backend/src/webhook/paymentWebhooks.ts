@@ -115,6 +115,16 @@ paymentWebhookRouter.post("/:provider/:businessId", async (req, res) => {
         where: { id: event.referenceId, businessId, status: "pending_payment", depositStatus: "pending" },
         include: { service: true, customer: true },
       });
+      // Defense in depth: these webhooks aren't signature-verified (each provider's IPN payload
+      // shape differs and none are wired to real sandbox creds yet), so a forged POST to this URL
+      // is otherwise enough to "confirm" a booking for free. Requiring the reported amount to at
+      // least cover the deposit blocks the trivial case of a bare/zero-amount forged payload.
+      if (pending && (!event.amountIls || event.amountIls < (pending.depositAmountIls ?? 0))) {
+        console.warn(
+          `[payments webhook] Rejecting deposit confirmation for ${pending.id}: reported amount ${event.amountIls} below required ${pending.depositAmountIls}`
+        );
+        return;
+      }
       if (pending) {
         await prisma.appointment.update({
           where: { id: pending.id },
