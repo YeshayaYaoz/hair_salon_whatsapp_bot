@@ -16,6 +16,7 @@ import { runRetentionJob } from "./lib/retentionJob.js";
 import { runReminderJob, runReviewJob, runDigestJob, runRoiReportJob } from "./lib/scheduledMessages.js";
 import { runDepositExpiryJob } from "./lib/depositExpiryJob.js";
 import { runMetricSnapshotJob } from "./billing/metricSnapshotJob.js";
+import { runWhatsAppHealthJob } from "./lib/whatsappHealthJob.js";
 import { runTrackedJob } from "./lib/jobStatus.js";
 import { leadFinderRouter } from "./leadfinder/routes.js";
 
@@ -120,3 +121,7 @@ runTrackedJob("depositExpiry", runDepositExpiryJob);
 const ONE_DAY = 24 * 60 * 60 * 1000;
 setInterval(() => runTrackedJob("metricSnapshot", runMetricSnapshotJob), ONE_DAY);
 runTrackedJob("metricSnapshot", runMetricSnapshotJob);
+
+const SIX_HOURS = 6 * 60 * 60 * 1000;
+setInterval(() => runTrackedJob("whatsappHealth", runWhatsAppHealthJob), SIX_HOURS);
+runTrackedJob("whatsappHealth", runWhatsAppHealthJob);

@@ -71,7 +71,7 @@ businessRouter.get("/admin/businesses", requireSuperAdmin, async (_req: AuthedRe
       paymentProvider: true, invoiceProvider: true, depositEnabled: true,
       walletBalanceAgorot: true, messagesUsedThisCycle: true,
       blockedAt: true, blockedReason: true,
-      _count: { select: { appointments: true, customers: true } },
+      _count: { select: { appointments: true, customers: true, services: true, hours: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -99,12 +99,25 @@ businessRouter.get("/admin/businesses", requireSuperAdmin, async (_req: AuthedRe
   res.json(
     businesses.map((b) => {
       const claude = claudeByBusiness.get(b.id);
+      // Per-business onboarding checklist — the concrete setup steps a salon must complete before
+      // the bot is actually useful, so the operator can see at a glance who's stuck mid-setup and
+      // who to nudge, instead of guessing from indirect signals.
+      const onboarding = {
+        whatsapp: Boolean(b.whatsappPhoneNumberId),
+        services: b._count.services > 0,
+        hours: b._count.hours > 0,
+        payment: Boolean(b.paymentProvider),
+      };
+      const onboardingDone = Object.values(onboarding).filter(Boolean).length;
       return {
         ...b,
         whatsappConnected: Boolean(b.whatsappPhoneNumberId),
         realClaudeCostAgorot30d: claude?._sum.costAgorot ?? 0,
         realClaudeTokens30d: (claude?._sum.inputTokens ?? 0) + (claude?._sum.outputTokens ?? 0),
         realWhatsappBillableCount30d: whatsappByBusiness.get(b.id) ?? 0,
+        onboarding,
+        onboardingDone,
+        onboardingTotal: 4,
       };
     })
   );

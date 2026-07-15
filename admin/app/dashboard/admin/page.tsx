@@ -29,6 +29,9 @@ interface AdminBusiness {
   realClaudeCostAgorot30d: number;
   realClaudeTokens30d: number;
   realWhatsappBillableCount30d: number;
+  onboarding: { whatsapp: boolean; services: boolean; hours: boolean; payment: boolean };
+  onboardingDone: number;
+  onboardingTotal: number;
   _count: { appointments: number; customers: number };
 }
 
@@ -59,7 +62,7 @@ interface MrrSnapshot {
   canceledCount: number;
 }
 
-type StatusFilter = "all" | "trial" | "active" | "past_due" | "canceled" | "blocked" | "attention";
+type StatusFilter = "all" | "trial" | "active" | "past_due" | "canceled" | "blocked" | "attention" | "onboarding";
 
 // Must match MESSAGE_QUOTA_BY_PLAN in backend/src/lib/wallet.ts — display-only, not authoritative.
 const MESSAGE_QUOTA_BY_PLAN: Record<string, number> = { standard: 300, premium: 1000 };
@@ -178,6 +181,7 @@ export default function AdminBusinessesPage() {
     .filter((b) => {
       if (statusFilter === "all") return true;
       if (statusFilter === "blocked") return Boolean(b.blockedAt);
+      if (statusFilter === "onboarding") return b.onboardingDone < b.onboardingTotal;
       if (statusFilter === "attention") {
         return b.subscriptionStatus === "past_due" || (b.whatsappConnected && !b.whatsappTokenValid) || b.walletBalanceAgorot < 0;
       }
@@ -229,6 +233,8 @@ export default function AdminBusinessesPage() {
   const brokenWhatsapp = all.filter((b) => b.whatsappConnected && !b.whatsappTokenValid);
   const negativeWallet = all.filter((b) => b.walletBalanceAgorot < 0);
   const noPaymentConnected = all.filter((b) => !b.paymentProvider && b.subscriptionStatus !== "canceled");
+  // Businesses still mid-setup: not canceled, but haven't finished all onboarding steps yet.
+  const incompleteSetup = all.filter((b) => b.subscriptionStatus !== "canceled" && b.onboardingDone < b.onboardingTotal);
   const attentionCount = counts.pastDue + brokenWhatsapp.length + negativeWallet.length;
 
   return (
@@ -248,6 +254,7 @@ export default function AdminBusinessesPage() {
             <option value="past_due">{he ? "בפיגור" : "Past due"}</option>
             <option value="canceled">{he ? "בוטל" : "Canceled"}</option>
             <option value="blocked">{he ? "חסום" : "Blocked"}</option>
+            <option value="onboarding">{he ? "הגדרה לא הושלמה" : "Incomplete setup"}</option>
             <option value="attention">{he ? "דורש תשומת לב" : "Needs attention"}</option>
           </select>
           <input
@@ -352,6 +359,13 @@ export default function AdminBusinessesPage() {
                     {he
                       ? `${noPaymentConnected.length} בלי סליקה מחוברת — לא יכולים להציע מקדמות`
                       : `${noPaymentConnected.length} without a payment provider connected — can't offer deposits`}
+                  </li>
+                )}
+                {incompleteSetup.length > 0 && (
+                  <li className="text-amber-600">
+                    {he
+                      ? `${incompleteSetup.length} לא סיימו את ההגדרה — שווה לדחוף`
+                      : `${incompleteSetup.length} haven't finished setup — worth nudging`}
                   </li>
                 )}
               </ul>
@@ -464,6 +478,39 @@ export default function AdminBusinessesPage() {
               <button onClick={() => setDrilldown(null)} className="text-gray-400 hover:text-gray-600 text-sm">
                 {he ? "סגור" : "Close"}
               </button>
+            </div>
+
+            {/* --- Onboarding checklist --- */}
+            <div className="mb-4 mt-2">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-xs font-semibold text-gray-700">
+                  {he ? "הגדרה" : "Setup"} — {drilldown.onboardingDone}/{drilldown.onboardingTotal}
+                </span>
+                <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${drilldown.onboardingDone === drilldown.onboardingTotal ? "bg-green-500" : "bg-amber-400"}`}
+                    style={{ width: `${(drilldown.onboardingDone / drilldown.onboardingTotal) * 100}%` }}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {([
+                  ["whatsapp", "WhatsApp"],
+                  ["services", he ? "שירותים" : "Services"],
+                  ["hours", he ? "שעות" : "Hours"],
+                  ["payment", he ? "סליקה" : "Payment"],
+                ] as const).map(([key, label]) => {
+                  const done = drilldown.onboarding[key];
+                  return (
+                    <span
+                      key={key}
+                      className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border ${done ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}
+                    >
+                      {done ? "✓" : "○"} {label}
+                    </span>
+                  );
+                })}
+              </div>
             </div>
 
             {/* --- Admin actions --- */}
