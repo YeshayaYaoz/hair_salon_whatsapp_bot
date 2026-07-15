@@ -89,22 +89,31 @@ interface Appt {
   service: { name: string };
 }
 
+// Time-of-day greeting — makes the landing screen feel like a concierge, not a spreadsheet.
+function greetingFor(lang: "he" | "en"): string {
+  const h = new Date().getHours();
+  if (lang === "he") return h < 12 ? "בוקר טוב" : h < 18 ? "צהריים טובים" : "ערב טוב";
+  return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+}
+
 export default function AnalyticsPage() {
   const { t, lang } = useLanguage();
   const [data, setData] = useState<Analytics | null>(null);
   const [setup, setSetup] = useState<SetupState | null>(null);
   const [todayAppts, setTodayAppts] = useState<Appt[]>([]);
   const [tz, setTz] = useState("Asia/Jerusalem");
+  const [businessName, setBusinessName] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
       apiFetch<Analytics>("/api/business/analytics"),
-      apiFetch<Me & { timezone?: string }>("/api/business/me"),
+      apiFetch<Me & { timezone?: string; name?: string }>("/api/business/me"),
       apiFetch<{ id: string }[]>("/api/business/services"),
       apiFetch<{ id: string }[]>("/api/business/hours"),
       apiFetch<Appt[]>("/api/business/appointments"),
     ]).then(([analytics, me, services, hours, appts]) => {
       setData(analytics);
+      setBusinessName(me.name ?? null);
       const businessTz = me.timezone || "Asia/Jerusalem";
       setTz(businessTz);
       setSetup({
@@ -159,8 +168,16 @@ export default function AnalyticsPage() {
   return (
     <div className="animate-fade-in">
       <div className="mb-8 animate-fade-up">
-        <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">{t.analyticsTitle}</h1>
-        <p className="text-sm mt-1" style={{ color: "#9CA3AF" }}>{t.analyticsSubtitle}</p>
+        <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">
+          {greetingFor(lang)}{businessName ? `, ${businessName}` : ""} 👋
+        </h1>
+        <p className="text-sm mt-1" style={{ color: "#9CA3AF" }}>
+          {new Date().toLocaleDateString(lang === "he" ? "he-IL" : "en-US", { weekday: "long", day: "numeric", month: "long" })}
+          {" · "}
+          {todayAppts.length === 0
+            ? (lang === "he" ? "אין תורים היום" : "no appointments today")
+            : (lang === "he" ? `${todayAppts.length} תורים היום` : `${todayAppts.length} appointments today`)}
+        </p>
       </div>
 
       {/* Today's schedule */}

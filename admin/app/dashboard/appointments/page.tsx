@@ -5,6 +5,7 @@ import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { formatTimeInTz, formatDateTimeInTz, partsInTz, dayKeyInTz } from "../../lib/tz";
 import { SkeletonBlock, SkeletonRow } from "../../lib/Skeleton";
+import { EmptyState } from "../../lib/EmptyState";
 import { formatPhone } from "../../lib/formatPhone";
 
 function localDayKey(d: Date): string {
@@ -491,7 +492,13 @@ export default function AppointmentsPage() {
                 {Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} cols={4} />)}
               </div>
             ) : filtered.length === 0 ? (
-              <div className="px-6 py-12 text-center text-gray-400 text-sm">{t.noAppointments}</div>
+              <EmptyState
+                icon="📅"
+                title={t.noAppointments}
+                hint={lang === "he"
+                  ? "ברגע שלקוח יקבע תור בוואטסאפ — הוא יופיע כאן אוטומטית."
+                  : "As soon as a customer books via WhatsApp, it will show up here automatically."}
+              />
             ) : (
               <table className="w-full text-sm">
                 <thead>

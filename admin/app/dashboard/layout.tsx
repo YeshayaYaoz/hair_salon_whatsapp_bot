@@ -122,8 +122,8 @@ function SidebarContent({ pathname, isSuperAdmin }: { pathname: string; isSuperA
           <Image
             src="/tori_logo-white.jpeg"
             alt="תורי"
-            width={38}
-            height={38}
+            width={46}
+            height={46}
             className="rounded-xl shrink-0"
             style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.3)" }}
           />
@@ -273,7 +273,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         style={{ background: "rgba(255,255,255,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid #E5E7EB" }}
       >
         <div className="flex items-center gap-2.5">
-          <Image src="/tori_logo-white.jpeg" alt="תורי" width={30} height={30} className="rounded-lg" />
+          <Image src="/tori_logo-white.jpeg" alt="תורי" width={36} height={36} className="rounded-lg" />
           <span className="font-semibold text-gray-900 text-base">
             {activeItem ? t.nav[activeItem.key] : "תורי"}
           </span>
@@ -338,19 +338,31 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             className="absolute bottom-16 start-0 end-0 bg-white rounded-t-2xl shadow-2xl p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] max-h-[70vh] overflow-y-auto"
           >
             <div className="w-9 h-1 rounded-full bg-gray-200 mx-auto mb-2" />
-            {MORE_ITEMS.map((item) => {
-              const active = pathname === item.href;
+            {/* Mirror the sidebar's grouping so the mobile sheet reads as sections, not a flat list */}
+            {NAV_GROUPS.map((group) => {
+              const items = group.items.filter((i) => MORE_ITEMS.includes(i));
+              if (items.length === 0) return null;
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition ${active ? "bg-[#1B7FA0]/10 text-[#1B7FA0]" : "text-gray-700"}`}
-                >
-                  <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={item.icon} />
-                  </svg>
-                  {t.nav[item.key]}
-                </Link>
+                <div key={group.titleKey}>
+                  <div className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                    {t.navGroups[group.titleKey]}
+                  </div>
+                  {items.map((item) => {
+                    const active = pathname === item.href;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition ${active ? "bg-[#1B7FA0]/10 text-[#1B7FA0]" : "text-gray-700"}`}
+                      >
+                        <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={item.icon} />
+                        </svg>
+                        {t.nav[item.key]}
+                      </Link>
+                    );
+                  })}
+                </div>
               );
             })}
             {isSuperAdmin && (

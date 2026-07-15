@@ -369,6 +369,8 @@ export default function LoginPage() {
           margin-bottom: 14px;
         }
 
+        .login-form-brand { display: flex; justify-content: center; margin-bottom: 18px; }
+
         /* Signup step indicator */
         .login-steps { display: flex; align-items: center; gap: 8px; margin-bottom: 22px; }
         .login-step { display: flex; align-items: center; gap: 8px; }
@@ -502,7 +504,7 @@ export default function LoginPage() {
 
           <div>
             <div className="login-left-brand">
-              <Image src="/tori_logo_transparent.png" alt="תורי" width={32} height={32} style={{ flexShrink: 0, borderRadius: 8 }} />
+              <Image src="/tori_logo_transparent.png" alt="תורי" width={48} height={48} style={{ flexShrink: 0, borderRadius: 12 }} />
               <span className="login-left-brand-name">תורי</span>
             </div>
             <div className="login-left-golden">תור הזהב של העסק שלך</div>
@@ -555,6 +557,12 @@ export default function LoginPage() {
         {/* Right panel */}
         <div className="login-right">
           <div className={`login-form-wrap ${mounted ? "show" : ""}`}>
+
+            {/* Brand mark — the left panel (which carries the logo) is hidden on mobile, so the
+                form itself needs one for the page to feel branded on phones too. */}
+            <div className="login-form-brand">
+              <Image src="/tori_logo_transparent.png" alt="תורי" width={56} height={56} style={{ borderRadius: 14 }} />
+            </div>
 
             {/* Signup step indicator */}
             {mode === "signup" && (

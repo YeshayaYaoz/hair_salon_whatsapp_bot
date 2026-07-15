@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
+import { EmptyState } from "../../lib/EmptyState";
 import { formatPhone } from "../../lib/formatPhone";
 
 interface WaitlistEntry {
@@ -14,7 +15,7 @@ interface WaitlistEntry {
 }
 
 export default function WaitlistPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [entries, setEntries] = useState<WaitlistEntry[]>([]);
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
@@ -55,8 +56,14 @@ export default function WaitlistPage() {
       </div>
 
       {entries.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-xl px-6 py-12 text-center text-gray-400 text-sm">
-          {t.noWaitlist}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <EmptyState
+            icon="⏳"
+            title={t.noWaitlist}
+            hint={lang === "he"
+              ? "כשאין מקום פנוי, הבוט מציע ללקוח להצטרף לרשימת ההמתנה — ותראו אותו כאן."
+              : "When no slot is free, the bot offers the customer a waitlist spot — they'll appear here."}
+          />
         </div>
       ) : (
         <>

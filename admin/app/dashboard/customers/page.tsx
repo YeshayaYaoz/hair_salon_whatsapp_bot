@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SkeletonBlock, SkeletonRow } from "../../lib/Skeleton";
+import { EmptyState } from "../../lib/EmptyState";
 import { formatPhone } from "../../lib/formatPhone";
 
 // Short, stable, human-recognizable reference for a customer (there's no business-facing
@@ -361,9 +362,13 @@ export default function CustomersPage() {
             {Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={3} />)}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="px-6 py-12 text-center text-gray-400 text-sm">
-            {t.noCustomers}
-          </div>
+          <EmptyState
+            icon="🤝"
+            title={t.noCustomers}
+            hint={lang === "he"
+              ? "כל לקוח שכותב לבוט נשמר כאן אוטומטית, כולל היסטוריית התורים שלו."
+              : "Every customer who messages the bot is saved here automatically, with their booking history."}
+          />
         ) : (
           <table className="w-full text-sm">
             <thead>

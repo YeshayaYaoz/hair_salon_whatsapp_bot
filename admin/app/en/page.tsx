@@ -536,7 +536,7 @@ export default function LandingPageEN() {
         .lp-footer-top { max-width: 1080px; margin: 0 auto 40px; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 40px; }
         @media (max-width: 700px) { .lp-footer-top { grid-template-columns: 1fr; } }
         .lp-footer-logo-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-        .lp-footer-logo-row img { width: 42px; height: 42px; border-radius: 10px; }
+        .lp-footer-logo-row img { width: 52px; height: 52px; border-radius: 12px; }
         .lp-footer-brand { font-size: 15px; font-weight: 700; color: #fff; }
         .lp-footer-tagline { font-size: 13px; color: rgba(255,255,255,0.35); line-height: 1.6; max-width: 280px; }
         .lp-footer-col { display: flex; flex-direction: column; gap: 10px; }
@@ -605,7 +605,7 @@ export default function LandingPageEN() {
         {/* NAV */}
         <nav className="lp-nav">
           <a className="lp-nav-logo" href="/en">
-            <img src="/tori_logo_transparent.png" alt="Tori" style={{ width: 42, height: 42, borderRadius: 10 }} />
+            <img src="/tori_logo_transparent.png" alt="Tori" style={{ width: 52, height: 52, borderRadius: 12 }} />
             <span>Tori</span>
           </a>
           <div className="lp-nav-links">

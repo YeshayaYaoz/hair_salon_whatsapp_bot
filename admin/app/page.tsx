@@ -275,8 +275,8 @@ export default function LandingPage() {
           display: flex; align-items: center; justify-content: space-between; padding: 0 44px;
         }
         .lp-nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; animation: fadeDown 0.5s ease 0.1s both; }
-        .lp-nav-logo img { width: 42px; height: 42px; border-radius: 10px; }
-        .lp-nav-logo span { font-size: 17px; font-weight: 700; color: #111; letter-spacing: -0.3px; }
+        .lp-nav-logo img { width: 52px; height: 52px; border-radius: 12px; }
+        .lp-nav-logo span { font-size: 19px; font-weight: 800; color: #111; letter-spacing: -0.3px; }
         .lp-nav-links { display: flex; align-items: center; gap: 4px; animation: fadeDown 0.5s ease 0.15s both; }
         .lp-nav-link { font-size: 13px; font-weight: 500; color: #555; text-decoration: none; padding: 7px 14px; border-radius: 7px; transition: background 0.15s, color 0.15s; }
         .lp-nav-link:hover { background: #F5F5F5; color: #111; }
@@ -717,7 +717,7 @@ export default function LandingPage() {
         .lp-footer-top { display: grid; grid-template-columns: 1.7fr 1fr 1fr 1.5fr; gap: 48px; margin-bottom: 44px; align-items: start; max-width: 1200px; }
         .lp-footer-brand-block { max-width: 300px; }
         .lp-footer-logo-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
-        .lp-footer-logo-row img { width: 42px; height: 42px; border-radius: 10px; opacity: 0.95; }
+        .lp-footer-logo-row img { width: 52px; height: 52px; border-radius: 12px; opacity: 0.95; }
         .lp-footer-brand { font-size: 16px; font-weight: 700; color: #fff; }
         .lp-footer-tagline { font-size: 14px; color: rgba(255,255,255,0.62); line-height: 1.7; }
         .lp-footer-col h4 { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.4); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 16px; }
@@ -907,7 +907,7 @@ export default function LandingPage() {
         {/* NAV */}
         <nav className="lp-nav">
           <a className="lp-nav-logo" href="#">
-            <img src="/tori_logo_transparent.png" alt="תורי" style={{ width: 32, height: 32, borderRadius: 8 }} />
+            <img src="/tori_logo_transparent.png" alt="תורי" />
             <span>תורי</span>
           </a>
           <div className="lp-nav-links">
