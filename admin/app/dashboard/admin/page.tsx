@@ -20,6 +20,8 @@ interface AdminBusiness {
   depositEnabled: boolean;
   walletBalanceAgorot: number;
   messagesUsedThisCycle: number;
+  blockedAt: string | null;
+  blockedReason: string | null;
   // Real, metered figures from ApiUsageEvent — actual Anthropic token usage (costed from
   // Anthropic's own published rates) and actual billable WhatsApp messages, last 30 days. Not
   // estimates: a business with no bot activity in that window shows ₪0/0 here, which is correct.
@@ -64,12 +66,43 @@ export default function AdminBusinessesPage() {
   const [search, setSearch] = useState("");
   const [drilldown, setDrilldown] = useState<AdminBusiness | null>(null);
   const [phoneRows, setPhoneRows] = useState<PhoneUsageRow[] | null>(null);
+  const [blockReason, setBlockReason] = useState("");
+  const [planChoice, setPlanChoice] = useState<"standard" | "premium">("standard");
+  const [confirmDeleteName, setConfirmDeleteName] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
 
-  useEffect(() => {
-    apiFetch<AdminBusiness[]>("/api/business/admin/businesses")
+  function reload() {
+    return apiFetch<AdminBusiness[]>("/api/business/admin/businesses")
       .then(setBusinesses)
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load"));
+  }
+
+  useEffect(() => {
+    reload();
   }, []);
+
+  function openDrilldown(b: AdminBusiness) {
+    setDrilldown(b);
+    setBlockReason("");
+    setPlanChoice((b.subscriptionPlan as "standard" | "premium") ?? "standard");
+    setConfirmDeleteName("");
+    setActionError(null);
+  }
+
+  async function runAction(fn: () => Promise<unknown>) {
+    setActionBusy(true);
+    setActionError(null);
+    try {
+      await fn();
+      await reload();
+      setDrilldown(null);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setActionBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (!drilldown) return;
@@ -208,11 +241,18 @@ export default function AdminBusinessesPage() {
               {filtered.map((b, i) => (
                 <tr
                   key={b.id}
-                  onClick={() => setDrilldown(b)}
-                  className={`cursor-pointer hover:bg-gray-50 ${i !== filtered.length - 1 ? "border-b border-gray-200/50" : ""}`}
+                  onClick={() => openDrilldown(b)}
+                  className={`cursor-pointer hover:bg-gray-50 ${b.blockedAt ? "bg-red-50/40" : ""} ${i !== filtered.length - 1 ? "border-b border-gray-200/50" : ""}`}
                 >
                   <td className="px-4 py-3">
-                    <div className="text-gray-800 font-medium">{b.name}</div>
+                    <div className="text-gray-800 font-medium flex items-center gap-1.5">
+                      {b.name}
+                      {b.blockedAt && (
+                        <span className="inline-flex text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200">
+                          {he ? "חסום" : "blocked"}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-gray-400 text-xs" dir="ltr">{b.email}</div>
                   </td>
                   <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{fmtDate(b.createdAt)}</td>
@@ -281,6 +321,103 @@ export default function AdminBusinessesPage() {
                 {he ? "סגור" : "Close"}
               </button>
             </div>
+
+            {/* --- Admin actions --- */}
+            <div className="border border-gray-200 rounded-lg p-3.5 mb-4 space-y-3">
+              {actionError && <div className="bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg px-3 py-2">{actionError}</div>}
+
+              {/* Block / unblock */}
+              {drilldown.blockedAt ? (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs text-gray-600">
+                    {he ? "חסום" : "Blocked"}{drilldown.blockedReason ? `: ${drilldown.blockedReason}` : ""}
+                  </div>
+                  <button
+                    disabled={actionBusy}
+                    onClick={() =>
+                      runAction(() => apiFetch(`/api/business/admin/businesses/${drilldown.id}/unblock`, { method: "POST" }))
+                    }
+                    className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-50"
+                  >
+                    {he ? "בטל חסימה" : "Unblock"}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    placeholder={he ? "סיבת חסימה (לא חובה)" : "Block reason (optional)"}
+                    value={blockReason}
+                    onChange={(e) => setBlockReason(e.target.value)}
+                    className="flex-1 text-xs"
+                  />
+                  <button
+                    disabled={actionBusy}
+                    onClick={() =>
+                      runAction(() =>
+                        apiFetch(`/api/business/admin/businesses/${drilldown.id}/block`, {
+                          method: "POST",
+                          body: JSON.stringify({ reason: blockReason || undefined }),
+                        })
+                      )
+                    }
+                    className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {he ? "חסום עסק" : "Block business"}
+                  </button>
+                </div>
+              )}
+
+              {/* Plan upgrade/downgrade */}
+              <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+                <select
+                  value={planChoice}
+                  onChange={(e) => setPlanChoice(e.target.value as "standard" | "premium")}
+                  className="text-xs flex-1"
+                >
+                  <option value="standard">{he ? "סטנדרט" : "Standard"} (₪{PLAN_PRICES_ILS.standard})</option>
+                  <option value="premium">{he ? "פרימיום" : "Premium"} (₪{PLAN_PRICES_ILS.premium})</option>
+                </select>
+                <button
+                  disabled={actionBusy}
+                  onClick={() =>
+                    runAction(() =>
+                      apiFetch(`/api/business/admin/businesses/${drilldown.id}/plan`, {
+                        method: "POST",
+                        body: JSON.stringify({ plan: planChoice }),
+                      })
+                    )
+                  }
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {he ? "קבע מנוי" : "Set plan"}
+                </button>
+              </div>
+
+              {/* Permanent delete */}
+              <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+                <input
+                  placeholder={he ? `הקלד "${drilldown.name}" לאישור מחיקה` : `Type "${drilldown.name}" to confirm delete`}
+                  value={confirmDeleteName}
+                  onChange={(e) => setConfirmDeleteName(e.target.value)}
+                  className="flex-1 text-xs"
+                />
+                <button
+                  disabled={actionBusy || confirmDeleteName.trim() !== drilldown.name}
+                  onClick={() =>
+                    runAction(() =>
+                      apiFetch(`/api/business/admin/businesses/${drilldown.id}`, {
+                        method: "DELETE",
+                        body: JSON.stringify({ confirmName: confirmDeleteName }),
+                      })
+                    )
+                  }
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  {he ? "מחק לצמיתות" : "Delete permanently"}
+                </button>
+              </div>
+            </div>
+
             <p className="text-xs text-gray-500 mb-4">
               {he ? "עלות בפועל, לפי מספר טלפון, 30 יום אחרונים" : "Real usage by phone number, last 30 days"}
             </p>

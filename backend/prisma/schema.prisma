@@ -16,6 +16,12 @@ model Business {
   passwordHash       String
   subscriptionStatus String @default("trial") // trial | active | past_due | canceled
 
+  // Super-admin block: independent of subscriptionStatus — a blocked business is locked out of
+  // login and the bot stops replying, regardless of whether their subscription is otherwise fine
+  // (e.g. abuse, fraud, a support dispute), without touching their billing state.
+  blockedAt     DateTime?
+  blockedReason String?
+
   // Own-account recurring billing via PayPlus tokens — charges the business (salon owner) for
   // their Tori subscription. Separate from paymentProvider/paymentApiKey above, which are the
   // salon's own merchant account for charging their customers, not this.

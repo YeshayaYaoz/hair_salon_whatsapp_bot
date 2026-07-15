@@ -1,0 +1,3 @@
+ALTER TABLE "Business"
+  ADD COLUMN IF NOT EXISTS "blockedAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "blockedReason" TEXT;

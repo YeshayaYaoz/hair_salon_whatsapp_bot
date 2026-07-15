@@ -62,6 +62,10 @@ authRouter.post("/login", authLimiter, async (req, res) => {
   const valid = await bcrypt.compare(password, business.passwordHash);
   if (!valid) return res.status(401).json({ error: "Invalid credentials" });
 
+  if (business.blockedAt) {
+    return res.status(403).json({ error: "This account has been suspended. Contact support." });
+  }
+
   res.json({ token: signBusinessToken(business.id) });
 });
 
@@ -153,6 +157,10 @@ authRouter.post("/google/callback", authLimiter, async (req, res) => {
     // Save the Calendar connection using the tokens already in hand — the authorization code was
     // already consumed above, so a second exchangeCode call (what saveGoogleTokens does) would
     // fail. refresh_token is only present when the user actually granted the calendar scope.
+    if (business.blockedAt) {
+      return res.status(403).json({ error: "This account has been suspended. Contact support." });
+    }
+
     await saveGoogleTokensFromResponse(business.id, tokens);
 
     if (isNewAccount) sendWelcomeEmail(profile.email, business.name).catch((err) => console.error("Welcome email failed:", err));

@@ -21,7 +21,7 @@ businessRouter.use(requireAuth);
 // /me and /me/whatsapp stay reachable even with a lapsed subscription so a business can see its
 // status and the billing UI can still load; everything else requires an active subscription.
 businessRouter.use((req, res, next) => {
-  if (req.path === "/me" || req.path === "/me/whatsapp" || req.path === "/admin/businesses") return next();
+  if (req.path === "/me" || req.path === "/me/whatsapp" || req.path.startsWith("/admin/")) return next();
   requireActiveSubscription(req, res, next);
 });
 
@@ -68,6 +68,7 @@ businessRouter.get("/admin/businesses", requireSuperAdmin, async (_req: AuthedRe
       whatsappPhoneNumberId: true, whatsappTokenValid: true,
       paymentProvider: true, invoiceProvider: true, depositEnabled: true,
       walletBalanceAgorot: true, messagesUsedThisCycle: true,
+      blockedAt: true, blockedReason: true,
       _count: { select: { appointments: true, customers: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -139,6 +140,85 @@ businessRouter.get("/admin/usage-by-phone", requireSuperAdmin, async (req: Authe
   }
 
   res.json(Array.from(byPhone.values()).sort((a, b) => b.claudeCostAgorot - a.claudeCostAgorot));
+});
+
+// Block/suspend a business: independent of subscriptionStatus (see schema comment) — locks out
+// dashboard login and stops the WhatsApp bot from replying, without touching billing state, so a
+// support/fraud suspension doesn't get silently undone by the next successful charge.
+const blockSchema = z.object({ reason: z.string().max(500).optional() });
+businessRouter.post("/admin/businesses/:id/block", requireSuperAdmin, async (req: AuthedRequest, res) => {
+  const parsed = blockSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const business = await prisma.business.update({
+    where: { id: req.params.id },
+    data: { blockedAt: new Date(), blockedReason: parsed.data.reason ?? null },
+  });
+  res.json({ ok: true, blockedAt: business.blockedAt });
+});
+
+businessRouter.post("/admin/businesses/:id/unblock", requireSuperAdmin, async (req: AuthedRequest, res) => {
+  await prisma.business.update({ where: { id: req.params.id }, data: { blockedAt: null, blockedReason: null } });
+  res.json({ ok: true });
+});
+
+// Manually set a business's plan/subscription — for comping an account, a sales-negotiated
+// upgrade, or fixing a stuck billing state. Setting subscriptionStatus to "active" here does NOT
+// create a PayPlus recurring token — it just marks the account as paid, same as a successful
+// charge would; the business's OWN recurring billing (if any) is untouched.
+const planSchema = z.object({
+  plan: z.enum(["standard", "premium"]),
+  billingCycle: z.enum(["monthly", "annual"]).optional(),
+  subscriptionStatus: z.enum(["trial", "active", "past_due", "canceled"]).optional(),
+});
+businessRouter.post("/admin/businesses/:id/plan", requireSuperAdmin, async (req: AuthedRequest, res) => {
+  const parsed = planSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const business = await prisma.business.update({
+    where: { id: req.params.id },
+    data: {
+      subscriptionPlan: parsed.data.plan,
+      ...(parsed.data.billingCycle ? { billingCycle: parsed.data.billingCycle } : {}),
+      subscriptionStatus: parsed.data.subscriptionStatus ?? "active",
+    },
+  });
+  res.json({ ok: true, subscriptionPlan: business.subscriptionPlan, subscriptionStatus: business.subscriptionStatus });
+});
+
+// Permanently deletes a business and every row scoped to it. No cascade at the DB level (kept
+// explicit and in dependency order on purpose — an accidental ON DELETE CASCADE is how you lose
+// a business by mistake). Requires re-typing the business's exact name as confirmation, since this
+// is unrecoverable and wipes real appointment/customer history, not just account access — for
+// almost every real case, block (above) is the right tool; this is for GDPR-style erasure requests
+// or definitively fake/test accounts.
+const deleteSchema = z.object({ confirmName: z.string() });
+businessRouter.delete("/admin/businesses/:id", requireSuperAdmin, async (req: AuthedRequest, res) => {
+  const parsed = deleteSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const business = await prisma.business.findUnique({ where: { id: req.params.id }, select: { name: true } });
+  if (!business) return res.status(404).json({ error: "Not found" });
+  if (parsed.data.confirmName.trim() !== business.name) {
+    return res.status(400).json({ error: "Business name confirmation does not match" });
+  }
+
+  const businessId = req.params.id;
+  await prisma.$transaction([
+    prisma.appointment.deleteMany({ where: { businessId } }),
+    prisma.waitlistEntry.deleteMany({ where: { businessId } }),
+    prisma.customer.deleteMany({ where: { businessId } }),
+    prisma.service.deleteMany({ where: { businessId } }),
+    prisma.staffMember.deleteMany({ where: { businessId } }),
+    prisma.businessHours.deleteMany({ where: { businessId } }),
+    prisma.blockedTime.deleteMany({ where: { businessId } }),
+    prisma.faqEntry.deleteMany({ where: { businessId } }),
+    prisma.googleCalendarToken.deleteMany({ where: { businessId } }),
+    prisma.conversationMessage.deleteMany({ where: { businessId } }),
+    prisma.apiUsageEvent.deleteMany({ where: { businessId } }),
+    prisma.passwordResetToken.deleteMany({ where: { businessId } }),
+    prisma.business.delete({ where: { id: businessId } }),
+  ]);
+  console.log(`[admin] Business ${businessId} (${business.name}) permanently deleted by super admin`);
+  res.json({ ok: true });
 });
 
 // Global background job health (reminders/reviews/digest/retention) — same info for every
