@@ -1,10 +1,13 @@
 import { Router } from "express";
 import { z } from "zod";
+import crypto from "crypto";
+import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, type AuthedRequest } from "../lib/auth.js";
 import { requireSuperAdmin } from "../api/businessRoutes.js";
 import { executeLeadFinderRun } from "./runner.js";
 import { loadScoringWeights, DEFAULT_SCORING_CONFIG_KEY } from "./scoring.js";
+import { APP_URL, sendTrialAccountCreatedEmail } from "../lib/email.js";
 
 export const leadFinderRouter = Router();
 
@@ -96,7 +99,10 @@ leadFinderRouter.get("/campaigns/:id/leads", async (req: AuthedRequest, res) => 
   const statusFilter = typeof req.query.status === "string" ? req.query.status : undefined;
   const leads = await prisma.lead.findMany({
     where: { campaignId: req.params.id, ...(statusFilter ? { status: statusFilter } : {}) },
-    include: { scores: { orderBy: { version: "desc" }, take: 1 } },
+    include: {
+      scores: { orderBy: { version: "desc" }, take: 1 },
+      linkedBusiness: { select: { id: true, name: true, subscriptionStatus: true, subscriptionPlan: true, createdAt: true } },
+    },
   });
 
   // Sort by latest score desc (score lives in a related table, so sort in application code
@@ -119,10 +125,84 @@ leadFinderRouter.get("/leads/:id", async (req: AuthedRequest, res) => {
       scores: { orderBy: { version: "desc" } },
       statusEvents: { orderBy: { createdAt: "desc" } },
       profile: true,
+      linkedBusiness: { select: { id: true, name: true, subscriptionStatus: true, subscriptionPlan: true, createdAt: true } },
     },
   });
   if (!lead) return res.status(404).json({ error: "Lead not found" });
   res.json(lead);
+});
+
+// Manually link a lead to an existing Business — for the case where the salon signed themselves
+// up (rather than the admin creating a trial account for them below), so ROI/conversion tracking
+// still connects the two records.
+const linkBusinessSchema = z.object({ businessId: z.string().min(1) });
+leadFinderRouter.post("/leads/:id/link-business", async (req: AuthedRequest, res) => {
+  const parsed = linkBusinessSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const [lead, business] = await Promise.all([
+    prisma.lead.findUnique({ where: { id: req.params.id } }),
+    prisma.business.findUnique({ where: { id: parsed.data.businessId }, select: { id: true } }),
+  ]);
+  if (!lead) return res.status(404).json({ error: "Lead not found" });
+  if (!business) return res.status(404).json({ error: "Business not found" });
+
+  await prisma.$transaction([
+    prisma.lead.update({ where: { id: lead.id }, data: { linkedBusinessId: business.id, status: "converted" } }),
+    prisma.leadStatusEvent.create({
+      data: { leadId: lead.id, fromStatus: lead.status, toStatus: "converted", note: "Linked to existing business" },
+    }),
+  ]);
+  res.json({ ok: true });
+});
+
+leadFinderRouter.delete("/leads/:id/link-business", async (req: AuthedRequest, res) => {
+  await prisma.lead.update({ where: { id: req.params.id }, data: { linkedBusinessId: null } });
+  res.json({ ok: true });
+});
+
+// Creates a real trial Business account directly from a lead — for a warm lead who agreed on a
+// call, skipping the self-signup step. The salon gets a set-password email (same token flow as
+// forgot-password) rather than a password we'd have to relay to them insecurely.
+const createAccountSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(1).optional(), // defaults to the lead's discovered business name
+});
+leadFinderRouter.post("/leads/:id/create-account", async (req: AuthedRequest, res) => {
+  const parsed = createAccountSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const lead = await prisma.lead.findUnique({ where: { id: req.params.id } });
+  if (!lead) return res.status(404).json({ error: "Lead not found" });
+  if (lead.linkedBusinessId) return res.status(409).json({ error: "Lead is already linked to a business" });
+
+  const existing = await prisma.business.findUnique({ where: { email: parsed.data.email } });
+  if (existing) return res.status(409).json({ error: "A business with this email already exists — use link-business instead" });
+
+  const businessName = parsed.data.name ?? lead.name;
+  // Unguessable placeholder hash — same pattern as Google-signup accounts (lib/authRoutes.ts) —
+  // the salon sets their own password via the emailed link below, never receiving this one.
+  const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
+  const business = await prisma.business.create({
+    data: { name: businessName, email: parsed.data.email, passwordHash },
+  });
+
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days — longer than the self-serve 30min reset window, since this isn't time-sensitive account recovery
+  await prisma.passwordResetToken.create({ data: { businessId: business.id, token, expiresAt } });
+
+  await prisma.$transaction([
+    prisma.lead.update({ where: { id: lead.id }, data: { linkedBusinessId: business.id, status: "trial_sent" } }),
+    prisma.leadStatusEvent.create({
+      data: { leadId: lead.id, fromStatus: lead.status, toStatus: "trial_sent", note: `Trial account created (${parsed.data.email})` },
+    }),
+  ]);
+
+  sendTrialAccountCreatedEmail(parsed.data.email, businessName, `${APP_URL}/reset-password?token=${token}`).catch((err) =>
+    console.error("[leadfinder] Trial account email failed:", err)
+  );
+
+  res.status(201).json({ ok: true, businessId: business.id });
 });
 
 leadFinderRouter.patch("/leads/:id/status", async (req: AuthedRequest, res) => {
@@ -141,6 +221,18 @@ leadFinderRouter.patch("/leads/:id/status", async (req: AuthedRequest, res) => {
   ]);
 
   res.json({ ok: true });
+});
+
+// Lightweight business search for the "link to existing business" picker in the lead-linking UI.
+leadFinderRouter.get("/businesses-search", async (req: AuthedRequest, res) => {
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  if (q.length < 2) return res.json([]);
+  const businesses = await prisma.business.findMany({
+    where: { OR: [{ name: { contains: q, mode: "insensitive" } }, { email: { contains: q, mode: "insensitive" } }] },
+    select: { id: true, name: true, email: true, subscriptionStatus: true },
+    take: 10,
+  });
+  res.json(businesses);
 });
 
 // --- Scoring config ---

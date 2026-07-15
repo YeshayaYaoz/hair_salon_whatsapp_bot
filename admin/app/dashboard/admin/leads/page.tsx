@@ -41,6 +41,7 @@ interface LeadListItem {
   website: string | null;
   status: string;
   latestScore: number | null;
+  linkedBusiness: { id: string; name: string } | null;
 }
 
 interface LeadScoreRow {
@@ -59,6 +60,14 @@ interface LeadStatusEventRow {
   createdAt: string;
 }
 
+interface LinkedBusiness {
+  id: string;
+  name: string;
+  subscriptionStatus: string;
+  subscriptionPlan: string | null;
+  createdAt: string;
+}
+
 interface LeadDetail extends LeadListItem {
   address: string | null;
   category: string | null;
@@ -72,6 +81,14 @@ interface LeadDetail extends LeadListItem {
   scores: LeadScoreRow[];
   statusEvents: LeadStatusEventRow[];
   profile: { summary: string; strengths: string[]; gaps: string[]; whyToriFits: string } | null;
+  linkedBusiness: LinkedBusiness | null;
+}
+
+interface BusinessSearchResult {
+  id: string;
+  name: string;
+  email: string;
+  subscriptionStatus: string;
 }
 
 const LEAD_STATUSES = ["new", "contacted", "replied", "meeting_scheduled", "trial_sent", "converted", "not_interested"] as const;
@@ -414,7 +431,14 @@ function CampaignDetailView({
                   className={`cursor-pointer hover:bg-gray-50 ${i !== leads.length - 1 ? "border-b border-gray-200/50" : ""}`}
                   onClick={() => onOpenLead(l.id)}
                 >
-                  <td className="px-4 py-3 text-gray-800 font-medium">{l.name}</td>
+                  <td className="px-4 py-3 text-gray-800 font-medium">
+                    {l.name}
+                    {l.linkedBusiness && (
+                      <span className="ms-1.5 inline-flex text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
+                        מקושר
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-gray-500" dir="ltr">{l.phone ?? "—"}</td>
                   <td className="px-4 py-3 text-gray-500 truncate max-w-[200px]" dir="ltr">{l.website ?? "—"}</td>
                   <td className="px-4 py-3">
@@ -434,6 +458,147 @@ function CampaignDetailView({
 }
 
 // --- Lead detail ---
+
+function ConversionPanel({ lead, onChanged }: { lead: LeadDetail; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [mode, setMode] = useState<"none" | "create" | "link">("none");
+  const [email, setEmail] = useState("");
+  const [nameOverride, setNameOverride] = useState(lead.name);
+  const [searchQ, setSearchQ] = useState("");
+  const [searchResults, setSearchResults] = useState<BusinessSearchResult[]>([]);
+
+  useEffect(() => {
+    if (mode !== "link" || searchQ.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      apiFetch<BusinessSearchResult[]>(`/api/leadfinder/businesses-search?q=${encodeURIComponent(searchQ)}`)
+        .then(setSearchResults)
+        .catch(() => setSearchResults([]));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [mode, searchQ]);
+
+  async function createAccount() {
+    setBusy(true);
+    setErr(null);
+    try {
+      await apiFetch(`/api/leadfinder/leads/${lead.id}/create-account`, {
+        method: "POST",
+        body: JSON.stringify({ email, name: nameOverride }),
+      });
+      onChanged();
+      setMode("none");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "שגיאה");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function linkBusiness(businessId: string) {
+    setBusy(true);
+    setErr(null);
+    try {
+      await apiFetch(`/api/leadfinder/leads/${lead.id}/link-business`, {
+        method: "POST",
+        body: JSON.stringify({ businessId }),
+      });
+      onChanged();
+      setMode("none");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "שגיאה");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function unlink() {
+    if (!confirm("להסיר את הקישור לחשבון?")) return;
+    setBusy(true);
+    try {
+      await apiFetch(`/api/leadfinder/leads/${lead.id}/link-business`, { method: "DELETE" });
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (lead.linkedBusiness) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6">
+        <h2 className="text-sm font-semibold text-gray-700 mb-2">חשבון תורי מקושר</h2>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="text-sm text-gray-700">
+            <span className="font-medium">{lead.linkedBusiness.name}</span>
+            <span className="text-gray-400 ms-2">
+              {lead.linkedBusiness.subscriptionStatus}{lead.linkedBusiness.subscriptionPlan ? ` · ${lead.linkedBusiness.subscriptionPlan}` : ""}
+            </span>
+          </div>
+          <button onClick={unlink} disabled={busy} className="text-xs text-gray-400 hover:text-red-600 border border-gray-200 hover:border-red-200 px-3 py-1.5 rounded-lg">
+            הסר קישור
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6">
+      <h2 className="text-sm font-semibold text-gray-700 mb-3">המרה לחשבון תורי</h2>
+      {err && <div className="bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg px-3 py-2 mb-3">{err}</div>}
+
+      {mode === "none" && (
+        <div className="flex items-center gap-2">
+          <button onClick={() => setMode("create")} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100">
+            צור חשבון ניסיון
+          </button>
+          <button onClick={() => setMode("link")} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100">
+            קשר לחשבון קיים (נרשם עצמאית)
+          </button>
+        </div>
+      )}
+
+      {mode === "create" && (
+        <div className="flex flex-col gap-2">
+          <input placeholder="שם העסק" value={nameOverride} onChange={(e) => setNameOverride(e.target.value)} className="text-xs" />
+          <input placeholder="אימייל העסק" type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} className="text-xs" />
+          <p className="text-[11px] text-gray-400">ישלח לעסק מייל עם קישור לקביעת סיסמה והתחלה.</p>
+          <div className="flex gap-2">
+            <button disabled={busy || !email} onClick={createAccount} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50">
+              {busy ? "יוצר…" : "צור ושלח"}
+            </button>
+            <button onClick={() => setMode("none")} className="text-xs text-gray-400">ביטול</button>
+          </div>
+        </div>
+      )}
+
+      {mode === "link" && (
+        <div className="flex flex-col gap-2">
+          <input placeholder="חיפוש לפי שם או אימייל" value={searchQ} onChange={(e) => setSearchQ(e.target.value)} className="text-xs" />
+          {searchResults.length > 0 && (
+            <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-40 overflow-y-auto">
+              {searchResults.map((b) => (
+                <button
+                  key={b.id}
+                  disabled={busy}
+                  onClick={() => linkBusiness(b.id)}
+                  className="w-full text-start px-3 py-2 text-xs hover:bg-gray-50 flex items-center justify-between"
+                >
+                  <span>{b.name} <span className="text-gray-400" dir="ltr">({b.email})</span></span>
+                  <span className="text-gray-400">{b.subscriptionStatus}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <button onClick={() => setMode("none")} className="text-xs text-gray-400 self-start">ביטול</button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function LeadDetailView({ leadId, onBack }: { leadId: string; onBack: () => void }) {
   const [lead, setLead] = useState<LeadDetail | null>(null);
@@ -497,6 +662,8 @@ function LeadDetailView({ leadId, onBack }: { leadId: string; onBack: () => void
       </div>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3 mb-4">{error}</div>}
+
+      <ConversionPanel lead={lead} onChanged={load} />
 
       <div className="grid md:grid-cols-2 gap-4 mb-6">
         <div className="bg-white border border-gray-200 rounded-xl p-4">

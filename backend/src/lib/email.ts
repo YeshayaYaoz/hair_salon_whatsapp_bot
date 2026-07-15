@@ -82,6 +82,25 @@ export async function sendBusinessNoticeEmail(to: string, businessName: string, 
   });
 }
 
+/** Sent when a super admin creates a trial account directly from a Lead Finder card — the salon
+ * didn't sign themselves up, so instead of a password they get a set-password link (reusing the
+ * same token flow as forgot-password) to claim the account. */
+export async function sendTrialAccountCreatedEmail(to: string, businessName: string, setPasswordUrl: string) {
+  await resendSend({
+    from: "תורי <noreply@torionline.com>",
+    to,
+    subject: `${businessName} — הצטרפות לתורי`,
+    html: `
+      <div dir="rtl" style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#09090b;color:#e4e4e7;border-radius:12px;">
+        <h2 style="color:#fff;margin-bottom:8px;">פתחנו לך חשבון ניסיון בתורי!</h2>
+        <p style="color:#a1a1aa;margin-bottom:24px;">כדי להתחיל להשתמש בבוט הוואטסאפ שינהל את התורים של ${businessName}, קבע/י סיסמה לחשבון:</p>
+        <a href="${setPasswordUrl}" style="display:inline-block;background:#7c3aed;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;">קביעת סיסמה והתחלה</a>
+        <p style="color:#71717a;margin-top:24px;font-size:13px;">הקישור תקף ל-7 ימים.</p>
+      </div>
+    `,
+  });
+}
+
 export async function sendWelcomeEmail(to: string, name: string) {
   await resendSend({
     from: "תורי <noreply@torionline.com>",
