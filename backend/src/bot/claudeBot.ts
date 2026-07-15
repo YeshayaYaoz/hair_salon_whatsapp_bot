@@ -10,6 +10,7 @@ import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { syncAppointmentToCalendar, deleteCalendarEvent } from "../lib/googleCalendar.js";
 import { captureError } from "../lib/errorMonitoring.js";
+import { logClaudeUsage } from "../lib/usageLedger.js";
 
 // maxRetries: 0 here because we do our own retry in makeApiCall below — that lets us log each
 // attempt and control the backoff explicitly, rather than relying on the SDK's opaque internal
@@ -492,15 +493,40 @@ async function runTool(
 const RETRYABLE_STATUSES = new Set([408, 409, 429, 500, 502, 503, 529]);
 const RETRY_DELAY_MS = 700;
 
-async function makeApiCall(model: string, system: string, messages: Anthropic.MessageParam[]): Promise<Anthropic.Message> {
+/** Logs the real token usage Anthropic reported for this call — never estimated. Failure to log
+ * must never take down a live bot reply, so it's swallowed after being reported to error monitoring. */
+async function recordUsage(businessId: string, customerPhone: string, model: string, response: Anthropic.Message) {
   try {
-    return (await anthropic.messages.create({
+    await logClaudeUsage({
+      businessId,
+      customerPhone,
+      model,
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+    });
+  } catch (err) {
+    console.error("[bot] Failed to record Claude usage:", err);
+    captureError(err, { businessId, customerPhone, model, phase: "usage logging" });
+  }
+}
+
+async function makeApiCall(
+  businessId: string,
+  customerPhone: string,
+  model: string,
+  system: string,
+  messages: Anthropic.MessageParam[]
+): Promise<Anthropic.Message> {
+  try {
+    const response = (await anthropic.messages.create({
       model,
       max_tokens: 1024,
       system,
       tools,
       messages,
     })) as Anthropic.Message;
+    await recordUsage(businessId, customerPhone, model, response);
+    return response;
   } catch (err) {
     const retryable = err instanceof APIError ? RETRYABLE_STATUSES.has(err.status ?? 0) : true; // network errors: also retry once
     if (!retryable) throw err;
@@ -508,13 +534,15 @@ async function makeApiCall(model: string, system: string, messages: Anthropic.Me
     console.warn(`[bot] Anthropic call failed (${err instanceof APIError ? err.status : "network"}), retrying once...`);
     await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
 
-    return (await anthropic.messages.create({
+    const response = (await anthropic.messages.create({
       model,
       max_tokens: 1024,
       system,
       tools,
       messages,
     })) as Anthropic.Message;
+    await recordUsage(businessId, customerPhone, model, response);
+    return response;
   }
 }
 
@@ -542,7 +570,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
 
   let response: Anthropic.Message;
   try {
-    response = await makeApiCall(model, system, messages);
+    response = await makeApiCall(businessId, customerPhone, model, system, messages);
   } catch (err) {
     if (err instanceof APIError) console.error(`Anthropic API error ${err.status}:`, err.message);
     else console.error("Unexpected Anthropic error:", err);
@@ -586,7 +614,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     messages.push({ role: "user", content: toolResults });
 
     try {
-      response = await makeApiCall(model, system, messages);
+      response = await makeApiCall(businessId, customerPhone, model, system, messages);
     } catch (err) {
       if (err instanceof APIError) console.error(`Anthropic API error ${err.status} (tool loop):`, err.message);
       else console.error("Unexpected Anthropic error (tool loop):", err);
@@ -613,7 +641,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
       content: `(מערכתי: ניסיון הקביעה/שינוי האחרון נכשל בפועל (${unconfirmedBookingFailure}) — שום תור לא נשמר. אל תגיד ללקוח שהתור נקבע. הסבר לו בקצרה שהמועד לא זמין/קרתה תקלה, והצע לבדוק זמינות אחרת או לנסות שוב.)`,
     });
     try {
-      const corrected = await makeApiCall(model, system, messages);
+      const corrected = await makeApiCall(businessId, customerPhone, model, system, messages);
       const correctedText = corrected.content
         .filter((b): b is Anthropic.TextBlock => b.type === "text")
         .map((b) => b.text)
@@ -636,7 +664,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     messages.push({ role: "assistant", content: response.content });
     messages.push({ role: "user", content: "(תן ללקוח סיכום קצר של מה שקרה כרגע, במשפט אחד.)" });
     try {
-      const followUp = await makeApiCall(model, system, messages);
+      const followUp = await makeApiCall(businessId, customerPhone, model, system, messages);
       replyText = followUp.content
         .filter((b): b is Anthropic.TextBlock => b.type === "text")
         .map((b) => b.text)

@@ -14,6 +14,7 @@ import { Prisma } from "@prisma/client";
 import { captureError } from "../lib/errorMonitoring.js";
 import { transcribeWhatsAppVoiceNote, TranscriptionNotConfiguredError } from "../lib/transcription.js";
 import { sendYieldCampaignOffers, type PendingYieldCampaign } from "../billing/yieldCampaignJob.js";
+import { logWhatsAppBillingEvent } from "../lib/usageLedger.js";
 
 export const whatsappRouter = Router();
 
@@ -144,6 +145,28 @@ async function handleYieldCampaignReply(
   });
 }
 
+/** Logs each status entry that carries a real Meta billing category/billable flag. Meta only
+ * attaches `pricing` to status callbacks it actually bills for — most delivery/read receipts have
+ * no pricing field at all and are skipped here, same as WhatsApp's own accounting would skip them. */
+async function recordWhatsAppBillingStatuses(phoneNumberId: string, statuses: any[]) {
+  const billed = statuses.filter((s) => s?.pricing);
+  if (billed.length === 0) return;
+  try {
+    const business = await resolveBusinessByPhoneNumberId(phoneNumberId);
+    if (!business) return;
+    for (const status of billed) {
+      await logWhatsAppBillingEvent({
+        businessId: business.id,
+        customerPhone: status.recipient_id as string,
+        category: status.pricing?.category ?? "unknown",
+        billable: Boolean(status.pricing?.billable),
+      });
+    }
+  } catch (err) {
+    console.error("[whatsapp webhook] Failed to record billing status:", err);
+  }
+}
+
 whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => {
   // Verify Meta's HMAC signature before processing.
   const signature = req.headers["x-hub-signature-256"] as string | undefined;
@@ -170,6 +193,14 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
     const entry = payload?.entry?.[0];
     const change = entry?.changes?.[0]?.value;
     phoneNumberId = change?.metadata?.phone_number_id;
+
+    // Delivery-status callbacks carry Meta's own real per-message billing category/billable flag
+    // (statuses[].pricing) — this is the actual ledger entry, not a guess, so log it whenever
+    // present. These arrive as separate webhook deliveries from the inbound message itself.
+    if (phoneNumberId && Array.isArray(change?.statuses) && change.statuses.length > 0) {
+      await recordWhatsAppBillingStatuses(phoneNumberId, change.statuses);
+    }
+
     const message = change?.messages?.[0];
     if (!phoneNumberId || !message) return;
 

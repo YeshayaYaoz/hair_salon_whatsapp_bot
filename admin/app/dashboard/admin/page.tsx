@@ -20,7 +20,21 @@ interface AdminBusiness {
   depositEnabled: boolean;
   walletBalanceAgorot: number;
   messagesUsedThisCycle: number;
+  // Real, metered figures from ApiUsageEvent — actual Anthropic token usage (costed from
+  // Anthropic's own published rates) and actual billable WhatsApp messages, last 30 days. Not
+  // estimates: a business with no bot activity in that window shows ₪0/0 here, which is correct.
+  realClaudeCostAgorot30d: number;
+  realClaudeTokens30d: number;
+  realWhatsappBillableCount30d: number;
   _count: { appointments: number; customers: number };
+}
+
+interface PhoneUsageRow {
+  customerPhone: string;
+  claudeCostAgorot: number;
+  claudeTokens: number;
+  whatsappBillableCount: number;
+  whatsappByCategory: Record<string, number>;
 }
 
 // Must match MESSAGE_QUOTA_BY_PLAN in backend/src/lib/wallet.ts — display-only, not authoritative.
@@ -28,20 +42,6 @@ const MESSAGE_QUOTA_BY_PLAN: Record<string, number> = { standard: 300, premium: 
 // Must match PLAN_PRICES_ILS in backend/src/billing/payplusSubscription.ts.
 const PLAN_PRICES_ILS: Record<string, number> = { standard: 149, premium: 299 };
 const ANNUAL_MONTHS_CHARGED = 10;
-
-// --- Unit-economics placeholders (documented, not authoritative) ---
-// Actual WhatsApp Business API conversation pricing varies by country/category (utility vs
-// marketing vs service) and changes periodically; Claude API cost depends on token usage per
-// conversation. These are rough per-business/month estimates for a directional margin view only
-// — tune them once real invoiced costs are known. Keep in one place so it's a config edit later.
-const EST_WHATSAPP_COST_ILS_PER_MSG = 0.15; // rough blended conversation cost, Israel utility-tier
-const EST_CLAUDE_COST_ILS_PER_MSG = 0.08; // rough blended input+output tokens per bot reply
-const EST_HOSTING_SHARE_ILS_PER_BIZ = 8; // Railway + Neon, spread across an assumed active fleet size
-
-function estimatedMonthlyCostIls(messagesUsedThisCycle: number): number {
-  const variableCost = messagesUsedThisCycle * (EST_WHATSAPP_COST_ILS_PER_MSG + EST_CLAUDE_COST_ILS_PER_MSG);
-  return variableCost + EST_HOSTING_SHARE_ILS_PER_BIZ;
-}
 
 function monthlyRevenueIls(b: AdminBusiness): number {
   if (b.subscriptionStatus !== "active" || !b.subscriptionPlan) return 0;
@@ -62,12 +62,22 @@ export default function AdminBusinessesPage() {
   const [businesses, setBusinesses] = useState<AdminBusiness[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [drilldown, setDrilldown] = useState<AdminBusiness | null>(null);
+  const [phoneRows, setPhoneRows] = useState<PhoneUsageRow[] | null>(null);
 
   useEffect(() => {
     apiFetch<AdminBusiness[]>("/api/business/admin/businesses")
       .then(setBusinesses)
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load"));
   }, []);
+
+  useEffect(() => {
+    if (!drilldown) return;
+    setPhoneRows(null);
+    apiFetch<PhoneUsageRow[]>(`/api/business/admin/usage-by-phone?businessId=${drilldown.id}`)
+      .then(setPhoneRows)
+      .catch(() => setPhoneRows([]));
+  }, [drilldown]);
 
   const filtered = (businesses ?? []).filter(
     (b) => b.name.toLowerCase().includes(search.toLowerCase()) || b.email.toLowerCase().includes(search.toLowerCase())
@@ -79,8 +89,9 @@ export default function AdminBusinessesPage() {
 
   const all = businesses ?? [];
   const mrrIls = all.reduce((sum, b) => sum + monthlyRevenueIls(b), 0);
-  const estCostIls = all.reduce((sum, b) => sum + estimatedMonthlyCostIls(b.messagesUsedThisCycle), 0);
-  const marginIls = mrrIls - estCostIls;
+  // Real, metered — sum of actual ApiUsageEvent Claude costs across all businesses, last 30 days.
+  const realClaudeCostIls30d = all.reduce((sum, b) => sum + b.realClaudeCostAgorot30d, 0) / 100;
+  const realWhatsappBillable30d = all.reduce((sum, b) => sum + b.realWhatsappBillableCount30d, 0);
   const counts = {
     trial: all.filter((b) => b.subscriptionStatus === "trial").length,
     active: all.filter((b) => b.subscriptionStatus === "active").length,
@@ -122,15 +133,14 @@ export default function AdminBusinessesPage() {
               sub={he ? `${counts.active} עסקים פעילים` : `${counts.active} active`}
             />
             <KpiCard
-              label={he ? "עלות משוערת/חודש" : "Est. cost/mo"}
-              value={`₪${estCostIls.toLocaleString(he ? "he-IL" : "en-US", { maximumFractionDigits: 0 })}`}
-              sub={he ? "WhatsApp + Claude + אחסון" : "WhatsApp + Claude + hosting"}
+              label={he ? "עלות Claude בפועל (30 יום)" : "Real Claude cost (30d)"}
+              value={`₪${realClaudeCostIls30d.toLocaleString(he ? "he-IL" : "en-US", { maximumFractionDigits: 2 })}`}
+              sub={he ? "לפי טוקנים בפועל, לא הערכה" : "actual tokens, not estimated"}
             />
             <KpiCard
-              label={he ? "רווח גולמי משוער" : "Est. gross margin"}
-              value={`₪${marginIls.toLocaleString(he ? "he-IL" : "en-US", { maximumFractionDigits: 0 })}`}
-              sub={mrrIls > 0 ? `${Math.round((marginIls / mrrIls) * 100)}%` : "—"}
-              tone={marginIls >= 0 ? "good" : "bad"}
+              label={he ? "הודעות WhatsApp חייבות (30 יום)" : "Billable WhatsApp msgs (30d)"}
+              value={String(realWhatsappBillable30d)}
+              sub={he ? "לפי Meta pricing status, בפועל" : "from Meta's own pricing status"}
             />
             <KpiCard
               label={he ? "בניסיון" : "In trial"}
@@ -189,14 +199,18 @@ export default function AdminBusinessesPage() {
                 <th className="text-start px-4 py-3 text-gray-500 font-medium">{he ? "סליקה" : "Payment"}</th>
                 <th className="text-start px-4 py-3 text-gray-500 font-medium">{he ? "חשבוניות" : "Invoicing"}</th>
                 <th className="text-start px-4 py-3 text-gray-500 font-medium">{he ? "ארנק / שימוש" : "Wallet / usage"}</th>
-                <th className="text-end px-4 py-3 text-gray-500 font-medium">{he ? "רווח משוער/חודש" : "Est. margin/mo"}</th>
+                <th className="text-end px-4 py-3 text-gray-500 font-medium">{he ? "עלות Claude (30 יום)" : "Claude cost (30d)"}</th>
                 <th className="text-end px-4 py-3 text-gray-500 font-medium">{he ? "תורים" : "Bookings"}</th>
                 <th className="text-end px-4 py-3 text-gray-500 font-medium">{he ? "לקוחות" : "Customers"}</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((b, i) => (
-                <tr key={b.id} className={i !== filtered.length - 1 ? "border-b border-gray-200/50" : ""}>
+                <tr
+                  key={b.id}
+                  onClick={() => setDrilldown(b)}
+                  className={`cursor-pointer hover:bg-gray-50 ${i !== filtered.length - 1 ? "border-b border-gray-200/50" : ""}`}
+                >
                   <td className="px-4 py-3">
                     <div className="text-gray-800 font-medium">{b.name}</div>
                     <div className="text-gray-400 text-xs" dir="ltr">{b.email}</div>
@@ -239,11 +253,9 @@ export default function AdminBusinessesPage() {
                       · {b.messagesUsedThisCycle}/{MESSAGE_QUOTA_BY_PLAN[b.subscriptionPlan ?? ""] ?? MESSAGE_QUOTA_BY_PLAN.standard}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-end tabular-nums">
-                    {(() => {
-                      const margin = monthlyRevenueIls(b) - estimatedMonthlyCostIls(b.messagesUsedThisCycle);
-                      return <span className={margin >= 0 ? "text-gray-700" : "text-red-600 font-medium"}>₪{margin.toFixed(0)}</span>;
-                    })()}
+                  <td className="px-4 py-3 text-end tabular-nums text-gray-700">
+                    ₪{(b.realClaudeCostAgorot30d / 100).toFixed(2)}
+                    <span className="text-gray-400 ms-1 text-xs">· {b.realClaudeTokens30d.toLocaleString()} tok</span>
                   </td>
                   <td className="px-4 py-3 text-end tabular-nums text-gray-700">{b._count.appointments}</td>
                   <td className="px-4 py-3 text-end tabular-nums text-gray-700">{b._count.customers}</td>
@@ -253,6 +265,60 @@ export default function AdminBusinessesPage() {
           </table>
         )}
       </div>
+
+      {drilldown && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          onClick={() => setDrilldown(null)}
+        >
+          <div
+            className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-lg font-bold text-gray-900">{drilldown.name}</h2>
+              <button onClick={() => setDrilldown(null)} className="text-gray-400 hover:text-gray-600 text-sm">
+                {he ? "סגור" : "Close"}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">
+              {he ? "עלות בפועל, לפי מספר טלפון, 30 יום אחרונים" : "Real usage by phone number, last 30 days"}
+            </p>
+            {phoneRows === null ? (
+              <div className="text-sm text-gray-400 py-6 text-center">…</div>
+            ) : phoneRows.length === 0 ? (
+              <div className="text-sm text-gray-400 py-6 text-center">
+                {he ? "אין פעילות רשומה ב-30 הימים האחרונים" : "No recorded activity in the last 30 days"}
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-start py-2 text-gray-500 font-medium">{he ? "טלפון" : "Phone"}</th>
+                    <th className="text-end py-2 text-gray-500 font-medium">{he ? "עלות Claude" : "Claude cost"}</th>
+                    <th className="text-end py-2 text-gray-500 font-medium">{he ? "טוקנים" : "Tokens"}</th>
+                    <th className="text-end py-2 text-gray-500 font-medium">WhatsApp</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {phoneRows.map((r) => (
+                    <tr key={r.customerPhone} className="border-b border-gray-100">
+                      <td className="py-2 text-gray-800" dir="ltr">{r.customerPhone}</td>
+                      <td className="py-2 text-end tabular-nums text-gray-700">₪{(r.claudeCostAgorot / 100).toFixed(2)}</td>
+                      <td className="py-2 text-end tabular-nums text-gray-500">{r.claudeTokens.toLocaleString()}</td>
+                      <td className="py-2 text-end tabular-nums text-gray-500">
+                        {r.whatsappBillableCount > 0
+                          ? `${r.whatsappBillableCount} (${Object.entries(r.whatsappByCategory).map(([c, n]) => `${c}:${n}`).join(", ")})`
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -232,6 +232,30 @@ model ConversationMessage {
   @@index([businessId, phone, createdAt])
 }
 
+// Real, per-call usage ledger — no estimates. Every Anthropic API call and every billable
+// WhatsApp message actually sent is logged here with its real token counts / billing category, so
+// cost-per-phone-number in the super-admin panel reflects what was actually metered by the
+// provider, not a guessed average. costAgorot is only populated when we have an authoritative
+// published rate to compute it from (Claude token pricing); WhatsApp entries record the real
+// category/billable flag Meta itself reports, since Meta doesn't return a $ amount per message —
+// only the account's own invoice has that, and we don't fabricate a number to fill the gap.
+model ApiUsageEvent {
+  id           String   @id @default(cuid())
+  businessId   String
+  customerPhone String
+  kind         String // "claude" | "whatsapp"
+  model        String? // Claude model id, e.g. "claude-haiku-4-5-20251001"
+  inputTokens  Int?
+  outputTokens Int?
+  costAgorot   Int? // only set when computed from a known published rate (Claude); null for WhatsApp
+  category     String? // WhatsApp billing category Meta reports: marketing | utility | authentication | service
+  billable     Boolean? // WhatsApp: Meta's own "billable" flag for this message
+  createdAt    DateTime @default(now())
+
+  @@index([businessId, customerPhone, createdAt])
+  @@index([businessId, kind, createdAt])
+}
+
 model PasswordResetToken {
   id         String   @id @default(cuid())
   business   Business @relation(fields: [businessId], references: [id])

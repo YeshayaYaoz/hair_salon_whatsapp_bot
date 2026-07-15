@@ -72,7 +72,73 @@ businessRouter.get("/admin/businesses", requireSuperAdmin, async (_req: AuthedRe
     },
     orderBy: { createdAt: "desc" },
   });
-  res.json(businesses.map((b) => ({ ...b, whatsappConnected: Boolean(b.whatsappPhoneNumberId) })));
+
+  // Real, metered cost from the last 30 days — actual Anthropic token usage (exact, computed from
+  // Anthropic's own published rates) plus a count of real billable WhatsApp messages per Meta's
+  // own billing-status callbacks. No estimation: businesses with zero events here simply show ₪0,
+  // which reflects the ledger, not a fallback guess.
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const [claudeCosts, whatsappBillable] = await Promise.all([
+    prisma.apiUsageEvent.groupBy({
+      by: ["businessId"],
+      where: { kind: "claude", createdAt: { gte: since } },
+      _sum: { costAgorot: true, inputTokens: true, outputTokens: true },
+    }),
+    prisma.apiUsageEvent.groupBy({
+      by: ["businessId"],
+      where: { kind: "whatsapp", billable: true, createdAt: { gte: since } },
+      _count: { _all: true },
+    }),
+  ]);
+  const claudeByBusiness = new Map(claudeCosts.map((c) => [c.businessId, c]));
+  const whatsappByBusiness = new Map(whatsappBillable.map((w) => [w.businessId, w._count._all]));
+
+  res.json(
+    businesses.map((b) => {
+      const claude = claudeByBusiness.get(b.id);
+      return {
+        ...b,
+        whatsappConnected: Boolean(b.whatsappPhoneNumberId),
+        realClaudeCostAgorot30d: claude?._sum.costAgorot ?? 0,
+        realClaudeTokens30d: (claude?._sum.inputTokens ?? 0) + (claude?._sum.outputTokens ?? 0),
+        realWhatsappBillableCount30d: whatsappByBusiness.get(b.id) ?? 0,
+      };
+    })
+  );
+});
+
+// Real per-phone-number usage breakdown for one business — backs the drill-down in the
+// super-admin panel. Every row here is an actual recorded API call, not an estimate.
+businessRouter.get("/admin/usage-by-phone", requireSuperAdmin, async (req: AuthedRequest, res) => {
+  const businessId = req.query.businessId as string | undefined;
+  if (!businessId) return res.status(400).json({ error: "businessId required" });
+
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const events = await prisma.apiUsageEvent.findMany({
+    where: { businessId, createdAt: { gte: since } },
+    select: { customerPhone: true, kind: true, costAgorot: true, inputTokens: true, outputTokens: true, category: true, billable: true },
+  });
+
+  const byPhone = new Map<
+    string,
+    { customerPhone: string; claudeCostAgorot: number; claudeTokens: number; whatsappBillableCount: number; whatsappByCategory: Record<string, number> }
+  >();
+  for (const e of events) {
+    if (!byPhone.has(e.customerPhone)) {
+      byPhone.set(e.customerPhone, { customerPhone: e.customerPhone, claudeCostAgorot: 0, claudeTokens: 0, whatsappBillableCount: 0, whatsappByCategory: {} });
+    }
+    const row = byPhone.get(e.customerPhone)!;
+    if (e.kind === "claude") {
+      row.claudeCostAgorot += e.costAgorot ?? 0;
+      row.claudeTokens += (e.inputTokens ?? 0) + (e.outputTokens ?? 0);
+    } else if (e.kind === "whatsapp" && e.billable) {
+      row.whatsappBillableCount += 1;
+      const cat = e.category ?? "unknown";
+      row.whatsappByCategory[cat] = (row.whatsappByCategory[cat] ?? 0) + 1;
+    }
+  }
+
+  res.json(Array.from(byPhone.values()).sort((a, b) => b.claudeCostAgorot - a.claudeCostAgorot));
 });
 
 // Global background job health (reminders/reviews/digest/retention) — same info for every

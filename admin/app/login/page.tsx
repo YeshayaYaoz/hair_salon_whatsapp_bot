@@ -5,9 +5,12 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, setToken } from "../lib/api";
+import { useLanguage } from "../lib/LanguageContext";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { lang } = useLanguage();
+  const he = lang === "he";
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [signupStep, setSignupStep] = useState<1 | 2>(1); // guided 2-step signup: credentials → business
   const [name, setName] = useState("");
@@ -35,11 +38,11 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError("כתובת אימייל לא תקינה");
+      setError(he ? "כתובת אימייל לא תקינה" : "Invalid email address");
       return;
     }
     if (password.length < 8) {
-      setError("הסיסמה חייבת להכיל לפחות 8 תווים");
+      setError(he ? "הסיסמה חייבת להכיל לפחות 8 תווים" : "Password must be at least 8 characters");
       return;
     }
     setSignupStep(2);
@@ -83,7 +86,6 @@ export default function LoginPage() {
           min-height: 100vh;
           display: grid;
           grid-template-columns: minmax(480px, 46%) 1fr;
-          direction: rtl;
           font-family: var(--font-heebo), 'Segoe UI', system-ui, -apple-system, sans-serif;
         }
         @media (max-width: 900px) {
@@ -269,7 +271,7 @@ export default function LoginPage() {
 
         .login-card {
           width: 100%;
-          max-width: 430px;
+          max-width: 470px;
           background: #FFFFFF;
           border: 1px solid #E8EEF3;
           border-radius: 24px;
@@ -367,7 +369,7 @@ export default function LoginPage() {
         .login-field-hint { font-size: 11.5px; color: #9CA3AF; margin-top: 2px; }
 
         .login-forgot {
-          display: block; text-align: left; font-size: 13px; color: #8A97A5;
+          display: block; text-align: start; font-size: 13px; color: #8A97A5;
           text-decoration: none; margin-top: -4px; margin-bottom: 10px; transition: color 0.15s;
         }
         .login-forgot:hover { color: #1B7FA0; }
@@ -464,7 +466,7 @@ export default function LoginPage() {
         }
       `}</style>
 
-      <main className="login-root">
+      <main className="login-root" dir={he ? "rtl" : "ltr"}>
         {/* Left / dark showcase panel */}
         <div className="login-left">
           <div className="login-aurora" />
@@ -473,14 +475,19 @@ export default function LoginPage() {
           <div className="login-left-mid">
             <div className="login-left-tag">
               <span className="login-left-tag-dot" />
-              בוט AI פעיל · 24/7
+              {he ? "בוט AI פעיל · 24/7" : "AI bot active · 24/7"}
             </div>
             <div className="login-left-headline">
-              הדשבורד שמנהל<br />
-              את <em>כל התורים</em> בשבילך
+              {he ? (
+                <>הדשבורד שמנהל<br />את <em>כל התורים</em> בשבילך</>
+              ) : (
+                <>The dashboard that runs<br /><em>every booking</em> for you</>
+              )}
             </div>
             <p className="login-left-sub">
-              קבלו תורים בוואטסאפ, ראו את היומן בזמן אמת, ותנו ל-AI לטפל בכל השאר.
+              {he
+                ? "קבלו תורים בוואטסאפ, ראו את היומן בזמן אמת, ותנו ל-AI לטפל בכל השאר."
+                : "Take bookings over WhatsApp, watch the calendar update live, and let AI handle the rest."}
             </p>
 
             {/* Live WhatsApp conversation mockup — the product, shown working */}
@@ -488,40 +495,45 @@ export default function LoginPage() {
               <div className="login-demo-head">
                 <div className="login-demo-ava"><img src="/tori_logo_transparent.png" alt="" /></div>
                 <div>
-                  <div className="login-demo-name">מספרת שרה · תורי</div>
-                  <div className="login-demo-status">● מחובר/ת</div>
+                  <div className="login-demo-name">{he ? "מספרת שרה · תורי" : "Sarah's Salon · Tori"}</div>
+                  <div className="login-demo-status">{he ? "● מחובר/ת" : "● Online"}</div>
                 </div>
               </div>
-              <div className="login-bubble customer">היי, אפשר תור לצבע מחר? 🙏</div>
-              <div className="login-bubble bot">בטח! מחר פנוי: 10:00, 12:30 או 16:00. מה מתאים לך?</div>
-              <div className="login-bubble bot second">✅ קבעתי לך לצבע מחר ב-12:30. נתראה!<span className="ticks">✓✓</span></div>
+              <div className="login-bubble customer">{he ? "היי, אפשר תור לצבע מחר? 🙏" : "Hi, can I get a color appointment tomorrow? 🙏"}</div>
+              <div className="login-bubble bot">{he ? "בטח! מחר פנוי: 10:00, 12:30 או 16:00. מה מתאים לך?" : "Sure! Tomorrow's open: 10:00, 12:30 or 16:00. What works for you?"}</div>
+              <div className="login-bubble bot second">
+                {he ? "✅ קבעתי לך לצבע מחר ב-12:30. נתראה!" : "✅ Booked you for color tomorrow at 12:30. See you then!"}
+                <span className="ticks">✓✓</span>
+              </div>
             </div>
 
             <div className="login-left-stats">
               <div className="login-left-stat">
                 <div className="login-left-stat-n"><span>+</span>2,400</div>
-                <div className="login-left-stat-l">עסקים פעילים</div>
+                <div className="login-left-stat-l">{he ? "עסקים פעילים" : "active businesses"}</div>
               </div>
               <div className="login-left-stat">
                 <div className="login-left-stat-n"><span>98</span>%</div>
-                <div className="login-left-stat-l">שיעור מענה</div>
+                <div className="login-left-stat-l">{he ? "שיעור מענה" : "response rate"}</div>
               </div>
               <div className="login-left-stat">
                 <div className="login-left-stat-n"><span>4.9</span>★</div>
-                <div className="login-left-stat-l">דירוג לקוחות</div>
+                <div className="login-left-stat-l">{he ? "דירוג לקוחות" : "customer rating"}</div>
               </div>
             </div>
           </div>
 
           <div className="login-left-testimonial">
             <div className="login-left-quote">
-              מאז שהתחלתי להשתמש בתורי, הפסקתי לאבד לקוחות בגלל שלא עניתי לטלפונים. הבוט עובד גם ב-2 בלילה.
+              {he
+                ? "מאז שהתחלתי להשתמש בתורי, הפסקתי לאבד לקוחות בגלל שלא עניתי לטלפונים. הבוט עובד גם ב-2 בלילה."
+                : "Since I started using Tori, I stopped losing customers over unanswered calls. The bot works even at 2am."}
             </div>
             <div className="login-left-author">
-              <div className="login-left-avatar">ש</div>
+              <div className="login-left-avatar">{he ? "ש" : "S"}</div>
               <div>
-                <div className="login-left-author-name">שרה לוי</div>
-                <div className="login-left-author-role">מספרת שרה, תל אביב</div>
+                <div className="login-left-author-name">{he ? "שרה לוי" : "Sarah Levi"}</div>
+                <div className="login-left-author-role">{he ? "מספרת שרה, תל אביב" : "Sarah's Salon, Tel Aviv"}</div>
               </div>
             </div>
           </div>
@@ -535,7 +547,7 @@ export default function LoginPage() {
                 form itself needs one for the page to feel branded on phones too. */}
             <div className="login-form-brand">
               <Image src="/tori_logo_transparent.png" alt="תורי" width={60} height={60} style={{ borderRadius: 15 }} />
-              <div className="login-form-golden">תור הזהב של העסק שלך</div>
+              <div className="login-form-golden">{he ? "תור הזהב של העסק שלך" : "The golden ticket for your business"}</div>
             </div>
 
             {/* Signup step indicator */}
@@ -543,25 +555,29 @@ export default function LoginPage() {
               <div className="login-steps">
                 <div className={`login-step ${signupStep >= 1 ? "active" : ""}`}>
                   <span className="login-step-dot">1</span>
-                  <span className="login-step-label">פרטי חשבון</span>
+                  <span className="login-step-label">{he ? "פרטי חשבון" : "Account"}</span>
                 </div>
                 <div className={`login-step-line ${signupStep >= 2 ? "active" : ""}`} />
                 <div className={`login-step ${signupStep >= 2 ? "active" : ""}`}>
                   <span className="login-step-dot">2</span>
-                  <span className="login-step-label">פרטי העסק</span>
+                  <span className="login-step-label">{he ? "פרטי העסק" : "Business"}</span>
                 </div>
               </div>
             )}
 
             <h1 className="login-form-heading">
-              {mode === "login" ? "ברוכים השבים 👋" : signupStep === 1 ? "יוצרים חשבון חדש" : "כמעט סיימנו!"}
+              {mode === "login"
+                ? (he ? "ברוכים השבים 👋" : "Welcome back 👋")
+                : signupStep === 1
+                ? (he ? "יוצרים חשבון חדש" : "Create a new account")
+                : (he ? "כמעט סיימנו!" : "Almost done!")}
             </h1>
             <p className="login-form-sub">
               {mode === "login"
-                ? "מתחברים ורואים מה קורה בעסק"
+                ? (he ? "מתחברים ורואים מה קורה בעסק" : "Sign in and see what's happening")
                 : signupStep === 1
-                ? "מצטרפים לאלפי עסקים שכבר עובדים עם תורי"
-                : "עוד פרט אחד ואתם באוויר"}
+                ? (he ? "מצטרפים לאלפי עסקים שכבר עובדים עם תורי" : "Join thousands of businesses already using Tori")
+                : (he ? "עוד פרט אחד ואתם באוויר" : "One more detail and you're live")}
             </p>
 
             {/* Google + credentials only on login, or on signup step 1 */}
@@ -579,12 +595,12 @@ export default function LoginPage() {
                     <path fill="#FBBC05" d="M5.29 14.29A7.2 7.2 0 014.9 12c0-.8.14-1.57.39-2.29V6.6H1.28A11.998 11.998 0 000 12c0 1.94.46 3.77 1.28 5.4l4.01-3.11z"/>
                     <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.69 1.28 6.6l4.01 3.11C6.23 6.86 8.88 4.75 12 4.75z"/>
                   </svg>
-                  {googleLoading ? "רגע..." : "המשך עם Google"}
+                  {googleLoading ? (he ? "רגע..." : "One sec...") : (he ? "המשך עם Google" : "Continue with Google")}
                 </button>
 
                 <div className="login-divider">
                   <div className="login-divider-line" />
-                  <span className="login-divider-text">או עם אימייל</span>
+                  <span className="login-divider-text">{he ? "או עם אימייל" : "or with email"}</span>
                   <div className="login-divider-line" />
                 </div>
               </>
@@ -594,7 +610,7 @@ export default function LoginPage() {
             {(mode === "login" || signupStep === 1) && (
               <form onSubmit={mode === "login" ? submit : continueToBusinessStep}>
                 <div className="login-field">
-                  <label>כתובת אימייל</label>
+                  <label>{he ? "כתובת אימייל" : "Email address"}</label>
                   <div className="login-input-wrap">
                     <span className="login-input-icon">
                       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -612,7 +628,7 @@ export default function LoginPage() {
                   </div>
                 </div>
                 <div className="login-field">
-                  <label>סיסמה</label>
+                  <label>{he ? "סיסמה" : "Password"}</label>
                   <div className="login-input-wrap">
                     <span className="login-input-icon">
                       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -632,7 +648,11 @@ export default function LoginPage() {
                       type="button"
                       className="login-eye-btn"
                       onClick={() => setShowPassword((v) => !v)}
-                      aria-label={showPassword ? "הסתרת סיסמה" : "הצגת סיסמה"}
+                      aria-label={
+                        showPassword
+                          ? (he ? "הסתרת סיסמה" : "Hide password")
+                          : (he ? "הצגת סיסמה" : "Show password")
+                      }
                       tabIndex={-1}
                     >
                       {showPassword ? (
@@ -650,13 +670,15 @@ export default function LoginPage() {
                 </div>
 
                 {mode === "login" && (
-                  <Link href="/forgot-password" className="login-forgot">שכחתם סיסמה?</Link>
+                  <Link href="/forgot-password" className="login-forgot">{he ? "שכחתם סיסמה?" : "Forgot password?"}</Link>
                 )}
 
                 {error && <div className="login-error">⚠️ {error}</div>}
 
                 <button type="submit" disabled={loading} className="login-submit">
-                  {mode === "login" ? (loading ? "רגע..." : "כניסה לחשבון") : "ממשיכים ←"}
+                  {mode === "login"
+                    ? (loading ? (he ? "רגע..." : "One sec...") : (he ? "כניסה לחשבון" : "Sign in"))
+                    : (he ? "ממשיכים ←" : "Continue →")}
                 </button>
               </form>
             )}
@@ -665,7 +687,7 @@ export default function LoginPage() {
             {mode === "signup" && signupStep === 2 && (
               <form onSubmit={submit}>
                 <div className="login-field">
-                  <label>שם העסק</label>
+                  <label>{he ? "שם העסק" : "Business name"}</label>
                   <div className="login-input-wrap">
                     <span className="login-input-icon">
                       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -673,24 +695,24 @@ export default function LoginPage() {
                       </svg>
                     </span>
                     <input
-                      placeholder="מספרה / קליניקה / סטודיו..."
+                      placeholder={he ? "מספרה / קליניקה / סטודיו..." : "Salon / clinic / studio..."}
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       autoFocus
                       required
-                      style={{ direction: "rtl", paddingRight: 42, paddingLeft: 16 }}
+                      style={{ direction: he ? "rtl" : "ltr", paddingRight: 42, paddingLeft: 16 }}
                     />
                   </div>
-                  <p className="login-field-hint">ככה הבוט יציג את עצמו ללקוחות שלכם</p>
+                  <p className="login-field-hint">{he ? "ככה הבוט יציג את עצמו ללקוחות שלכם" : "This is how the bot will introduce itself to your customers"}</p>
                 </div>
 
                 {error && <div className="login-error">⚠️ {error}</div>}
 
                 <button type="submit" disabled={loading} className="login-submit">
-                  {loading ? "רגע..." : "יצירת חשבון וסיום 🎉"}
+                  {loading ? (he ? "רגע..." : "One sec...") : (he ? "יצירת חשבון וסיום 🎉" : "Create account & finish 🎉")}
                 </button>
                 <button type="button" className="login-back-btn" onClick={() => { setSignupStep(1); setError(null); }}>
-                  → חזרה
+                  {he ? "→ חזרה" : "← Back"}
                 </button>
               </form>
             )}
@@ -698,21 +720,25 @@ export default function LoginPage() {
             <div className="login-divider">
               <div className="login-divider-line" />
               <span className="login-divider-text">
-                {mode === "login" ? "עוד אין לכם חשבון?" : "כבר יש לכם חשבון?"}
+                {mode === "login"
+                  ? (he ? "עוד אין לכם חשבון?" : "Don't have an account yet?")
+                  : (he ? "כבר יש לכם חשבון?" : "Already have an account?")}
               </span>
               <div className="login-divider-line" />
             </div>
 
             <div className="login-switch">
               <button onClick={() => switchMode(mode === "login" ? "signup" : "login")}>
-                {mode === "login" ? "נרשמים חינם ←" : "כניסה לחשבון ←"}
+                {mode === "login"
+                  ? (he ? "נרשמים חינם ←" : "Sign up free →")
+                  : (he ? "כניסה לחשבון ←" : "Sign in →")}
               </button>
             </div>
 
             <div className="login-trust">
-              <div className="login-trust-item"><span className="login-trust-icon">🔒</span>SSL מאובטח</div>
-              <div className="login-trust-item"><span className="login-trust-icon">🛡️</span>ללא התחייבות</div>
-              <div className="login-trust-item"><span className="login-trust-icon">⚡</span>באוויר תוך דקות</div>
+              <div className="login-trust-item"><span className="login-trust-icon">🔒</span>{he ? "SSL מאובטח" : "SSL secured"}</div>
+              <div className="login-trust-item"><span className="login-trust-icon">🛡️</span>{he ? "ללא התחייבות" : "No commitment"}</div>
+              <div className="login-trust-item"><span className="login-trust-icon">⚡</span>{he ? "באוויר תוך דקות" : "Live in minutes"}</div>
             </div>
           </div>
         </div>

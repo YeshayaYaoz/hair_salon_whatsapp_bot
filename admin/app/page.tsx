@@ -495,7 +495,7 @@ export default function LandingPage() {
         .lp-trust-item:hover { border-color: #D0D0D0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
 
         /* SECTION LABELS */
-        .lp-label { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #25D366; margin-bottom: 12px; }
+        .lp-label { font-size: 13px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #25D366; margin-bottom: 12px; }
         .lp-title { font-size: clamp(28px, 3.5vw, 44px); font-weight: 800; letter-spacing: -1.5px; color: #0A0A0A; margin-bottom: 56px; line-height: 1.1; }
 
         /* STATS BAND */
@@ -1321,7 +1321,7 @@ export default function LandingPage() {
         <div style={{ background: "#F8F8F8", borderTop: "1px solid #EBEBEB", borderBottom: "1px solid #EBEBEB", padding: "100px 40px" }}>
           <div style={{ maxWidth: 1080, margin: "0 auto" }}>
             <div className="lp-label reveal">תהליך</div>
-            <div className="lp-title reveal">שלושה צעדים, ואחרי זה הכל קורה לבד.</div>
+            <div className="lp-title reveal">3 צעדים, ואחרי זה הכל קורה לבד.</div>
             <div className="lp-steps-grid">
               <div className="lp-step reveal d1">
                 <div className="lp-step-num">01</div>
@@ -1355,7 +1355,7 @@ export default function LandingPage() {
         <section className="lp-features" id="features">
           <div className="lp-features-inner">
             <div className="lp-label reveal">מה כלול</div>
-            <div className="lp-title reveal">כל הכלים שהעסק שלך צריך — ואפס כלים שלא.</div>
+            <div className="lp-title reveal">כל הכלים שהעסק שלך צריך.</div>
             <div className="lp-feats-grid">
               {[
                 { icon: "💬", title: "בוט WhatsApp בעברית", desc: "מבין שפה טבעית, עונה ב-24/7, ומנהל שיחה מתחילה ועד אישור התור.", descShort: "מבין עברית, עונה 24/7, סוגר תור לבד.", d: "d1" },
