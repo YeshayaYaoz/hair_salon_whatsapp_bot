@@ -14,6 +14,12 @@ declare global {
 
 const META_APP_ID = process.env.NEXT_PUBLIC_META_APP_ID || "1556761279502082";
 const META_CONFIG_ID = process.env.NEXT_PUBLIC_META_CONFIG_ID || "1011752745059826";
+// Must exactly match a URI registered under Meta App Dashboard > Facebook Login > Settings >
+// Valid OAuth Redirect URIs, AND the WHATSAPP_EMBEDDED_SIGNUP_REDIRECT_URI backend env var. The
+// FB.login() dialog binds the issued code to whatever redirect_uri it's given here (defaulting to
+// an internal Meta value if omitted) — the server-side exchange then fails unless it passes back
+// that exact same value, which is why this needs to be explicit here rather than left out.
+const EMBEDDED_SIGNUP_REDIRECT_URI = "https://torionline.com/dashboard/whatsapp";
 
 export default function WhatsAppPage() {
   const { t, lang } = useLanguage();
@@ -171,6 +177,7 @@ export default function WhatsAppPage() {
         // app secret) for a real access token — see exchangeCodeForAccessToken in businessRoutes.ts.
         response_type: "code",
         override_default_response_type: true,
+        redirect_uri: EMBEDDED_SIGNUP_REDIRECT_URI,
         // No `scope` here — with config_id-based Embedded Signup, permissions come from the login
         // configuration itself (set in Meta App Dashboard → Facebook Login → Configurations), and
         // passing an explicit scope alongside config_id is invalid (Meta logs "Invalid Scopes" and
