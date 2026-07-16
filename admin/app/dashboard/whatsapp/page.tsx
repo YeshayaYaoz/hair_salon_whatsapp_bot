@@ -139,7 +139,22 @@ export default function WhatsAppPage() {
     window.FB.login(
       (response: any) => {
         console.log("FB.login response:", JSON.stringify(response));
-        if (response.authResponse?.code) {
+        // This config_id returns the code inside the signed_request JWT's payload rather than as
+        // authResponse.code directly (confirmed live — authResponse only has accessToken/userID at
+        // the top level). The payload segment is just base64url JSON, no signature verification
+        // needed here since we're only extracting a value we hand off to Meta's own server-side
+        // exchange right after — if it were tampered with, that exchange would simply fail.
+        let code = response.authResponse?.code;
+        if (!code && response.authResponse?.signedRequest) {
+          try {
+            const payload = response.authResponse.signedRequest.split(".")[1];
+            const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+            code = JSON.parse(json)?.code;
+          } catch {
+            // fall through — code stays undefined, handled below
+          }
+        }
+        if (code) {
           if (codeUsedRef.current) return; // StrictMode double-fire guard
           codeUsedRef.current = true;
           setLoading(true);
@@ -148,7 +163,7 @@ export default function WhatsAppPage() {
             {
               method: "POST",
               body: JSON.stringify({
-                code: response.authResponse.code,
+                code,
                 wabaId: signupDataRef.current.wabaId,
                 phoneNumberId: signupDataRef.current.phoneNumberId,
               }),
