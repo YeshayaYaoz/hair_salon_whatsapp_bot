@@ -7,6 +7,37 @@ export default function LandingPageEN() {
   const tiltEl = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [appts, setAppts] = useState(40);
+  const [demoMsgs, setDemoMsgs] = useState<{ role: "user" | "bot"; text: string }[]>([
+    { role: "bot", text: "Hi! 👋 I'm Tori, Dana's Salon's assistant. I can book you an appointment — try typing something like \"I'd like a haircut tomorrow\"" },
+  ]);
+  const [demoInput, setDemoInput] = useState("");
+  const demoScrollRef = useRef<HTMLDivElement>(null);
+
+  function demoReply(msg: string): string {
+    const m = msg.trim();
+    if (/price|cost|how much/i.test(m)) return "A haircut here is $22 (30 min), coloring $65. Want to book an appointment? 😊";
+    if (/hours|open|when/i.test(m)) return "We're open Mon–Fri 09:00–19:00, Sat 09:00–14:00. Which day works for you?";
+    if (/haircut|color|appointment|book|tomorrow|today/i.test(m))
+      return "Sure! Tomorrow I have openings at 10:00, 12:30 and 15:00 ✂️ Which works for you?";
+    if (/10:00|12:30|15:00|works|yes|great|sounds good/i.test(m))
+      return "Perfect! ✅ Booked your appointment. You'll get a reminder the day before. See you then! 👋";
+    if (/thanks|thank you/i.test(m)) return "Anytime! Always here for you 😊";
+    return "I'm here to help book appointments! Try asking about pricing, hours, or just say \"I'd like to book an appointment\" 😊";
+  }
+
+  function sendDemo(e: React.FormEvent) {
+    e.preventDefault();
+    const text = demoInput.trim();
+    if (!text) return;
+    setDemoInput("");
+    setDemoMsgs((prev) => [...prev, { role: "user", text }]);
+    setTimeout(() => setDemoMsgs((prev) => [...prev, { role: "bot", text: demoReply(text) }]), 700);
+  }
+
+  useEffect(() => {
+    const el = demoScrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [demoMsgs]);
 
   useEffect(() => {
     const el = tiltEl.current;
@@ -347,6 +378,14 @@ export default function LandingPageEN() {
         .lp-trust-logo-text { font-size: 15px; font-weight: 800; color: #111; letter-spacing: -0.5px; }
 
         /* Stats band */
+        .lp-marquee { background: #0A0A0A; padding: 16px 0; overflow: hidden; }
+        .marquee-track { display: flex; gap: 0; animation: marquee-scroll 28s linear infinite; white-space: nowrap; width: max-content; }
+        .marquee-track:hover { animation-play-state: paused; }
+        @keyframes marquee-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        .marquee-item { display: inline-flex; align-items: center; gap: 10px; padding: 0 36px; font-size: 14px; color: rgba(255,255,255,0.72); font-weight: 500; border-left: 1px solid rgba(255,255,255,0.1); }
+        .marquee-item .star { color: #F59E0B; font-size: 11px; }
+        .marquee-item strong { color: rgba(255,255,255,0.9); }
+
         .lp-stats-band { background: #0A0A0A; padding: 72px 40px; }
         .lp-stats-band-inner { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
         .lp-stat-cell { padding: 48px 36px; background: #141414; border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; }
@@ -549,6 +588,24 @@ export default function LandingPageEN() {
         .lp-footer-copy-link:hover { color: #25D366; }
 
         /* Premium */
+        .lp-demo { padding: 100px 40px; background: #fff; }
+        .lp-demo-inner { max-width: 620px; margin: 0 auto; }
+        .lp-demo-chat { background: #fff; border: 1px solid #E8E8E8; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.1); }
+        .lp-demo-header { display: flex; align-items: center; gap: 12px; padding: 14px 18px; background: #0D2A38; }
+        .lp-demo-avatar { width: 42px; height: 42px; border-radius: 50%; overflow: hidden; background: #fff; flex-shrink: 0; box-shadow: 0 0 0 2px rgba(37,211,102,0.3); }
+        .lp-demo-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .lp-demo-name { font-size: 15px; font-weight: 700; color: #fff; }
+        .lp-demo-status { font-size: 12px; color: #25D366; margin-top: 1px; }
+        .lp-demo-body { background: #E5DDD5; padding: 20px 16px; height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .lp-demo-bubble { max-width: 80%; padding: 9px 13px; font-size: 14px; line-height: 1.5; border-radius: 12px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); word-break: break-word; }
+        .lp-demo-bubble.bot { background: #fff; align-self: flex-start; border-top-left-radius: 2px; color: #111; }
+        .lp-demo-bubble.user { background: #DCF8C6; align-self: flex-end; border-top-right-radius: 2px; color: #111; }
+        .lp-demo-input { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: #F0F0F0; }
+        .lp-demo-input input { flex: 1; border: none; border-radius: 22px; padding: 11px 16px; font-size: 14px; outline: none; font-family: inherit; background: #fff; color: #111; }
+        .lp-demo-input button { width: 42px; height: 42px; border-radius: 50%; border: none; background: #25D366; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: transform 0.12s, background 0.15s; }
+        .lp-demo-input button:hover { background: #20c45a; transform: scale(1.05); }
+        @media (max-width: 900px) { .lp-demo { padding: 72px 20px; } }
+
         .lp-premium { padding: 100px 40px; background: #0A0A0A; }
         .lp-premium-inner { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
         @media (max-width: 800px) { .lp-premium-inner { grid-template-columns: 1fr; } }
@@ -612,6 +669,8 @@ export default function LandingPageEN() {
             <a className="lp-nav-link" href="#how">How it works</a>
             <a className="lp-nav-link" href="#features">Features</a>
             <a className="lp-nav-link" href="#premium">Premium</a>
+            <a className="lp-nav-link" href="#demo">Live demo</a>
+            <a className="lp-nav-link" href="#roi">Savings calculator</a>
             <a className="lp-nav-link" href="#pricing">Pricing</a>
             <a className="lp-nav-link" href="#faq">FAQ</a>
           </div>
@@ -627,6 +686,8 @@ export default function LandingPageEN() {
           <a className="mobile-nav-link" href="#how" onClick={() => setMenuOpen(false)}>How it works</a>
           <a className="mobile-nav-link" href="#features" onClick={() => setMenuOpen(false)}>Features</a>
           <a className="mobile-nav-link" href="#premium" onClick={() => setMenuOpen(false)}>Premium</a>
+          <a className="mobile-nav-link" href="#demo" onClick={() => setMenuOpen(false)}>Live demo</a>
+          <a className="mobile-nav-link" href="#roi" onClick={() => setMenuOpen(false)}>Savings calculator</a>
           <a className="mobile-nav-link" href="#pricing" onClick={() => setMenuOpen(false)}>Pricing</a>
           <a className="mobile-nav-link" href="#faq" onClick={() => setMenuOpen(false)}>FAQ</a>
           <div className="mobile-nav-divider" />
@@ -765,6 +826,33 @@ export default function LandingPageEN() {
               <div key={text} className="lp-trust-logo">
                 <span style={{ fontSize: 18 }}>{emoji}</span>
                 <span className="lp-trust-logo-text">{text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* MARQUEE */}
+        <div className="lp-marquee">
+          <div className="marquee-track">
+            {[
+              { q: "\"Saved two hours a day on booking management\"", name: "Dana K., Tel Aviv" },
+              { q: "\"Customers love that the bot replies at 2am\"", name: "Michelle L., Jerusalem" },
+              { q: "\"10-minute setup, Google Calendar syncs itself\"", name: "Joe H., Haifa" },
+              { q: "\"No-shows dropped 80% since we started\"", name: "Sarah M., Ramat Gan" },
+              { q: "\"The bot replies faster than I do\"", name: "Amir K., Beer Sheva" },
+              { q: "\"Best thing I've done for my salon\"", name: "Rachel B., Netanya" },
+            ].concat([
+              { q: "\"Saved two hours a day on booking management\"", name: "Dana K., Tel Aviv" },
+              { q: "\"Customers love that the bot replies at 2am\"", name: "Michelle L., Jerusalem" },
+              { q: "\"10-minute setup, Google Calendar syncs itself\"", name: "Joe H., Haifa" },
+              { q: "\"No-shows dropped 80% since we started\"", name: "Sarah M., Ramat Gan" },
+              { q: "\"The bot replies faster than I do\"", name: "Amir K., Beer Sheva" },
+              { q: "\"Best thing I've done for my salon\"", name: "Rachel B., Netanya" },
+            ]).map((m, i) => (
+              <div key={i} className="marquee-item">
+                <span className="star">★★★★★</span>
+                <span>{m.q}</span>
+                <strong>— {m.name}</strong>
               </div>
             ))}
           </div>
@@ -1021,8 +1109,44 @@ export default function LandingPageEN() {
           </div>
         </section>
 
+        {/* LIVE INTERACTIVE DEMO */}
+        <section className="lp-demo" id="demo">
+          <div className="lp-demo-inner">
+            <div className="lp-label reveal" style={{ textAlign: "center" }}>Try it yourself</div>
+            <h2 className="lp-title reveal" style={{ textAlign: "center", marginBottom: 12 }}>Talk to the bot right now</h2>
+            <p className="reveal" style={{ textAlign: "center", color: "#666", fontSize: 16, marginBottom: 40 }}>
+              Type a message like a real customer would — and see how Tori replies. No install, right here.
+            </p>
+            <div className="lp-demo-chat reveal">
+              <div className="lp-demo-header">
+                <div className="lp-demo-avatar"><img src="/tori_logo_transparent.png" alt="Tori" /></div>
+                <div>
+                  <div className="lp-demo-name">Tori — Dana's Salon</div>
+                  <div className="lp-demo-status">Online · replies within seconds</div>
+                </div>
+              </div>
+              <div className="lp-demo-body" ref={demoScrollRef}>
+                {demoMsgs.map((m, i) => (
+                  <div key={i} className={`lp-demo-bubble ${m.role}`}>{m.text}</div>
+                ))}
+              </div>
+              <form className="lp-demo-input" onSubmit={sendDemo}>
+                <input
+                  value={demoInput}
+                  onChange={(e) => setDemoInput(e.target.value)}
+                  placeholder="Type a message..."
+                  aria-label="Message the bot"
+                />
+                <button type="submit" aria-label="Send">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                </button>
+              </form>
+            </div>
+          </div>
+        </section>
+
         {/* ROI CALCULATOR */}
-        <section className="lp-roi" id="pricing">
+        <section className="lp-roi" id="roi">
           <div className="lp-roi-inner">
             <div className="lp-label reveal" style={{ textAlign: "center", color: "#F59E0B" }}>Savings calculator</div>
             <div className="lp-title reveal" style={{ color: "#fff", textAlign: "center" }}>How much does Tori save you?</div>
@@ -1062,7 +1186,7 @@ export default function LandingPageEN() {
         </section>
 
         {/* PRICING */}
-        <section className="lp-pricing">
+        <section className="lp-pricing" id="pricing">
           <div className="lp-pricing-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>Pricing</div>
             <div className="lp-title reveal" style={{ textAlign: "center" }}>Simple. Transparent. No surprises.</div>
