@@ -109,7 +109,7 @@ export default function WhatsAppPage() {
   useEffect(() => {
     if (!META_APP_ID) return;
     window.fbAsyncInit = () => {
-      window.FB.init({ appId: META_APP_ID, autoLogAppEvents: true, xfbml: true, version: "v19.0" });
+      window.FB.init({ appId: META_APP_ID, autoLogAppEvents: true, xfbml: true, version: "v23.0" });
       console.log("FB SDK initialized, appId:", META_APP_ID);
       setSdkReady(true);
     };

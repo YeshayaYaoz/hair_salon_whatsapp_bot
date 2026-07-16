@@ -361,7 +361,7 @@ businessRouter.post("/admin/businesses/:id/whatsapp", requireSuperAdmin, async (
   let displayNumber: string | undefined;
   try {
     const verifyRes = await fetch(
-      `https://graph.facebook.com/v20.0/${parsed.data.phoneNumberId}?fields=display_phone_number&access_token=${encodeURIComponent(parsed.data.accessToken)}`
+      `https://graph.facebook.com/v23.0/${parsed.data.phoneNumberId}?fields=display_phone_number&access_token=${encodeURIComponent(parsed.data.accessToken)}`
     );
     const verifyData = (await verifyRes.json()) as any;
     if (verifyData?.error) {
@@ -671,7 +671,7 @@ async function exchangeCodeForAccessToken(code: string): Promise<string> {
   // must be the exact page the FB.login() popup was launched from.
   const redirectUri = process.env.WHATSAPP_EMBEDDED_SIGNUP_REDIRECT_URI;
   if (!redirectUri) throw new Error("WHATSAPP_EMBEDDED_SIGNUP_REDIRECT_URI not configured");
-  const url = `https://graph.facebook.com/v20.0/oauth/access_token?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${encodeURIComponent(appSecret)}&code=${encodeURIComponent(code)}`;
+  const url = `https://graph.facebook.com/v23.0/oauth/access_token?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${encodeURIComponent(appSecret)}&code=${encodeURIComponent(code)}`;
   const res = await fetch(url);
   const data = (await res.json()) as any;
   if (data?.error || !data?.access_token) {
@@ -704,7 +704,7 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
   // depends on permissions/scopes that turned out not to be consistently granted.
   if (parsed.data.phoneNumberId) {
     const phoneRes = await fetch(
-      `https://graph.facebook.com/v20.0/${parsed.data.phoneNumberId}?fields=id,display_phone_number&access_token=${encodeURIComponent(userToken)}`
+      `https://graph.facebook.com/v23.0/${parsed.data.phoneNumberId}?fields=id,display_phone_number&access_token=${encodeURIComponent(userToken)}`
     );
     const phoneData = await phoneRes.json() as any;
     debugTrail.postMessagePhone = phoneData?.error ?? "ok";
@@ -722,7 +722,7 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
   // carry its id.
   if (!phone && parsed.data.wabaId) {
     const phoneRes = await fetch(
-      `https://graph.facebook.com/v20.0/${parsed.data.wabaId}/phone_numbers?fields=id,display_phone_number&access_token=${encodeURIComponent(userToken)}`
+      `https://graph.facebook.com/v23.0/${parsed.data.wabaId}/phone_numbers?fields=id,display_phone_number&access_token=${encodeURIComponent(userToken)}`
     );
     const phoneData = await phoneRes.json() as any;
     debugTrail.wabaDirect = phoneData?.error ?? `found ${phoneData?.data?.length ?? 0} numbers`;
@@ -737,7 +737,7 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
   // (e.g. an ad/popup blocker interfering) but the login itself still succeeded.
   if (!phone) {
     const debugRes = await fetch(
-      `https://graph.facebook.com/v20.0/debug_token?input_token=${encodeURIComponent(userToken)}&access_token=${encodeURIComponent(userToken)}`
+      `https://graph.facebook.com/v23.0/debug_token?input_token=${encodeURIComponent(userToken)}&access_token=${encodeURIComponent(userToken)}`
     );
     const debugData = await debugRes.json() as any;
     debugTrail.debugToken = debugData?.error ?? "ok";
@@ -748,7 +748,7 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
 
     for (const id of wabaIds) {
       const phoneRes = await fetch(
-        `https://graph.facebook.com/v20.0/${id}/phone_numbers?fields=id,display_phone_number&access_token=${encodeURIComponent(userToken)}`
+        `https://graph.facebook.com/v23.0/${id}/phone_numbers?fields=id,display_phone_number&access_token=${encodeURIComponent(userToken)}`
       );
       const phoneData = await phoneRes.json() as any;
       debugTrail[`waba_${id}`] = phoneData?.error ?? `found ${phoneData?.data?.length ?? 0} numbers`;
@@ -764,7 +764,7 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
   // manually-created tokens pasted through this endpoint, not the Embedded Signup flow).
   if (!phone) {
     const bizRes = await fetch(
-      `https://graph.facebook.com/v20.0/me/businesses?fields=owned_whatsapp_business_accounts{id,phone_numbers{id,display_phone_number}}&access_token=${encodeURIComponent(userToken)}`
+      `https://graph.facebook.com/v23.0/me/businesses?fields=owned_whatsapp_business_accounts{id,phone_numbers{id,display_phone_number}}&access_token=${encodeURIComponent(userToken)}`
     );
     const bizData = await bizRes.json() as any;
     debugTrail.meBusinesses = bizData?.error ?? "ok";
@@ -783,7 +783,7 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
     });
   }
   if (wabaId) {
-    await fetch(`https://graph.facebook.com/v20.0/${wabaId}/subscribed_apps`, {
+    await fetch(`https://graph.facebook.com/v23.0/${wabaId}/subscribed_apps`, {
       method: "POST",
       headers: { Authorization: `Bearer ${userToken}` },
     });
