@@ -18,7 +18,7 @@ const META_APP_ID = process.env.NEXT_PUBLIC_META_APP_ID || "1556761279502082";
 // Facebook Login for Business configuration. Using the wrong config_id here is what caused every
 // code exchange to fail with a misleading "redirect_uri is identical" error (Meta error_subcode
 // 36008) no matter what redirect_uri was set to: the code itself was never valid for this flow.
-const META_CONFIG_ID = process.env.NEXT_PUBLIC_META_CONFIG_ID || "1013901801398198";
+const META_CONFIG_ID = process.env.NEXT_PUBLIC_META_CONFIG_ID || "1013901801388198";
 
 export default function WhatsAppPage() {
   const { t, lang } = useLanguage();
