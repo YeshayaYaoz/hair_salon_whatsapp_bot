@@ -183,9 +183,11 @@ export default function WhatsAppPage() {
         // configuration itself (set in Meta App Dashboard → Facebook Login → Configurations), and
         // passing an explicit scope alongside config_id is invalid (Meta logs "Invalid Scopes" and
         // ignores it for end users, but it's a real misconfiguration worth not shipping).
-        // Matches Meta's own generated Embedded Signup link for this config_id exactly (version:
-        // "v4" — the extras shape/version Meta expects can drift from generic FB Login samples).
-        extras: { setup: {}, featureType: "", sessionInfoVersion: "3", version: "v4" },
+        // NOT extras.version: "v4" — that switches Meta's response shape to embed the code inside
+        // a signed_request JWT instead of authResponse.code directly (confirmed live: with v4 the
+        // callback returned a plain accessToken/userID with no top-level code, which the handler
+        // below doesn't parse). sessionInfoVersion "3" is what keeps the code in authResponse.code.
+        extras: { setup: {}, featureType: "", sessionInfoVersion: "3" },
       }
     );
   }
