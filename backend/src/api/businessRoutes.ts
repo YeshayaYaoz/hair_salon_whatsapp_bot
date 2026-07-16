@@ -675,6 +675,9 @@ async function exchangeCodeForAccessToken(code: string): Promise<string> {
   const res = await fetch(url);
   const data = (await res.json()) as any;
   if (data?.error || !data?.access_token) {
+    // Log Meta's full error object (type/code/error_subcode/fbtrace_id) — the message alone is a
+    // generic, reused string across several distinct underlying causes and isn't enough to diagnose.
+    console.error("[embedded-signup] Full Graph API error response:", JSON.stringify(data));
     throw new Error(`Code exchange failed: ${data?.error?.message ?? "no access_token in response"}`);
   }
   return data.access_token as string;
