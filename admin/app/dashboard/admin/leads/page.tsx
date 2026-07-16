@@ -91,6 +91,17 @@ interface BusinessSearchResult {
   subscriptionStatus: string;
 }
 
+interface OutreachMessage {
+  id: string;
+  channel: "email" | "manual_call";
+  angle: string | null;
+  subject: string | null;
+  body: string;
+  approvalStatus: "draft" | "approved" | "rejected";
+  sentAt: string | null;
+  createdAt: string;
+}
+
 interface SuggestedMatch {
   leadId: string;
   leadName: string;
@@ -763,6 +774,220 @@ function ConversionPanel({ lead, onChanged }: { lead: LeadDetail; onChanged: () 
   );
 }
 
+const APPROVAL_LABELS_HE: Record<string, string> = { draft: "טיוטה", approved: "מאושר", rejected: "נדחה" };
+const CHANNEL_LABELS_HE: Record<string, string> = { email: "מייל", manual_call: "שיחת טלפון" };
+
+function OutreachPanel({ leadId }: { leadId: string }) {
+  const [messages, setMessages] = useState<OutreachMessage[] | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [channel, setChannel] = useState<"email" | "manual_call">("email");
+  const [angle, setAngle] = useState<"initial" | "follow_up_1">("initial");
+  const [err, setErr] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editSubject, setEditSubject] = useState("");
+  const [editBody, setEditBody] = useState("");
+  const [sendToEmail, setSendToEmail] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    apiFetch<OutreachMessage[]>(`/api/leadfinder/leads/${leadId}/outreach`)
+      .then(setMessages)
+      .catch(() => setMessages([]));
+  }, [leadId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function generate() {
+    setGenerating(true);
+    setErr(null);
+    try {
+      await apiFetch(`/api/leadfinder/leads/${leadId}/outreach/generate`, {
+        method: "POST",
+        body: JSON.stringify({ channel, angle }),
+      });
+      load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "שגיאה ביצירת טיוטה");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  function startEdit(m: OutreachMessage) {
+    setEditingId(m.id);
+    setEditSubject(m.subject ?? "");
+    setEditBody(m.body);
+  }
+
+  async function saveEdit(id: string) {
+    setBusyId(id);
+    try {
+      await apiFetch(`/api/leadfinder/outreach/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ subject: editSubject || undefined, body: editBody }),
+      });
+      setEditingId(null);
+      load();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function setApproval(id: string, approvalStatus: "approved" | "rejected") {
+    setBusyId(id);
+    try {
+      await apiFetch(`/api/leadfinder/outreach/${id}`, { method: "PATCH", body: JSON.stringify({ approvalStatus }) });
+      load();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function send(m: OutreachMessage) {
+    setBusyId(m.id);
+    setErr(null);
+    try {
+      await apiFetch(`/api/leadfinder/outreach/${m.id}/send`, {
+        method: "POST",
+        body: JSON.stringify(m.channel === "email" ? { toEmail: sendToEmail } : {}),
+      });
+      load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "שגיאה בשליחה");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6">
+      <h2 className="text-sm font-semibold text-gray-700 mb-3">הודעות יזומות (Outreach)</h2>
+      {err && <div className="bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg px-3 py-2 mb-3">{err}</div>}
+
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <select value={channel} onChange={(e) => setChannel(e.target.value as "email" | "manual_call")} className="text-xs">
+          <option value="email">מייל</option>
+          <option value="manual_call">תסריט שיחה</option>
+        </select>
+        <select value={angle} onChange={(e) => setAngle(e.target.value as "initial" | "follow_up_1")} className="text-xs">
+          <option value="initial">פנייה ראשונה</option>
+          <option value="follow_up_1">מעקב (follow-up)</option>
+        </select>
+        <button
+          disabled={generating}
+          onClick={generate}
+          className="text-xs font-medium px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 disabled:opacity-50"
+        >
+          {generating ? "יוצר טיוטה…" : "✨ צור טיוטה עם AI"}
+        </button>
+      </div>
+
+      {messages === null ? (
+        <div className="text-xs text-gray-400 py-4 text-center">…</div>
+      ) : messages.length === 0 ? (
+        <div className="text-xs text-gray-400 py-4 text-center">אין עדיין טיוטות — צור אחת למעלה</div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {messages.map((m) => (
+            <div key={m.id} className="border border-gray-200 rounded-lg p-3">
+              <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                <div className="flex items-center gap-1.5 text-[11px]">
+                  <span className="font-medium text-gray-600">{CHANNEL_LABELS_HE[m.channel]}</span>
+                  <span className="text-gray-400">· {m.angle === "follow_up_1" ? "מעקב" : "ראשונה"}</span>
+                  <span
+                    className={`inline-flex px-1.5 py-0.5 rounded-full border ${
+                      m.approvalStatus === "approved"
+                        ? "bg-green-50 text-green-700 border-green-200"
+                        : m.approvalStatus === "rejected"
+                          ? "bg-red-50 text-red-600 border-red-200"
+                          : "bg-gray-50 text-gray-500 border-gray-200"
+                    }`}
+                  >
+                    {APPROVAL_LABELS_HE[m.approvalStatus]}
+                  </span>
+                  {m.sentAt && <span className="text-green-600">✓ נשלח {new Date(m.sentAt).toLocaleDateString("he-IL")}</span>}
+                </div>
+                {!m.sentAt && editingId !== m.id && (
+                  <button onClick={() => startEdit(m)} className="text-[11px] text-gray-400 hover:text-gray-700">עריכה</button>
+                )}
+              </div>
+
+              {editingId === m.id ? (
+                <div className="flex flex-col gap-2">
+                  {m.channel === "email" && (
+                    <input placeholder="נושא" value={editSubject} onChange={(e) => setEditSubject(e.target.value)} className="text-xs" />
+                  )}
+                  <textarea value={editBody} onChange={(e) => setEditBody(e.target.value)} rows={5} className="text-xs" />
+                  <div className="flex gap-2">
+                    <button
+                      disabled={busyId === m.id}
+                      onClick={() => saveEdit(m.id)}
+                      className="text-xs font-medium px-3 py-1.5 rounded-lg bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50"
+                    >
+                      שמור
+                    </button>
+                    <button onClick={() => setEditingId(null)} className="text-xs text-gray-400">ביטול</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {m.subject && <div className="text-xs font-medium text-gray-800 mb-1">{m.subject}</div>}
+                  <div className="text-xs text-gray-600 whitespace-pre-wrap">{m.body}</div>
+                </>
+              )}
+
+              {!m.sentAt && editingId !== m.id && (
+                <div className="flex items-center gap-2 mt-3 pt-2 border-t border-gray-100 flex-wrap">
+                  {m.approvalStatus === "draft" && (
+                    <>
+                      <button
+                        disabled={busyId === m.id}
+                        onClick={() => setApproval(m.id, "approved")}
+                        className="text-xs font-medium px-2.5 py-1 rounded-lg bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-50"
+                      >
+                        אשר
+                      </button>
+                      <button
+                        disabled={busyId === m.id}
+                        onClick={() => setApproval(m.id, "rejected")}
+                        className="text-xs text-gray-400 hover:text-red-600 px-2.5 py-1"
+                      >
+                        דחה
+                      </button>
+                    </>
+                  )}
+                  {m.approvalStatus === "approved" && (
+                    <>
+                      {m.channel === "email" && (
+                        <input
+                          placeholder="אימייל היעד"
+                          dir="ltr"
+                          value={sendToEmail}
+                          onChange={(e) => setSendToEmail(e.target.value)}
+                          className="text-xs flex-1 min-w-[160px]"
+                        />
+                      )}
+                      <button
+                        disabled={busyId === m.id || (m.channel === "email" && !sendToEmail.trim())}
+                        onClick={() => send(m)}
+                        className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
+                      >
+                        {m.channel === "email" ? "שלח מייל" : "סמן כבוצע"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LeadDetailView({ leadId, onBack }: { leadId: string; onBack: () => void }) {
   const [lead, setLead] = useState<LeadDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -827,6 +1052,8 @@ function LeadDetailView({ leadId, onBack }: { leadId: string; onBack: () => void
       {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3 mb-4">{error}</div>}
 
       <ConversionPanel lead={lead} onChanged={load} />
+
+      <OutreachPanel leadId={lead.id} />
 
       <div className="grid md:grid-cols-2 gap-4 mb-6">
         <div className="bg-white border border-gray-200 rounded-xl p-4">

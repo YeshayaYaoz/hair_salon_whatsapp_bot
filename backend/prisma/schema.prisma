@@ -56,6 +56,13 @@ model Business {
   paymentProvider  String? // "payplus" | "tranzila" | "cardcom"
   paymentApiKey    String? // encrypted at rest — provider's key/terminal/username
   paymentApiSecret String? // encrypted at rest — provider's secret/password
+  // Random per-business secret embedded in the payment webhook URL path (…/webhook/payments/
+  // :provider/:businessId/:webhookSecret). Unlike businessId/appointmentId, this is never exposed
+  // to the customer (only the payment LINK is; the webhook URL is configured once, server-side, in
+  // the provider's own merchant dashboard) — so it's what actually stops a forged POST to the
+  // webhook endpoint from confirming a deposit for free. Generated when a payment provider is
+  // first connected; see businessRoutes.ts.
+  paymentWebhookSecret String?
 
   // Per-business Israeli invoice/receipt provider — issues the actual חשבונית/קבלה after payment.
   invoiceProvider  String? // "greeninvoice" | "icount"

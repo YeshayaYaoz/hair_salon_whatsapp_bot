@@ -11,8 +11,6 @@ type PaymentProviderName = (typeof PAYMENT_PROVIDERS)[number];
 const INVOICE_PROVIDERS = ["greeninvoice", "icount", "payplus-invoice"] as const;
 type InvoiceProviderName = (typeof INVOICE_PROVIDERS)[number];
 
-const MANAGED_INVOICE_SURCHARGE_ILS = 39;
-
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 interface ProviderMeta {
@@ -99,6 +97,7 @@ interface Me {
   id: string;
   paymentConnected: boolean;
   paymentProvider?: string | null;
+  paymentWebhookSecret?: string | null;
   invoiceConnected: boolean;
   invoiceProvider?: string | null;
 }
@@ -309,94 +308,6 @@ function ProviderCard<T extends string>({
 /** Distinct from ProviderCard on purpose — this isn't "one more provider to pick from", it's Tori
  * itself stepping in as a fallback, so it gets its own visual identity (dashed gold border,
  * no tabs, just a single toggle) instead of living as a tab inside the provider list. */
-function ManagedCard({
-  he,
-  kind,
-  active,
-  surchargeIls,
-  description,
-  legalNote,
-  onEnable,
-  onDisable,
-}: {
-  he: boolean;
-  kind: "payment" | "invoice";
-  active: boolean;
-  surchargeIls: number;
-  description: string;
-  legalNote?: string;
-  onEnable: () => Promise<void>;
-  onDisable: () => Promise<void>;
-}) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function toggle() {
-    setError(null);
-    setLoading(true);
-    try {
-      if (active) await onDisable();
-      else await onEnable();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div
-      className="rounded-2xl overflow-hidden border-2 border-dashed"
-      style={{ borderColor: "#C08A00", background: "linear-gradient(180deg, #FFFBEF 0%, #FFFFFF 55%)" }}
-    >
-      <div className="flex items-center gap-3 px-5 py-4">
-        <span className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-white font-bold text-xs shadow-sm" style={{ backgroundColor: "#C08A00" }} dir="ltr">
-          T
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold text-gray-900">
-            {kind === "payment"
-              ? (he ? "אין לך ספק סליקה? תורי תעבד עבורך" : "No payment provider? Let Tori handle it")
-              : (he ? "אין לך ספק חשבוניות? תורי תפיק עבורך" : "No invoicing provider? Let Tori handle it")}
-          </h2>
-          <p className="text-xs mt-0.5" style={{ color: "#8A6400" }}>
-            {he ? `תוספת ₪${surchargeIls}/חודש` : `+₪${surchargeIls}/month`}
-          </p>
-        </div>
-        {active && (
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-green-50 text-green-700 border border-green-200 shrink-0">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
-            {he ? "פעיל" : "Active"}
-          </span>
-        )}
-      </div>
-
-      <div className="px-5 pb-5">
-        <p className="text-xs text-gray-500 leading-relaxed mb-3">{description}</p>
-        {legalNote && (
-          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3.5 py-2.5 leading-relaxed mb-3">{legalNote}</p>
-        )}
-        {error && <p className="text-red-600 text-xs mb-2">{error}</p>}
-        <button
-          type="button"
-          onClick={toggle}
-          disabled={loading}
-          className={`text-sm font-semibold px-5 py-2.5 rounded-lg transition disabled:opacity-50 ${
-            active ? "bg-white text-red-600 border border-red-200 hover:bg-red-50" : "text-white"
-          }`}
-          style={active ? undefined : { backgroundColor: "#C08A00" }}
-        >
-          {loading
-            ? (he ? "מעדכן..." : "Updating...")
-            : active
-              ? (he ? "בטל שירות מנוהל" : "Disable managed service")
-              : (he ? "הפעל שירות מנוהל" : "Enable managed service")}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export default function PaymentsPage() {
   const { lang } = useLanguage();
   const he = lang === "he";
@@ -490,39 +401,13 @@ export default function PaymentsPage() {
         />
       </div>
 
-      {/* Managed *payment* clearing was intentionally removed: processing cards for other
-          businesses through Tori's own PayPlus merchant account is third-party clearing, which
-          PayPlus's contract forbids and which carries anti-money-laundering, tax, and chargeback
-          liability for Tori. Every salon connects its own merchant account above. A real managed
-          offering would require a PayPlus Marketplace/Split-Payments contract, not this shortcut.
-          The managed *invoice* card stays — that's a separate call, and it already carries its
-          own legal disclaimer. */}
-      <div className="grid gap-5 lg:grid-cols-2 items-start mt-5 animate-fade-up stagger-2">
-        <ManagedCard
-          he={he}
-          kind="invoice"
-          active={me?.invoiceProvider === "tori_managed"}
-          surchargeIls={MANAGED_INVOICE_SURCHARGE_ILS}
-          description={
-            he
-              ? "אין לך ספק חשבוניות משלך? תורי תפיק עבורך קבלות דרך המערכת שלנו — אין צורך במפתחות API."
-              : "Don't have your own invoicing provider? Tori will issue receipts through our own system for you — no API keys needed."
-          }
-          legalNote={
-            he
-              ? 'שימו לב: המסמכים יונפקו תחת העסק "תורי" ולא תחת מספר העוסק שלכם — לא מתאים כתחליף להנהלת חשבונות עצמאית.'
-              : "Note: documents will be issued under Tori's business, not your own tax ID — not a substitute for independent bookkeeping."
-          }
-          onEnable={async () => {
-            await apiFetch("/api/business/me/invoice-provider", { method: "PUT", body: JSON.stringify({ provider: "tori_managed" }) });
-            await load();
-          }}
-          onDisable={async () => {
-            await apiFetch("/api/business/me/invoice-provider", { method: "DELETE" });
-            await load();
-          }}
-        />
-      </div>
+      {/* Managed *payment* and managed *invoice* clearing were both intentionally removed: issuing
+          receipts or processing cards for other businesses through Tori's own accounts is the same
+          third-party liability problem either way — anti-money-laundering exposure, tax
+          misattribution (documents/volume reported under Tori's own ח.פ. instead of the salon's),
+          and (for payments) 100% of the chargeback risk falling on Tori. Every salon connects its
+          own merchant/invoicing account above. A real managed offering would require a proper
+          Marketplace/Split-Payments contract with per-salon KYC, not a shared-account shortcut. */}
 
       {me?.paymentConnected && me.paymentProvider && me.paymentProvider !== "tori_managed" && (
         <div className="mt-5 bg-white border border-gray-200 rounded-2xl px-5 py-4 animate-fade-up stagger-2">
@@ -531,12 +416,20 @@ export default function PaymentsPage() {
           </p>
           <p className="text-xs text-gray-400 mb-2.5">
             {he
-              ? "כדי שקבלות יופקו אוטומטית לאחר תשלום מוצלח, הדבק כתובת זו בהגדרות ה-Webhook/Notify של " + PAYMENT_META[me.paymentProvider as PaymentProviderName].label + "."
-              : `So receipts get issued automatically on a successful payment, paste this into ${PAYMENT_META[me.paymentProvider as PaymentProviderName].label}'s Webhook/Notify settings.`}
+              ? "כדי שתורים עם מקדמה יאושרו אוטומטית וקבלות יופקו לאחר תשלום מוצלח, הדבק כתובת זו בהגדרות ה-Webhook/Notify של " + PAYMENT_META[me.paymentProvider as PaymentProviderName].label + ". הכתובת כוללת מפתח סודי — אל תשתף אותה."
+              : `So deposit-appointments get confirmed automatically and receipts get issued on a successful payment, paste this into ${PAYMENT_META[me.paymentProvider as PaymentProviderName].label}'s Webhook/Notify settings. The URL includes a secret key — don't share it.`}
           </p>
-          <code className="block text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-600 break-all" dir="ltr">
-            {`${API_URL}/webhook/payments/${me.paymentProvider}/${me.id}`}
-          </code>
+          {me.paymentWebhookSecret ? (
+            <code className="block text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-600 break-all" dir="ltr">
+              {`${API_URL}/webhook/payments/${me.paymentProvider}/${me.id}/${me.paymentWebhookSecret}`}
+            </code>
+          ) : (
+            <p className="text-xs text-amber-600">
+              {he
+                ? "לא נמצא מפתח סודי — נתק וחבר מחדש את ספק הסליקה כדי ליצור אחד."
+                : "No secret found — disconnect and reconnect your payment provider to generate one."}
+            </p>
+          )}
         </div>
       )}
     </div>

@@ -9,6 +9,8 @@ import { executeLeadFinderRun } from "./runner.js";
 import { loadScoringWeights, DEFAULT_SCORING_CONFIG_KEY } from "./scoring.js";
 import { APP_URL, sendTrialAccountCreatedEmail } from "../lib/email.js";
 import { nameSimilarity } from "./matching.js";
+import { generateOutreachDraft } from "./outreach.js";
+import { sendOutreachEmail } from "../lib/email.js";
 
 export const leadFinderRouter = Router();
 
@@ -293,6 +295,112 @@ leadFinderRouter.get("/suggested-matches", async (_req: AuthedRequest, res) => {
 
   suggestions.sort((a, b) => b.score - a.score);
   res.json(suggestions.slice(0, 50));
+});
+
+// --- Outreach ---
+
+leadFinderRouter.get("/leads/:id/outreach", async (req: AuthedRequest, res) => {
+  const messages = await prisma.outreachMessage.findMany({
+    where: { leadId: req.params.id },
+    orderBy: { createdAt: "desc" },
+  });
+  res.json(messages);
+});
+
+// Drafts a personalized outreach message via Claude, from the lead's own enrichment/score data —
+// never auto-sent. Always saved with approvalStatus "draft" so the operator reviews/edits before
+// anything goes out; see POST /outreach/:id/send below for the only path that actually sends.
+const generateOutreachSchema = z.object({
+  channel: z.enum(["email", "manual_call"]),
+  angle: z.enum(["initial", "follow_up_1"]).default("initial"),
+});
+leadFinderRouter.post("/leads/:id/outreach/generate", async (req: AuthedRequest, res) => {
+  const parsed = generateOutreachSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const lead = await prisma.lead.findUnique({
+    where: { id: req.params.id },
+    include: { scores: { orderBy: { version: "desc" }, take: 1 } },
+  });
+  if (!lead) return res.status(404).json({ error: "Lead not found" });
+
+  try {
+    const draft = await generateOutreachDraft(
+      {
+        name: lead.name,
+        category: lead.category,
+        address: lead.address,
+        rating: lead.rating,
+        reviewCount: lead.reviewCount,
+        website: lead.website,
+        whatsappDetected: lead.whatsappDetected,
+        hasOnlineBooking: lead.hasOnlineBooking,
+        hasContactForm: lead.hasContactForm,
+        websiteStale: lead.websiteStale,
+        notes: lead.notes,
+      },
+      (lead.scores[0]?.breakdown as Record<string, number> | undefined) ?? null,
+      parsed.data.channel,
+      parsed.data.angle
+    );
+
+    const message = await prisma.outreachMessage.create({
+      data: {
+        leadId: lead.id,
+        channel: parsed.data.channel,
+        angle: parsed.data.angle,
+        subject: draft.subject,
+        body: draft.body,
+        approvalStatus: "draft",
+      },
+    });
+    res.status(201).json(message);
+  } catch (err) {
+    console.error("[leadfinder] Outreach generation failed:", err);
+    res.status(502).json({ error: err instanceof Error ? err.message : "Draft generation failed" });
+  }
+});
+
+// Edit a draft before approving it (the model's wording isn't always right — this is meant to be
+// touched up by a human, not sent verbatim).
+const updateOutreachSchema = z.object({
+  subject: z.string().optional(),
+  body: z.string().min(1).optional(),
+  approvalStatus: z.enum(["draft", "approved", "rejected"]).optional(),
+});
+leadFinderRouter.patch("/outreach/:id", async (req: AuthedRequest, res) => {
+  const parsed = updateOutreachSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const message = await prisma.outreachMessage.update({ where: { id: req.params.id }, data: parsed.data }).catch(() => null);
+  if (!message) return res.status(404).json({ error: "Outreach message not found" });
+  res.json(message);
+});
+
+// Actually sends an approved email draft (real send, via Resend) — or for manual_call, just marks
+// it as done since the "send" there is the operator picking up the phone themselves. Requires
+// approvalStatus "approved" first, so nothing goes out straight from a fresh, unreviewed draft.
+const sendOutreachSchema = z.object({ toEmail: z.string().email().optional() });
+leadFinderRouter.post("/outreach/:id/send", async (req: AuthedRequest, res) => {
+  const parsed = sendOutreachSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const message = await prisma.outreachMessage.findUnique({ where: { id: req.params.id } });
+  if (!message) return res.status(404).json({ error: "Outreach message not found" });
+  if (message.approvalStatus !== "approved") return res.status(400).json({ error: "Approve the draft before sending" });
+  if (message.sentAt) return res.status(409).json({ error: "Already sent" });
+
+  if (message.channel === "email") {
+    if (!parsed.data.toEmail) return res.status(400).json({ error: "toEmail required for email channel" });
+    try {
+      await sendOutreachEmail(parsed.data.toEmail, message.subject ?? "", message.body);
+    } catch (err) {
+      return res.status(502).json({ error: err instanceof Error ? err.message : "Send failed" });
+    }
+  }
+  // manual_call: nothing to send programmatically — marking sentAt just records the call happened.
+
+  const updated = await prisma.outreachMessage.update({ where: { id: message.id }, data: { sentAt: new Date() } });
+  res.json(updated);
 });
 
 // Lightweight business search for the "link to existing business" picker in the lead-linking UI.

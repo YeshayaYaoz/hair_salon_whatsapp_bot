@@ -101,6 +101,21 @@ export async function sendTrialAccountCreatedEmail(to: string, businessName: str
   });
 }
 
+/** Sends a Lead Finder outreach email — deliberately plain (no Tori branding chrome) since this is
+ * a cold email meant to read as personal correspondence from the sales side, not a product email. */
+export async function sendOutreachEmail(to: string, subject: string, bodyText: string) {
+  const bodyHtml = bodyText
+    .split("\n\n")
+    .map((para) => `<p style="margin:0 0 14px;">${para.replace(/\n/g, "<br/>")}</p>`)
+    .join("");
+  await resendSend({
+    from: "תורי <noreply@torionline.com>",
+    to,
+    subject,
+    html: `<div dir="rtl" style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:8px;color:#1a1a1a;font-size:14px;line-height:1.6;">${bodyHtml}</div>`,
+  });
+}
+
 export async function sendWelcomeEmail(to: string, name: string) {
   await resendSend({
     from: "תורי <noreply@torionline.com>",

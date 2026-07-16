@@ -1,4 +1,5 @@
 import { Router } from "express";
+import crypto from "crypto";
 import { prisma } from "../lib/prisma.js";
 import { getInvoiceProvider, resolveInvoiceCredentials } from "../lib/invoices/index.js";
 import { captureError } from "../lib/errorMonitoring.js";
@@ -70,11 +71,19 @@ const PARSERS: Record<string, (body: Record<string, unknown>) => ParsedPaymentEv
   grow: parseGrowEvent,
 };
 
-// Configure this URL (…/webhook/payments/<provider>/<businessId>) as the notify/webhook/IPN URL
-// in each provider's own merchant dashboard. businessId in the path is how we know which
-// tenant's credentials to use, since these providers don't know about our multi-tenant setup.
-paymentWebhookRouter.post("/:provider/:businessId", async (req, res) => {
-  const { provider, businessId } = req.params;
+// Configure this URL (…/webhook/payments/<provider>/<businessId>/<webhookSecret>) as the notify/
+// webhook/IPN URL in each provider's own merchant dashboard. businessId in the path is how we know
+// which tenant's credentials to use, since these providers don't know about our multi-tenant
+// setup. webhookSecret is what actually authenticates the request: it's a random value generated
+// when the business first connects a payment provider (businessRoutes.ts), shown to them once to
+// paste into their provider's dashboard, and NEVER exposed anywhere a customer could see it —
+// unlike businessId/the appointment id, which do leak via the customer-facing payment link. We
+// deliberately don't implement per-provider HMAC/signature verification here: each provider's
+// actual signing scheme isn't confirmed against live docs/sandbox for this integration, and
+// shipping a guessed implementation would be worse than this — either silently accepting forged
+// requests if wrong, or silently dropping real ones. This secret is the verifiable alternative.
+paymentWebhookRouter.post("/:provider/:businessId/:webhookSecret", async (req, res) => {
+  const { provider, businessId, webhookSecret } = req.params;
   const parser = PARSERS[provider];
   if (!parser) return res.status(404).json({ error: "Unknown provider" });
 
@@ -83,15 +92,13 @@ paymentWebhookRouter.post("/:provider/:businessId", async (req, res) => {
   res.status(200).json({ ok: true });
 
   try {
-    const event = parser(req.body as Record<string, unknown>);
-    if (!event.success) return;
-
     const business = await prisma.business.findUnique({
       where: { id: businessId },
       select: {
         name: true,
         timezone: true,
         paymentProvider: true,
+        paymentWebhookSecret: true,
         invoiceProvider: true,
         invoiceApiKey: true,
         invoiceApiSecret: true,
@@ -105,6 +112,17 @@ paymentWebhookRouter.post("/:provider/:businessId", async (req, res) => {
       console.warn(`[payments webhook] Unrecognized business/provider combo: ${businessId}/${provider}`);
       return;
     }
+    if (
+      !business.paymentWebhookSecret ||
+      webhookSecret.length !== business.paymentWebhookSecret.length ||
+      !crypto.timingSafeEqual(Buffer.from(webhookSecret), Buffer.from(business.paymentWebhookSecret))
+    ) {
+      console.warn(`[payments webhook] Invalid webhook secret for business ${businessId} (${provider})`);
+      return;
+    }
+
+    const event = parser(req.body as Record<string, unknown>);
+    if (!event.success) return;
 
     // Deposit-before-booking: the payment link's referenceId is the appointment's own id (see
     // claudeBot.ts book_appointment). If this event matches a still-pending hold, confirm it —

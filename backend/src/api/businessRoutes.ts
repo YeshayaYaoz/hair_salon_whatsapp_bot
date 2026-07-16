@@ -1,4 +1,5 @@
 import { Router } from "express";
+import crypto from "crypto";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, signImpersonationToken, type AuthedRequest } from "../lib/auth.js";
@@ -508,15 +509,22 @@ businessRouter.put("/me/payment-provider", async (req: AuthedRequest, res) => {
   const verification = await provider.verifyCredentials(creds);
   if (!verification.valid) return res.status(400).json({ error: verification.error ?? "Invalid credentials" });
 
+  // Generate the webhook secret once, on first connect — reused across reconnects/provider
+  // switches so the URL already configured in the provider's dashboard keeps working. Only a
+  // business that has never connected a provider before gets a fresh one.
+  const existing = await prisma.business.findUnique({ where: { id: req.businessId! }, select: { paymentWebhookSecret: true } });
+  const webhookSecret = existing?.paymentWebhookSecret ?? crypto.randomBytes(24).toString("hex");
+
   await prisma.business.update({
     where: { id: req.businessId! },
     data: {
       paymentProvider: parsed.data.provider,
       paymentApiKey: encryptSecret(parsed.data.apiKey!),
       paymentApiSecret: encryptSecret(parsed.data.apiSecret!),
+      paymentWebhookSecret: webhookSecret,
     },
   });
-  res.json({ ok: true });
+  res.json({ ok: true, webhookSecret });
 });
 
 businessRouter.delete("/me/payment-provider", async (req: AuthedRequest, res) => {
@@ -530,12 +538,18 @@ businessRouter.delete("/me/payment-provider", async (req: AuthedRequest, res) =>
 // --- Invoice provider (Green Invoice / iCount / PayPlus Invoice+ / Tori-managed) — issues the
 // actual חשבונית/קבלה ---
 
-// "payplus-invoice" and "tori_managed" don't need a business-supplied apiKey/apiSecret — the
-// former reuses the PayPlus payment credentials, the latter uses Tori's own account.
-const NO_KEYS_NEEDED = new Set(["payplus-invoice", "tori_managed"]);
+// NOTE: "tori_managed" is intentionally NOT accepted here either, same reasoning as managed
+// *payment* clearing above: issuing invoices/receipts under Tori's own tax ID for a sale that was
+// actually made by a different business is the same kind of misattribution risk (could read as
+// falsified accounting documents, and creates a real mess for the salon's own bookkeeping/tax
+// filing since the documents wouldn't be under their own ח.פ.). "payplus-invoice" alone still
+// needs no business-supplied apiKey/apiSecret since it reuses their own PayPlus payment credentials.
+const NO_KEYS_NEEDED = new Set(["payplus-invoice"]);
 const invoiceConnectSchema = z
   .object({
-    provider: z.enum(INVOICE_PROVIDERS),
+    provider: z.enum(INVOICE_PROVIDERS).refine((p) => p !== "tori_managed", {
+      message: "Managed invoicing is not available — connect your own invoicing provider.",
+    }),
     apiKey: z.string().min(1).optional(),
     apiSecret: z.string().min(1).optional(),
   })
@@ -555,17 +569,6 @@ businessRouter.put("/me/invoice-provider", async (req: AuthedRequest, res) => {
     await prisma.business.update({
       where: { id: req.businessId! },
       data: { invoiceProvider: "payplus-invoice", invoiceApiKey: null, invoiceApiSecret: null },
-    });
-    return res.json({ ok: true });
-  }
-
-  if (parsed.data.provider === "tori_managed") {
-    const provider = getInvoiceProvider("tori_managed");
-    const verification = await provider.verifyCredentials({ apiKey: "", apiSecret: "" });
-    if (!verification.valid) return res.status(400).json({ error: verification.error ?? "Managed invoicing isn't available right now" });
-    await prisma.business.update({
-      where: { id: req.businessId! },
-      data: { invoiceProvider: "tori_managed", invoiceApiKey: null, invoiceApiSecret: null },
     });
     return res.json({ ok: true });
   }
