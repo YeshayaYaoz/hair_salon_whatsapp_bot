@@ -38,6 +38,9 @@ model Business {
   pendingYieldCampaign      Json? // set when the empty-slot campaign is awaiting the owner's WhatsApp confirmation
   address                   String?
   whatsappPhoneNumberId     String?   @unique
+  // Cartesia-provisioned phone number for the voice bot, one per salon — same 1:1 routing model as
+  // whatsappPhoneNumberId: the number Cartesia's tool call reports as "called" identifies the salon.
+  voicePhoneNumber          String?   @unique
   whatsappAccessToken       String? // encrypted at rest
   whatsappTokenValid        Boolean   @default(true) // set false when Meta rejects the token (expired/revoked)
   notificationPhone         String? // owner's personal phone for booking alerts

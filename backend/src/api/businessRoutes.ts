@@ -449,6 +449,27 @@ businessRouter.delete("/me/whatsapp", async (req: AuthedRequest, res) => {
   res.json({ ok: true });
 });
 
+// Voice bot phone number — the Cartesia-provisioned number this salon's calls come in on. Just a
+// lookup key (unlike WhatsApp, no token to store here: Cartesia holds the call, our server only
+// answers its tool calls — see voiceRoutes.ts).
+businessRouter.put("/me/voice-phone", async (req: AuthedRequest, res) => {
+  const parsed = z.object({ voicePhoneNumber: z.string().min(1) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  try {
+    await prisma.business.update({ where: { id: req.businessId! }, data: { voicePhoneNumber: parsed.data.voicePhoneNumber } });
+  } catch (err: any) {
+    if (err?.code === "P2002") return res.status(409).json({ error: "This number is already connected to another business" });
+    throw err;
+  }
+  res.json({ ok: true });
+});
+
+businessRouter.delete("/me/voice-phone", async (req: AuthedRequest, res) => {
+  await prisma.business.update({ where: { id: req.businessId! }, data: { voicePhoneNumber: null } });
+  res.json({ ok: true });
+});
+
 /**
  * Submits the reminder + review message templates for approval to this business's own WABA, so
  * the owner doesn't have to hand-create them in Meta Business Manager. Templates take up to ~24h

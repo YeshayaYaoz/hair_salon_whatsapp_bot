@@ -27,6 +27,7 @@ const RECOMMENDED: RequiredVar[] = [
   { name: "GOOGLE_REDIRECT_URI", description: "OAuth callback for the Settings-page \"connect Calendar\" flow (an already-logged-in business)" },
   { name: "GOOGLE_LOGIN_REDIRECT_URI", description: "OAuth callback for \"Sign in with Google\" on the login page (unauthenticated) — must be a separate registered redirect URI from GOOGLE_REDIRECT_URI" },
   { name: "META_APP_ID", description: "same Meta app as WHATSAPP_APP_SECRET — required to exchange the WhatsApp Embedded Signup code for an access token" },
+  { name: "CARTESIA_TOOL_SECRET", description: "shared bearer secret Cartesia's voice agent sends when calling POST /api/voice/context — without it, that endpoint rejects every request" },
   { name: "WHATSAPP_APP_SECRET", description: "verifies WhatsApp webhook signatures, and (as the Meta app secret) exchanges the Embedded Signup code for an access token" },
   { name: "WHATSAPP_VERIFY_TOKEN", description: "required for Meta to verify the webhook URL" },
   { name: "PAYPLUS_API_KEY", description: "Tori's own PayPlus account — recurring subscription billing" },

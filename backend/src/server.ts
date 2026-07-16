@@ -19,6 +19,7 @@ import { runMetricSnapshotJob } from "./billing/metricSnapshotJob.js";
 import { runWhatsAppHealthJob } from "./lib/whatsappHealthJob.js";
 import { runTrackedJob } from "./lib/jobStatus.js";
 import { leadFinderRouter } from "./leadfinder/routes.js";
+import { voiceRouter } from "./api/voiceRoutes.js";
 
 validateEnv(); // exits the process before anything binds to a port if required config is missing
 initErrorMonitoring();
@@ -56,6 +57,7 @@ app.use("/api/public", publicRouter);
 app.use("/api/business", businessRouter);
 app.use("/api/billing", payplusBillingRouter);
 app.use("/api/leadfinder", leadFinderRouter);
+app.use("/api/voice", voiceRouter);
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
