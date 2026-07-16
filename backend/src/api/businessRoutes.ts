@@ -665,13 +665,12 @@ async function exchangeCodeForAccessToken(code: string): Promise<string> {
   const appSecret = process.env.WHATSAPP_APP_SECRET; // same Meta app as the WhatsApp webhook signature secret
   if (!appId || !appSecret) throw new Error("META_APP_ID/WHATSAPP_APP_SECRET not configured");
 
-  // redirect_uri is required by Graph's oauth/access_token endpoint and must exactly match a URI
-  // registered under Facebook Login > Settings > Valid OAuth Redirect URIs (confirmed live: both
-  // omitting it and passing it empty were rejected with "redirect_uri is identical" errors). This
-  // must be the exact page the FB.login() popup was launched from.
-  const redirectUri = process.env.WHATSAPP_EMBEDDED_SIGNUP_REDIRECT_URI;
-  if (!redirectUri) throw new Error("WHATSAPP_EMBEDDED_SIGNUP_REDIRECT_URI not configured");
-  const url = `https://graph.facebook.com/v23.0/oauth/access_token?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&client_secret=${encodeURIComponent(appSecret)}&code=${encodeURIComponent(code)}`;
+  // No redirect_uri: Meta's own generated Embedded Signup link for this config_id doesn't include
+  // one, confirming this flow doesn't use it. Every earlier "redirect_uri is identical" failure
+  // (error_subcode 36008) was actually caused by using the wrong config_id on the frontend — a
+  // generic Facebook Login for Business config instead of the one tied to the WhatsApp use case
+  // (App Dashboard > WhatsApp use case > Become a Partner > Embedded Signup Builder).
+  const url = `https://graph.facebook.com/v23.0/oauth/access_token?client_id=${encodeURIComponent(appId)}&client_secret=${encodeURIComponent(appSecret)}&code=${encodeURIComponent(code)}`;
   const res = await fetch(url);
   const data = (await res.json()) as any;
   if (data?.error || !data?.access_token) {

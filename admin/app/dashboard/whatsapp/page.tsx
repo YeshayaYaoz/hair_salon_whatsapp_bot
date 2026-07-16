@@ -13,13 +13,12 @@ declare global {
 }
 
 const META_APP_ID = process.env.NEXT_PUBLIC_META_APP_ID || "1556761279502082";
-const META_CONFIG_ID = process.env.NEXT_PUBLIC_META_CONFIG_ID || "1011752745059826";
-// Must exactly match a URI registered under Meta App Dashboard > Facebook Login > Settings >
-// Valid OAuth Redirect URIs, AND the WHATSAPP_EMBEDDED_SIGNUP_REDIRECT_URI backend env var. The
-// FB.login() dialog binds the issued code to whatever redirect_uri it's given here (defaulting to
-// an internal Meta value if omitted) — the server-side exchange then fails unless it passes back
-// that exact same value, which is why this needs to be explicit here rather than left out.
-const EMBEDDED_SIGNUP_REDIRECT_URI = "https://torionline.com/dashboard/whatsapp";
+// This must be the config_id shown on the WhatsApp use case's own "Embedded Signup Builder" page
+// (App Dashboard > WhatsApp use case > Become a Partner > Embedded Signup Builder) — NOT a generic
+// Facebook Login for Business configuration. Using the wrong config_id here is what caused every
+// code exchange to fail with a misleading "redirect_uri is identical" error (Meta error_subcode
+// 36008) no matter what redirect_uri was set to: the code itself was never valid for this flow.
+const META_CONFIG_ID = process.env.NEXT_PUBLIC_META_CONFIG_ID || "1013901801398198";
 
 export default function WhatsAppPage() {
   const { t, lang } = useLanguage();
@@ -177,12 +176,16 @@ export default function WhatsAppPage() {
         // app secret) for a real access token — see exchangeCodeForAccessToken in businessRoutes.ts.
         response_type: "code",
         override_default_response_type: true,
-        redirect_uri: EMBEDDED_SIGNUP_REDIRECT_URI,
+        // No redirect_uri: Meta's own generated Embedded Signup link for this config_id doesn't
+        // include one either — the earlier redirect_uri debugging was chasing a misleading error
+        // message; the real problem was an unrelated config_id (see the constant above).
         // No `scope` here — with config_id-based Embedded Signup, permissions come from the login
         // configuration itself (set in Meta App Dashboard → Facebook Login → Configurations), and
         // passing an explicit scope alongside config_id is invalid (Meta logs "Invalid Scopes" and
         // ignores it for end users, but it's a real misconfiguration worth not shipping).
-        extras: { setup: {}, featureType: "", sessionInfoVersion: "3" },
+        // Matches Meta's own generated Embedded Signup link for this config_id exactly (version:
+        // "v4" — the extras shape/version Meta expects can drift from generic FB Login samples).
+        extras: { setup: {}, featureType: "", sessionInfoVersion: "3", version: "v4" },
       }
     );
   }
