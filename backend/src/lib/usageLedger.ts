@@ -16,18 +16,37 @@ const CLAUDE_PRICING_USD_PER_MTOK: Record<string, { input: number; output: numbe
 // than fabricating a per-message cost, since it only scales an otherwise-exact token cost.
 const USD_TO_ILS = 3.7;
 
+// Prompt-caching billing multipliers on top of the base input rate — official, published, and
+// fixed regardless of model (only the base input rate above varies by model). A cache write costs
+// MORE than a plain input token (you're paying to populate the cache); a cache read costs much
+// LESS (that's the whole point). Both are still real input tokens Anthropic bills for, so both
+// must be counted for the cost to stay exact — see cache_control usage in claudeBot.ts.
+const CACHE_WRITE_MULTIPLIER = 1.25;
+const CACHE_READ_MULTIPLIER = 0.1;
+
 /** Records the real token usage (and computed cost, from Anthropic's own published rates — no
- * estimate) of one actual Claude API call, so cost-per-phone-number is exact, not guessed. */
+ * estimate) of one actual Claude API call, so cost-per-phone-number is exact, not guessed.
+ * inputTokens here is the plain (non-cached) portion only — cacheCreationTokens/cacheReadTokens
+ * are the other two buckets Anthropic reports separately once prompt caching is in use. */
 export async function logClaudeUsage(params: {
   businessId: string;
   customerPhone: string;
   model: string;
   inputTokens: number;
   outputTokens: number;
+  cacheCreationTokens?: number;
+  cacheReadTokens?: number;
 }) {
   const rate = CLAUDE_PRICING_USD_PER_MTOK[params.model];
-  const costUsd = rate ? (params.inputTokens * rate.input + params.outputTokens * rate.output) / 1_000_000 : null;
+  const costUsd = rate
+    ? (params.inputTokens * rate.input +
+        params.outputTokens * rate.output +
+        (params.cacheCreationTokens ?? 0) * rate.input * CACHE_WRITE_MULTIPLIER +
+        (params.cacheReadTokens ?? 0) * rate.input * CACHE_READ_MULTIPLIER) /
+      1_000_000
+    : null;
   const costAgorot = costUsd !== null ? Math.round(costUsd * USD_TO_ILS * 100) : null;
+  const totalInputTokens = params.inputTokens + (params.cacheCreationTokens ?? 0) + (params.cacheReadTokens ?? 0);
 
   await prisma.apiUsageEvent.create({
     data: {
@@ -35,7 +54,7 @@ export async function logClaudeUsage(params: {
       customerPhone: params.customerPhone,
       kind: "claude",
       model: params.model,
-      inputTokens: params.inputTokens,
+      inputTokens: totalInputTokens,
       outputTokens: params.outputTokens,
       costAgorot,
     },

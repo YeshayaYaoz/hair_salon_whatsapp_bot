@@ -116,6 +116,19 @@ const tools: Anthropic.Tool[] = [
   },
 ];
 
+// Prompt caching: the tool definitions never change between calls (they're a module-level
+// constant), and each business's system prompt is byte-identical across consecutive messages in
+// the same conversation unless the owner just edited their services/hours/etc. Marking the last
+// tool and the system block as cache breakpoints lets Anthropic skip re-processing (and re-billing
+// at full input-token rate) that unchanged prefix on every turn — a real latency + cost win for
+// exactly the metered cost this app now tracks per business/phone (see usageLedger.ts). Minimum
+// cacheable prefix is 1024 tokens on Sonnet, 4096 on Haiku 4.5 — below that Anthropic silently
+// skips caching rather than erroring, so a small business's system prompt on Haiku may just not
+// hit the minimum yet; nothing breaks either way, it only sometimes doesn't save money.
+const cachedTools: Anthropic.Tool[] = tools.map((tool, i) =>
+  i === tools.length - 1 ? { ...tool, cache_control: { type: "ephemeral" } } : tool
+);
+
 export interface BotResult {
   text: string;
   offeredSlots?: AvailableSlot[];
@@ -503,6 +516,8 @@ async function recordUsage(businessId: string, customerPhone: string, model: str
       model,
       inputTokens: response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
+      cacheCreationTokens: response.usage.cache_creation_input_tokens ?? undefined,
+      cacheReadTokens: response.usage.cache_read_input_tokens ?? undefined,
     });
   } catch (err) {
     console.error("[bot] Failed to record Claude usage:", err);
@@ -517,12 +532,14 @@ async function makeApiCall(
   system: string,
   messages: Anthropic.MessageParam[]
 ): Promise<Anthropic.Message> {
+  const cachedSystem: Anthropic.TextBlockParam[] = [{ type: "text", text: system, cache_control: { type: "ephemeral" } }];
+
   try {
     const response = (await anthropic.messages.create({
       model,
       max_tokens: 1024,
-      system,
-      tools,
+      system: cachedSystem,
+      tools: cachedTools,
       messages,
     })) as Anthropic.Message;
     await recordUsage(businessId, customerPhone, model, response);
@@ -537,8 +554,8 @@ async function makeApiCall(
     const response = (await anthropic.messages.create({
       model,
       max_tokens: 1024,
-      system,
-      tools,
+      system: cachedSystem,
+      tools: cachedTools,
       messages,
     })) as Anthropic.Message;
     await recordUsage(businessId, customerPhone, model, response);

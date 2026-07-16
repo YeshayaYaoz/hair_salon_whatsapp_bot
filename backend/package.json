@@ -14,7 +14,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.1",
+    "@anthropic-ai/sdk": "^0.65.0",
     "@prisma/client": "^5.20.0",
     "@sentry/node": "^10.63.0",
     "bcryptjs": "^2.4.3",
