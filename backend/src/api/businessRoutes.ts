@@ -665,9 +665,12 @@ async function exchangeCodeForAccessToken(code: string): Promise<string> {
   const appSecret = process.env.WHATSAPP_APP_SECRET; // same Meta app as the WhatsApp webhook signature secret
   if (!appId || !appSecret) throw new Error("META_APP_ID/WHATSAPP_APP_SECRET not configured");
 
-  // No redirect_uri: this code came from the JS SDK's FB.login() popup, not a browser redirect —
-  // Meta's code-exchange endpoint accepts an empty redirect_uri specifically for that case.
-  const url = `https://graph.facebook.com/v20.0/oauth/access_token?client_id=${encodeURIComponent(appId)}&redirect_uri=&client_secret=${encodeURIComponent(appSecret)}&code=${encodeURIComponent(code)}`;
+  // No redirect_uri parameter AT ALL: this code came from the JS SDK's FB.login() popup, not a
+  // browser redirect. Meta's documented Embedded Signup exchange omits redirect_uri entirely —
+  // passing it as an empty string (`redirect_uri=`) is treated as a MISMATCH against the SDK's
+  // internal value and fails with "Error validating verification code… redirect_uri is identical",
+  // which is exactly the error observed live before this was removed.
+  const url = `https://graph.facebook.com/v20.0/oauth/access_token?client_id=${encodeURIComponent(appId)}&client_secret=${encodeURIComponent(appSecret)}&code=${encodeURIComponent(code)}`;
   const res = await fetch(url);
   const data = (await res.json()) as any;
   if (data?.error || !data?.access_token) {
