@@ -134,7 +134,7 @@ export default function WhatsAppPage() {
     window.FB.login(
       (response: any) => {
         console.log("FB.login response:", JSON.stringify(response));
-        if (response.authResponse?.accessToken) {
+        if (response.authResponse?.code) {
           if (codeUsedRef.current) return; // StrictMode double-fire guard
           codeUsedRef.current = true;
           setLoading(true);
@@ -143,7 +143,7 @@ export default function WhatsAppPage() {
             {
               method: "POST",
               body: JSON.stringify({
-                accessToken: response.authResponse.accessToken,
+                code: response.authResponse.code,
                 wabaId: signupDataRef.current.wabaId,
                 phoneNumberId: signupDataRef.current.phoneNumberId,
               }),
@@ -164,7 +164,12 @@ export default function WhatsAppPage() {
       },
       {
         config_id: META_CONFIG_ID,
-        response_type: "token",
+        // Meta's currently documented WhatsApp Embedded Signup flow requires response_type: "code"
+        // — the older implicit "token" flow silently falls back to a plain Facebook login instead
+        // of routing through the WABA/phone-number selection UI (no WA_EMBEDDED_SIGNUP postMessage,
+        // authResponse.userID stays null). The resulting code is exchanged server-side (needs the
+        // app secret) for a real access token — see exchangeCodeForAccessToken in businessRoutes.ts.
+        response_type: "code",
         override_default_response_type: true,
         // No `scope` here — with config_id-based Embedded Signup, permissions come from the login
         // configuration itself (set in Meta App Dashboard → Facebook Login → Configurations), and

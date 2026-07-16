@@ -654,15 +654,41 @@ businessRouter.post("/invoices/receipt", async (req: AuthedRequest, res) => {
   }
 });
 
-// Embedded Signup: receive the access token from FB.login (response_type: "token"),
-// then fetch the phone number ID from the WABA and save everything.
+// Embedded Signup: FB.login runs with response_type: "code" (Meta's currently documented flow for
+// WhatsApp Embedded Signup — the older implicit response_type: "token" flow silently falls back to
+// a plain Facebook login instead of routing through the WABA/phone-number selection UI, which is
+// why waba_id/phone_number_id and the WA_EMBEDDED_SIGNUP postMessage never showed up before this).
+// The short-lived code from the popup must be exchanged server-side (needs the app secret) for a
+// real user access token before any of the phone-number lookups below can run.
+async function exchangeCodeForAccessToken(code: string): Promise<string> {
+  const appId = process.env.META_APP_ID;
+  const appSecret = process.env.WHATSAPP_APP_SECRET; // same Meta app as the WhatsApp webhook signature secret
+  if (!appId || !appSecret) throw new Error("META_APP_ID/WHATSAPP_APP_SECRET not configured");
+
+  // No redirect_uri: this code came from the JS SDK's FB.login() popup, not a browser redirect —
+  // Meta's code-exchange endpoint accepts an empty redirect_uri specifically for that case.
+  const url = `https://graph.facebook.com/v20.0/oauth/access_token?client_id=${encodeURIComponent(appId)}&redirect_uri=&client_secret=${encodeURIComponent(appSecret)}&code=${encodeURIComponent(code)}`;
+  const res = await fetch(url);
+  const data = (await res.json()) as any;
+  if (data?.error || !data?.access_token) {
+    throw new Error(`Code exchange failed: ${data?.error?.message ?? "no access_token in response"}`);
+  }
+  return data.access_token as string;
+}
+
 businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, res) => {
   const parsed = z
-    .object({ accessToken: z.string().min(1), wabaId: z.string().optional(), phoneNumberId: z.string().optional() })
+    .object({ code: z.string().min(1), wabaId: z.string().optional(), phoneNumberId: z.string().optional() })
     .safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "Missing accessToken" });
+  if (!parsed.success) return res.status(400).json({ error: "Missing code" });
 
-  const userToken: string = parsed.data.accessToken;
+  let userToken: string;
+  try {
+    userToken = await exchangeCodeForAccessToken(parsed.data.code);
+  } catch (err) {
+    console.error("[embedded-signup] Code exchange failed:", err);
+    return res.status(502).json({ error: err instanceof Error ? err.message : "Code exchange failed" });
+  }
 
   let phone: { id: string; display_phone_number: string } | undefined;
   let wabaId: string | undefined;
