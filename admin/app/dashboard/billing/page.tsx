@@ -13,7 +13,6 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const PLAN_PRICES: Record<"standard" | "premium", number> = { standard: 149, premium: 299 };
-const PLAN_PRICE = PLAN_PRICES.standard; // ₪/month — used by the savings calculator copy below
 
 // Must match MESSAGE_QUOTA_BY_PLAN in backend/src/lib/wallet.ts — display-only, not authoritative.
 const MESSAGE_QUOTA_BY_PLAN: Record<"standard" | "premium", number> = { standard: 300, premium: 1000 };
@@ -39,7 +38,10 @@ const WEEKS_PER_MONTH = 4.33;
 const AFTER_HOURS_CAPTURE = 0.15; // share of bookings recovered by answering 24/7
 const MINUTES_SAVED_PER_BOOKING = 4; // manual admin time saved per booking
 
-function SavingsCalculator({ lang }: { lang: "he" | "en" }) {
+// planPrice is the business's actual current monthly cost (real plan price, minus any loyalty
+// discount actually applied to their account) — not a fixed constant — so the "net savings after
+// subscription" figure below is honest about what this specific business pays, not a generic quote.
+function SavingsCalculator({ lang, planPrice }: { lang: "he" | "en"; planPrice: number }) {
   const [weekly, setWeekly] = useState(30);
   const [price, setPrice] = useState(120);
   const he = lang === "he";
@@ -47,8 +49,8 @@ function SavingsCalculator({ lang }: { lang: "he" | "en" }) {
   const monthlyBookings = Math.round(weekly * WEEKS_PER_MONTH);
   const recoveredRevenue = Math.round(monthlyBookings * AFTER_HOURS_CAPTURE * price);
   const hoursSaved = Math.max(1, Math.round((monthlyBookings * MINUTES_SAVED_PER_BOOKING) / 60));
-  const netSavings = Math.max(0, recoveredRevenue - PLAN_PRICE);
-  const coversSubscription = recoveredRevenue >= PLAN_PRICE;
+  const netSavings = Math.max(0, recoveredRevenue - planPrice);
+  const coversSubscription = recoveredRevenue >= planPrice;
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-6 mt-4">
@@ -122,7 +124,7 @@ function SavingsCalculator({ lang }: { lang: "he" | "en" }) {
           {coversSubscription ? `₪${netSavings.toLocaleString()}` : "₪0"}
         </div>
         <div className="text-xs text-gray-600 mt-1 font-medium">
-          {he ? `חיסכון נטו לחודש (אחרי עלות המנוי ₪${PLAN_PRICE})` : `Net monthly savings (after the ₪${PLAN_PRICE} subscription)`}
+          {he ? `חיסכון נטו לחודש (אחרי עלות המנוי ₪${planPrice})` : `Net monthly savings (after the ₪${planPrice} subscription)`}
         </div>
       </div>
 
@@ -259,6 +261,12 @@ export default function BillingPage() {
     trialDaysLeft = Math.max(0, Math.ceil((trialEnd - Date.now()) / (24 * 60 * 60 * 1000)));
   }
 
+  // The business's actual current monthly cost: their real plan (once subscribed) minus any
+  // loyalty discount actually applied — falls back to the pre-checkout selected plan's list price
+  // before a subscription exists, so the calculator below is never showing a fabricated number.
+  const activePlan = (status === "active" && currentPlan === "premium" ? "premium" : status === "active" ? "standard" : plan) as "standard" | "premium";
+  const realMonthlyPrice = Math.max(0, PLAN_PRICES[activePlan] - (status === "active" ? loyaltyDiscountIls : 0));
+
   return (
     <div className="animate-fade-in">
       <div className="mb-6 animate-fade-up">
@@ -302,7 +310,50 @@ export default function BillingPage() {
             </div>
           </div>
 
-          {/* Plan comparison */}
+          {/* Once a subscription is live, the full marketing comparison (ribbons, repeated feature
+              checklists) is just noise — a business that already subscribed doesn't need to be
+              re-sold. Past-due is treated like "not active" here since they need the full choice
+              again to fix payment, same as trial/canceled. */}
+          {status === "active" ? (
+            <div className="bg-white border border-gray-200 rounded-xl p-5 flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-semibold text-gray-900">
+                    {currentPlan === "premium" ? "Premium" : "Standard"}
+                  </span>
+                  <div className="flex items-baseline gap-1">
+                    {loyaltyDiscountIls > 0 && (
+                      <span className="text-xs text-gray-400 line-through tabular-nums">₪{PLAN_PRICES[activePlan]}</span>
+                    )}
+                    <span className="text-lg font-extrabold text-gray-900 tabular-nums">₪{realMonthlyPrice}</span>
+                    <span className="text-xs text-gray-400">{lang === "he" ? "/חודש" : "/month"}</span>
+                  </div>
+                </div>
+                {loyaltyDiscountIls > 0 ? (
+                  <p className="text-xs font-medium text-green-600 mt-0.5">
+                    🎁 {lang === "he" ? "הנחת נאמנות מוחלת אוטומטית" : "Loyalty discount applied automatically"}
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {lang === "he"
+                      ? `עד ${MESSAGE_QUOTA_BY_PLAN[activePlan].toLocaleString()} הודעות תזכורת/ביקורת בחודש`
+                      : `Up to ${MESSAGE_QUOTA_BY_PLAN[activePlan].toLocaleString()} reminder/review messages/month`}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => changePlan(activePlan === "premium" ? "standard" : "premium")}
+                disabled={checkoutLoading}
+                className="inline-flex items-center justify-center gap-1.5 bg-gray-50 hover:bg-gray-100 disabled:opacity-50 text-gray-700 border border-gray-200 text-sm font-semibold px-4 py-2 rounded-lg transition"
+              >
+                {checkoutLoading
+                  ? t.redirecting
+                  : activePlan === "premium"
+                    ? (lang === "he" ? "עבור ל-Standard" : "Switch to Standard")
+                    : (lang === "he" ? "שדרג ל-Premium" : "Upgrade to Premium")}
+              </button>
+            </div>
+          ) : (
           <div className="grid sm:grid-cols-2 gap-4">
             {(["standard", "premium"] as const).map((p) => {
               const isCurrent = currentPlan === p && status === "active";
@@ -410,6 +461,7 @@ export default function BillingPage() {
               );
             })}
           </div>
+          )}
 
           {error && <p className="text-red-600 text-xs mt-3">{error}</p>}
         </>
@@ -417,11 +469,21 @@ export default function BillingPage() {
 
       {status === "active" && (
         <div className="grid md:grid-cols-2 gap-4 mt-4">
-          {/* Annual plan */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="w-8 h-8 rounded-lg bg-[#1B7FA0]/10 flex items-center justify-center text-base flex-shrink-0">📅</span>
-              <h2 className="text-sm font-semibold text-gray-900">{lang === "he" ? "מנוי שנתי" : "Annual plan"}</h2>
+          {/* Annual plan — 2 months free, i.e. the same yearly cost spread over 10 months instead
+              of 12. Leads with the effective monthly price (what actually changes on their bill)
+              rather than a lump year total, since that's the number that actually answers "is this
+              worth it" at a glance. */}
+          <div className={`relative rounded-xl p-5 overflow-hidden ${billingCycle === "annual" ? "bg-white border border-gray-200" : "bg-gradient-to-br from-[#1B7FA0] to-[#155F79] border border-[#1B7FA0]"}`}>
+            {billingCycle !== "annual" && (
+              <span className="absolute top-3 left-3 bg-[#F59E0B] text-white text-[10px] font-bold px-2.5 py-1 rounded-full tracking-wide">
+                {lang === "he" ? "חודשיים מתנה" : "2 MONTHS FREE"}
+              </span>
+            )}
+            <div className={`flex items-center gap-2 mb-1 ${billingCycle !== "annual" ? "mt-6" : ""}`}>
+              <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-base flex-shrink-0 ${billingCycle === "annual" ? "bg-[#1B7FA0]/10" : "bg-white/15"}`}>📅</span>
+              <h2 className={`text-sm font-semibold ${billingCycle === "annual" ? "text-gray-900" : "text-white"}`}>
+                {lang === "he" ? "מנוי שנתי" : "Annual plan"}
+              </h2>
             </div>
             {billingCycle === "annual" ? (
               <p className="text-sm text-gray-500 mt-3">
@@ -429,15 +491,20 @@ export default function BillingPage() {
               </p>
             ) : (
               <>
-                <p className="text-xs text-gray-500 mt-1 mb-4">
+                <div className="flex items-baseline gap-1.5 mt-3">
+                  <span className="text-white/50 text-base line-through tabular-nums">₪{PLAN_PRICES[activePlan]}</span>
+                  <span className="text-3xl font-extrabold text-white tabular-nums">₪{Math.round((PLAN_PRICES[activePlan] * 10) / 12)}</span>
+                  <span className="text-sm text-white/70">{lang === "he" ? "/חודש בממוצע" : "/mo on average"}</span>
+                </div>
+                <p className="text-xs text-white/80 mt-2 mb-4 leading-relaxed">
                   {lang === "he"
-                    ? `עבור למנוי שנתי וקבל חודשיים מתנה — ₪${PLAN_PRICES[plan] * 10} לשנה במקום ₪${PLAN_PRICES[plan] * 12}.`
-                    : `Switch to annual and get 2 months free — ₪${PLAN_PRICES[plan] * 10}/year instead of ₪${PLAN_PRICES[plan] * 12}.`}
+                    ? `₪${PLAN_PRICES[activePlan] * 10} לשנה במקום ₪${PLAN_PRICES[activePlan] * 12} — חוסך לך ₪${PLAN_PRICES[activePlan] * 2} בשנה, מחויב פעם אחת.`
+                    : `₪${PLAN_PRICES[activePlan] * 10}/year instead of ₪${PLAN_PRICES[activePlan] * 12} — saves you ₪${PLAN_PRICES[activePlan] * 2}/year, billed once.`}
                 </p>
                 <button
                   onClick={switchToAnnual}
                   disabled={annualLoading}
-                  className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
+                  className="bg-white hover:bg-gray-50 disabled:opacity-50 text-[#1B7FA0] text-sm font-bold px-4 py-2 rounded-lg transition"
                 >
                   {annualLoading ? t.redirecting : (lang === "he" ? "עבור למנוי שנתי" : "Switch to annual")}
                 </button>
@@ -475,7 +542,7 @@ export default function BillingPage() {
         </div>
       )}
 
-      <SavingsCalculator lang={lang} />
+      <SavingsCalculator lang={lang} planPrice={realMonthlyPrice} />
     </div>
   );
 }
