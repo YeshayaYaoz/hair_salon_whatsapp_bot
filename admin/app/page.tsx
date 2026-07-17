@@ -672,7 +672,7 @@ export default function LandingPage() {
         .lp-roi { padding: 100px 40px; background: #0A0A0A; }
         .lp-roi-inner { max-width: 640px; margin: 0 auto; text-align: center; }
         .lp-roi .lp-label { color: #F59E0B; }
-        .lp-roi .lp-title { color: #fff; margin-bottom: 16px; }
+        .lp-roi .lp-title { color: #fff; margin-bottom: 44px; }
         .lp-roi-sub { font-size: 16px; color: rgba(255,255,255,0.65); margin-bottom: 48px; }
         /* One clear headline number the slider drives, instead of four competing stat cards. */
         .lp-roi-headline { text-align: center; padding: 8px 0 4px; }
@@ -708,12 +708,12 @@ export default function LandingPage() {
           .lp-roi-multiple-badge .text { text-align: center; }
         }
         .lp-roi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 32px 0 4px; }
-        .lp-roi-cell { padding: 22px 18px; background: #161616; border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; text-align: center; transition: border-color 0.2s; }
+        .lp-roi-cell { padding: 26px 18px; background: #161616; border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; text-align: center; transition: border-color 0.2s; }
         .lp-roi-cell:hover { border-color: rgba(37,211,102,0.25); }
-        .lp-roi-icon { font-size: 20px; margin-bottom: 8px; opacity: 0.85; }
-        .lp-roi-n { font-size: 28px; font-weight: 800; letter-spacing: -1.5px; color: #fff; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+        .lp-roi-icon { font-size: 22px; margin-bottom: 10px; opacity: 0.85; }
+        .lp-roi-n { font-size: 42px; font-weight: 800; letter-spacing: -2px; color: #fff; margin-bottom: 8px; font-variant-numeric: tabular-nums; line-height: 1; }
         .lp-roi-n .accent { color: #25D366; }
-        .lp-roi-l { font-size: 12.5px; color: rgba(255,255,255,0.55); line-height: 1.45; }
+        .lp-roi-l { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.7); line-height: 1.45; }
         .lp-roi-note { font-size: 13px; color: rgba(255,255,255,0.42); line-height: 1.65; text-align: center; max-width: 480px; margin: 0 auto; }
         .lp-roi-note strong { color: rgba(255,255,255,0.7); }
 
@@ -1582,7 +1582,6 @@ export default function LandingPage() {
           <div className="lp-roi-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>מחשבון חיסכון</div>
             <div className="lp-title reveal" style={{ color: "#fff", textAlign: "center" }}>כמה תורי חוסך לך?</div>
-            <div className="lp-roi-sub reveal">מבוסס על עסק ממוצע עם כ-{AVG_WEEKLY_APPTS} תורים בשבוע</div>
 
             <div className="lp-roi-card reveal">
 
