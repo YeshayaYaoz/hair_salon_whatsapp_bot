@@ -6,11 +6,11 @@ import { findAvailableSlots, createAppointment, attachDepositPaymentLink, SlotUn
 import { getPaymentProvider } from "../lib/payments/index.js";
 import { parseBookingTime, parseDateString, dayOfWeekForDate, instantPartsInTz } from "../lib/timezone.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
-import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { syncAppointmentToCalendar, deleteCalendarEvent } from "../lib/googleCalendar.js";
 import { captureError } from "../lib/errorMonitoring.js";
 import { logClaudeUsage } from "../lib/usageLedger.js";
+import { notifyOwner } from "../lib/ownerNotify.js";
 
 // maxRetries: 0 here because we do our own retry in makeApiCall below — that lets us log each
 // attempt and control the backoff explicitly, rather than relying on the SDK's opaque internal
@@ -132,26 +132,6 @@ const cachedTools: Anthropic.Tool[] = tools.map((tool, i) =>
 export interface BotResult {
   text: string;
   offeredSlots?: AvailableSlot[];
-}
-
-/** Returns true only if the owner was actually reachable and the WhatsApp send succeeded. */
-async function notifyOwner(businessId: string, message: string): Promise<boolean> {
-  try {
-    const business = await prisma.business.findUnique({
-      where: { id: businessId },
-      select: { notificationPhone: true, whatsappPhoneNumberId: true, whatsappAccessToken: true },
-    });
-    if (!business?.notificationPhone || !business.whatsappPhoneNumberId || !business.whatsappAccessToken) {
-      console.warn(`[notifyOwner] business ${businessId} has no notificationPhone configured — skipping`);
-      return false;
-    }
-    const accessToken = decryptSecret(business.whatsappAccessToken);
-    await sendWhatsAppMessage({ phoneNumberId: business.whatsappPhoneNumberId, accessToken, to: business.notificationPhone, text: message });
-    return true;
-  } catch (err) {
-    console.error("Owner notification failed (non-fatal):", err);
-    return false;
-  }
 }
 
 /**
