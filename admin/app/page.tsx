@@ -680,6 +680,33 @@ export default function LandingPage() {
         .lp-roi-headline-num { font-size: clamp(46px, 7vw, 72px); font-weight: 800; letter-spacing: -3px; color: #25D366; font-variant-numeric: tabular-nums; line-height: 1; text-shadow: 0 0 60px rgba(37,211,102,0.25); }
         .lp-roi-headline-sub { font-size: 14px; color: rgba(255,255,255,0.5); margin-top: 12px; }
         .lp-roi-headline-sub strong { color: #fff; font-weight: 700; }
+        /* The "pays for itself Nx over" figure is the number that actually answers "is this worth
+           it" — it was previously a clause inside a small gray sentence, easy to skim past. Made
+           it its own high-contrast badge so it registers in the first second of looking. */
+        .lp-roi-multiple-badge {
+          display: inline-flex; align-items: center; gap: 12px;
+          background: linear-gradient(135deg, rgba(37,211,102,0.16), rgba(37,211,102,0.08));
+          border: 1px solid rgba(37,211,102,0.35);
+          border-radius: 100px;
+          padding: 8px 14px 8px 20px;
+          margin-top: 18px;
+          max-width: 100%;
+        }
+        .lp-roi-multiple-badge .text { font-size: 13.5px; color: rgba(255,255,255,0.75); font-weight: 500; text-align: start; line-height: 1.4; }
+        .lp-roi-multiple-badge .cost { color: #fff; font-weight: 700; }
+        .lp-roi-multiple-badge .multiple {
+          display: flex; flex-direction: column; align-items: center; line-height: 1;
+          flex-shrink: 0;
+          background: rgba(37,211,102,0.18);
+          border-radius: 100px;
+          padding: 6px 14px;
+        }
+        .lp-roi-multiple-badge .multiple b { color: #25D366; font-size: 22px; font-weight: 800; }
+        .lp-roi-multiple-badge .multiple span { color: rgba(37,211,102,0.85); font-size: 9.5px; font-weight: 700; letter-spacing: 0.03em; margin-top: 1px; }
+        @media (max-width: 480px) {
+          .lp-roi-multiple-badge { flex-direction: column; border-radius: 20px; padding: 14px 18px; gap: 10px; }
+          .lp-roi-multiple-badge .text { text-align: center; }
+        }
         .lp-roi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 32px 0 4px; }
         .lp-roi-cell { padding: 22px 18px; background: #161616; border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; text-align: center; transition: border-color 0.2s; }
         .lp-roi-cell:hover { border-color: rgba(37,211,102,0.25); }
@@ -1573,11 +1600,16 @@ export default function LandingPage() {
                 <>
                   <div className="lp-roi-headline reveal">
                     <div className="lp-roi-headline-label">
-                      על בסיס כ-{monthlyAppts} תורים בחודש ({AVG_WEEKLY_APPTS} בשבוע) — הכנסה נוספת משוערת:
+                      💰 ככה תורי חוסך לך כסף — על בסיס כ-{monthlyAppts} תורים בחודש ({AVG_WEEKLY_APPTS} בשבוע):
                     </div>
                     <div className="lp-roi-headline-num">₪{monthlyRevenue.toLocaleString("he-IL")}</div>
-                    <div className="lp-roi-headline-sub">
-                      לחודש, מול עלות של <strong>₪149/חודש</strong> — כלומר תורי מחזירה את עצמה כ-<strong>{roiMultiple}x</strong>
+                    <div className="lp-roi-headline-sub">בחיסכון והכנסה נוספת, כל חודש</div>
+                    <div className="lp-roi-multiple-badge">
+                      <span className="text">עולה לך רק <span className="cost">₪149/חודש</span> — תורי מחזיר את עצמו</span>
+                      <div className="multiple">
+                        <b>{roiMultiple}×</b>
+                        <span>מעל העלות</span>
+                      </div>
                     </div>
                   </div>
 
