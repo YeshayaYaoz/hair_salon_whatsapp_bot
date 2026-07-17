@@ -315,10 +315,15 @@ export default function LoginPage() {
           .login-left { padding-top: 20px; padding-bottom: 20px; }
           .login-left-tag { margin-bottom: 10px; }
           .login-left-headline { font-size: clamp(21px, 2vw, 26px); margin-bottom: 6px; }
-          .login-left-sub { margin-bottom: 14px; }
-          /* The WhatsApp demo mockup is decorative, not essential — dropped first when space is
-             tight rather than continuing to shrink every element by a few px each. */
-          .login-demo { display: none; }
+          .login-left-sub { margin-bottom: 10px; }
+          /* Shrunk rather than hidden — the mockup is the most persuasive element on the panel,
+             so it's kept visible and compressed along with everything else instead of dropped. */
+          .login-demo { padding: 8px; margin-bottom: 10px; }
+          .login-demo-head { padding-bottom: 5px; margin-bottom: 5px; }
+          .login-demo-ava { width: 28px; height: 28px; }
+          .login-demo-name { font-size: 12px; }
+          .login-demo-status { font-size: 9.5px; }
+          .login-bubble { padding: 5px 10px; font-size: 11px; margin-bottom: 4px; }
           .login-left-stats { margin-bottom: 0; }
           .login-card { padding: 18px 30px 14px; }
           .login-form-brand { margin-bottom: 8px; }
