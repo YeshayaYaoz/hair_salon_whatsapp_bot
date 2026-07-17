@@ -312,11 +312,7 @@ export default function LoginPage() {
            panels enough that nothing needs to scroll to see the full page. */
         @media (max-height: 820px) {
           .login-right { padding: 16px 28px; }
-          /* space-between stretches .login-left-mid and .login-left-testimonial across the full
-             panel height — fine when there's room, but on a short viewport it leaves a dead gap
-             in the middle while the top half stays crowded. A fixed gap keeps everything packed
-             together instead, so the compression below actually reduces total height. */
-          .login-left { padding-top: 18px; padding-bottom: 18px; justify-content: flex-start; gap: 14px; }
+          .login-left { padding-top: 18px; padding-bottom: 18px; justify-content: space-between; }
           .login-left-tag { margin-bottom: 8px; }
           .login-left-headline { font-size: clamp(19px, 2vw, 24px); margin-bottom: 5px; }
           .login-left-sub { margin-bottom: 8px; }
