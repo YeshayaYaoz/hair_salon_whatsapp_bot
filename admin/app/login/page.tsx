@@ -312,27 +312,54 @@ export default function LoginPage() {
            panels enough that nothing needs to scroll to see the full page. */
         @media (max-height: 820px) {
           .login-right { padding: 16px 28px; }
-          .login-left { padding-top: 20px; padding-bottom: 20px; }
-          .login-left-tag { margin-bottom: 10px; }
-          .login-left-headline { font-size: clamp(21px, 2vw, 26px); margin-bottom: 6px; }
-          .login-left-sub { margin-bottom: 10px; }
+          /* space-between stretches .login-left-mid and .login-left-testimonial across the full
+             panel height — fine when there's room, but on a short viewport it leaves a dead gap
+             in the middle while the top half stays crowded. A fixed gap keeps everything packed
+             together instead, so the compression below actually reduces total height. */
+          .login-left { padding-top: 18px; padding-bottom: 18px; justify-content: flex-start; gap: 14px; }
+          .login-left-tag { margin-bottom: 8px; }
+          .login-left-headline { font-size: clamp(19px, 2vw, 24px); margin-bottom: 5px; }
+          .login-left-sub { margin-bottom: 8px; }
           /* Shrunk rather than hidden — the mockup is the most persuasive element on the panel,
              so it's kept visible and compressed along with everything else instead of dropped. */
-          .login-demo { padding: 8px; margin-bottom: 10px; }
-          .login-demo-head { padding-bottom: 5px; margin-bottom: 5px; }
-          .login-demo-ava { width: 28px; height: 28px; }
-          .login-demo-name { font-size: 12px; }
-          .login-demo-status { font-size: 9.5px; }
-          .login-bubble { padding: 5px 10px; font-size: 11px; margin-bottom: 4px; }
-          .login-left-stats { margin-bottom: 0; }
-          .login-card { padding: 18px 30px 14px; }
-          .login-form-brand { margin-bottom: 8px; }
-          .login-form-brand img { width: 44px !important; height: 44px !important; }
-          .login-form-heading { font-size: 21px; margin-bottom: 3px; }
-          .login-form-sub { margin-bottom: 10px; }
-          .login-field { margin-bottom: 8px; }
-          .login-divider { margin: 10px 0; }
-          .login-trust { margin-top: 10px; }
+          .login-demo { padding: 7px; margin-bottom: 8px; max-width: 340px; }
+          .login-demo-head { padding-bottom: 4px; margin-bottom: 4px; }
+          .login-demo-ava { width: 26px; height: 26px; }
+          .login-demo-name { font-size: 11.5px; }
+          .login-demo-status { font-size: 9px; }
+          .login-bubble { padding: 4px 9px; font-size: 10.5px; margin-bottom: 3px; }
+          .login-left-stats { margin-bottom: 0; gap: 8px; }
+          .login-left-stat { padding: 7px 10px; }
+          .login-left-stat-icon { margin-bottom: 2px; }
+          .login-left-stat-n { font-size: 17px; margin-bottom: 1px; }
+          .login-left-testimonial { padding: 10px 14px; }
+          .login-left-author { margin-bottom: 5px; }
+          .login-left-quote { font-size: 12px; -webkit-line-clamp: 2; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+          .login-card { padding: 14px 30px 10px; }
+          .login-form-brand { margin-bottom: 5px; }
+          .login-form-brand img { width: 36px !important; height: 36px !important; }
+          .login-form-heading { font-size: 19px; margin-bottom: 2px; }
+          .login-form-sub { margin-bottom: 6px; }
+          .login-field { margin-bottom: 6px; }
+          .login-divider { margin: 6px 0; }
+          .login-trust { margin-top: 6px; }
+        }
+        /* Very short viewports (e.g. a maximized 1080p browser with chrome eating into the
+           viewport) — drop the testimonial entirely rather than keep shrinking text to
+           illegibility; the demo mockup + stats carry the panel's persuasion on their own. */
+        @media (max-height: 740px) {
+          .login-left-testimonial { display: none; }
+          .login-left { gap: 10px; }
+          .login-right { padding: 10px 28px; }
+          .login-card { padding: 10px 30px 8px; }
+          .login-form-brand { margin-bottom: 3px; }
+          .login-form-brand img { width: 30px !important; height: 30px !important; }
+          .login-form-heading { font-size: 17px; }
+          .login-form-sub { margin-bottom: 4px; }
+          .login-field { margin-bottom: 5px; }
+          .login-field input { padding-top: 10px; padding-bottom: 10px; }
+          .login-divider { margin: 5px 0; }
+          .login-trust { margin-top: 5px; }
         }
 
         .login-form-brand {
