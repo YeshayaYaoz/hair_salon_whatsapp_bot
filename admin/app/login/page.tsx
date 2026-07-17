@@ -225,6 +225,7 @@ export default function LoginPage() {
           padding: 14px 16px;
           backdrop-filter: blur(6px);
         }
+        .login-left-stat-icon { font-size: 13px; margin-bottom: 6px; opacity: 0.8; }
         .login-left-stat-n {
           font-size: 22px; font-weight: 800; color: #fff; letter-spacing: -0.8px;
           line-height: 1; margin-bottom: 5px; font-variant-numeric: tabular-nums;
@@ -232,32 +233,41 @@ export default function LoginPage() {
         .login-left-stat-n span { color: #5BB8D4; }
         .login-left-stat-l { font-size: 10.5px; color: rgba(255,255,255,0.42); letter-spacing: 0.03em; }
 
+        /* Testimonial card, laid out like a real review (author + rating up top, quote below) —
+           previously led with an oversized decorative quotation mark and put the author at the
+           bottom, which reads more like a generic placeholder than an actual review. */
         .login-left-testimonial {
-          position: relative; z-index: 1;
+          position: relative; z-index: 1; overflow: hidden;
           background: rgba(255,255,255,0.04);
           border: 1px solid rgba(255,255,255,0.08);
           border-radius: 16px;
-          padding: 20px 24px;
+          padding: 18px 20px;
           backdrop-filter: blur(6px);
         }
         .login-left-testimonial::before {
           content: '“';
-          position: absolute; top: 2px; right: 16px;
-          font-size: 54px; font-weight: 800; line-height: 1;
-          color: rgba(91,184,212,0.25);
-          font-family: Georgia, serif;
+          position: absolute; bottom: -34px; left: 10px;
+          font-size: 90px; font-weight: 800; line-height: 1;
+          color: rgba(91,184,212,0.05);
+          font-family: Georgia, serif; pointer-events: none;
         }
-        .login-left-quote { font-size: 13.5px; color: rgba(255,255,255,0.78); line-height: 1.7; margin-bottom: 14px; padding-top: 6px; }
-        .login-left-author { display: flex; align-items: center; gap: 10px; }
+        .login-left-author { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
         .login-left-avatar {
-          width: 34px; height: 34px; border-radius: 50%;
+          width: 36px; height: 36px; border-radius: 50%;
           background: linear-gradient(135deg, #1B7FA0, #145F78);
           display: flex; align-items: center; justify-content: center;
           font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0;
           box-shadow: 0 0 0 2px rgba(91,184,212,0.25);
         }
+        .login-left-author-name-row { display: flex; align-items: center; gap: 6px; }
         .login-left-author-name { font-size: 13px; font-weight: 600; color: #fff; }
-        .login-left-author-role { font-size: 11px; color: rgba(255,255,255,0.4); }
+        .login-left-author-verified {
+          width: 13px; height: 13px; border-radius: 50%; background: #5BB8D4; flex-shrink: 0;
+          display: flex; align-items: center; justify-content: center;
+        }
+        .login-left-author-role { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 1px; }
+        .login-left-stars { color: #F59E0B; font-size: 10px; letter-spacing: 1.5px; flex-shrink: 0; }
+        .login-left-quote { position: relative; font-size: 13.5px; color: rgba(255,255,255,0.78); line-height: 1.7; }
 
         /* ══════════════ RIGHT / FORM PANEL ══════════════ */
         .login-right {
@@ -271,7 +281,7 @@ export default function LoginPage() {
 
         .login-card {
           width: 100%;
-          max-width: 470px;
+          max-width: 564px;
           background: #FFFFFF;
           border: 1px solid #E8EEF3;
           border-radius: 24px;
@@ -350,7 +360,11 @@ export default function LoginPage() {
           background: #FAFCFD;
           border: 1.5px solid #E4EAF0;
           border-radius: 12px;
-          padding: 13px 42px 13px 16px;
+          /* Inputs are always dir=ltr (even in Hebrew — email/password are Latin-script content),
+             so the icon always sits on the physical left at 14px. Padding must reserve space
+             there (42px), not on the right (was backwards, causing the icon to overlap the first
+             couple of typed characters instead of sitting beside them). */
+          padding: 13px 16px 13px 42px;
           /* 16px, not 15px: iOS Safari auto-zooms the page on focus for any input under 16px,
              which is jarring on a phone — this keeps focus from yanking the viewport around. */
           font-size: 16px;
@@ -521,14 +535,17 @@ export default function LoginPage() {
 
             <div className="login-left-stats">
               <div className="login-left-stat">
+                <div className="login-left-stat-icon">🏪</div>
                 <div className="login-left-stat-n"><span>+</span>2,400</div>
                 <div className="login-left-stat-l">{he ? "עסקים פעילים" : "active businesses"}</div>
               </div>
               <div className="login-left-stat">
+                <div className="login-left-stat-icon">💬</div>
                 <div className="login-left-stat-n"><span>98</span>%</div>
                 <div className="login-left-stat-l">{he ? "שיעור מענה" : "response rate"}</div>
               </div>
               <div className="login-left-stat">
+                <div className="login-left-stat-icon">⭐</div>
                 <div className="login-left-stat-n"><span>4.9</span>★</div>
                 <div className="login-left-stat-l">{he ? "דירוג לקוחות" : "customer rating"}</div>
               </div>
@@ -536,17 +553,23 @@ export default function LoginPage() {
           </div>
 
           <div className="login-left-testimonial">
+            <div className="login-left-author">
+              <div className="login-left-avatar">{he ? "ש" : "S"}</div>
+              <div>
+                <div className="login-left-author-name-row">
+                  <span className="login-left-author-name">{he ? "שרה לוי" : "Sarah Levi"}</span>
+                  <span className="login-left-author-verified">
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#0D2A38" strokeWidth={3.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                  </span>
+                </div>
+                <div className="login-left-author-role">{he ? "מספרת שרה, תל אביב" : "Sarah's Salon, Tel Aviv"}</div>
+              </div>
+              <span className="login-left-stars">★★★★★</span>
+            </div>
             <div className="login-left-quote">
               {he
                 ? "מאז שהתחלתי להשתמש בתורי, הפסקתי לאבד לקוחות בגלל שלא עניתי לטלפונים. הבוט עובד גם ב-2 בלילה."
                 : "Since I started using Tori, I stopped losing customers over unanswered calls. The bot works even at 2am."}
-            </div>
-            <div className="login-left-author">
-              <div className="login-left-avatar">{he ? "ש" : "S"}</div>
-              <div>
-                <div className="login-left-author-name">{he ? "שרה לוי" : "Sarah Levi"}</div>
-                <div className="login-left-author-role">{he ? "מספרת שרה, תל אביב" : "Sarah's Salon, Tel Aviv"}</div>
-              </div>
             </div>
           </div>
         </div>
