@@ -513,7 +513,7 @@ export default function LoginPage() {
 
         .login-trust {
           display: flex; align-items: center; justify-content: center;
-          gap: 8px; margin-top: 24px; flex-wrap: wrap;
+          gap: 8px; margin-top: 32px; flex-wrap: wrap;
         }
         .login-trust-item {
           display: flex; align-items: center; gap: 6px;
