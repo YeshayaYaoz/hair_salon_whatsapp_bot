@@ -285,11 +285,11 @@ export default function LoginPage() {
 
         .login-card {
           width: 100%;
-          max-width: 564px;
+          max-width: 500px;
           background: #FFFFFF;
           border: 1px solid #E8EEF3;
           border-radius: 24px;
-          padding: 32px 38px 26px;
+          padding: 32px 38px 38px;
           box-shadow:
             0 1px 2px rgba(13,42,56,0.04),
             0 12px 32px rgba(13,42,56,0.07),
@@ -568,7 +568,7 @@ export default function LoginPage() {
             <div className="login-demo-head">
               <div className="login-demo-ava"><img src="/tori_logo_transparent.png" alt="" /></div>
               <div>
-                <div className="login-demo-name">{he ? "מספרת שרה · תורי" : "Sarah's Salon · Tori"}</div>
+                <div className="login-demo-name">{he ? "המספרה של שרה" : "Sarah's Salon · Tori"}</div>
                 <div className="login-demo-status">{he ? "● מחובר/ת" : "● Online"}</div>
               </div>
             </div>
