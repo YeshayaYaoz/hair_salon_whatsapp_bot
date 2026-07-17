@@ -373,7 +373,10 @@ export default function LoginPage() {
           font-size: 26px; font-weight: 850; color: #0F1D2A;
           letter-spacing: -0.8px; margin-bottom: 6px; text-align: center;
         }
-        .login-form-sub { font-size: 14.5px; color: #8A97A5; margin-bottom: 26px; text-align: center; }
+        /* #6B7A88 rather than the lighter #8A97A5 used elsewhere as a border/icon tint — at this
+           font weight/size, #8A97A5-on-white sits under the 4.5:1 contrast ratio normal text
+           needs for WCAG AA. */
+        .login-form-sub { font-size: 14.5px; color: #6B7A88; margin-bottom: 26px; text-align: center; }
 
         /* Signup step indicator */
         .login-steps { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
@@ -442,10 +445,14 @@ export default function LoginPage() {
         .login-field-hint { font-size: 11.5px; color: #9CA3AF; margin-top: 2px; }
 
         .login-forgot {
-          display: block; text-align: start; font-size: 13px; color: #8A97A5;
+          display: block; text-align: start; font-size: 13px; color: #6B7A88;
           text-decoration: none; margin-top: -4px; margin-bottom: 10px; transition: color 0.15s;
         }
         .login-forgot:hover { color: #1B7FA0; }
+        .login-forgot:focus-visible, .login-eye-btn:focus-visible, .login-back-btn:focus-visible,
+        .login-switch button:focus-visible {
+          outline: 2px solid #1B7FA0; outline-offset: 2px; border-radius: 4px;
+        }
 
         .login-error {
           display: flex; align-items: center; gap: 8px;
@@ -470,6 +477,7 @@ export default function LoginPage() {
           transform: translateY(-1px);
         }
         .login-google-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .login-google-btn:focus-visible { outline: 2px solid #1B7FA0; outline-offset: 2px; }
 
         .login-submit {
           width: 100%;
@@ -491,6 +499,7 @@ export default function LoginPage() {
         }
         .login-submit:active:not(:disabled) { transform: none; box-shadow: 0 3px 10px rgba(27,127,160,0.3); }
         .login-submit:disabled { opacity: 0.55; cursor: not-allowed; }
+        .login-submit:focus-visible { outline: 2px solid #0F1D2A; outline-offset: 2px; }
 
         .login-back-btn {
           width: 100%; background: none; border: none; color: #9CA3AF;
@@ -503,7 +512,7 @@ export default function LoginPage() {
         .login-divider-line { flex: 1; height: 1px; background: #EAEFF4; }
         .login-divider-text { font-size: 12.5px; color: #A8B4C0; white-space: nowrap; }
 
-        .login-switch { text-align: center; font-size: 14.5px; color: #8A97A5; }
+        .login-switch { text-align: center; font-size: 14.5px; color: #6B7A88; }
         .login-switch button {
           background: none; border: none; color: #1B7FA0;
           font-size: 14.5px; font-weight: 700; cursor: pointer;
@@ -651,7 +660,7 @@ export default function LoginPage() {
 
             <h1 className="login-form-heading">
               {mode === "login"
-                ? (he ? "ברוכים השבים 👋" : "Welcome back 👋")
+                ? (he ? <>ברוכים השבים <span aria-hidden="true">👋</span></> : <>Welcome back <span aria-hidden="true">👋</span></>)
                 : signupStep === 1
                 ? (he ? "יוצרים חשבון חדש" : "Create a new account")
                 : (he ? "כמעט סיימנו!" : "Almost done!")}
@@ -694,14 +703,15 @@ export default function LoginPage() {
             {(mode === "login" || signupStep === 1) && (
               <form onSubmit={mode === "login" ? submit : continueToBusinessStep}>
                 <div className="login-field">
-                  <label>{he ? "כתובת אימייל" : "Email address"}</label>
+                  <label htmlFor="login-email">{he ? "כתובת אימייל" : "Email address"}</label>
                   <div className="login-input-wrap">
-                    <span className="login-input-icon">
+                    <span className="login-input-icon" aria-hidden="true">
                       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                       </svg>
                     </span>
                     <input
+                      id="login-email"
                       placeholder="name@example.com"
                       type="email"
                       autoComplete="email"
@@ -712,14 +722,15 @@ export default function LoginPage() {
                   </div>
                 </div>
                 <div className="login-field">
-                  <label>{he ? "סיסמה" : "Password"}</label>
+                  <label htmlFor="login-password">{he ? "סיסמה" : "Password"}</label>
                   <div className="login-input-wrap">
-                    <span className="login-input-icon">
+                    <span className="login-input-icon" aria-hidden="true">
                       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                       </svg>
                     </span>
                     <input
+                      id="login-password"
                       className="has-eye"
                       placeholder="••••••••"
                       type={showPassword ? "text" : "password"}
@@ -728,6 +739,8 @@ export default function LoginPage() {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                     />
+                    {/* Keyboard-reachable: a keyboard-only user typing a password needs to be able
+                        to tab to this and reveal it, same as a mouse user can click it. */}
                     <button
                       type="button"
                       className="login-eye-btn"
@@ -737,7 +750,6 @@ export default function LoginPage() {
                           ? (he ? "הסתרת סיסמה" : "Hide password")
                           : (he ? "הצגת סיסמה" : "Show password")
                       }
-                      tabIndex={-1}
                     >
                       {showPassword ? (
                         <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -757,7 +769,7 @@ export default function LoginPage() {
                   <Link href="/forgot-password" className="login-forgot">{he ? "שכחתם סיסמה?" : "Forgot password?"}</Link>
                 )}
 
-                {error && <div className="login-error">⚠️ {error}</div>}
+                {error && <div className="login-error" role="alert"><span aria-hidden="true">⚠️</span> {error}</div>}
 
                 <button type="submit" disabled={loading} className="login-submit">
                   {mode === "login"
@@ -771,14 +783,15 @@ export default function LoginPage() {
             {mode === "signup" && signupStep === 2 && (
               <form onSubmit={submit}>
                 <div className="login-field">
-                  <label>{he ? "שם העסק" : "Business name"}</label>
+                  <label htmlFor="login-business-name">{he ? "שם העסק" : "Business name"}</label>
                   <div className="login-input-wrap">
-                    <span className="login-input-icon">
+                    <span className="login-input-icon" aria-hidden="true">
                       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                       </svg>
                     </span>
                     <input
+                      id="login-business-name"
                       placeholder={he ? "מספרה / קליניקה / סטודיו..." : "Salon / clinic / studio..."}
                       value={name}
                       onChange={(e) => setName(e.target.value)}
@@ -790,7 +803,7 @@ export default function LoginPage() {
                   <p className="login-field-hint">{he ? "ככה הבוט יציג את עצמו ללקוחות שלכם" : "This is how the bot will introduce itself to your customers"}</p>
                 </div>
 
-                {error && <div className="login-error">⚠️ {error}</div>}
+                {error && <div className="login-error" role="alert"><span aria-hidden="true">⚠️</span> {error}</div>}
 
                 <button type="submit" disabled={loading} className="login-submit">
                   {loading ? (he ? "רגע..." : "One sec...") : (he ? "יצירת חשבון וסיום 🎉" : "Create account & finish 🎉")}
@@ -820,9 +833,9 @@ export default function LoginPage() {
             </div>
 
             <div className="login-trust">
-              <div className="login-trust-item"><span className="login-trust-icon">🔒</span>{he ? "SSL מאובטח" : "SSL secured"}</div>
-              <div className="login-trust-item"><span className="login-trust-icon">🛡️</span>{he ? "ללא התחייבות" : "No commitment"}</div>
-              <div className="login-trust-item"><span className="login-trust-icon">⚡</span>{he ? "באוויר תוך דקות" : "Live in minutes"}</div>
+              <div className="login-trust-item"><span className="login-trust-icon" aria-hidden="true">🔒</span>{he ? "SSL מאובטח" : "SSL secured"}</div>
+              <div className="login-trust-item"><span className="login-trust-icon" aria-hidden="true">🛡️</span>{he ? "ללא התחייבות" : "No commitment"}</div>
+              <div className="login-trust-item"><span className="login-trust-icon" aria-hidden="true">⚡</span>{he ? "באוויר תוך דקות" : "Live in minutes"}</div>
             </div>
           </div>
         </div>
