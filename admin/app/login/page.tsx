@@ -99,7 +99,10 @@ export default function LoginPage() {
           background: linear-gradient(160deg, #081826 0%, #0D2A38 55%, #0A1F2E 100%);
           display: flex;
           flex-direction: column;
-          justify-content: space-between;
+          /* space-evenly across 4 groups (intro text, demo, stats, testimonial) rather than
+             space-between across 2 — 2 groups puts the entire gap in one place, which reads as
+             a blank hole on a tall viewport instead of evenly-distributed breathing room. */
+          justify-content: space-evenly;
           padding: 32px 48px;
           overflow: hidden;
         }
@@ -140,7 +143,8 @@ export default function LoginPage() {
           -webkit-mask-image: radial-gradient(ellipse 90% 80% at 50% 40%, black 30%, transparent 100%);
         }
 
-        .login-left-mid { position: relative; z-index: 1; }
+        .login-left-top { position: relative; z-index: 1; }
+        .login-demo, .login-left-stats { position: relative; z-index: 1; }
         .login-left-tag {
           display: inline-flex; align-items: center; gap: 7px;
           background: rgba(27,127,160,0.14); border: 1px solid rgba(91,184,212,0.25);
@@ -312,18 +316,10 @@ export default function LoginPage() {
            panels enough that nothing needs to scroll to see the full page. */
         @media (max-height: 820px) {
           .login-right { padding: 16px 28px; }
-          .login-left { padding-top: 18px; padding-bottom: 18px; justify-content: space-between; }
+          .login-left { padding-top: 18px; padding-bottom: 18px; justify-content: space-evenly; }
           .login-left-tag { margin-bottom: 8px; }
           .login-left-headline { font-size: clamp(19px, 2vw, 24px); margin-bottom: 5px; }
           .login-left-sub { margin-bottom: 8px; }
-          /* Shrunk rather than hidden — the mockup is the most persuasive element on the panel,
-             so it's kept visible and compressed along with everything else instead of dropped. */
-          .login-demo { padding: 7px; margin-bottom: 8px; max-width: 340px; }
-          .login-demo-head { padding-bottom: 4px; margin-bottom: 4px; }
-          .login-demo-ava { width: 26px; height: 26px; }
-          .login-demo-name { font-size: 11.5px; }
-          .login-demo-status { font-size: 9px; }
-          .login-bubble { padding: 4px 9px; font-size: 10.5px; margin-bottom: 3px; }
           .login-left-stats { margin-bottom: 0; gap: 8px; }
           .login-left-stat { padding: 7px 10px; }
           .login-left-stat-icon { margin-bottom: 2px; }
@@ -548,7 +544,7 @@ export default function LoginPage() {
           <div className="login-aurora" />
           <div className="login-left-grid" />
 
-          <div className="login-left-mid">
+          <div className="login-left-top">
             <div className="login-left-tag">
               <span className="login-left-tag-dot" />
               {he ? "בוט AI פעיל · 24/7" : "AI bot active · 24/7"}
@@ -565,40 +561,40 @@ export default function LoginPage() {
                 ? "קבלו תורים בוואטסאפ, ראו את היומן בזמן אמת, ותנו ל-AI לטפל בכל השאר."
                 : "Take bookings over WhatsApp, watch the calendar update live, and let AI handle the rest."}
             </p>
+          </div>
 
-            {/* Live WhatsApp conversation mockup — the product, shown working */}
-            <div className="login-demo" aria-hidden="true">
-              <div className="login-demo-head">
-                <div className="login-demo-ava"><img src="/tori_logo_transparent.png" alt="" /></div>
-                <div>
-                  <div className="login-demo-name">{he ? "מספרת שרה · תורי" : "Sarah's Salon · Tori"}</div>
-                  <div className="login-demo-status">{he ? "● מחובר/ת" : "● Online"}</div>
-                </div>
-              </div>
-              <div className="login-bubble customer">{he ? "היי, אפשר תור לצבע מחר? 🙏" : "Hi, can I get a color appointment tomorrow? 🙏"}</div>
-              <div className="login-bubble bot">{he ? "בטח! מחר פנוי: 10:00, 12:30 או 16:00. מה מתאים לך?" : "Sure! Tomorrow's open: 10:00, 12:30 or 16:00. What works for you?"}</div>
-              <div className="login-bubble bot second">
-                {he ? "✅ קבעתי לך לצבע מחר ב-12:30. נתראה!" : "✅ Booked you for color tomorrow at 12:30. See you then!"}
-                <span className="ticks">✓✓</span>
+          {/* Live WhatsApp conversation mockup — the product, shown working */}
+          <div className="login-demo" aria-hidden="true">
+            <div className="login-demo-head">
+              <div className="login-demo-ava"><img src="/tori_logo_transparent.png" alt="" /></div>
+              <div>
+                <div className="login-demo-name">{he ? "מספרת שרה · תורי" : "Sarah's Salon · Tori"}</div>
+                <div className="login-demo-status">{he ? "● מחובר/ת" : "● Online"}</div>
               </div>
             </div>
+            <div className="login-bubble customer">{he ? "היי, אפשר תור לצבע מחר? 🙏" : "Hi, can I get a color appointment tomorrow? 🙏"}</div>
+            <div className="login-bubble bot">{he ? "בטח! מחר פנוי: 10:00, 12:30 או 16:00. מה מתאים לך?" : "Sure! Tomorrow's open: 10:00, 12:30 or 16:00. What works for you?"}</div>
+            <div className="login-bubble bot second">
+              {he ? "✅ קבעתי לך לצבע מחר ב-12:30. נתראה!" : "✅ Booked you for color tomorrow at 12:30. See you then!"}
+              <span className="ticks">✓✓</span>
+            </div>
+          </div>
 
-            <div className="login-left-stats">
-              <div className="login-left-stat">
-                <div className="login-left-stat-icon">🏪</div>
-                <div className="login-left-stat-n"><span>+</span>2,400</div>
-                <div className="login-left-stat-l">{he ? "עסקים פעילים" : "active businesses"}</div>
-              </div>
-              <div className="login-left-stat">
-                <div className="login-left-stat-icon">💬</div>
-                <div className="login-left-stat-n"><span>98</span>%</div>
-                <div className="login-left-stat-l">{he ? "שיעור מענה" : "response rate"}</div>
-              </div>
-              <div className="login-left-stat">
-                <div className="login-left-stat-icon">⭐</div>
-                <div className="login-left-stat-n"><span>4.9</span>★</div>
-                <div className="login-left-stat-l">{he ? "דירוג לקוחות" : "customer rating"}</div>
-              </div>
+          <div className="login-left-stats">
+            <div className="login-left-stat">
+              <div className="login-left-stat-icon">🏪</div>
+              <div className="login-left-stat-n"><span>+</span>2,400</div>
+              <div className="login-left-stat-l">{he ? "עסקים פעילים" : "active businesses"}</div>
+            </div>
+            <div className="login-left-stat">
+              <div className="login-left-stat-icon">💬</div>
+              <div className="login-left-stat-n"><span>98</span>%</div>
+              <div className="login-left-stat-l">{he ? "שיעור מענה" : "response rate"}</div>
+            </div>
+            <div className="login-left-stat">
+              <div className="login-left-stat-icon">⭐</div>
+              <div className="login-left-stat-n"><span>4.9</span>★</div>
+              <div className="login-left-stat-l">{he ? "דירוג לקוחות" : "customer rating"}</div>
             </div>
           </div>
 
