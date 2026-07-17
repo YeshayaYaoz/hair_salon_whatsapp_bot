@@ -220,7 +220,8 @@ export default function LoginPage() {
           .login-bubble { animation: none; opacity: 1; transform: none; }
         }
 
-        .login-left-stats { display: flex; gap: 10px; margin-bottom: 16px; }
+        .login-left-bottom { display: flex; flex-direction: column; gap: 14px; }
+        .login-left-stats { display: flex; gap: 10px; }
         .login-left-stat {
           flex: 1;
           background: rgba(255,255,255,0.04);
@@ -289,7 +290,7 @@ export default function LoginPage() {
           background: #FFFFFF;
           border: 1px solid #E8EEF3;
           border-radius: 24px;
-          padding: 32px 38px 52px;
+          padding: 32px 38px 64px;
           box-shadow:
             0 1px 2px rgba(13,42,56,0.04),
             0 12px 32px rgba(13,42,56,0.07),
@@ -580,42 +581,44 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div className="login-left-stats">
-            <div className="login-left-stat">
-              <div className="login-left-stat-icon">🏪</div>
-              <div className="login-left-stat-n"><span>+</span>2,400</div>
-              <div className="login-left-stat-l">{he ? "עסקים פעילים" : "active businesses"}</div>
-            </div>
-            <div className="login-left-stat">
-              <div className="login-left-stat-icon">💬</div>
-              <div className="login-left-stat-n"><span>98</span>%</div>
-              <div className="login-left-stat-l">{he ? "שיעור מענה" : "response rate"}</div>
-            </div>
-            <div className="login-left-stat">
-              <div className="login-left-stat-icon">⭐</div>
-              <div className="login-left-stat-n"><span>4.9</span>★</div>
-              <div className="login-left-stat-l">{he ? "דירוג לקוחות" : "customer rating"}</div>
-            </div>
-          </div>
-
-          <div className="login-left-testimonial">
-            <div className="login-left-author">
-              <div className="login-left-avatar">{he ? "ש" : "S"}</div>
-              <div>
-                <div className="login-left-author-name-row">
-                  <span className="login-left-author-name">{he ? "שרה לוי" : "Sarah Levi"}</span>
-                  <span className="login-left-author-verified">
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#0D2A38" strokeWidth={3.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                  </span>
-                </div>
-                <div className="login-left-author-role">{he ? "מספרת שרה, תל אביב" : "Sarah's Salon, Tel Aviv"}</div>
+          <div className="login-left-bottom">
+            <div className="login-left-stats">
+              <div className="login-left-stat">
+                <div className="login-left-stat-icon">🏪</div>
+                <div className="login-left-stat-n"><span>+</span>2,400</div>
+                <div className="login-left-stat-l">{he ? "עסקים פעילים" : "active businesses"}</div>
               </div>
-              <span className="login-left-stars">★★★★★</span>
+              <div className="login-left-stat">
+                <div className="login-left-stat-icon">💬</div>
+                <div className="login-left-stat-n"><span>98</span>%</div>
+                <div className="login-left-stat-l">{he ? "שיעור מענה" : "response rate"}</div>
+              </div>
+              <div className="login-left-stat">
+                <div className="login-left-stat-icon">⭐</div>
+                <div className="login-left-stat-n"><span>4.9</span>★</div>
+                <div className="login-left-stat-l">{he ? "דירוג לקוחות" : "customer rating"}</div>
+              </div>
             </div>
-            <div className="login-left-quote">
-              {he
-                ? "מאז שהתחלתי להשתמש בתורי, הפסקתי לאבד לקוחות בגלל שלא עניתי לטלפונים. הבוט עובד גם ב-2 בלילה."
-                : "Since I started using Tori, I stopped losing customers over unanswered calls. The bot works even at 2am."}
+
+            <div className="login-left-testimonial">
+              <div className="login-left-author">
+                <div className="login-left-avatar">{he ? "ש" : "S"}</div>
+                <div>
+                  <div className="login-left-author-name-row">
+                    <span className="login-left-author-name">{he ? "שרה לוי" : "Sarah Levi"}</span>
+                    <span className="login-left-author-verified">
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#0D2A38" strokeWidth={3.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                    </span>
+                  </div>
+                  <div className="login-left-author-role">{he ? "מספרת שרה, תל אביב" : "Sarah's Salon, Tel Aviv"}</div>
+                </div>
+                <span className="login-left-stars">★★★★★</span>
+              </div>
+              <div className="login-left-quote">
+                {he
+                  ? "מאז שהתחלתי להשתמש בתורי, הפסקתי לאבד לקוחות בגלל שלא עניתי לטלפונים. הבוט עובד גם ב-2 בלילה."
+                  : "Since I started using Tori, I stopped losing customers over unanswered calls. The bot works even at 2am."}
+              </div>
             </div>
           </div>
         </div>
