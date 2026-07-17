@@ -167,53 +167,107 @@ export default function LoginPage() {
           max-width: 380px; margin-bottom: 28px;
         }
 
-        /* live WhatsApp demo card */
+        /* live WhatsApp demo card — styled as an actual phone chat screenshot (header chrome,
+           doodle wallpaper, message tails, timestamps, WhatsApp's own read-receipt blue) rather
+           than a generic floating bubble list, so it reads as a real conversation, not a mockup. */
         .login-demo {
-          background: rgba(255,255,255,0.045);
-          border: 1px solid rgba(255,255,255,0.09);
           border-radius: 18px;
-          padding: 16px;
           max-width: 380px;
+          overflow: hidden;
           backdrop-filter: blur(8px);
           box-shadow: 0 24px 60px rgba(0,0,0,0.35);
           margin-bottom: 26px;
+          border: 1px solid rgba(255,255,255,0.09);
         }
         .login-demo-head {
           display: flex; align-items: center; gap: 10px;
-          padding-bottom: 12px; margin-bottom: 12px;
-          border-bottom: 1px solid rgba(255,255,255,0.07);
+          padding: 11px 14px;
+          background: #202C33;
+          border-bottom: 1px solid rgba(255,255,255,0.06);
         }
         .login-demo-ava {
           width: 34px; height: 34px; border-radius: 50%;
-          background: #fff; overflow: hidden; flex-shrink: 0;
-          box-shadow: 0 0 0 2px rgba(37,211,102,0.35);
+          background: linear-gradient(135deg, #E0A93B, #C9962E);
+          overflow: hidden; flex-shrink: 0;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 13px; font-weight: 700; color: #fff;
+        }
+        .login-demo-name-row { display: flex; align-items: center; gap: 4px; }
+        .login-demo-name { font-size: 13px; font-weight: 600; color: #E9EDEF; line-height: 1.2; }
+        .login-demo-verified {
+          width: 13px; height: 13px; border-radius: 50%;
+          background: #53BDEB; flex-shrink: 0;
           display: flex; align-items: center; justify-content: center;
         }
-        .login-demo-ava img { width: 100%; height: 100%; object-fit: cover; }
-        .login-demo-name { font-size: 13px; font-weight: 700; color: #fff; line-height: 1.2; }
-        .login-demo-status { font-size: 10.5px; color: #4ADE80; }
+        .login-demo-status { font-size: 11px; color: rgba(233,237,239,0.5); margin-top: 1px; }
+        .login-demo-icons { display: flex; align-items: center; gap: 16px; margin-inline-start: auto; color: rgba(233,237,239,0.55); }
+
+        .login-demo-body {
+          position: relative;
+          padding: 14px 12px 16px;
+          background-color: #0B141A;
+          background-image:
+            radial-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+            radial-gradient(rgba(255,255,255,0.02) 1px, transparent 1px);
+          background-size: 26px 26px;
+          background-position: 0 0, 13px 13px;
+        }
+        .login-demo-daychip {
+          display: block; width: fit-content; margin: 0 auto 12px;
+          background: rgba(255,255,255,0.06); color: rgba(233,237,239,0.6);
+          font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em;
+          padding: 3px 10px; border-radius: 8px;
+        }
+        .login-bubble-row { display: flex; margin-bottom: 6px; }
+        .login-bubble-row.customer { justify-content: flex-start; }
+        .login-bubble-row.bot { justify-content: flex-end; }
         .login-bubble {
-          max-width: 82%; border-radius: 14px; padding: 9px 13px;
-          font-size: 12.5px; line-height: 1.55; margin-bottom: 8px;
+          position: relative;
+          max-width: 82%; border-radius: 8px; padding: 7px 9px 6px 9px;
+          font-size: 12.5px; line-height: 1.5;
           opacity: 0; transform: translateY(8px);
-          animation: bubble-in 0.45s ease forwards;
+          animation: bubble-in 0.4s ease forwards;
+          box-shadow: 0 1px 1px rgba(0,0,0,0.2);
         }
         .login-bubble.customer {
-          background: rgba(255,255,255,0.09); color: rgba(255,255,255,0.9);
-          border-bottom-right-radius: 4px; margin-inline-start: auto;
+          background: #202C33; color: #E9EDEF;
+          border-bottom-left-radius: 2px;
           animation-delay: 0.5s;
         }
         .login-bubble.bot {
-          background: rgba(37,211,102,0.14); border: 1px solid rgba(37,211,102,0.18);
-          color: rgba(255,255,255,0.92);
-          border-bottom-left-radius: 4px;
+          background: #005C4B; color: #E9EDEF;
+          border-bottom-right-radius: 2px;
           animation-delay: 1.15s;
         }
-        .login-bubble.bot.second { animation-delay: 1.9s; }
-        .login-bubble .ticks { color: #5BB8D4; font-size: 10px; margin-inline-start: 6px; }
+        .login-bubble.bot.second { animation-delay: 2.15s; }
+        .login-bubble-meta {
+          display: flex; align-items: center; justify-content: flex-end; gap: 3px;
+          margin-top: 2px;
+          font-size: 10px; color: rgba(233,237,239,0.45);
+        }
+        .login-bubble .ticks { color: #53BDEB; display: flex; align-items: center; }
+
+        /* typing indicator — three bouncing dots that appear while the bot is "composing" the
+           confirmation, timed to disappear exactly as the real bubble takes its place. */
+        .login-typing-row { display: flex; justify-content: flex-end; margin-bottom: 6px; }
+        .login-typing {
+          background: #005C4B; border-radius: 8px; border-bottom-right-radius: 2px;
+          padding: 9px 12px; display: flex; gap: 3px;
+          opacity: 0; animation: typing-visibility 1s ease forwards; animation-delay: 1.15s;
+        }
+        .login-typing span {
+          width: 5px; height: 5px; border-radius: 50%; background: rgba(233,237,239,0.55);
+          animation: typing-dot 1s ease infinite;
+        }
+        .login-typing span:nth-child(2) { animation-delay: 0.15s; }
+        .login-typing span:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes typing-dot { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-3px); opacity: 1; } }
+        @keyframes typing-visibility { 0% { opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
+
         @keyframes bubble-in { to { opacity: 1; transform: none; } }
         @media (prefers-reduced-motion: reduce) {
           .login-bubble { animation: none; opacity: 1; transform: none; }
+          .login-typing { animation: none; opacity: 0; }
         }
 
         .login-left-stats { display: flex; gap: 12px; }
@@ -502,20 +556,54 @@ export default function LoginPage() {
                 : "Take bookings over WhatsApp, watch the calendar update live, and let AI handle the rest."}
             </p>
 
-            {/* Live WhatsApp conversation mockup — the product, shown working */}
+            {/* Live WhatsApp conversation mockup — the product, shown working. Styled as an actual
+                chat screenshot: the salon's own avatar/name (not our logo — this is the customer's
+                view of the salon's number, Tori is invisible to them), WhatsApp's real header
+                chrome, doodle wallpaper, and a typing indicator before the bot's second reply. */}
             <div className="login-demo" aria-hidden="true">
               <div className="login-demo-head">
-                <div className="login-demo-ava"><img src="/tori_logo_transparent.png" alt="" /></div>
+                <div className="login-demo-ava">{he ? "ש" : "S"}</div>
                 <div>
-                  <div className="login-demo-name">{he ? "מספרת שרה · תורי" : "Sarah's Salon · Tori"}</div>
-                  <div className="login-demo-status">{he ? "● מחובר/ת" : "● Online"}</div>
+                  <div className="login-demo-name-row">
+                    <span className="login-demo-name">{he ? "מספרת שרה" : "Sarah's Salon"}</span>
+                    <span className="login-demo-verified">
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={3.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                    </span>
+                  </div>
+                  <div className="login-demo-status">{he ? "לאחרונה באפליקציה" : "last seen recently"}</div>
+                </div>
+                <div className="login-demo-icons">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h12a1 1 0 001-1v-3.5l4 4v-11l-4 4z"/></svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.02-.24c1.12.37 2.33.57 3.57.57a1 1 0 011 1V20a1 1 0 01-1 1C10.61 21 3 13.39 3 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.24.2 2.45.57 3.57a1 1 0 01-.25 1.02l-2.2 2.2z"/></svg>
                 </div>
               </div>
-              <div className="login-bubble customer">{he ? "היי, אפשר תור לצבע מחר? 🙏" : "Hi, can I get a color appointment tomorrow? 🙏"}</div>
-              <div className="login-bubble bot">{he ? "בטח! מחר פנוי: 10:00, 12:30 או 16:00. מה מתאים לך?" : "Sure! Tomorrow's open: 10:00, 12:30 or 16:00. What works for you?"}</div>
-              <div className="login-bubble bot second">
-                {he ? "✅ קבעתי לך לצבע מחר ב-12:30. נתראה!" : "✅ Booked you for color tomorrow at 12:30. See you then!"}
-                <span className="ticks">✓✓</span>
+              <div className="login-demo-body">
+                <span className="login-demo-daychip">{he ? "היום" : "Today"}</span>
+
+                <div className="login-bubble-row customer">
+                  <div className="login-bubble customer">
+                    {he ? "היי, אפשר תור לצבע מחר? 🙏" : "Hi, can I get a color appointment tomorrow? 🙏"}
+                    <span className="login-bubble-meta">14:02</span>
+                  </div>
+                </div>
+
+                <div className="login-bubble-row bot">
+                  <div className="login-bubble bot">
+                    {he ? "בטח! מחר פנוי: 10:00, 12:30 או 16:00. מה מתאים לך?" : "Sure! Tomorrow's open: 10:00, 12:30 or 16:00. What works for you?"}
+                    <span className="login-bubble-meta">14:02 <span className="ticks">✓✓</span></span>
+                  </div>
+                </div>
+
+                <div className="login-typing-row">
+                  <div className="login-typing"><span /><span /><span /></div>
+                </div>
+
+                <div className="login-bubble-row bot">
+                  <div className="login-bubble bot second">
+                    {he ? "✅ קבעתי לך לצבע מחר ב-12:30. נתראה!" : "✅ Booked you for color tomorrow at 12:30. See you then!"}
+                    <span className="login-bubble-meta">14:03 <span className="ticks">✓✓</span></span>
+                  </div>
+                </div>
               </div>
             </div>
 
