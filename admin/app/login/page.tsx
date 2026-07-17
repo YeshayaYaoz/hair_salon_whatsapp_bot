@@ -100,7 +100,7 @@ export default function LoginPage() {
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          padding: 48px 56px;
+          padding: 32px 48px;
           overflow: hidden;
         }
         /* breathing aurora glows */
@@ -146,7 +146,7 @@ export default function LoginPage() {
           background: rgba(27,127,160,0.14); border: 1px solid rgba(91,184,212,0.25);
           border-radius: 20px; padding: 5px 14px;
           font-size: 12px; font-weight: 600; color: #5BB8D4; letter-spacing: 0.04em;
-          margin-bottom: 24px;
+          margin-bottom: 16px;
           backdrop-filter: blur(4px);
         }
         .login-left-tag-dot {
@@ -157,14 +157,14 @@ export default function LoginPage() {
         @keyframes pulse-dot { 0%,100% { opacity: 1; transform: scale(1);} 50% { opacity: 0.45; transform: scale(0.75);} }
 
         .login-left-headline {
-          font-size: clamp(28px, 2.6vw, 38px);
-          font-weight: 850; color: #fff; line-height: 1.18; letter-spacing: -1.3px;
-          margin-bottom: 14px; text-wrap: balance;
+          font-size: clamp(24px, 2.2vw, 32px);
+          font-weight: 850; color: #fff; line-height: 1.18; letter-spacing: -1.1px;
+          margin-bottom: 10px; text-wrap: balance;
         }
         .login-left-headline em { font-style: normal; color: #5BB8D4; }
         .login-left-sub {
-          font-size: 14.5px; color: rgba(255,255,255,0.5); line-height: 1.75;
-          max-width: 380px; margin-bottom: 28px;
+          font-size: 13.5px; color: rgba(255,255,255,0.5); line-height: 1.6;
+          max-width: 380px; margin-bottom: 18px;
         }
 
         /* live WhatsApp demo card */
@@ -172,15 +172,15 @@ export default function LoginPage() {
           background: rgba(255,255,255,0.045);
           border: 1px solid rgba(255,255,255,0.09);
           border-radius: 18px;
-          padding: 16px;
+          padding: 12px;
           max-width: 380px;
           backdrop-filter: blur(8px);
           box-shadow: 0 24px 60px rgba(0,0,0,0.35);
-          margin-bottom: 26px;
+          margin-bottom: 16px;
         }
         .login-demo-head {
           display: flex; align-items: center; gap: 10px;
-          padding-bottom: 12px; margin-bottom: 12px;
+          padding-bottom: 8px; margin-bottom: 8px;
           border-bottom: 1px solid rgba(255,255,255,0.07);
         }
         .login-demo-ava {
@@ -193,8 +193,8 @@ export default function LoginPage() {
         .login-demo-name { font-size: 13px; font-weight: 700; color: #fff; line-height: 1.2; }
         .login-demo-status { font-size: 10.5px; color: #4ADE80; }
         .login-bubble {
-          max-width: 82%; border-radius: 14px; padding: 9px 13px;
-          font-size: 12.5px; line-height: 1.55; margin-bottom: 8px;
+          max-width: 82%; border-radius: 14px; padding: 7px 12px;
+          font-size: 12px; line-height: 1.5; margin-bottom: 6px;
           opacity: 0; transform: translateY(8px);
           animation: bubble-in 0.45s ease forwards;
         }
@@ -216,19 +216,19 @@ export default function LoginPage() {
           .login-bubble { animation: none; opacity: 1; transform: none; }
         }
 
-        .login-left-stats { display: flex; gap: 12px; }
+        .login-left-stats { display: flex; gap: 10px; margin-bottom: 16px; }
         .login-left-stat {
           flex: 1;
           background: rgba(255,255,255,0.04);
           border: 1px solid rgba(255,255,255,0.08);
           border-radius: 14px;
-          padding: 14px 16px;
+          padding: 10px 14px;
           backdrop-filter: blur(6px);
         }
-        .login-left-stat-icon { font-size: 13px; margin-bottom: 6px; opacity: 0.8; }
+        .login-left-stat-icon { font-size: 12px; margin-bottom: 4px; opacity: 0.8; }
         .login-left-stat-n {
-          font-size: 22px; font-weight: 800; color: #fff; letter-spacing: -0.8px;
-          line-height: 1; margin-bottom: 5px; font-variant-numeric: tabular-nums;
+          font-size: 20px; font-weight: 800; color: #fff; letter-spacing: -0.8px;
+          line-height: 1; margin-bottom: 3px; font-variant-numeric: tabular-nums;
         }
         .login-left-stat-n span { color: #5BB8D4; }
         .login-left-stat-l { font-size: 10.5px; color: rgba(255,255,255,0.42); letter-spacing: 0.03em; }
@@ -241,7 +241,7 @@ export default function LoginPage() {
           background: rgba(255,255,255,0.04);
           border: 1px solid rgba(255,255,255,0.08);
           border-radius: 16px;
-          padding: 18px 20px;
+          padding: 14px 18px;
           backdrop-filter: blur(6px);
         }
         .login-left-testimonial::before {
@@ -251,9 +251,9 @@ export default function LoginPage() {
           color: rgba(91,184,212,0.05);
           font-family: Georgia, serif; pointer-events: none;
         }
-        .login-left-author { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+        .login-left-author { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
         .login-left-avatar {
-          width: 36px; height: 36px; border-radius: 50%;
+          width: 32px; height: 32px; border-radius: 50%;
           background: linear-gradient(135deg, #1B7FA0, #145F78);
           display: flex; align-items: center; justify-content: center;
           font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0;
@@ -267,7 +267,7 @@ export default function LoginPage() {
         }
         .login-left-author-role { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 1px; }
         .login-left-stars { color: #F59E0B; font-size: 10px; letter-spacing: 1.5px; flex-shrink: 0; }
-        .login-left-quote { position: relative; font-size: 13.5px; color: rgba(255,255,255,0.78); line-height: 1.7; }
+        .login-left-quote { position: relative; font-size: 13px; color: rgba(255,255,255,0.78); line-height: 1.55; }
 
         /* ══════════════ RIGHT / FORM PANEL ══════════════ */
         .login-right {
@@ -285,7 +285,7 @@ export default function LoginPage() {
           background: #FFFFFF;
           border: 1px solid #E8EEF3;
           border-radius: 24px;
-          padding: 40px 38px 32px;
+          padding: 32px 38px 26px;
           box-shadow:
             0 1px 2px rgba(13,42,56,0.04),
             0 12px 32px rgba(13,42,56,0.07),
@@ -306,6 +306,28 @@ export default function LoginPage() {
           .login-field { margin-bottom: 12px; }
           .login-trust { gap: 6px; margin-top: 18px; }
           .login-trust-item { font-size: 11px; padding: 5px 10px; }
+        }
+        /* Short viewports (common laptop screens, e.g. 1366x768) — the height problem, not width,
+           so this keys off max-height rather than max-width. Compresses vertical rhythm on both
+           panels enough that nothing needs to scroll to see the full page. */
+        @media (max-height: 820px) {
+          .login-right { padding: 16px 28px; }
+          .login-left { padding-top: 20px; padding-bottom: 20px; }
+          .login-left-tag { margin-bottom: 10px; }
+          .login-left-headline { font-size: clamp(21px, 2vw, 26px); margin-bottom: 6px; }
+          .login-left-sub { margin-bottom: 14px; }
+          /* The WhatsApp demo mockup is decorative, not essential — dropped first when space is
+             tight rather than continuing to shrink every element by a few px each. */
+          .login-demo { display: none; }
+          .login-left-stats { margin-bottom: 0; }
+          .login-card { padding: 18px 30px 14px; }
+          .login-form-brand { margin-bottom: 8px; }
+          .login-form-brand img { width: 44px !important; height: 44px !important; }
+          .login-form-heading { font-size: 21px; margin-bottom: 3px; }
+          .login-form-sub { margin-bottom: 10px; }
+          .login-field { margin-bottom: 8px; }
+          .login-divider { margin: 10px 0; }
+          .login-trust { margin-top: 10px; }
         }
 
         .login-form-brand {
