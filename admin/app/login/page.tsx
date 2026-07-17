@@ -174,29 +174,37 @@ export default function LoginPage() {
           background: rgba(255,255,255,0.045);
           border: 1px solid rgba(255,255,255,0.09);
           border-radius: 18px;
-          padding: 12px;
-          max-width: 380px;
+          padding: 20px;
+          max-width: 460px;
           backdrop-filter: blur(8px);
           box-shadow: 0 24px 60px rgba(0,0,0,0.35);
           margin-bottom: 16px;
+          /* Grows to absorb whatever slack the flex column has (the other two groups are
+             intrinsically sized) instead of sitting at a fixed height with dead space below it
+             on tall viewports, capped so it doesn't get comically tall on very tall screens. */
+          flex: 1 1 auto;
+          max-height: 340px;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
         }
         .login-demo-head {
-          display: flex; align-items: center; gap: 10px;
-          padding-bottom: 8px; margin-bottom: 8px;
+          display: flex; align-items: center; gap: 12px;
+          padding-bottom: 14px; margin-bottom: 14px;
           border-bottom: 1px solid rgba(255,255,255,0.07);
         }
         .login-demo-ava {
-          width: 34px; height: 34px; border-radius: 50%;
+          width: 42px; height: 42px; border-radius: 50%;
           background: #fff; overflow: hidden; flex-shrink: 0;
           box-shadow: 0 0 0 2px rgba(37,211,102,0.35);
           display: flex; align-items: center; justify-content: center;
         }
         .login-demo-ava img { width: 100%; height: 100%; object-fit: cover; }
-        .login-demo-name { font-size: 13px; font-weight: 700; color: #fff; line-height: 1.2; }
-        .login-demo-status { font-size: 10.5px; color: #4ADE80; }
+        .login-demo-name { font-size: 15px; font-weight: 700; color: #fff; line-height: 1.2; }
+        .login-demo-status { font-size: 12px; color: #4ADE80; margin-top: 2px; }
         .login-bubble {
-          max-width: 82%; border-radius: 14px; padding: 7px 12px;
-          font-size: 12px; line-height: 1.5; margin-bottom: 6px;
+          max-width: 82%; border-radius: 16px; padding: 10px 16px;
+          font-size: 14px; line-height: 1.55; margin-bottom: 10px;
           opacity: 0; transform: translateY(8px);
           animation: bubble-in 0.45s ease forwards;
         }
@@ -321,6 +329,12 @@ export default function LoginPage() {
           .login-left-tag { margin-bottom: 8px; }
           .login-left-headline { font-size: clamp(19px, 2vw, 24px); margin-bottom: 5px; }
           .login-left-sub { margin-bottom: 8px; }
+          .login-demo { padding: 12px; max-height: 200px; }
+          .login-demo-head { padding-bottom: 6px; margin-bottom: 6px; }
+          .login-demo-ava { width: 28px; height: 28px; }
+          .login-demo-name { font-size: 12px; }
+          .login-demo-status { font-size: 10px; margin-top: 0; }
+          .login-bubble { padding: 5px 10px; font-size: 11px; margin-bottom: 5px; }
           .login-left-stats { margin-bottom: 0; gap: 8px; }
           .login-left-stat { padding: 7px 10px; }
           .login-left-stat-icon { margin-bottom: 2px; }
