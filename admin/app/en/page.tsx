@@ -6,7 +6,7 @@ import { jsonLd } from "../lib/jsonLd";
 export default function LandingPageEN() {
   const tiltEl = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [appts, setAppts] = useState(40);
+  const AVG_WEEKLY_APPTS = 40; // industry-average estimate the ROI section calculates against, no slider input
   const [demoMsgs, setDemoMsgs] = useState<{ role: "user" | "bot"; text: string }[]>([
     { role: "bot", text: "Hi! 👋 I'm Tori, Dana's Salon's assistant. I can book you an appointment — try typing something like \"I'd like a haircut tomorrow\"" },
   ]);
@@ -224,9 +224,9 @@ export default function LandingPageEN() {
     return () => obs.disconnect();
   }, []);
 
-  const savingsHours = Math.round(appts * 5 / 60 * 4.3);
-  const extraIncome = Math.round(appts * 0.15 * 0.8) * 180;
-  const staffSavings = Math.round(appts * 5 / 60 * 4.3 * 38);
+  const savingsHours = Math.round(AVG_WEEKLY_APPTS * 5 / 60 * 4.3);
+  const extraIncome = Math.round(AVG_WEEKLY_APPTS * 0.15 * 0.8) * 180;
+  const staffSavings = Math.round(AVG_WEEKLY_APPTS * 5 / 60 * 4.3 * 38);
   const premiumTotal = extraIncome + staffSavings;
 
   return (
@@ -1150,19 +1150,7 @@ export default function LandingPageEN() {
           <div className="lp-roi-inner">
             <div className="lp-label reveal" style={{ textAlign: "center", color: "#F59E0B" }}>Savings calculator</div>
             <div className="lp-title reveal" style={{ color: "#fff", textAlign: "center" }}>How much does Tori save you?</div>
-            <div className="lp-roi-sub reveal">Drag the slider to match your weekly appointment count</div>
-            <div className="lp-roi-slider-row reveal">
-              <span className="lp-roi-slider-label">Appointments per week</span>
-              <span className="lp-roi-val">{appts}</span>
-              <div style={{ direction: "ltr", flex: 1 }}>
-                <input
-                  type="range" min={5} max={150} step={5} value={appts}
-                  className="roi-slider"
-                  style={{ background: `linear-gradient(to right, #F59E0B 0%, #F59E0B ${((appts - 5) / 145) * 100}%, rgba(255,255,255,0.15) ${((appts - 5) / 145) * 100}%, rgba(255,255,255,0.15) 100%)` }}
-                  onChange={e => setAppts(Number(e.target.value))}
-                />
-              </div>
-            </div>
+            <div className="lp-roi-sub reveal">Based on an average business with about {AVG_WEEKLY_APPTS} appointments/week</div>
             <div className="lp-roi-grid">
               <div className="lp-roi-cell">
                 <div className="lp-roi-n" style={{ color: "#F59E0B" }}>{savingsHours}<span style={{ fontSize: 16, color: "rgba(255,255,255,0.4)" }}> hrs</span></div>

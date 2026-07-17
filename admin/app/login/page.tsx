@@ -285,8 +285,17 @@ export default function LoginPage() {
         }
         .login-card.show { opacity: 1; transform: none; }
         @media (max-width: 480px) {
-          .login-right { padding: 24px 16px; }
-          .login-card { padding: 32px 22px 26px; border-radius: 20px; }
+          /* start-aligned rather than centered: on a short viewport (small phone, or keyboard
+             open) vertical centering can push the top of the card — logo, heading — off-screen
+             with no way to scroll back up to it. Anchoring to the top keeps it always reachable. */
+          .login-right { padding: 20px 14px; align-items: flex-start; }
+          .login-card { padding: 28px 18px 22px; border-radius: 18px; }
+          .login-form-brand { margin-bottom: 16px; }
+          .login-form-heading { font-size: 22px; }
+          .login-form-sub { margin-bottom: 20px; }
+          .login-field { margin-bottom: 12px; }
+          .login-trust { gap: 6px; margin-top: 18px; }
+          .login-trust-item { font-size: 11px; padding: 5px 10px; }
         }
 
         .login-form-brand {
@@ -342,7 +351,9 @@ export default function LoginPage() {
           border: 1.5px solid #E4EAF0;
           border-radius: 12px;
           padding: 13px 42px 13px 16px;
-          font-size: 15px;
+          /* 16px, not 15px: iOS Safari auto-zooms the page on focus for any input under 16px,
+             which is jarring on a phone — this keeps focus from yanking the viewport around. */
+          font-size: 16px;
           color: #0F1D2A;
           outline: none;
           transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
@@ -359,9 +370,10 @@ export default function LoginPage() {
            reserves space on the physical left (42px) where the icon lives. */
         .login-input-icon { inset-inline-start: auto; left: 14px; }
         .login-eye-btn {
-          position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+          position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
           background: none; border: none; cursor: pointer; color: #A8B4C0;
-          display: flex; padding: 4px; border-radius: 6px; transition: color 0.15s;
+          display: flex; align-items: center; justify-content: center;
+          width: 32px; height: 32px; padding: 0; border-radius: 8px; transition: color 0.15s;
         }
         .login-eye-btn:hover { color: #1B7FA0; }
         .login-field input.has-eye { padding-right: 42px; padding-left: 42px; }

@@ -8,7 +8,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 export default function LandingPage() {
   const tiltEl = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [appts, setAppts] = useState(40);
+  const AVG_WEEKLY_APPTS = 40; // industry-average estimate the ROI section calculates against, no slider input
   const [social, setSocial] = useState<{ businesses: number; appointments: number } | null>(null);
   const [demoMsgs, setDemoMsgs] = useState<{ role: "user" | "bot"; text: string }[]>([
     { role: "bot", text: "היי! 👋 אני תורי, העוזר של סלון דנה. אפשר לקבוע לך תור — נסה לכתוב לי משהו כמו \"רוצה תספורת מחר\"" },
@@ -1555,45 +1555,25 @@ export default function LandingPage() {
           <div className="lp-roi-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>מחשבון חיסכון</div>
             <div className="lp-title reveal" style={{ color: "#fff", textAlign: "center" }}>כמה תורי חוסך לך?</div>
-            <div className="lp-roi-sub reveal">גרור לפי מספר התורים שיש לך בשבוע — התוצאה מתעדכנת מיד</div>
+            <div className="lp-roi-sub reveal">מבוסס על עסק ממוצע עם כ-{AVG_WEEKLY_APPTS} תורים בשבוע</div>
 
             <div className="lp-roi-card reveal">
-            <div className="lp-roi-slider-wrap">
-              <div className="roi-slider-label">
-                <span>תורים בשבוע</span>
-                <span className="roi-slider-val">{appts}</span>
-              </div>
-              <div style={{ direction: "ltr" }}>
-                <input
-                  type="range" min={5} max={150} step={5} value={appts}
-                  className="roi-slider"
-                  aria-label="תורים בשבוע"
-                  style={{ background: `linear-gradient(to right, #25D366 0%, #25D366 ${((appts - 5) / 145) * 100}%, rgba(255,255,255,0.15) ${((appts - 5) / 145) * 100}%, rgba(255,255,255,0.15) 100%)` }}
-                  onChange={e => setAppts(Number(e.target.value))}
-                />
-              </div>
-              <div style={{ direction: "ltr", display: "flex", justifyContent: "space-between", fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 6 }}>
-                <span>5</span><span>150</span>
-              </div>
-            </div>
-
-            <div className="lp-roi-divider" />
 
             {(() => {
               // Single source of truth for every number below, so the headline and the two
               // supporting stats always agree with each other (previously each of 4 cards
               // computed its own thing inline, several combining metrics in ways that were
               // hard to trace back to the slider).
-              const monthlyAppts = appts * 4; // the slider is weekly — everything below is monthly, on a simple ×4
+              const monthlyAppts = AVG_WEEKLY_APPTS * 4; // everything below is monthly, on a simple ×4
               const savedBookings = Math.round(monthlyAppts * 0.15 * 0.8); // recovered from reminders/24-7 answering, out of the MONTHLY total
               const monthlyRevenue = savedBookings * 180; // avg service price
-              const hoursPerWeek = Math.round((appts * 4 / 60) * 10) / 10;
+              const hoursPerWeek = Math.round((AVG_WEEKLY_APPTS * 4 / 60) * 10) / 10;
               const roiMultiple = Math.max(1, Math.round(monthlyRevenue / 149));
               return (
                 <>
                   <div className="lp-roi-headline reveal">
                     <div className="lp-roi-headline-label">
-                      על בסיס כ-{monthlyAppts} תורים בחודש ({appts} בשבוע) — הכנסה נוספת משוערת:
+                      על בסיס כ-{monthlyAppts} תורים בחודש ({AVG_WEEKLY_APPTS} בשבוע) — הכנסה נוספת משוערת:
                     </div>
                     <div className="lp-roi-headline-num">₪{monthlyRevenue.toLocaleString("he-IL")}</div>
                     <div className="lp-roi-headline-sub">
