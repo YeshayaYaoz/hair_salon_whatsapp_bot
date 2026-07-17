@@ -274,8 +274,10 @@ export default function LoginPage() {
 
         /* ══════════════ RIGHT / FORM PANEL ══════════════ */
         .login-right {
-          display: flex; align-items: center; justify-content: center;
-          padding: 40px 28px;
+          display: flex; align-items: flex-end; justify-content: center;
+          /* bottom padding matches .login-left's so the card's bottom edge lines up with the
+             stats/testimonial block pinned to the bottom of the dark panel. */
+          padding: 32px 28px 64px;
           background:
             radial-gradient(ellipse 700px 500px at 85% -10%, rgba(27,127,160,0.07) 0%, transparent 60%),
             radial-gradient(ellipse 500px 400px at 0% 110%, rgba(224,169,59,0.05) 0%, transparent 60%),
@@ -314,7 +316,7 @@ export default function LoginPage() {
            so this keys off max-height rather than max-width. Compresses vertical rhythm on both
            panels enough that nothing needs to scroll to see the full page. */
         @media (max-height: 820px) {
-          .login-right { padding: 16px 28px; }
+          .login-right { padding: 16px 28px 18px; }
           .login-left { padding-top: 18px; padding-bottom: 18px; gap: 14px; }
           .login-left-tag { margin-bottom: 8px; }
           .login-left-headline { font-size: clamp(19px, 2vw, 24px); margin-bottom: 5px; }
@@ -341,7 +343,7 @@ export default function LoginPage() {
         @media (max-height: 740px) {
           .login-left-testimonial { display: none; }
           .login-left { gap: 10px; }
-          .login-right { padding: 10px 28px; }
+          .login-right { padding: 10px 28px 18px; }
           .login-card { padding: 10px 30px 8px; }
           .login-form-brand { margin-bottom: 3px; }
           .login-form-brand img { width: 30px !important; height: 30px !important; }
