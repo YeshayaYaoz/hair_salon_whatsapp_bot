@@ -99,11 +99,9 @@ export default function LoginPage() {
           background: linear-gradient(160deg, #081826 0%, #0D2A38 55%, #0A1F2E 100%);
           display: flex;
           flex-direction: column;
-          /* space-evenly across 4 groups (intro text, demo, stats, testimonial) rather than
-             space-between across 2 — 2 groups puts the entire gap in one place, which reads as
-             a blank hole on a tall viewport instead of evenly-distributed breathing room. */
-          justify-content: space-evenly;
-          padding: 32px 48px;
+          justify-content: flex-start;
+          gap: 22px;
+          padding: 32px 48px 64px;
           overflow: hidden;
         }
         /* breathing aurora glows */
@@ -220,7 +218,7 @@ export default function LoginPage() {
           .login-bubble { animation: none; opacity: 1; transform: none; }
         }
 
-        .login-left-bottom { display: flex; flex-direction: column; gap: 14px; }
+        .login-left-bottom { display: flex; flex-direction: column; gap: 14px; margin-top: auto; }
         .login-left-stats { display: flex; gap: 10px; }
         .login-left-stat {
           flex: 1;
@@ -317,7 +315,7 @@ export default function LoginPage() {
            panels enough that nothing needs to scroll to see the full page. */
         @media (max-height: 820px) {
           .login-right { padding: 16px 28px; }
-          .login-left { padding-top: 18px; padding-bottom: 18px; justify-content: space-evenly; }
+          .login-left { padding-top: 18px; padding-bottom: 18px; gap: 14px; }
           .login-left-tag { margin-bottom: 8px; }
           .login-left-headline { font-size: clamp(19px, 2vw, 24px); margin-bottom: 5px; }
           .login-left-sub { margin-bottom: 8px; }
