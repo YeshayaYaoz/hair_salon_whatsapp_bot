@@ -24,6 +24,7 @@ interface BusinessProfile {
   depositAmountIls?: number;
   depositHoldMinutes?: number;
   paymentConnected?: boolean;
+  voicePhoneNumber?: string | null;
 }
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
@@ -111,6 +112,110 @@ function SystemStatusSection() {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function VoicePhoneSection() {
+  const { lang } = useLanguage();
+  const he = lang === "he";
+  const [current, setCurrent] = useState<string | null | undefined>(undefined); // undefined = loading
+  const [value, setValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiFetch<{ voicePhoneNumber?: string | null }>("/api/business/me").then((me) => {
+      setCurrent(me.voicePhoneNumber ?? null);
+      setValue(me.voicePhoneNumber ?? "");
+    });
+  }, []);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      await apiFetch("/api/business/me/voice-phone", { method: "PUT", body: JSON.stringify({ voicePhoneNumber: value }) });
+      setCurrent(value);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : he ? "השמירה נכשלה" : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function disconnect() {
+    setSaving(true);
+    setError(null);
+    try {
+      await apiFetch("/api/business/me/voice-phone", { method: "DELETE" });
+      setCurrent(null);
+      setValue("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : he ? "הניתוק נכשל" : "Failed to disconnect");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
+      <div className="flex items-center gap-2 mb-0.5">
+        <h2 className="text-sm font-semibold text-gray-900">{he ? "בוט טלפוני (שיחות קוליות)" : "Voice bot (phone calls)"}</h2>
+        {current === null ? (
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+            {he ? "לא מחובר" : "Not connected"}
+          </span>
+        ) : current ? (
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">
+            {he ? "מחובר" : "Connected"}
+          </span>
+        ) : null}
+      </div>
+      <p className="text-xs text-gray-400 mb-4">
+        {he
+          ? "מספר הטלפון שסופק ע\"י Cartesia עבור העסק שלך — שיחות נכנסות למספר הזה ייענו ע\"י הבוט הקולי."
+          : "The phone number Cartesia provisioned for your business — incoming calls to this number are answered by the voice bot."}
+      </p>
+      {current === undefined ? (
+        <SkeletonCard lines={1} />
+      ) : (
+        <form onSubmit={save} className="flex items-end gap-2 flex-wrap">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">{he ? "מספר טלפון" : "Phone number"}</label>
+            <input
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder="+972501234567"
+              dir="ltr"
+              className="w-full"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={saving || !value}
+            className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
+          >
+            {saving ? (he ? "שומר..." : "Saving...") : he ? "שמור" : "Save"}
+          </button>
+          {current && (
+            <button
+              type="button"
+              onClick={disconnect}
+              disabled={saving}
+              className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50 transition px-2 py-2"
+            >
+              {he ? "נתק" : "Disconnect"}
+            </button>
+          )}
+          {saved && <SavedBadge text={he ? "נשמר" : "Saved"} />}
+        </form>
+      )}
+      {error && <p className="text-red-600 text-xs mt-2">{error}</p>}
     </div>
   );
 }
@@ -400,6 +505,7 @@ export default function SettingsPage() {
         </div>
       </form>
 
+      <VoicePhoneSection />
       <SystemStatusSection />
     </div>
   );
