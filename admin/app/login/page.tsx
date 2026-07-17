@@ -289,7 +289,7 @@ export default function LoginPage() {
           background: #FFFFFF;
           border: 1px solid #E8EEF3;
           border-radius: 24px;
-          padding: 32px 38px 38px;
+          padding: 32px 38px 52px;
           box-shadow:
             0 1px 2px rgba(13,42,56,0.04),
             0 12px 32px rgba(13,42,56,0.07),
