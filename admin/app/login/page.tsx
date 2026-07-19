@@ -174,19 +174,11 @@ export default function LoginPage() {
           background: rgba(255,255,255,0.045);
           border: 1px solid rgba(255,255,255,0.09);
           border-radius: 18px;
-          padding: 20px;
+          padding: 16px 20px;
           max-width: 460px;
           backdrop-filter: blur(8px);
           box-shadow: 0 24px 60px rgba(0,0,0,0.35);
           margin-bottom: 16px;
-          /* Grows to absorb whatever slack the flex column has (the other two groups are
-             intrinsically sized) instead of sitting at a fixed height with dead space below it
-             on tall viewports, capped so it doesn't get comically tall on very tall screens. */
-          flex: 1 1 auto;
-          max-height: 340px;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
         }
         .login-demo-head {
           display: flex; align-items: center; gap: 12px;
@@ -203,8 +195,8 @@ export default function LoginPage() {
         .login-demo-name { font-size: 15px; font-weight: 700; color: #fff; line-height: 1.2; }
         .login-demo-status { font-size: 12px; color: #4ADE80; margin-top: 2px; }
         .login-bubble {
-          max-width: 82%; border-radius: 16px; padding: 10px 16px;
-          font-size: 14px; line-height: 1.55; margin-bottom: 10px;
+          max-width: 82%; border-radius: 16px; padding: 9px 15px;
+          font-size: 13.5px; line-height: 1.5; margin-bottom: 8px;
           opacity: 0; transform: translateY(8px);
           animation: bubble-in 0.45s ease forwards;
         }
@@ -219,7 +211,8 @@ export default function LoginPage() {
           border-bottom-left-radius: 4px;
           animation-delay: 1.15s;
         }
-        .login-bubble.bot.second { animation-delay: 1.9s; }
+        .login-bubble.customer.second { animation-delay: 1.9s; }
+        .login-bubble.bot.third { animation-delay: 2.55s; }
         .login-bubble .ticks { color: #5BB8D4; font-size: 10px; margin-inline-start: 6px; }
         @keyframes bubble-in { to { opacity: 1; transform: none; } }
         @media (prefers-reduced-motion: reduce) {
@@ -329,7 +322,7 @@ export default function LoginPage() {
           .login-left-tag { margin-bottom: 8px; }
           .login-left-headline { font-size: clamp(19px, 2vw, 24px); margin-bottom: 5px; }
           .login-left-sub { margin-bottom: 8px; }
-          .login-demo { padding: 12px; max-height: 200px; }
+          .login-demo { padding: 12px; }
           .login-demo-head { padding-bottom: 6px; margin-bottom: 6px; }
           .login-demo-ava { width: 28px; height: 28px; }
           .login-demo-name { font-size: 12px; }
@@ -598,7 +591,8 @@ export default function LoginPage() {
             </div>
             <div className="login-bubble customer">{he ? "היי, אפשר תור לצבע מחר? 🙏" : "Hi, can I get a color appointment tomorrow? 🙏"}</div>
             <div className="login-bubble bot">{he ? "בטח! מחר פנוי: 10:00, 12:30 או 16:00. מה מתאים לך?" : "Sure! Tomorrow's open: 10:00, 12:30 or 16:00. What works for you?"}</div>
-            <div className="login-bubble bot second">
+            <div className="login-bubble customer second">{he ? "12:30 מעולה, תודה!" : "12:30 works great, thanks!"}</div>
+            <div className="login-bubble bot third">
               {he ? "✅ קבעתי לך לצבע מחר ב-12:30. נתראה!" : "✅ Booked you for color tomorrow at 12:30. See you then!"}
               <span className="ticks">✓✓</span>
             </div>
