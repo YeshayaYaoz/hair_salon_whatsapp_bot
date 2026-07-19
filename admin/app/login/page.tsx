@@ -82,34 +82,17 @@ export default function LoginPage() {
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
-        /* On a very tall display, a split-screen that always fills 100vh either leaves the
-           decorative left panel visibly empty or forces every element on it to keep inflating to
-           chase the extra height — neither reads as intentional. Capping the whole layout as a
-           centered card (like most auth screens) sidesteps that: past a comfortable height it
-           just stops growing, with calm neutral space around it instead of stretched content. */
-        .login-page-outer {
-          min-height: 100vh;
-          display: flex; align-items: center; justify-content: center;
-          background: #EAF0F4;
-          padding: 32px 20px;
-        }
         .login-root {
-          width: 100%;
-          max-width: 1180px;
-          height: min(840px, calc(100vh - 64px));
-          border-radius: 28px;
-          overflow: hidden;
-          box-shadow: 0 40px 100px rgba(13,42,56,0.16), 0 4px 18px rgba(13,42,56,0.06);
+          min-height: 100vh;
           display: grid;
           grid-template-columns: minmax(480px, 46%) 1fr;
           font-family: var(--font-heebo), 'Segoe UI', system-ui, -apple-system, sans-serif;
         }
         @media (max-width: 900px) {
-          .login-page-outer { padding: 0; }
-          .login-root { grid-template-columns: 1fr; height: auto; min-height: 100vh; border-radius: 0; box-shadow: none; }
-          /* !important: the unconditional .login-left rule further down the stylesheet has equal
-             specificity and comes later in source order, so it would otherwise win over this
-             media query regardless of viewport width. */
+          .login-root { grid-template-columns: 1fr; }
+          /* !important: the unconditional .login-left rule further down this stylesheet has
+             equal specificity and comes later in source order, so it would otherwise win over
+             this media query regardless of viewport width. */
           .login-left { display: none !important; }
         }
 
@@ -119,9 +102,12 @@ export default function LoginPage() {
           background: linear-gradient(160deg, #081826 0%, #0D2A38 55%, #0A1F2E 100%);
           display: flex;
           flex-direction: column;
-          justify-content: flex-start;
-          gap: 22px;
-          padding: 32px 48px 64px;
+          /* Content is centered as one natural-height block rather than stretched or pinned to
+             an edge — on a tall display that just means equal calm space above and below, which
+             reads as a deliberate layout instead of dead space or inflated components. */
+          justify-content: center;
+          gap: 26px;
+          padding: 48px;
           overflow: hidden;
         }
         /* breathing aurora glows */
@@ -239,7 +225,7 @@ export default function LoginPage() {
           .login-bubble { animation: none; opacity: 1; transform: none; }
         }
 
-        .login-left-bottom { display: flex; flex-direction: column; gap: 14px; margin-top: auto; }
+        .login-left-bottom { display: flex; flex-direction: column; gap: 14px; }
         .login-left-stats { display: flex; gap: 10px; }
         .login-left-stat {
           flex: 1;
@@ -295,10 +281,8 @@ export default function LoginPage() {
 
         /* ══════════════ RIGHT / FORM PANEL ══════════════ */
         .login-right {
-          display: flex; align-items: flex-end; justify-content: center;
-          /* bottom padding matches .login-left's so the card's bottom edge lines up with the
-             stats/testimonial block pinned to the bottom of the dark panel. */
-          padding: 32px 28px 64px;
+          display: flex; align-items: center; justify-content: center;
+          padding: 40px 28px;
           background:
             radial-gradient(ellipse 700px 500px at 85% -10%, rgba(27,127,160,0.07) 0%, transparent 60%),
             radial-gradient(ellipse 500px 400px at 0% 110%, rgba(224,169,59,0.05) 0%, transparent 60%),
@@ -311,7 +295,7 @@ export default function LoginPage() {
           background: #FFFFFF;
           border: 1px solid #E8EEF3;
           border-radius: 24px;
-          padding: 32px 38px 64px;
+          padding: 32px 38px 26px;
           box-shadow:
             0 1px 2px rgba(13,42,56,0.04),
             0 12px 32px rgba(13,42,56,0.07),
@@ -337,13 +321,8 @@ export default function LoginPage() {
            so this keys off max-height rather than max-width. Compresses vertical rhythm on both
            panels enough that nothing needs to scroll to see the full page. */
         @media (max-height: 820px) {
-          /* Less outer breathing room around the card so the compact internal spacing below
-             actually has the height budget it was tuned for (the card's max-height is derived
-             from the viewport minus this padding). */
-          .login-page-outer { padding: 12px; }
-          .login-root { height: min(840px, calc(100vh - 24px)); }
-          .login-right { padding: 16px 28px 18px; }
-          .login-left { padding-top: 18px; padding-bottom: 18px; gap: 14px; }
+          .login-right { padding: 16px 28px; }
+          .login-left { padding: 18px 48px; gap: 14px; }
           .login-left-tag { margin-bottom: 8px; }
           .login-left-headline { font-size: clamp(19px, 2vw, 24px); margin-bottom: 5px; }
           .login-left-sub { margin-bottom: 8px; }
@@ -375,7 +354,7 @@ export default function LoginPage() {
         @media (max-height: 740px) {
           .login-left-testimonial { display: none; }
           .login-left { gap: 10px; }
-          .login-right { padding: 10px 28px 18px; }
+          .login-right { padding: 10px 28px; }
           .login-card { padding: 10px 30px 8px; }
           .login-form-brand { margin-bottom: 3px; }
           .login-form-brand img { width: 30px !important; height: 30px !important; }
@@ -580,8 +559,7 @@ export default function LoginPage() {
         }
       `}</style>
 
-      <main className="login-page-outer" dir={he ? "rtl" : "ltr"}>
-      <div className="login-root">
+      <main className="login-root" dir={he ? "rtl" : "ltr"}>
         {/* Left / dark showcase panel */}
         <div className="login-left">
           <div className="login-aurora" />
@@ -873,7 +851,6 @@ export default function LoginPage() {
             </div>
           </div>
         </div>
-      </div>
       </main>
     </>
   );
