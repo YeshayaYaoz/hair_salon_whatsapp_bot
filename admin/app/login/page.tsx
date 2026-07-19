@@ -153,7 +153,7 @@ export default function LoginPage() {
           display: inline-flex; align-items: center; gap: 7px;
           background: rgba(27,127,160,0.14); border: 1px solid rgba(91,184,212,0.25);
           border-radius: 20px; padding: 5px 14px;
-          font-size: 12px; font-weight: 600; color: #5BB8D4; letter-spacing: 0.04em;
+          font-size: 13px; font-weight: 600; color: #5BB8D4; letter-spacing: 0.04em;
           margin-bottom: 16px;
           backdrop-filter: blur(4px);
         }
@@ -165,13 +165,13 @@ export default function LoginPage() {
         @keyframes pulse-dot { 0%,100% { opacity: 1; transform: scale(1);} 50% { opacity: 0.45; transform: scale(0.75);} }
 
         .login-left-headline {
-          font-size: clamp(24px, 2.2vw, 32px);
+          font-size: clamp(27px, 2.4vw, 36px);
           font-weight: 850; color: #fff; line-height: 1.18; letter-spacing: -1.1px;
           margin-bottom: 10px; text-wrap: balance;
         }
         .login-left-headline em { font-style: normal; color: #5BB8D4; }
         .login-left-sub {
-          font-size: 13.5px; color: rgba(255,255,255,0.5); line-height: 1.6;
+          font-size: 15px; color: rgba(255,255,255,0.5); line-height: 1.6;
           max-width: 380px; margin-bottom: 18px;
         }
 
@@ -198,11 +198,11 @@ export default function LoginPage() {
           display: flex; align-items: center; justify-content: center;
         }
         .login-demo-ava img { width: 100%; height: 100%; object-fit: cover; }
-        .login-demo-name { font-size: 15px; font-weight: 700; color: #fff; line-height: 1.2; }
-        .login-demo-status { font-size: 12px; color: #4ADE80; margin-top: 2px; }
+        .login-demo-name { font-size: 16px; font-weight: 700; color: #fff; line-height: 1.2; }
+        .login-demo-status { font-size: 13px; color: #4ADE80; margin-top: 2px; }
         .login-bubble {
           max-width: 82%; border-radius: 16px; padding: 9px 15px;
-          font-size: 13.5px; line-height: 1.5; margin-bottom: 8px;
+          font-size: 14.5px; line-height: 1.5; margin-bottom: 8px;
           opacity: 0; transform: translateY(8px);
           animation: bubble-in 0.45s ease forwards;
         }
@@ -237,11 +237,11 @@ export default function LoginPage() {
         }
         .login-left-stat-icon { font-size: 12px; margin-bottom: 4px; opacity: 0.8; }
         .login-left-stat-n {
-          font-size: 20px; font-weight: 800; color: #fff; letter-spacing: -0.8px;
+          font-size: 22px; font-weight: 800; color: #fff; letter-spacing: -0.8px;
           line-height: 1; margin-bottom: 3px; font-variant-numeric: tabular-nums;
         }
         .login-left-stat-n span { color: #5BB8D4; }
-        .login-left-stat-l { font-size: 10.5px; color: rgba(255,255,255,0.42); letter-spacing: 0.03em; }
+        .login-left-stat-l { font-size: 11.5px; color: rgba(255,255,255,0.42); letter-spacing: 0.03em; }
 
         /* Testimonial card, laid out like a real review (author + rating up top, quote below) —
            previously led with an oversized decorative quotation mark and put the author at the
@@ -270,14 +270,14 @@ export default function LoginPage() {
           box-shadow: 0 0 0 2px rgba(91,184,212,0.25);
         }
         .login-left-author-name-row { display: flex; align-items: center; gap: 6px; }
-        .login-left-author-name { font-size: 13px; font-weight: 600; color: #fff; }
+        .login-left-author-name { font-size: 14px; font-weight: 600; color: #fff; }
         .login-left-author-verified {
           width: 13px; height: 13px; border-radius: 50%; background: #5BB8D4; flex-shrink: 0;
           display: flex; align-items: center; justify-content: center;
         }
-        .login-left-author-role { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 1px; }
+        .login-left-author-role { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 1px; }
         .login-left-stars { color: #F59E0B; font-size: 10px; letter-spacing: 1.5px; flex-shrink: 0; }
-        .login-left-quote { position: relative; font-size: 13px; color: rgba(255,255,255,0.78); line-height: 1.55; }
+        .login-left-quote { position: relative; font-size: 14px; color: rgba(255,255,255,0.78); line-height: 1.55; }
 
         /* ══════════════ RIGHT / FORM PANEL ══════════════ */
         .login-right {
@@ -374,20 +374,20 @@ export default function LoginPage() {
           box-shadow: 0 8px 24px rgba(27,127,160,0.18);
         }
         .login-form-golden {
-          font-size: 12.5px; font-weight: 700; letter-spacing: 0.02em;
+          font-size: 13.5px; font-weight: 700; letter-spacing: 0.02em;
           background: linear-gradient(90deg, #C9962E 0%, #A97A1F 60%, #C9962E 100%);
           -webkit-background-clip: text; background-clip: text;
           -webkit-text-fill-color: transparent; color: #A97A1F;
         }
 
         .login-form-heading {
-          font-size: 26px; font-weight: 850; color: #0F1D2A;
+          font-size: 29px; font-weight: 850; color: #0F1D2A;
           letter-spacing: -0.8px; margin-bottom: 6px; text-align: center;
         }
         /* #6B7A88 rather than the lighter #8A97A5 used elsewhere as a border/icon tint — at this
            font weight/size, #8A97A5-on-white sits under the 4.5:1 contrast ratio normal text
            needs for WCAG AA. */
-        .login-form-sub { font-size: 14.5px; color: #6B7A88; margin-bottom: 26px; text-align: center; }
+        .login-form-sub { font-size: 15.5px; color: #6B7A88; margin-bottom: 26px; text-align: center; }
 
         /* Signup step indicator */
         .login-steps { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
@@ -410,7 +410,7 @@ export default function LoginPage() {
 
         /* Fields with inline icons */
         .login-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
-        .login-field label { font-size: 13px; font-weight: 600; color: #5C6B7A; letter-spacing: 0.02em; }
+        .login-field label { font-size: 14px; font-weight: 600; color: #5C6B7A; letter-spacing: 0.02em; }
         .login-input-wrap { position: relative; }
         .login-input-icon {
           position: absolute; inset-inline-start: 14px; top: 50%; transform: translateY(-50%);
@@ -428,7 +428,7 @@ export default function LoginPage() {
           padding: 13px 16px 13px 42px;
           /* 16px, not 15px: iOS Safari auto-zooms the page on focus for any input under 16px,
              which is jarring on a phone — this keeps focus from yanking the viewport around. */
-          font-size: 16px;
+          font-size: 16.5px;
           color: #0F1D2A;
           outline: none;
           transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
@@ -453,10 +453,10 @@ export default function LoginPage() {
         .login-eye-btn:hover { color: #1B7FA0; }
         .login-field input.has-eye { padding-right: 42px; padding-left: 42px; }
 
-        .login-field-hint { font-size: 11.5px; color: #9CA3AF; margin-top: 2px; }
+        .login-field-hint { font-size: 12.5px; color: #9CA3AF; margin-top: 2px; }
 
         .login-forgot {
-          display: block; text-align: start; font-size: 13px; color: #6B7A88;
+          display: block; text-align: start; font-size: 14px; color: #6B7A88;
           text-decoration: none; margin-top: -4px; margin-bottom: 10px; transition: color 0.15s;
         }
         .login-forgot:hover { color: #1B7FA0; }
@@ -469,14 +469,14 @@ export default function LoginPage() {
           display: flex; align-items: center; gap: 8px;
           background: #FEF2F2; border: 1px solid #FECACA;
           border-radius: 10px; padding: 11px 14px;
-          font-size: 13px; color: #DC2626; margin-bottom: 14px;
+          font-size: 14px; color: #DC2626; margin-bottom: 14px;
         }
 
         .login-google-btn {
           width: 100%;
           display: flex; align-items: center; justify-content: center; gap: 10px;
           background: #fff; color: #3C4043;
-          font-size: 14.5px; font-weight: 600;
+          font-size: 15.5px; font-weight: 600;
           border: 1.5px solid #E4EAF0; border-radius: 12px;
           padding: 12.5px; cursor: pointer;
           transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
@@ -494,7 +494,7 @@ export default function LoginPage() {
           width: 100%;
           background: linear-gradient(135deg, #1B7FA0 0%, #146A87 100%);
           color: #fff;
-          font-size: 15px; font-weight: 700;
+          font-size: 16px; font-weight: 700;
           border: none; border-radius: 12px;
           padding: 14px;
           cursor: pointer;
@@ -514,19 +514,19 @@ export default function LoginPage() {
 
         .login-back-btn {
           width: 100%; background: none; border: none; color: #9CA3AF;
-          font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;
+          font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer;
           padding: 10px; margin-top: 4px; transition: color 0.15s;
         }
         .login-back-btn:hover { color: #1B7FA0; }
 
         .login-divider { display: flex; align-items: center; gap: 12px; margin: 20px 0; }
         .login-divider-line { flex: 1; height: 1px; background: #EAEFF4; }
-        .login-divider-text { font-size: 12.5px; color: #A8B4C0; white-space: nowrap; }
+        .login-divider-text { font-size: 13.5px; color: #A8B4C0; white-space: nowrap; }
 
-        .login-switch { text-align: center; font-size: 14.5px; color: #6B7A88; }
+        .login-switch { text-align: center; font-size: 15.5px; color: #6B7A88; }
         .login-switch button {
           background: none; border: none; color: #1B7FA0;
-          font-size: 14.5px; font-weight: 700; cursor: pointer;
+          font-size: 15.5px; font-weight: 700; cursor: pointer;
           font-family: inherit; transition: color 0.15s;
         }
         .login-switch button:hover { color: #145F78; }
@@ -537,11 +537,11 @@ export default function LoginPage() {
         }
         .login-trust-item {
           display: flex; align-items: center; gap: 6px;
-          font-size: 11.5px; font-weight: 600; color: #6B7A88;
+          font-size: 12.5px; font-weight: 600; color: #6B7A88;
           background: #F3F7FA; border: 1px solid #E8EEF3;
           border-radius: 20px; padding: 5px 12px;
         }
-        .login-trust-icon { font-size: 12px; }
+        .login-trust-icon { font-size: 13px; }
 
         /* staggered entrance for form children */
         .login-card.show > * { animation: form-item-in 0.5s ease backwards; }
