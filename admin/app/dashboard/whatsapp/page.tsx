@@ -12,7 +12,12 @@ declare global {
   }
 }
 
-const META_APP_ID = process.env.NEXT_PUBLIC_META_APP_ID || "1556761279502082";
+// Sanitize before use: a Facebook App ID must be a bare numeric string. The #1 cause of Meta's
+// "Invalid App ID" error here is the Vercel env var being pasted with surrounding quotes or a
+// trailing newline/space (e.g. `"1556761279502082"` or `1556761279502082\n`) — strip those, and
+// any stray non-digit characters, so a slightly-mispasted value still works instead of hard-failing.
+const RAW_META_APP_ID = process.env.NEXT_PUBLIC_META_APP_ID || "1556761279502082";
+const META_APP_ID = RAW_META_APP_ID.replace(/[^0-9]/g, "");
 // This must be the config_id shown on the WhatsApp use case's own "Embedded Signup Builder" page
 // (App Dashboard > WhatsApp use case > Become a Partner > Embedded Signup Builder) — NOT a generic
 // Facebook Login for Business configuration. Using the wrong config_id here is what caused every
@@ -113,6 +118,13 @@ export default function WhatsAppPage() {
   // Load Facebook JS SDK
   useEffect(() => {
     if (!META_APP_ID) return;
+    if (RAW_META_APP_ID !== META_APP_ID) {
+      console.warn(
+        `NEXT_PUBLIC_META_APP_ID contained non-digit characters and was cleaned: ` +
+        `${JSON.stringify(RAW_META_APP_ID)} → ${JSON.stringify(META_APP_ID)}. ` +
+        `Fix the value in Vercel so it's a bare number with no quotes or whitespace.`
+      );
+    }
     window.fbAsyncInit = () => {
       window.FB.init({ appId: META_APP_ID, autoLogAppEvents: true, xfbml: true, version: "v23.0" });
       console.log("FB SDK initialized, appId:", META_APP_ID);
