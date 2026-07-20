@@ -5,10 +5,11 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth, signImpersonationToken, type AuthedRequest } from "../lib/auth.js";
 import { logAdminAction } from "../lib/adminAudit.js";
 import { sendAdminAlertEmail, sendBusinessNoticeEmail } from "../lib/email.js";
+import { captureError } from "../lib/errorMonitoring.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import { requireActiveSubscription } from "../lib/subscriptionGate.js";
 import { getAuthUrl, saveGoogleTokens, disconnectGoogleCalendar, deleteCalendarEvent, GoogleCalendarNotConfiguredError } from "../lib/googleCalendar.js";
-import { sendWhatsAppMessage, getWabaId, createMessageTemplate, setWhatsAppProfilePicture, type CreateTemplateResult } from "../webhook/whatsappClient.js";
+import { sendWhatsAppMessage, getWabaId, subscribeAppToWaba, createMessageTemplate, setWhatsAppProfilePicture, type CreateTemplateResult } from "../webhook/whatsappClient.js";
 import { reminderTemplate, reviewTemplate, REMINDER_TEMPLATE_BODY, REVIEW_TEMPLATE_BODY } from "../lib/whatsappTemplates.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
 import { appendTurn } from "../bot/conversationStore.js";
@@ -843,10 +844,25 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
       debug: debugTrail,
     });
   }
-  if (wabaId) {
-    await fetch(`https://graph.facebook.com/v23.0/${wabaId}/subscribed_apps`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${userToken}` },
+
+  // wabaId isn't always known at this point — the primary (postMessage) path only ever sets it
+  // to whatever the frontend happened to capture, which can be undefined even when a phone number
+  // was found. Resolve it from the phone number itself rather than silently skipping the
+  // subscription below: a connection that never subscribes the app to the WABA's webhook events
+  // looks fully "connected" in the dashboard (valid token, phone number stored) but the bot will
+  // never receive a single incoming message.
+  if (!wabaId) {
+    try {
+      wabaId = await getWabaId(phone.id, userToken);
+    } catch (err) {
+      console.error("[embedded-signup] Could not resolve WABA id for subscription:", err);
+    }
+  }
+
+  const subscribed = wabaId ? await subscribeAppToWaba(wabaId, userToken) : false;
+  if (!subscribed) {
+    captureError(new Error("WhatsApp embedded-signup: app subscription to WABA failed or wabaId unresolved"), {
+      businessId: req.businessId, wabaId, phoneNumberId: phone.id,
     });
   }
 
@@ -859,7 +875,33 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
     },
   });
 
-  res.json({ ok: true, phoneNumber: phone.display_phone_number });
+  res.json({ ok: true, phoneNumber: phone.display_phone_number, subscribed });
+});
+
+// Re-subscribes this business's own app to its WABA's webhook events, using the access token
+// already on file — no new Meta login required. Exists because the subscription step above can
+// fail (or, before this fix, silently skip) without it being visible anywhere: the business shows
+// as "connected" (valid token, phone number saved) but the bot never receives incoming messages,
+// since Meta only pushes webhook events to apps explicitly subscribed to that WABA.
+businessRouter.post("/me/whatsapp/resubscribe", async (req: AuthedRequest, res) => {
+  const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! } });
+  if (!business.whatsappPhoneNumberId || !business.whatsappAccessToken) {
+    return res.status(400).json({ error: "Connect a WhatsApp number first" });
+  }
+  const accessToken = decryptSecret(business.whatsappAccessToken);
+
+  let wabaId: string;
+  try {
+    wabaId = await getWabaId(business.whatsappPhoneNumberId, accessToken);
+  } catch (err) {
+    return res.status(502).json({ error: err instanceof Error ? err.message : "Could not resolve WhatsApp Business Account" });
+  }
+
+  const subscribed = await subscribeAppToWaba(wabaId, accessToken);
+  if (!subscribed) {
+    return res.status(502).json({ error: "Meta rejected the subscription request — see server logs for details" });
+  }
+  res.json({ ok: true });
 });
 
 // --- Services ---

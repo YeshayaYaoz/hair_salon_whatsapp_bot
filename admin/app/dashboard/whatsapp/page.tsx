@@ -82,7 +82,7 @@ function WhatsAppLogoSection() {
       <h3 className="text-sm font-semibold text-gray-900 mb-1">
         {lang === "he" ? "תמונת פרופיל בוואטסאפ" : "WhatsApp profile picture"}
       </h3>
-      <p className="text-xs text-gray-500 leading-relaxed max-w-md mb-4">
+      <p className="text-xs text-gray-600 leading-relaxed max-w-md mb-4">
         {lang === "he"
           ? "התמונה שהלקוחות שלך רואים ליד הודעות הבוט. מומלץ תמונה מרובעת וברורה (לוגו העסק)."
           : "The picture your customers see next to the bot's messages. A clear, square image (your business logo) works best."}
@@ -140,6 +140,27 @@ export default function WhatsAppPage() {
   const [disconnecting, setDisconnecting] = useState(false);
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [templateResults, setTemplateResults] = useState<{ name: string; submitted: boolean; status?: string; error?: string }[] | null>(null);
+  const [resubscribing, setResubscribing] = useState(false);
+  const [resubscribed, setResubscribed] = useState(false);
+
+  // Fixes a specific failure mode: the dashboard shows "connected" (valid token, phone number
+  // saved) but the bot never receives incoming messages, because Meta only pushes webhook events
+  // to apps explicitly subscribed to the WABA — a step that can fail silently during setup. Reuses
+  // the access token already on file instead of requiring a full reconnect through Meta's popup.
+  async function fixConnection() {
+    setResubscribing(true);
+    setError(null);
+    setResubscribed(false);
+    try {
+      await apiFetch("/api/business/me/whatsapp/resubscribe", { method: "POST" });
+      setResubscribed(true);
+      setTimeout(() => setResubscribed(false), 3000);
+    } catch (err: any) {
+      setError(err?.message ?? "Fix failed");
+    } finally {
+      setResubscribing(false);
+    }
+  }
 
   async function createTemplates() {
     setTemplatesLoading(true);
@@ -358,38 +379,57 @@ export default function WhatsAppPage() {
         </div>
       )}
 
-      {/* Connection — the one thing that has to happen before anything else on this page matters,
-          so status + the connect/reconnect action live together in a single card at the top
-          instead of a status line and a separate button further down the page. */}
+      {/* Connection — the one thing that has to happen before anything else on this page matters.
+          Kept to exactly this: status, the connect/reconnect action, and nothing else — manual
+          setup and everything downstream live in their own sections so this card stays scannable
+          at a glance instead of turning into a catch-all. */}
       <div className="bg-white border border-gray-200 rounded-xl p-6 mb-4">
-        <div className="flex items-center gap-2 mb-1 flex-wrap">
-          <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${
-            connected && tokenValid ? "bg-green-50 text-green-700 border border-green-200"
-            : connected && !tokenValid ? "bg-amber-50 text-amber-700 border border-amber-300"
-            : "bg-gray-100 text-gray-500 border border-gray-200"
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${
+            connected && tokenValid ? "bg-green-50 text-green-800 border border-green-200"
+            : connected && !tokenValid ? "bg-amber-50 text-amber-800 border border-amber-300"
+            : "bg-gray-100 text-gray-600 border border-gray-200"
           }`}>
             <span className={`w-1.5 h-1.5 rounded-full ${
-              connected && tokenValid ? "bg-green-400" : connected && !tokenValid ? "bg-amber-400" : "bg-gray-300"
+              connected && tokenValid ? "bg-green-500" : connected && !tokenValid ? "bg-amber-500" : "bg-gray-400"
             }`} />
             {connected && !tokenValid ? (lang === "he" ? "נותק — נדרש חיבור מחדש" : "Disconnected — reconnect")
               : connected ? t.connected : t.notConnected}
           </span>
-          {phoneNumber && <span className="text-xs text-gray-500" dir="ltr">{phoneNumber}</span>}
+          {phoneNumber && <span className="text-sm text-gray-600 font-medium" dir="ltr">{phoneNumber}</span>}
           {saved && <SavedBadge text={t.saved} />}
+          {resubscribed && <SavedBadge text={lang === "he" ? "תוקן" : "Fixed"} />}
           {connected && (
-            <button
-              onClick={disconnect}
-              disabled={disconnecting}
-              className="ms-auto text-xs text-red-500 hover:text-red-600 disabled:opacity-50 transition"
-            >
-              {disconnecting ? "..." : (lang === "he" ? "נתק" : "Disconnect")}
-            </button>
+            <div className="ms-auto flex items-center gap-3">
+              <button
+                onClick={fixConnection}
+                disabled={resubscribing}
+                className="text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50 transition font-medium"
+                title={lang === "he" ? "הבוט לא עונה? זה מתקן חיבור webhook שנשבר בשקט" : "Bot not answering? Fixes a webhook subscription that can silently break"}
+              >
+                {resubscribing ? "..." : (lang === "he" ? "תיקון חיבור" : "Fix connection")}
+              </button>
+              <button
+                onClick={disconnect}
+                disabled={disconnecting}
+                className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50 transition font-medium"
+              >
+                {disconnecting ? "..." : (lang === "he" ? "נתק" : "Disconnect")}
+              </button>
+            </div>
           )}
         </div>
+        {connected && (
+          <p className="text-xs text-gray-500 mt-2">
+            {lang === "he"
+              ? "הבוט לא עונה בוואטסאפ למרות שהחיבור מוצג כתקין? נסה \"תיקון חיבור\" — לפעמים ההרשמה לקבלת הודעות נכשלת בשקט."
+              : "Bot not answering on WhatsApp even though this shows connected? Try \"Fix connection\" — the subscription to receive messages can silently fail."}
+          </p>
+        )}
 
         {(!connected || !tokenValid) && (
           <>
-            <p className="text-xs text-gray-500 leading-relaxed mt-3 mb-4 max-w-md">
+            <p className="text-sm text-gray-600 leading-relaxed mt-3 mb-4 max-w-md">
               {lang === "he"
                 ? "לחץ על הכפתור ובצע את תהליך החיבור של מטא. ייקח כ-2 דקות."
                 : "Click the button below and complete Meta's setup flow. Takes about 2 minutes."}
@@ -414,56 +454,61 @@ export default function WhatsAppPage() {
             )}
 
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg px-4 py-3 mt-4">
+              <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg px-4 py-3 mt-4">
                 {error}
               </div>
-            )}
-
-            <button
-              onClick={() => setShowManual((v) => !v)}
-              className="block text-xs text-gray-400 hover:text-gray-600 transition underline underline-offset-2 mt-4"
-            >
-              {showManual
-                ? (lang === "he" ? "← חזור לחיבור אוטומטי" : "← Back to automatic setup")
-                : (lang === "he" ? "חיבור ידני (מפתחים)" : "Manual setup (developers)")}
-            </button>
-
-            {showManual && (
-              <form onSubmit={saveManual} className="flex flex-col gap-3 mt-4 pt-4 border-t border-gray-100">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5">{t.phoneNumberId}</label>
-                  <input
-                    placeholder={t.phoneNumberIdPlaceholder}
-                    value={phoneNumberId}
-                    onChange={(e) => setPhoneNumberId(e.target.value)}
-                    required
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5">{t.accessToken}</label>
-                  <input
-                    placeholder={t.accessTokenPlaceholder}
-                    value={accessToken}
-                    onChange={(e) => setAccessToken(e.target.value)}
-                    required
-                    className="w-full"
-                  />
-                </div>
-                <div className="flex items-center gap-3 mt-1">
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition"
-                  >
-                    {saving ? t.saving : t.save}
-                  </button>
-                </div>
-              </form>
             )}
           </>
         )}
       </div>
+
+      {/* Manual setup — a rarely-used developer fallback, so it's a plain disclosure rather than
+          another full card competing for attention with the connection status above. */}
+      {(!connected || !tokenValid) && (
+        <div className="mb-4">
+          <button
+            onClick={() => setShowManual((v) => !v)}
+            className="text-xs text-gray-500 hover:text-gray-700 transition underline underline-offset-2"
+          >
+            {showManual
+              ? (lang === "he" ? "← חזור לחיבור אוטומטי" : "← Back to automatic setup")
+              : (lang === "he" ? "חיבור ידני (מפתחים)" : "Manual setup (developers)")}
+          </button>
+          {showManual && (
+            <form onSubmit={saveManual} className="flex flex-col gap-3 mt-3 bg-gray-50 border border-gray-200 rounded-xl p-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">{t.phoneNumberId}</label>
+                <input
+                  placeholder={t.phoneNumberIdPlaceholder}
+                  value={phoneNumberId}
+                  onChange={(e) => setPhoneNumberId(e.target.value)}
+                  required
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">{t.accessToken}</label>
+                <input
+                  placeholder={t.accessTokenPlaceholder}
+                  value={accessToken}
+                  onChange={(e) => setAccessToken(e.target.value)}
+                  required
+                  className="w-full"
+                />
+              </div>
+              <div className="flex items-center gap-3 mt-1">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition"
+                >
+                  {saving ? t.saving : t.save}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
 
       {/* Message templates — needed to reach customers outside the 24h reply window */}
       {connected && tokenValid && (
@@ -473,7 +518,7 @@ export default function WhatsAppPage() {
               <h3 className="text-sm font-semibold text-gray-900 mb-1">
                 {lang === "he" ? "תבניות הודעות לתזכורות וביקורות" : "Reminder & review message templates"}
               </h3>
-              <p className="text-xs text-gray-500 leading-relaxed max-w-md">
+              <p className="text-xs text-gray-600 leading-relaxed max-w-md">
                 {lang === "he"
                   ? "וואטסאפ מאפשר לשלוח הודעה חופשית רק אם הלקוח כתב ב-24 השעות האחרונות. כדי שתזכורות תורים ובקשות ביקורת יגיעו גם מעבר לזה, יש לאשר תבניות הודעה מול מטא. לחיצה כאן שולחת אותן לאישור (עד כ-24 שעות)."
                   : "WhatsApp only allows free-form messages within 24h of the customer's last reply. To reach customers beyond that for reminders/reviews, message templates must be approved by Meta. This submits them for approval (can take up to ~24h)."}

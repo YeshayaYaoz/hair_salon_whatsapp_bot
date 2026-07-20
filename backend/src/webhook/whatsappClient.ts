@@ -89,6 +89,30 @@ export async function sendWhatsAppList(
  * Looks up the WhatsApp Business Account (WABA) ID that owns a phone number — needed to call the
  * message-template management endpoints, which are scoped to the WABA rather than the phone number.
  */
+/**
+ * Subscribes this app to a WABA's webhook events — without this, Meta never pushes incoming
+ * message events to our webhook, even though the connection otherwise looks fully valid (token
+ * works, phone number resolves). Returns whether Meta actually confirmed the subscription rather
+ * than throwing, since callers use this as a health check as much as an action.
+ */
+export async function subscribeAppToWaba(wabaId: string, accessToken: string): Promise<boolean> {
+  try {
+    const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${wabaId}/subscribed_apps`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const body = (await res.json().catch(() => ({}))) as { success?: boolean; error?: { message?: string } };
+    if (!res.ok || body.success !== true) {
+      console.error(`[whatsapp] Subscribe app to WABA ${wabaId} failed:`, body.error?.message ?? `HTTP ${res.status}`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error(`[whatsapp] Subscribe app to WABA ${wabaId} threw:`, err);
+    return false;
+  }
+}
+
 export async function getWabaId(phoneNumberId: string, accessToken: string): Promise<string> {
   const url = `https://graph.facebook.com/${GRAPH_VERSION}/${phoneNumberId}?fields=whatsapp_business_account`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
