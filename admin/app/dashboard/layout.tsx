@@ -21,14 +21,21 @@ const ICONS = {
   hours: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
   faq: "M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
   whatsapp: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z",
-  bot: "M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 13V7a2 2 0 012-2h10a2 2 0 012 2v6a2 2 0 01-2 2H7a2 2 0 01-2-2z M9 10h.01M15 10h.01",
+  bot: "M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z",
   payments: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z",
   settings: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z",
   billing: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z",
 };
 
-// Grouped so the sidebar reads as a few short, scannable sections instead of one long flat list.
+// Grouped by *when you'd reach for it* rather than a flat categorical list, so the order itself
+// tells a story: get the bot connected and talking first, then the screens you check day to day,
+// then one-time business configuration, then account/money admin. WhatsApp leads every group —
+// nothing else on this dashboard does anything until it's connected.
 const NAV_GROUPS: { titleKey: keyof ReturnType<typeof useLanguage>["t"]["navGroups"]; items: NavItem[] }[] = [
+  { titleKey: "setup", items: [
+    { href: "/dashboard/whatsapp", key: "whatsapp", icon: ICONS.whatsapp },
+    { href: "/dashboard/bot", key: "bot", icon: ICONS.bot },
+  ] },
   { titleKey: "overview", items: [{ href: "/dashboard/analytics", key: "analytics", icon: ICONS.analytics }] },
   { titleKey: "operations", items: [
     { href: "/dashboard/appointments", key: "appointments", icon: ICONS.appointments },
@@ -41,12 +48,8 @@ const NAV_GROUPS: { titleKey: keyof ReturnType<typeof useLanguage>["t"]["navGrou
     { href: "/dashboard/hours", key: "hours", icon: ICONS.hours },
     { href: "/dashboard/faq", key: "faq", icon: ICONS.faq },
   ] },
-  { titleKey: "integrations", items: [
-    { href: "/dashboard/whatsapp", key: "whatsapp", icon: ICONS.whatsapp },
-    { href: "/dashboard/bot", key: "bot", icon: ICONS.bot },
-    { href: "/dashboard/payments", key: "payments", icon: ICONS.payments },
-  ] },
   { titleKey: "account", items: [
+    { href: "/dashboard/payments", key: "payments", icon: ICONS.payments },
     { href: "/dashboard/settings", key: "settings", icon: ICONS.settings },
     { href: "/dashboard/billing", key: "billing", icon: ICONS.billing },
   ] },
