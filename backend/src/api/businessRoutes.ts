@@ -484,11 +484,14 @@ businessRouter.post("/me/whatsapp/create-templates", async (req: AuthedRequest, 
   }
 
   const accessToken = decryptSecret(business.whatsappAccessToken);
-  let wabaId: string;
-  try {
-    wabaId = await getWabaId(business.whatsappPhoneNumberId, accessToken);
-  } catch (err) {
-    return res.status(502).json({ error: err instanceof Error ? err.message : "Could not resolve WhatsApp Business Account" });
+  let wabaId = business.whatsappWabaId ?? undefined;
+  if (!wabaId) {
+    try {
+      wabaId = await getWabaId(business.whatsappPhoneNumberId, accessToken);
+    } catch (err) {
+      return res.status(502).json({ error: err instanceof Error ? err.message : "Could not resolve WhatsApp Business Account" });
+    }
+    await prisma.business.update({ where: { id: business.id }, data: { whatsappWabaId: wabaId } });
   }
 
   const reminder = reminderTemplate();
@@ -872,6 +875,7 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
       whatsappPhoneNumberId: phone.id,
       whatsappAccessToken: encryptSecret(userToken),
       whatsappTokenValid: true,
+      ...(wabaId ? { whatsappWabaId: wabaId } : {}),
     },
   });
 
@@ -890,11 +894,15 @@ businessRouter.post("/me/whatsapp/resubscribe", async (req: AuthedRequest, res) 
   }
   const accessToken = decryptSecret(business.whatsappAccessToken);
 
-  let wabaId: string;
-  try {
-    wabaId = await getWabaId(business.whatsappPhoneNumberId, accessToken);
-  } catch (err) {
-    return res.status(502).json({ error: err instanceof Error ? err.message : "Could not resolve WhatsApp Business Account" });
+  let wabaId = business.whatsappWabaId ?? undefined;
+  if (!wabaId) {
+    try {
+      wabaId = await getWabaId(business.whatsappPhoneNumberId, accessToken);
+    } catch (err) {
+      return res.status(502).json({ error: err instanceof Error ? err.message : "Could not resolve WhatsApp Business Account" });
+    }
+    // Backfill so future resubscribes skip this lookup entirely.
+    await prisma.business.update({ where: { id: business.id }, data: { whatsappWabaId: wabaId } });
   }
 
   const subscribed = await subscribeAppToWaba(wabaId, accessToken);
