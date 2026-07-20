@@ -220,6 +220,125 @@ function VoicePhoneSection() {
   );
 }
 
+// Meta recommends a square ~640x640 profile picture — resizing/compressing client-side before
+// upload keeps the request small (server body limit is 6mb, but there's no reason to send a
+// multi-megabyte phone photo when 640px is all that's ever displayed) and avoids a round trip
+// just to reject an oversized file.
+const PROFILE_PICTURE_MAX_DIMENSION = 640;
+
+function resizeImageToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const scale = Math.min(1, PROFILE_PICTURE_MAX_DIMENSION / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("Canvas not supported"));
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Could not read image file"));
+    };
+    img.src = objectUrl;
+  });
+}
+
+function WhatsAppLogoSection() {
+  const { lang } = useLanguage();
+  const he = lang === "he";
+  const [connected, setConnected] = useState<boolean | undefined>(undefined); // undefined = loading
+  const [preview, setPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiFetch<{ whatsappConnected?: boolean }>("/api/business/me").then((me) => {
+      setConnected(Boolean(me.whatsappConnected));
+    });
+  }, []);
+
+  async function onFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-choosing the same file consecutively
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError(he ? "יש לבחור קובץ תמונה" : "Please choose an image file");
+      return;
+    }
+    setError(null);
+    setSaved(false);
+    setUploading(true);
+    try {
+      const dataUrl = await resizeImageToDataUrl(file);
+      setPreview(dataUrl);
+      await apiFetch("/api/business/me/whatsapp/profile-picture", {
+        method: "POST",
+        body: JSON.stringify({ imageBase64: dataUrl }),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : he ? "ההעלאה נכשלה" : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
+      <div className="flex items-center gap-2 mb-0.5">
+        <h2 className="text-sm font-semibold text-gray-900">{he ? "תמונת פרופיל בוואטסאפ" : "WhatsApp profile picture"}</h2>
+        {connected === false && (
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+            {he ? "וואטסאפ לא מחובר" : "WhatsApp not connected"}
+          </span>
+        )}
+      </div>
+      <p className="text-xs text-gray-400 mb-4">
+        {he
+          ? "התמונה שהלקוחות שלך רואים ליד הודעות הבוט בוואטסאפ. מומלץ תמונה מרובעת וברורה (לוגו העסק)."
+          : "The picture your customers see next to the bot's WhatsApp messages. A clear, square image (your business logo) works best."}
+      </p>
+
+      {connected === undefined ? (
+        <SkeletonCard lines={1} />
+      ) : connected === false ? (
+        <p className="text-xs text-gray-500">
+          {he ? "חבר/י מספר וואטסאפ עסקי (בעמוד החיבור) כדי להעלות תמונת פרופיל." : "Connect a WhatsApp Business number (on the connection page) before uploading a profile picture."}
+        </p>
+      ) : (
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-gray-100 border border-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
+            {preview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={preview} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-gray-300 text-2xl">📷</span>
+            )}
+          </div>
+          <div>
+            <label className="inline-block cursor-pointer bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+              {uploading ? (he ? "מעלה..." : "Uploading...") : he ? "העלאת תמונה" : "Upload image"}
+              <input type="file" accept="image/png,image/jpeg" className="hidden" disabled={uploading} onChange={onFileChosen} />
+            </label>
+            {saved && <span className="ms-3"><SavedBadge text={he ? "נשמר" : "Saved"} /></span>}
+          </div>
+        </div>
+      )}
+      {error && <p className="text-red-600 text-xs mt-2">{error}</p>}
+    </div>
+  );
+}
+
 function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
@@ -505,6 +624,7 @@ export default function SettingsPage() {
         </div>
       </form>
 
+      <WhatsAppLogoSection />
       <VoicePhoneSection />
       <SystemStatusSection />
     </div>

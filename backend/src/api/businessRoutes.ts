@@ -8,7 +8,7 @@ import { sendAdminAlertEmail, sendBusinessNoticeEmail } from "../lib/email.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import { requireActiveSubscription } from "../lib/subscriptionGate.js";
 import { getAuthUrl, saveGoogleTokens, disconnectGoogleCalendar, deleteCalendarEvent, GoogleCalendarNotConfiguredError } from "../lib/googleCalendar.js";
-import { sendWhatsAppMessage, getWabaId, createMessageTemplate, type CreateTemplateResult } from "../webhook/whatsappClient.js";
+import { sendWhatsAppMessage, getWabaId, createMessageTemplate, setWhatsAppProfilePicture, type CreateTemplateResult } from "../webhook/whatsappClient.js";
 import { reminderTemplate, reviewTemplate, REMINDER_TEMPLATE_BODY, REVIEW_TEMPLATE_BODY } from "../lib/whatsappTemplates.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
 import { appendTurn } from "../bot/conversationStore.js";
@@ -497,6 +497,44 @@ businessRouter.post("/me/whatsapp/create-templates", async (req: AuthedRequest, 
     createMessageTemplate(wabaId, accessToken, { name: review.name, languageCode: review.languageCode, bodyText: REVIEW_TEMPLATE_BODY }),
   ]);
   res.json({ results });
+});
+
+// Sets the WhatsApp Business Profile picture — the avatar customers see next to the bot's
+// messages. Accepts a data: URL (image already resized/compressed client-side) rather than a
+// multipart upload, matching every other endpoint on this router, which are all JSON.
+const MAX_PROFILE_PICTURE_BYTES = 5 * 1024 * 1024;
+const profilePictureSchema = z.object({ imageBase64: z.string().min(1) });
+businessRouter.post("/me/whatsapp/profile-picture", async (req: AuthedRequest, res) => {
+  const parsed = profilePictureSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! } });
+  if (!business.whatsappPhoneNumberId || !business.whatsappAccessToken) {
+    return res.status(400).json({ error: "Connect a WhatsApp number first" });
+  }
+  const appId = process.env.META_APP_ID;
+  if (!appId) return res.status(500).json({ error: "Server not configured for WhatsApp profile uploads" });
+
+  const dataUrlMatch = parsed.data.imageBase64.match(/^data:(image\/(?:jpeg|png));base64,(.+)$/);
+  const mimeType = dataUrlMatch ? dataUrlMatch[1] : "image/jpeg";
+  const rawBase64 = dataUrlMatch ? dataUrlMatch[2] : parsed.data.imageBase64;
+
+  let imageBuffer: Buffer;
+  try {
+    imageBuffer = Buffer.from(rawBase64, "base64");
+  } catch {
+    return res.status(400).json({ error: "Invalid image data" });
+  }
+  if (imageBuffer.length === 0) return res.status(400).json({ error: "Invalid image data" });
+  if (imageBuffer.length > MAX_PROFILE_PICTURE_BYTES) return res.status(400).json({ error: "Image too large (max 5MB)" });
+
+  const accessToken = decryptSecret(business.whatsappAccessToken);
+  try {
+    await setWhatsAppProfilePicture({ phoneNumberId: business.whatsappPhoneNumberId, accessToken, appId, imageBuffer, mimeType });
+  } catch (err) {
+    return res.status(502).json({ error: err instanceof Error ? err.message : "Failed to set profile picture" });
+  }
+  res.json({ ok: true });
 });
 
 // --- Payment provider (PayPlus / Tranzila / Cardcom / Grow / Tori-managed) — the business's own

@@ -46,7 +46,10 @@ app.use(cors({
 // before the global express.json() middleware below would otherwise consume the stream.
 app.use("/webhook/whatsapp", whatsappRouter);
 
-app.use(express.json());
+// Default 100kb is too small for a base64-encoded profile-picture upload (see
+// POST /api/business/me/whatsapp/profile-picture) — 6mb gives headroom over the ~33% base64
+// overhead on a client-resized image without opening the door to arbitrarily large bodies.
+app.use(express.json({ limit: "6mb" }));
 app.use(express.urlencoded({ extended: true })); // Tranzila's notify webhook posts form-encoded, not JSON
 
 app.use("/webhook/payments", paymentWebhookRouter);

@@ -138,6 +138,55 @@ export async function createMessageTemplate(
   return { name: params.name, submitted: false, error: message };
 }
 
+/**
+ * Sets a WhatsApp Business Profile picture via Meta's 3-step Resumable Upload flow:
+ *   1) open an app-scoped upload session for the image,
+ *   2) upload the raw bytes to that session to get a one-time file handle,
+ *   3) hand the handle to the phone number's own business_profile endpoint.
+ * appId is the Meta App ID the business connected through via Embedded Signup — the upload
+ * session is scoped to the app, not to the business's WABA or phone number.
+ */
+export async function setWhatsAppProfilePicture(params: {
+  phoneNumberId: string;
+  accessToken: string;
+  appId: string;
+  imageBuffer: Buffer;
+  mimeType: string;
+}): Promise<void> {
+  const { phoneNumberId, accessToken, appId, imageBuffer, mimeType } = params;
+
+  const sessionRes = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${appId}/uploads?file_length=${imageBuffer.length}&file_type=${encodeURIComponent(mimeType)}`,
+    { method: "POST", headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  const sessionBody = (await sessionRes.json().catch(() => ({}))) as { id?: string; error?: { message?: string } };
+  if (!sessionRes.ok || !sessionBody.id) {
+    throw new Error(`Could not start image upload: ${sessionBody.error?.message ?? `HTTP ${sessionRes.status}`}`);
+  }
+
+  // Note: this step authenticates with "OAuth <token>", not "Bearer <token>" like every other
+  // call in this file — that's Meta's Resumable Upload API convention, not a typo.
+  const uploadRes = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${sessionBody.id}`, {
+    method: "POST",
+    headers: { Authorization: `OAuth ${accessToken}`, file_offset: "0" },
+    body: new Uint8Array(imageBuffer),
+  });
+  const uploadBody = (await uploadRes.json().catch(() => ({}))) as { h?: string; error?: { message?: string } };
+  if (!uploadRes.ok || !uploadBody.h) {
+    throw new Error(`Could not upload image: ${uploadBody.error?.message ?? `HTTP ${uploadRes.status}`}`);
+  }
+
+  const profileRes = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${phoneNumberId}/whatsapp_business_profile`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ messaging_product: "whatsapp", profile_picture_handle: uploadBody.h }),
+  });
+  if (!profileRes.ok) {
+    const errBody = (await profileRes.json().catch(() => ({}))) as { error?: { message?: string } };
+    throw new Error(`Could not set profile picture: ${errBody.error?.message ?? `HTTP ${profileRes.status}`}`);
+  }
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function send(params: SendCommon, payload: Record<string, unknown>) {
