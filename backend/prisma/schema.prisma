@@ -49,6 +49,9 @@ model Business {
   // same token can subscribe apps and send messages fine — so callers should use this stored value
   // instead of re-querying Meta whenever possible.
   whatsappWabaId            String?
+  // Two-step verification PIN used to register the number to the Cloud API. Generated once per
+  // business and reused on every re-register — Meta requires the same PIN once one has been set.
+  whatsappRegistrationPin   String?
   notificationPhone         String? // owner's personal phone for booking alerts
   botGreeting               String? // custom greeting override
   botPersonality            String? // tone/personality instructions for the bot

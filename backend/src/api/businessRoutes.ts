@@ -9,7 +9,7 @@ import { captureError } from "../lib/errorMonitoring.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import { requireActiveSubscription } from "../lib/subscriptionGate.js";
 import { getAuthUrl, saveGoogleTokens, disconnectGoogleCalendar, deleteCalendarEvent, GoogleCalendarNotConfiguredError } from "../lib/googleCalendar.js";
-import { sendWhatsAppMessage, getWabaId, subscribeAppToWaba, createMessageTemplate, setWhatsAppProfilePicture, type CreateTemplateResult } from "../webhook/whatsappClient.js";
+import { sendWhatsAppMessage, getWabaId, subscribeAppToWaba, registerPhoneNumber, createMessageTemplate, setWhatsAppProfilePicture, type CreateTemplateResult } from "../webhook/whatsappClient.js";
 import { reminderTemplate, reviewTemplate, REMINDER_TEMPLATE_BODY, REVIEW_TEMPLATE_BODY } from "../lib/whatsappTemplates.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
 import { appendTurn } from "../bot/conversationStore.js";
@@ -52,6 +52,11 @@ businessRouter.get("/me", async (req: AuthedRequest, res) => {
 // --- Super-admin: lists every registered business (salon) using Tori. Gated by email match
 // against SUPER_ADMIN_EMAIL rather than a separate role system, since there's currently exactly
 // one operator account and adding a full RBAC system for that would be overkill. ---
+
+/** 6-digit two-step verification PIN for Cloud API phone registration. */
+function generateRegistrationPin(): string {
+  return crypto.randomInt(0, 1_000_000).toString().padStart(6, "0");
+}
 
 function isSuperAdminEmail(email: string): boolean {
   const adminEmail = process.env.SUPER_ADMIN_EMAIL;
@@ -869,12 +874,25 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
     });
   }
 
+  // Final activation step: without /register, the number stays "Pending" — verified and
+  // subscribed, but silent. Reuse the business's existing PIN if one was ever set (Meta rejects
+  // a different PIN once two-step verification is on).
+  const existing = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! }, select: { whatsappRegistrationPin: true } });
+  const pin = existing.whatsappRegistrationPin ?? generateRegistrationPin();
+  const registration = await registerPhoneNumber(phone.id, userToken, pin);
+  if (!registration.ok) {
+    captureError(new Error(`WhatsApp embedded-signup: phone registration failed: ${registration.error}`), {
+      businessId: req.businessId, phoneNumberId: phone.id,
+    });
+  }
+
   await prisma.business.update({
     where: { id: req.businessId! },
     data: {
       whatsappPhoneNumberId: phone.id,
       whatsappAccessToken: encryptSecret(userToken),
       whatsappTokenValid: true,
+      whatsappRegistrationPin: pin,
       ...(wabaId ? { whatsappWabaId: wabaId } : {}),
     },
   });
@@ -908,6 +926,17 @@ businessRouter.post("/me/whatsapp/resubscribe", async (req: AuthedRequest, res) 
   const subscribed = await subscribeAppToWaba(wabaId, accessToken);
   if (!subscribed) {
     return res.status(502).json({ error: "Meta rejected the subscription request — see server logs for details" });
+  }
+
+  // Also (re-)register the number to the Cloud API — an unregistered number is the other silent
+  // failure mode with these exact symptoms (everything shows connected, bot never hears anything).
+  const pin = business.whatsappRegistrationPin ?? generateRegistrationPin();
+  const registration = await registerPhoneNumber(business.whatsappPhoneNumberId, accessToken, pin);
+  if (registration.ok && !business.whatsappRegistrationPin) {
+    await prisma.business.update({ where: { id: business.id }, data: { whatsappRegistrationPin: pin } });
+  }
+  if (!registration.ok) {
+    return res.status(502).json({ error: `Phone registration failed: ${registration.error}` });
   }
   res.json({ ok: true });
 });

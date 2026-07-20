@@ -113,6 +113,27 @@ export async function subscribeAppToWaba(wabaId: string, accessToken: string): P
   }
 }
 
+/**
+ * Registers a phone number to the WhatsApp Cloud API. Verification (SMS/voice code) proves you own
+ * the number; registration is the separate, final step that actually activates it on WhatsApp's
+ * network — until it runs, the number stays "Pending": it can't send, customers messaging it get
+ * silence, and no webhook events fire, even though everything else (token, WABA subscription)
+ * checks out. The pin sets/uses the number's two-step verification PIN. Registering an
+ * already-registered number is a benign no-op, so this is safe to call repeatedly.
+ */
+export async function registerPhoneNumber(phoneNumberId: string, accessToken: string, pin: string): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${phoneNumberId}/register`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ messaging_product: "whatsapp", pin }),
+  });
+  const body = (await res.json().catch(() => ({}))) as { success?: boolean; error?: { message?: string; error_subcode?: number } };
+  if (res.ok && body.success === true) return { ok: true };
+  const error = body.error?.message ?? `HTTP ${res.status}`;
+  console.error(`[whatsapp] Register phone number ${phoneNumberId} failed:`, error);
+  return { ok: false, error };
+}
+
 export async function getWabaId(phoneNumberId: string, accessToken: string): Promise<string> {
   const url = `https://graph.facebook.com/${GRAPH_VERSION}/${phoneNumberId}?fields=whatsapp_business_account`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
