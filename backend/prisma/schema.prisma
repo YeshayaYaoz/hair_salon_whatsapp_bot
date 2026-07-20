@@ -355,6 +355,7 @@ model Lead {
   placeId          String?      @unique // Google Places place_id — dedupe key
   name             String
   phone            String?
+  email            String? // best-effort, scraped off the lead's own website (mailto: link/contact text) during enrichment — never guaranteed
   address          String?
   website          String?
   category         String?

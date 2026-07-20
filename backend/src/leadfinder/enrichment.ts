@@ -12,6 +12,7 @@ export interface EnrichmentResult {
   hasContactForm: boolean | null;
   whatsappDetected: boolean;
   websiteStale: boolean | null;
+  email: string | null;
 }
 
 const BOOKING_SIGNALS = [
@@ -38,7 +39,38 @@ const EMPTY_RESULT: EnrichmentResult = {
   hasContactForm: null,
   whatsappDetected: false,
   websiteStale: null,
+  email: null,
 };
+
+// Hosting/platform addresses that show up incidentally in page source (analytics beacons, theme
+// boilerplate, etc.) but were never meant as a contact address — surfacing one of these as "the
+// business's email" would be worse than finding none.
+const EMAIL_DOMAIN_DENYLIST = [
+  "wixpress.com", "sentry.io", "sentry-next.wixpress.com", "example.com", "godaddy.com",
+  "schema.org", "w3.org", "gstatic.com", "google.com", "googleapis.com", "facebook.com",
+  "wordpress.org", "wp.com",
+];
+const EMAIL_REGEX = /[a-zA-Z0-9][a-zA-Z0-9._%+-]*@[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}/g;
+
+/** Best-effort contact email off a fetched page: prefers an explicit mailto: link (a deliberate
+ * "email us" affordance) over a bare address appearing in body text, and filters out addresses
+ * on platform/boilerplate domains that aren't really the business's own. Never throws. */
+function extractEmail(html: string): string | null {
+  const mailtoMatch = html.match(/mailto:([^"'?\s>]+)/i);
+  const candidates = mailtoMatch ? [mailtoMatch[1], ...(html.match(EMAIL_REGEX) ?? [])] : html.match(EMAIL_REGEX) ?? [];
+
+  for (const raw of candidates) {
+    const email = raw.trim().toLowerCase();
+    const domain = email.split("@")[1];
+    if (!domain) continue;
+    if (EMAIL_DOMAIN_DENYLIST.some((d) => domain === d || domain.endsWith(`.${d}`))) continue;
+    // Image/font/script filenames occasionally satisfy the regex (e.g. "logo@2x.png") — reject
+    // anything whose domain-looking part is actually a file extension.
+    if (/\.(png|jpg|jpeg|gif|svg|webp|css|js)$/i.test(domain)) continue;
+    return email;
+  }
+  return null;
+}
 
 async function fetchWithTimeout(url: string): Promise<string | null> {
   const controller = new AbortController();
@@ -89,5 +121,6 @@ export async function enrichWebsite(website: string | null): Promise<EnrichmentR
     hasContactForm: /<form[\s>]/i.test(html),
     whatsappDetected: WHATSAPP_SIGNALS.some((s) => lowerHtml.includes(s.toLowerCase())),
     websiteStale: detectStaleWebsite(html),
+    email: extractEmail(html),
   };
 }

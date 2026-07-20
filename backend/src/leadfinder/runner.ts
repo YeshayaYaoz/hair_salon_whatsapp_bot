@@ -78,6 +78,10 @@ export async function executeLeadFinderRun(runId: string): Promise<void> {
             hasContactForm: enrichment.hasContactForm,
             whatsappDetected: enrichment.whatsappDetected,
             websiteStale: enrichment.websiteStale,
+            // Only overwrite if we actually found one this pass — an operator-entered or
+            // previously-found email must never be clobbered back to null by a re-run whose
+            // fetch happened to fail or whose page no longer shows the address.
+            ...(enrichment.email ? { email: enrichment.email } : {}),
           },
         });
       } catch (err) {

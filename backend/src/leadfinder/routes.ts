@@ -403,6 +403,86 @@ leadFinderRouter.post("/outreach/:id/send", async (req: AuthedRequest, res) => {
   res.json(updated);
 });
 
+// Sends the SAME operator-written message to every eligible lead in the campaign (or a specific
+// subset via leadIds) — unlike /leads/:id/outreach/generate+send above, there's no per-lead AI
+// draft or approval step here; the operator's own text *is* the approved content. "Eligible"
+// means: has a discovered email, hasn't opted out (ConsentLog), and hasn't already received a
+// broadcast from a previous call (checked so re-clicking Send after a partial failure doesn't
+// re-spam whoever already went out). Paced with a short delay between sends rather than
+// Promise.all — this is unsolicited outreach, so hammering Resend/the recipients' mail servers in
+// a burst is exactly the pattern that gets a sending domain flagged.
+const broadcastSchema = z.object({
+  subject: z.string().min(1),
+  body: z.string().min(1),
+  leadIds: z.array(z.string()).optional(),
+});
+leadFinderRouter.post("/campaigns/:id/outreach/broadcast", async (req: AuthedRequest, res) => {
+  const parsed = broadcastSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const campaign = await prisma.leadCampaign.findUnique({ where: { id: req.params.id }, select: { id: true } });
+  if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+
+  const leads = await prisma.lead.findMany({
+    where: {
+      campaignId: req.params.id,
+      email: { not: null },
+      ...(parsed.data.leadIds ? { id: { in: parsed.data.leadIds } } : {}),
+    },
+    select: { id: true, email: true },
+  });
+
+  if (leads.length === 0) {
+    return res.json({ sent: 0, skippedOptedOut: 0, skippedAlreadySent: 0, failed: 0, failedLeads: [], totalEligible: 0 });
+  }
+
+  const leadIds = leads.map((l) => l.id);
+  const [optedOutLogs, alreadySentMessages] = await Promise.all([
+    prisma.consentLog.findMany({ where: { leadId: { in: leadIds }, event: "opted_out" }, select: { leadId: true } }),
+    prisma.outreachMessage.findMany({
+      where: { leadId: { in: leadIds }, angle: "broadcast", sentAt: { not: null } },
+      select: { leadId: true },
+    }),
+  ]);
+  const optedOutSet = new Set(optedOutLogs.map((l) => l.leadId));
+  const alreadySentSet = new Set(alreadySentMessages.map((m) => m.leadId));
+
+  const footer = '\n\n—\nלהסרה מרשימת התפוצה, השיבו למייל זה במילה "הסר".';
+  const fullBody = `${parsed.data.body}${footer}`;
+
+  let sent = 0;
+  let failed = 0;
+  const failedLeads: { leadId: string; error: string }[] = [];
+  const skippedOptedOut = leads.filter((l) => optedOutSet.has(l.id)).length;
+  const skippedAlreadySent = leads.filter((l) => alreadySentSet.has(l.id) && !optedOutSet.has(l.id)).length;
+
+  for (const lead of leads) {
+    if (optedOutSet.has(lead.id) || alreadySentSet.has(lead.id)) continue;
+    try {
+      await sendOutreachEmail(lead.email!, parsed.data.subject, fullBody);
+      await prisma.outreachMessage.create({
+        data: {
+          leadId: lead.id,
+          channel: "email",
+          angle: "broadcast",
+          subject: parsed.data.subject,
+          body: fullBody,
+          approvalStatus: "approved",
+          sentAt: new Date(),
+        },
+      });
+      sent += 1;
+    } catch (err) {
+      failed += 1;
+      failedLeads.push({ leadId: lead.id, error: err instanceof Error ? err.message : "Unknown error" });
+      console.error(`[leadfinder] Broadcast send failed for lead ${lead.id}:`, err);
+    }
+    await new Promise((r) => setTimeout(r, 350));
+  }
+
+  res.json({ sent, skippedOptedOut, skippedAlreadySent, failed, failedLeads, totalEligible: leads.length });
+});
+
 // Lightweight business search for the "link to existing business" picker in the lead-linking UI.
 leadFinderRouter.get("/businesses-search", async (req: AuthedRequest, res) => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";

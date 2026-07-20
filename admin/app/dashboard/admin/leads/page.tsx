@@ -38,10 +38,20 @@ interface LeadListItem {
   id: string;
   name: string;
   phone: string | null;
+  email: string | null;
   website: string | null;
   status: string;
   latestScore: number | null;
   linkedBusiness: { id: string; name: string } | null;
+}
+
+interface BroadcastResult {
+  sent: number;
+  skippedOptedOut: number;
+  skippedAlreadySent: number;
+  failed: number;
+  failedLeads: { leadId: string; error: string }[];
+  totalEligible: number;
 }
 
 interface LeadScoreRow {
@@ -468,6 +478,131 @@ function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => 
   );
 }
 
+// --- Broadcast (one operator-written message, sent to every lead with a discovered email) ---
+
+const DEFAULT_BROADCAST_SUBJECT = "בוט AI שקובע לכם תורים אוטומטית בוואטסאפ";
+const DEFAULT_BROADCAST_BODY =
+  "היי,\n\nראיתי את העסק שלכם וחשבתי שזה יכול לעניין אתכם: בנינו את תורי — בוט AI שיושב על הוואטסאפ העסקי ומנהל לבד את קביעת התורים, 24/7, בלי שתצטרכו לענות לכל הודעה בעצמכם.\n\nאם זה נשמע רלוונטי, אשמח לתאם דמו קצר של 5 דקות.\n\nתודה,\nצוות תורי";
+
+function BroadcastModal({
+  campaignId,
+  eligibleCount,
+  onClose,
+  onSent,
+}: {
+  campaignId: string;
+  eligibleCount: number;
+  onClose: () => void;
+  onSent: () => void;
+}) {
+  const [subject, setSubject] = useState(DEFAULT_BROADCAST_SUBJECT);
+  const [body, setBody] = useState(DEFAULT_BROADCAST_BODY);
+  const [sending, setSending] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [result, setResult] = useState<BroadcastResult | null>(null);
+  const [confirming, setConfirming] = useState(false);
+
+  async function send() {
+    setSending(true);
+    setErr(null);
+    try {
+      const res = await apiFetch<BroadcastResult>(`/api/leadfinder/campaigns/${campaignId}/outreach/broadcast`, {
+        method: "POST",
+        body: JSON.stringify({ subject, body }),
+      });
+      setResult(res);
+      onSent();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "שגיאה בשליחה");
+    } finally {
+      setSending(false);
+      setConfirming(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl max-w-lg w-full p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-bold text-gray-900 mb-1">שליחת הודעת תפוצה</h2>
+
+        {result ? (
+          <div className="mt-3">
+            <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-3 py-2 mb-2">
+              נשלח בהצלחה ל-{result.sent} מתוך {result.totalEligible} עסקים.
+            </div>
+            {(result.skippedAlreadySent > 0 || result.skippedOptedOut > 0) && (
+              <div className="text-xs text-gray-500 mb-2">
+                {result.skippedAlreadySent > 0 && <div>דולג — כבר קיבלו הודעת תפוצה בעבר: {result.skippedAlreadySent}</div>}
+                {result.skippedOptedOut > 0 && <div>דולג — ביקשו הסרה: {result.skippedOptedOut}</div>}
+              </div>
+            )}
+            {result.failed > 0 && (
+              <div className="bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg px-3 py-2 mb-2">
+                נכשל אצל {result.failed} עסקים (למשל כתובת מייל לא תקינה). אפשר לנסות שוב מאוחר יותר — מי שכבר נשלח לו לא יקבל שוב.
+              </div>
+            )}
+            <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-medium text-white mt-2" style={{ background: "#1B7FA0" }}>
+              סגירה
+            </button>
+          </div>
+        ) : (
+          <>
+            <p className="text-gray-500 text-sm mb-4">
+              ההודעה תישלח בדיוק כפי שכתובה כאן — אין ניסוח אוטומטי לכל עסק בנפרד. יש
+              <span className="font-medium text-gray-700"> {eligibleCount} </span>
+              עסקים בקמפיין הזה עם כתובת מייל ידועה (מי שכבר קיבל הודעת תפוצה בעבר או ביקש הסרה ידולג אוטומטית, גם אם נכלל במספר הזה).
+            </p>
+            {err && <div className="bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg px-3 py-2 mb-3">{err}</div>}
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">נושא</label>
+                <input value={subject} onChange={(e) => setSubject(e.target.value)} className="text-sm w-full" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-1 block">תוכן ההודעה</label>
+                <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={10} className="text-sm w-full" />
+                <p className="text-[11px] text-gray-400 mt-1">שורת הסרה מרשימת התפוצה תתווסף אוטומטית בסוף ההודעה.</p>
+              </div>
+
+              {eligibleCount === 0 ? (
+                <div className="text-xs text-gray-400">
+                  אין כרגע עסקים עם כתובת מייל בקמפיין הזה. כתובות מייל מתגלות אוטומטית מהאתר של כל עסק — הרץ סריקה נוספת אם עברו עסקים בלי אתר ידוע קודם לכן.
+                </div>
+              ) : !confirming ? (
+                <button
+                  disabled={!subject.trim() || !body.trim()}
+                  onClick={() => setConfirming(true)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-white self-start disabled:opacity-50"
+                  style={{ background: "#1B7FA0" }}
+                >
+                  המשך
+                </button>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p className="text-sm text-amber-800 mb-3">
+                    לשלוח את ההודעה הזו ל-{eligibleCount} עסקים עכשיו? זו פעולה בלתי הפיכה — לא ניתן לבטל הודעות שכבר נשלחו.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      disabled={sending}
+                      onClick={send}
+                      className="px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50"
+                      style={{ background: "#B45309" }}
+                    >
+                      {sending ? "שולח…" : `כן, שלח ל-${eligibleCount} עסקים`}
+                    </button>
+                    <button onClick={() => setConfirming(false)} className="px-4 py-2 rounded-lg text-sm text-gray-500">ביטול</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // --- Campaign detail (runs + leads) ---
 
 function CampaignDetailView({
@@ -484,6 +619,7 @@ function CampaignDetailView({
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showBroadcast, setShowBroadcast] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadCampaign = useCallback(() => {
@@ -544,17 +680,35 @@ function CampaignDetailView({
           <h1 className="text-2xl font-bold text-gray-900">{campaign?.name ?? "…"}</h1>
           <p className="text-gray-500 text-sm mt-1">{campaign ? `${campaign.category} · ${campaign.locationQuery}` : ""}</p>
         </div>
-        <button
-          disabled={starting || Boolean(runInFlight)}
-          onClick={startRun}
-          className="px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50"
-          style={{ background: "#1B7FA0" }}
-        >
-          {runInFlight ? "סריקה פעילה…" : starting ? "מתחיל…" : "התחל סריקה"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            disabled={!leads || leads.filter((l) => l.email).length === 0}
+            onClick={() => setShowBroadcast(true)}
+            className="px-4 py-2 rounded-lg text-sm font-medium text-teal-700 bg-teal-50 border border-teal-200 hover:bg-teal-100 disabled:opacity-50"
+          >
+            📢 שלח הודעת תפוצה
+          </button>
+          <button
+            disabled={starting || Boolean(runInFlight)}
+            onClick={startRun}
+            className="px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50"
+            style={{ background: "#1B7FA0" }}
+          >
+            {runInFlight ? "סריקה פעילה…" : starting ? "מתחיל…" : "התחל סריקה"}
+          </button>
+        </div>
       </div>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3 mb-4">{error}</div>}
+
+      {showBroadcast && (
+        <BroadcastModal
+          campaignId={campaignId}
+          eligibleCount={leads?.filter((l) => l.email).length ?? 0}
+          onClose={() => setShowBroadcast(false)}
+          onSent={loadLeads}
+        />
+      )}
 
       {latestRun && (
         <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6">
@@ -584,15 +738,16 @@ function CampaignDetailView({
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
         {leads === null ? (
-          <div>{Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={5} />)}</div>
+          <div>{Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={6} />)}</div>
         ) : leads.length === 0 ? (
           <div className="px-6 py-12 text-center text-gray-400 text-sm">אין עדיין לידים — התחל סריקה כדי לאתר עסקים</div>
         ) : (
-          <table className="w-full text-sm min-w-[700px]">
+          <table className="w-full text-sm min-w-[820px]">
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="text-start px-4 py-3 text-gray-500 font-medium">שם</th>
                 <th className="text-start px-4 py-3 text-gray-500 font-medium">טלפון</th>
+                <th className="text-start px-4 py-3 text-gray-500 font-medium">מייל</th>
                 <th className="text-start px-4 py-3 text-gray-500 font-medium">אתר</th>
                 <th className="text-start px-4 py-3 text-gray-500 font-medium">סטטוס</th>
                 <th className="text-end px-4 py-3 text-gray-500 font-medium">ניקוד</th>
@@ -614,6 +769,7 @@ function CampaignDetailView({
                     )}
                   </td>
                   <td className="px-4 py-3 text-gray-500" dir="ltr">{l.phone ?? "—"}</td>
+                  <td className="px-4 py-3 text-gray-500 truncate max-w-[180px]" dir="ltr">{l.email ?? "—"}</td>
                   <td className="px-4 py-3 text-gray-500 truncate max-w-[200px]" dir="ltr">{l.website ?? "—"}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_COLORS[l.status] ?? ""}`}>
