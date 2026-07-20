@@ -427,6 +427,12 @@ export default function WhatsAppPage() {
           </p>
         )}
 
+        {error && connected && tokenValid && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg px-4 py-3 mt-3">
+            {error}
+          </div>
+        )}
+
         {(!connected || !tokenValid) && (
           <>
             <p className="text-sm text-gray-600 leading-relaxed mt-3 mb-4 max-w-md">
