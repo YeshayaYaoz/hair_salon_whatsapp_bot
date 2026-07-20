@@ -5,6 +5,7 @@ import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SavedBadge } from "../../lib/SavedBadge";
 import { SkeletonCard } from "../../lib/Skeleton";
+import { Toggle, Section, Field } from "../../lib/SettingsControls";
 
 interface BusinessProfile {
   name: string;
@@ -12,37 +13,11 @@ interface BusinessProfile {
   timezone: string;
   email: string;
   notificationPhone?: string;
-  botGreeting?: string;
-  botPersonality?: string;
   googleMapsUrl?: string;
-  remindersEnabled?: boolean;
-  reviewsEnabled?: boolean;
-  cancellationPolicy?: string;
-  referralText?: string;
-  digestEnabled?: boolean;
   depositEnabled?: boolean;
   depositAmountIls?: number;
   depositHoldMinutes?: number;
   paymentConnected?: boolean;
-  voicePhoneNumber?: string | null;
-}
-
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      dir="ltr"
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 transition-colors ${checked ? "bg-[#1B7FA0] border-[#1B7FA0]" : "bg-gray-200 border-gray-200"}`}
-    >
-      <span
-        className="absolute top-0 left-0 h-4 w-4 rounded-full bg-white shadow transition-transform"
-        style={{ transform: checked ? "translateX(1rem)" : "translateX(0)" }}
-      />
-    </button>
-  );
 }
 
 interface JobStatus {
@@ -116,257 +91,12 @@ function SystemStatusSection() {
   );
 }
 
-function VoicePhoneSection() {
-  const { lang } = useLanguage();
-  const he = lang === "he";
-  const [current, setCurrent] = useState<string | null | undefined>(undefined); // undefined = loading
-  const [value, setValue] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    apiFetch<{ voicePhoneNumber?: string | null }>("/api/business/me").then((me) => {
-      setCurrent(me.voicePhoneNumber ?? null);
-      setValue(me.voicePhoneNumber ?? "");
-    });
-  }, []);
-
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    setError(null);
-    try {
-      await apiFetch("/api/business/me/voice-phone", { method: "PUT", body: JSON.stringify({ voicePhoneNumber: value }) });
-      setCurrent(value);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : he ? "השמירה נכשלה" : "Failed to save");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function disconnect() {
-    setSaving(true);
-    setError(null);
-    try {
-      await apiFetch("/api/business/me/voice-phone", { method: "DELETE" });
-      setCurrent(null);
-      setValue("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : he ? "הניתוק נכשל" : "Failed to disconnect");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
-      <div className="flex items-center gap-2 mb-0.5">
-        <h2 className="text-sm font-semibold text-gray-900">{he ? "בוט טלפוני (שיחות קוליות)" : "Voice bot (phone calls)"}</h2>
-        {current === null ? (
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
-            {he ? "לא מחובר" : "Not connected"}
-          </span>
-        ) : current ? (
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">
-            {he ? "מחובר" : "Connected"}
-          </span>
-        ) : null}
-      </div>
-      <p className="text-xs text-gray-400 mb-4">
-        {he
-          ? "מספר הטלפון שסופק ע\"י Cartesia עבור העסק שלך — שיחות נכנסות למספר הזה ייענו ע\"י הבוט הקולי."
-          : "The phone number Cartesia provisioned for your business — incoming calls to this number are answered by the voice bot."}
-      </p>
-      {current === undefined ? (
-        <SkeletonCard lines={1} />
-      ) : (
-        <form onSubmit={save} className="flex items-end gap-2 flex-wrap">
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">{he ? "מספר טלפון" : "Phone number"}</label>
-            <input
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="+972501234567"
-              dir="ltr"
-              className="w-full"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={saving || !value}
-            className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
-          >
-            {saving ? (he ? "שומר..." : "Saving...") : he ? "שמור" : "Save"}
-          </button>
-          {current && (
-            <button
-              type="button"
-              onClick={disconnect}
-              disabled={saving}
-              className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50 transition px-2 py-2"
-            >
-              {he ? "נתק" : "Disconnect"}
-            </button>
-          )}
-          {saved && <SavedBadge text={he ? "נשמר" : "Saved"} />}
-        </form>
-      )}
-      {error && <p className="text-red-600 text-xs mt-2">{error}</p>}
-    </div>
-  );
-}
-
-// Meta recommends a square ~640x640 profile picture — resizing/compressing client-side before
-// upload keeps the request small (server body limit is 6mb, but there's no reason to send a
-// multi-megabyte phone photo when 640px is all that's ever displayed) and avoids a round trip
-// just to reject an oversized file.
-const PROFILE_PICTURE_MAX_DIMENSION = 640;
-
-function resizeImageToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const objectUrl = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      const scale = Math.min(1, PROFILE_PICTURE_MAX_DIMENSION / Math.max(img.width, img.height));
-      const w = Math.round(img.width * scale);
-      const h = Math.round(img.height * scale);
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return reject(new Error("Canvas not supported"));
-      ctx.drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL("image/jpeg", 0.85));
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error("Could not read image file"));
-    };
-    img.src = objectUrl;
-  });
-}
-
-function WhatsAppLogoSection() {
-  const { lang } = useLanguage();
-  const he = lang === "he";
-  const [connected, setConnected] = useState<boolean | undefined>(undefined); // undefined = loading
-  const [preview, setPreview] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    apiFetch<{ whatsappConnected?: boolean }>("/api/business/me").then((me) => {
-      setConnected(Boolean(me.whatsappConnected));
-    });
-  }, []);
-
-  async function onFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // allow re-choosing the same file consecutively
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setError(he ? "יש לבחור קובץ תמונה" : "Please choose an image file");
-      return;
-    }
-    setError(null);
-    setSaved(false);
-    setUploading(true);
-    try {
-      const dataUrl = await resizeImageToDataUrl(file);
-      setPreview(dataUrl);
-      await apiFetch("/api/business/me/whatsapp/profile-picture", {
-        method: "POST",
-        body: JSON.stringify({ imageBase64: dataUrl }),
-      });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : he ? "ההעלאה נכשלה" : "Upload failed");
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
-      <div className="flex items-center gap-2 mb-0.5">
-        <h2 className="text-sm font-semibold text-gray-900">{he ? "תמונת פרופיל בוואטסאפ" : "WhatsApp profile picture"}</h2>
-        {connected === false && (
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
-            {he ? "וואטסאפ לא מחובר" : "WhatsApp not connected"}
-          </span>
-        )}
-      </div>
-      <p className="text-xs text-gray-400 mb-4">
-        {he
-          ? "התמונה שהלקוחות שלך רואים ליד הודעות הבוט בוואטסאפ. מומלץ תמונה מרובעת וברורה (לוגו העסק)."
-          : "The picture your customers see next to the bot's WhatsApp messages. A clear, square image (your business logo) works best."}
-      </p>
-
-      {connected === undefined ? (
-        <SkeletonCard lines={1} />
-      ) : connected === false ? (
-        <p className="text-xs text-gray-500">
-          {he ? "חבר/י מספר וואטסאפ עסקי (בעמוד החיבור) כדי להעלות תמונת פרופיל." : "Connect a WhatsApp Business number (on the connection page) before uploading a profile picture."}
-        </p>
-      ) : (
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-gray-100 border border-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
-            {preview ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={preview} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-gray-300 text-2xl">📷</span>
-            )}
-          </div>
-          <div>
-            <label className="inline-block cursor-pointer bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
-              {uploading ? (he ? "מעלה..." : "Uploading...") : he ? "העלאת תמונה" : "Upload image"}
-              <input type="file" accept="image/png,image/jpeg" className="hidden" disabled={uploading} onChange={onFileChosen} />
-            </label>
-            {saved && <span className="ms-3"><SavedBadge text={he ? "נשמר" : "Saved"} /></span>}
-          </div>
-        </div>
-      )}
-      {error && <p className="text-red-600 text-xs mt-2">{error}</p>}
-    </div>
-  );
-}
-
-function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
-      <h2 className="text-sm font-semibold text-gray-900 mb-0.5">{title}</h2>
-      {description && <p className="text-xs text-gray-400 mb-4">{description}</p>}
-      <div className="mt-4 flex flex-col gap-3">{children}</div>
-    </div>
-  );
-}
-
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-xs font-medium text-gray-500 mb-1.5">{label}</label>
-      {children}
-      {hint && <p className="text-xs text-zinc-600 mt-1">{hint}</p>}
-    </div>
-  );
-}
-
 export default function SettingsPage() {
   const { t, lang } = useLanguage();
   const he = lang === "he";
   const [fields, setFields] = useState<BusinessProfile>({
     name: "", address: "", timezone: "Asia/Jerusalem", email: "",
-    notificationPhone: "", botGreeting: "", botPersonality: "", googleMapsUrl: "",
-    remindersEnabled: true, reviewsEnabled: true,
-    cancellationPolicy: "", referralText: "", digestEnabled: true,
+    notificationPhone: "", googleMapsUrl: "",
     depositEnabled: false, depositAmountIls: 0, depositHoldMinutes: 30, paymentConnected: false,
   });
   const [loaded, setLoaded] = useState(false);
@@ -382,14 +112,7 @@ export default function SettingsPage() {
         timezone: me.timezone,
         email: me.email,
         notificationPhone: me.notificationPhone ?? "",
-        botGreeting: me.botGreeting ?? "",
-        botPersonality: me.botPersonality ?? "",
         googleMapsUrl: me.googleMapsUrl ?? "",
-        remindersEnabled: me.remindersEnabled ?? true,
-        reviewsEnabled: me.reviewsEnabled ?? true,
-        cancellationPolicy: me.cancellationPolicy ?? "",
-        referralText: me.referralText ?? "",
-        digestEnabled: me.digestEnabled ?? true,
         depositEnabled: me.depositEnabled ?? false,
         depositAmountIls: me.depositAmountIls ?? 0,
         depositHoldMinutes: me.depositHoldMinutes ?? 30,
@@ -415,14 +138,7 @@ export default function SettingsPage() {
           address: fields.address,
           timezone: fields.timezone,
           notificationPhone: fields.notificationPhone,
-          botGreeting: fields.botGreeting,
-          botPersonality: fields.botPersonality,
           googleMapsUrl: fields.googleMapsUrl,
-          remindersEnabled: fields.remindersEnabled,
-          reviewsEnabled: fields.reviewsEnabled,
-          cancellationPolicy: fields.cancellationPolicy,
-          referralText: fields.referralText,
-          digestEnabled: fields.digestEnabled,
           depositEnabled: fields.depositEnabled,
           depositAmountIls: fields.depositAmountIls,
           depositHoldMinutes: fields.depositHoldMinutes,
@@ -492,24 +208,6 @@ export default function SettingsPage() {
           </Field>
         </Section>
 
-        <Section title={t.automatedMessages} description={t.automatedMessagesDesc}>
-          <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2.5">
-            {t.templateWarning}
-          </div>
-          <label className="flex items-center justify-between gap-3">
-            <span className="text-xs text-gray-700">{t.remindersLabel}</span>
-            <Toggle checked={fields.remindersEnabled ?? true} onChange={(v) => set("remindersEnabled", v)} />
-          </label>
-          <label className="flex items-center justify-between gap-3">
-            <span className="text-xs text-gray-700">{t.reviewsLabel}</span>
-            <Toggle checked={fields.reviewsEnabled ?? true} onChange={(v) => set("reviewsEnabled", v)} />
-          </label>
-          <label className="flex items-center justify-between gap-3">
-            <span className="text-xs text-gray-700">{he ? "סיכום יומי בבוקר (וואטסאפ)" : "Morning daily digest (WhatsApp)"}</span>
-            <Toggle checked={fields.digestEnabled ?? true} onChange={(v) => set("digestEnabled", v)} />
-          </label>
-        </Section>
-
         <Section
           title={he ? "מקדמה לפני תור" : "Deposit before booking"}
           description={
@@ -561,56 +259,6 @@ export default function SettingsPage() {
           )}
         </Section>
 
-        <Section
-          title={he ? "מדיניות ותמריצים" : "Policy & incentives"}
-          description={he ? "טקסטים שהבוט משתמש בהם בשיחות עם לקוחות" : "Text the bot uses in customer conversations"}
-        >
-          <Field
-            label={he ? "מדיניות ביטולים" : "Cancellation policy"}
-            hint={he ? "הבוט יזכיר את זה כשלקוח מבטל תור" : "The bot mentions this when a customer cancels"}
-          >
-            <textarea
-              rows={2}
-              placeholder={he ? "לדוגמה: ביטול עד 24 שעות מראש ללא עלות." : "e.g. Free cancellation up to 24h in advance."}
-              value={fields.cancellationPolicy}
-              onChange={(e) => set("cancellationPolicy", e.target.value)}
-              className="w-full"
-            />
-          </Field>
-          <Field
-            label={he ? "הצעת חבר מביא חבר" : "Referral offer"}
-            hint={he ? "נוסף להודעת הביקורת אחרי הביקור" : "Appended to the post-visit review message"}
-          >
-            <input
-              placeholder={he ? "לדוגמה: הזמן חבר וקבל 10% הנחה בביקור הבא!" : "e.g. Refer a friend and get 10% off your next visit!"}
-              value={fields.referralText}
-              onChange={(e) => set("referralText", e.target.value)}
-              className="w-full"
-            />
-          </Field>
-        </Section>
-
-        <Section title={t.botPersonalityTitle} description={t.botPersonalityDesc}>
-          <Field label={t.greeting}>
-            <textarea
-              rows={2}
-              placeholder={t.greetingPlaceholder}
-              value={fields.botGreeting}
-              onChange={(e) => set("botGreeting", e.target.value)}
-              className="w-full"
-            />
-          </Field>
-          <Field label={t.personality}>
-            <textarea
-              rows={3}
-              placeholder={t.personalityPlaceholder}
-              value={fields.botPersonality}
-              onChange={(e) => set("botPersonality", e.target.value)}
-              className="w-full"
-            />
-          </Field>
-        </Section>
-
         <div className="flex items-center gap-3 mt-2">
           <button
             type="submit"
@@ -624,8 +272,6 @@ export default function SettingsPage() {
         </div>
       </form>
 
-      <WhatsAppLogoSection />
-      <VoicePhoneSection />
       <SystemStatusSection />
     </div>
   );

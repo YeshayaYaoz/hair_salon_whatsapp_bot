@@ -6,7 +6,7 @@ const translations = {
       analytics: "Analytics", appointments: "Appointments", customers: "Customers",
       waitlist: "Waitlist", services: "Services", staff: "Staff", hours: "Schedule",
       blocked: "Time off", conversations: "Conversations",
-      whatsapp: "WhatsApp", payments: "Payments", faq: "FAQ", settings: "Settings", billing: "Billing", logout: "Log out",
+      whatsapp: "WhatsApp", bot: "Bot", payments: "Payments", faq: "FAQ", settings: "Settings", billing: "Billing", logout: "Log out",
     },
     navGroups: { overview: "Overview", operations: "Day-to-day", business: "Business setup", integrations: "Integrations", account: "Account" },
     days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
@@ -79,10 +79,13 @@ const translations = {
     markNotified: "Mark notified", noWaitlist: "No one on the waitlist yet.",
 
     // Settings
-    settingsTitle: "Settings", settingsSubtitle: "Salon profile and bot configuration",
+    settingsTitle: "Settings", settingsSubtitle: "Salon profile and business details",
     businessProfile: "Business profile", businessProfileDesc: "Basic info shown to customers via the bot.",
     bookingNotifications: "Booking notifications",
     bookingNotificationsDesc: "Get a WhatsApp message on your phone every time a customer books.",
+
+    // Bot
+    botTabTitle: "Bot", botTabSubtitle: "How the bot talks, and what it sends automatically",
     botPersonalityTitle: "Bot personality",
     botPersonalityDesc: "Customize how the bot introduces itself and speaks to customers.",
     salonName: "Salon name", address: "Address", timezone: "Timezone", loginEmail: "Login email",
@@ -138,7 +141,7 @@ const translations = {
       analytics: "סטטיסטיקות", appointments: "תורים", customers: "לקוחות",
       waitlist: "רשימת המתנה", services: "שירותים", staff: "צוות", hours: "לוח זמנים",
       blocked: "חופשות", conversations: "שיחות",
-      whatsapp: "וואטסאפ", payments: "סליקה וחשבוניות", faq: "שאלות נפוצות", settings: "הגדרות", billing: "תשלום", logout: "התנתקות",
+      whatsapp: "וואטסאפ", bot: "בוט", payments: "סליקה וחשבוניות", faq: "שאלות נפוצות", settings: "הגדרות", billing: "תשלום", logout: "התנתקות",
     },
     navGroups: { overview: "סקירה", operations: "ניהול יומי", business: "הגדרות העסק", integrations: "חיבורים", account: "חשבון" },
     days: ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"],
@@ -211,10 +214,13 @@ const translations = {
     markNotified: "סימון כעודכן", noWaitlist: "אין כרגע ממתינים",
 
     // Settings
-    settingsTitle: "הגדרות", settingsSubtitle: "פרופיל הסלון והגדרות הבוט",
+    settingsTitle: "הגדרות", settingsSubtitle: "פרופיל הסלון ופרטי העסק",
     businessProfile: "פרופיל העסק", businessProfileDesc: "מידע בסיסי שמוצג ללקוחות דרך הבוט.",
     bookingNotifications: "התראות הזמנה",
     bookingNotificationsDesc: "קבל הודעת וואטסאפ בכל פעם שלקוח קובע תור.",
+
+    // Bot
+    botTabTitle: "בוט", botTabSubtitle: "איך הבוט מדבר, ומה הוא שולח אוטומטית",
     botPersonalityTitle: "אישיות הבוט",
     botPersonalityDesc: "איך הבוט מדבר? רשמי, קליל, עם אימוג׳ים — אתם קובעים.",
     salonName: "שם הסלון", address: "כתובת", timezone: "אזור זמן", loginEmail: "אימייל כניסה",
