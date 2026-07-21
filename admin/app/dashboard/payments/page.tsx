@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SavedBadge } from "../../lib/SavedBadge";
+import { SkeletonCard } from "../../lib/Skeleton";
 
 const PAYMENT_PROVIDERS = ["payplus", "tranzila", "cardcom", "grow"] as const;
 type PaymentProviderName = (typeof PAYMENT_PROVIDERS)[number];
@@ -343,6 +344,14 @@ export default function PaymentsPage() {
         </p>
       </div>
 
+      {!me && (
+        <div className="grid gap-5 lg:grid-cols-2 items-start">
+          <SkeletonCard lines={4} />
+          <SkeletonCard lines={4} />
+        </div>
+      )}
+      {me && (<>
+
       <div className="grid gap-5 lg:grid-cols-2 items-start animate-fade-up stagger-1">
         <ProviderCard
           he={he}
@@ -432,6 +441,7 @@ export default function PaymentsPage() {
           )}
         </div>
       )}
+      </>)}
     </div>
   );
 }

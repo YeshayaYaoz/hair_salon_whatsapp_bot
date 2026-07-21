@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
+import { SkeletonRow } from "../../lib/Skeleton";
 
 interface Staff {
   id: string;
@@ -12,6 +13,7 @@ interface Staff {
 export default function StaffPage() {
   const { t } = useLanguage();
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -21,7 +23,7 @@ export default function StaffPage() {
   }
 
   useEffect(() => {
-    load().catch((e) => setError(e.message));
+    load().catch((e) => setError(e.message)).finally(() => setLoaded(true));
   }, []);
 
   async function addStaff(e: React.FormEvent) {
@@ -52,7 +54,9 @@ export default function StaffPage() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-6 animate-fade-up stagger-2">
-        {staff.length === 0 ? (
+        {!loaded ? (
+          <div><SkeletonRow cols={1} /><SkeletonRow cols={1} /><SkeletonRow cols={1} /></div>
+        ) : staff.length === 0 ? (
           <div className="px-6 py-10 text-center text-gray-400 text-sm">{t.noStaff}</div>
         ) : (
           <ul>

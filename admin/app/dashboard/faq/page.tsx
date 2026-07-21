@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
+import { SkeletonCard } from "../../lib/Skeleton";
 
 interface FaqEntry {
   id: string;
@@ -13,6 +14,7 @@ interface FaqEntry {
 export default function FaqPage() {
   const { t } = useLanguage();
   const [entries, setEntries] = useState<FaqEntry[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +25,7 @@ export default function FaqPage() {
   }
 
   useEffect(() => {
-    load().catch((e) => setError(e.message));
+    load().catch((e) => setError(e.message)).finally(() => setLoaded(true));
   }, []);
 
   async function addEntry(e: React.FormEvent) {
@@ -55,7 +57,9 @@ export default function FaqPage() {
       </div>
 
       <div className="flex flex-col gap-3 mb-6">
-        {entries.length === 0 ? (
+        {!loaded ? (
+          <><SkeletonCard lines={2} /><SkeletonCard lines={2} /></>
+        ) : entries.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-xl px-6 py-10 text-center text-gray-400 text-sm">
             {t.noFaq}
           </div>

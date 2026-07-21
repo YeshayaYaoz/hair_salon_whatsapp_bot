@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
+import { SkeletonRow } from "../../lib/Skeleton";
 
 // A curated, muted palette instead of raw saturated primaries — tones picked to sit together
 // (similar chroma/lightness) so any combination of service tags looks intentional, not like a
@@ -36,6 +37,7 @@ interface EditState {
 export default function ServicesPage() {
   const { t } = useLanguage();
   const [services, setServices] = useState<Service[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditState>({ name: "", description: "", price: "", duration: "", color: COLORS[0].hex });
   const [newName, setNewName] = useState("");
@@ -49,6 +51,7 @@ export default function ServicesPage() {
 
   async function load() {
     setServices(await apiFetch<Service[]>("/api/business/services"));
+    setLoaded(true);
   }
 
   useEffect(() => { load().catch((e) => setError(e.message)); }, []);
@@ -157,7 +160,9 @@ export default function ServicesPage() {
 
       {/* Services list */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-6 animate-fade-up stagger-2">
-        {services.length === 0 ? (
+        {!loaded ? (
+          <div><SkeletonRow cols={2} /><SkeletonRow cols={2} /><SkeletonRow cols={2} /></div>
+        ) : services.length === 0 ? (
           <div className="px-6 py-12 text-center">
             <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
               <svg className="w-6 h-6 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">

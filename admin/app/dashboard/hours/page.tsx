@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
+import { SkeletonBlock } from "../../lib/Skeleton";
 import { SavedBadge } from "../../lib/SavedBadge";
 
 interface DayHours {
@@ -141,20 +142,23 @@ export default function HoursPage() {
   const [hours, setHours] = useState<DayHours[]>(
     t.days.map((_, i) => ({ dayOfWeek: i, open: "09:00", close: "18:00", enabled: i !== 6 }))
   );
+  const [loaded, setLoaded] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     apiFetch<{ dayOfWeek: number; openMin: number; closeMin: number }[]>("/api/business/hours").then((existing) => {
-      if (existing.length === 0) return;
-      setHours(
-        t.days.map((_, i) => {
-          const match = existing.find((h) => h.dayOfWeek === i);
-          return match
-            ? { dayOfWeek: i, open: toHHMM(match.openMin), close: toHHMM(match.closeMin), enabled: true }
-            : { dayOfWeek: i, open: "09:00", close: "18:00", enabled: false };
-        })
-      );
-    });
+      if (existing.length > 0) {
+        setHours(
+          t.days.map((_, i) => {
+            const match = existing.find((h) => h.dayOfWeek === i);
+            return match
+              ? { dayOfWeek: i, open: toHHMM(match.openMin), close: toHHMM(match.closeMin), enabled: true }
+              : { dayOfWeek: i, open: "09:00", close: "18:00", enabled: false };
+          })
+        );
+      }
+      setLoaded(true);
+    }).catch(() => setLoaded(true));
   }, []);
 
   async function save() {
@@ -178,7 +182,17 @@ export default function HoursPage() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-4">
-        {hours.map((h, i) => (
+        {!loaded ? (
+          <div className="flex flex-col">
+            {t.days.map((_, i) => (
+              <div key={i} className={`flex items-center gap-4 px-5 py-3.5 ${i !== t.days.length - 1 ? "border-b border-gray-200/50" : ""}`}>
+                <SkeletonBlock className="h-4 w-4 rounded" />
+                <SkeletonBlock className="h-3.5 w-20" />
+                <SkeletonBlock className="h-7 w-40 ms-auto rounded-md" />
+              </div>
+            ))}
+          </div>
+        ) : hours.map((h, i) => (
           <div
             key={h.dayOfWeek}
             className={`flex items-center gap-4 px-5 py-3.5 ${i !== hours.length - 1 ? "border-b border-gray-200/50" : ""} ${!h.enabled ? "opacity-50" : ""}`}
