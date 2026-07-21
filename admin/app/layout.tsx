@@ -86,7 +86,17 @@ const karantina = Karantina({
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="he" suppressHydrationWarning className={`dark ${heebo.variable} ${karantina.variable}`}>
+    <html lang="he" dir="rtl" suppressHydrationWarning className={`dark ${heebo.variable} ${karantina.variable}`}>
+      <head>
+        {/* Sync lang/dir from the saved preference before first paint, so the page never flashes
+            the server default (Hebrew/RTL) before hydration corrects it for English users. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var l=localStorage.getItem('lang')||'he';document.documentElement.lang=l;document.documentElement.dir=l==='he'?'rtl':'ltr';}catch(e){}",
+          }}
+        />
+      </head>
       <body className="bg-zinc-950 text-zinc-100 min-h-screen font-[family-name:var(--font-heebo)]">
         <LanguageProvider>{children}</LanguageProvider>
       </body>
