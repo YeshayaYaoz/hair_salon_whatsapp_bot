@@ -52,6 +52,10 @@ model Business {
   // Two-step verification PIN used to register the number to the Cloud API. Generated once per
   // business and reused on every re-register — Meta requires the same PIN once one has been set.
   whatsappRegistrationPin   String?
+  // Set once the number is successfully registered to the Cloud API. Guards against re-registering
+  // on every reconnect/"Fix connection" click — Meta rate-limits registration attempts hard
+  // (error 133016, "too many attempts"), and a registered number never needs registering again.
+  whatsappRegisteredAt      DateTime?
   notificationPhone         String? // owner's personal phone for booking alerts
   botGreeting               String? // custom greeting override
   botPersonality            String? // tone/personality instructions for the bot

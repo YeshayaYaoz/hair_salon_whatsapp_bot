@@ -876,14 +876,24 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
 
   // Final activation step: without /register, the number stays "Pending" — verified and
   // subscribed, but silent. Reuse the business's existing PIN if one was ever set (Meta rejects
-  // a different PIN once two-step verification is on).
-  const existing = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! }, select: { whatsappRegistrationPin: true } });
+  // a different PIN once two-step verification is on). Skip if already registered — Meta
+  // rate-limits registration attempts (133016), so we never re-register a working number.
+  const existing = await prisma.business.findUniqueOrThrow({
+    where: { id: req.businessId! },
+    select: { whatsappRegistrationPin: true, whatsappRegisteredAt: true, whatsappPhoneNumberId: true },
+  });
   const pin = existing.whatsappRegistrationPin ?? generateRegistrationPin();
-  const registration = await registerPhoneNumber(phone.id, userToken, pin);
-  if (!registration.ok) {
-    captureError(new Error(`WhatsApp embedded-signup: phone registration failed: ${registration.error}`), {
-      businessId: req.businessId, phoneNumberId: phone.id,
-    });
+  const alreadyRegistered = existing.whatsappRegisteredAt !== null && existing.whatsappPhoneNumberId === phone.id;
+  let registeredAt = existing.whatsappRegisteredAt;
+  if (!alreadyRegistered) {
+    const registration = await registerPhoneNumber(phone.id, userToken, pin);
+    if (registration.ok) {
+      registeredAt = new Date();
+    } else {
+      captureError(new Error(`WhatsApp embedded-signup: phone registration failed: ${registration.error}`), {
+        businessId: req.businessId, phoneNumberId: phone.id,
+      });
+    }
   }
 
   await prisma.business.update({
@@ -893,6 +903,7 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
       whatsappAccessToken: encryptSecret(userToken),
       whatsappTokenValid: true,
       whatsappRegistrationPin: pin,
+      whatsappRegisteredAt: registeredAt,
       ...(wabaId ? { whatsappWabaId: wabaId } : {}),
     },
   });
@@ -928,15 +939,22 @@ businessRouter.post("/me/whatsapp/resubscribe", async (req: AuthedRequest, res) 
     return res.status(502).json({ error: "Meta rejected the subscription request — see server logs for details" });
   }
 
-  // Also (re-)register the number to the Cloud API — an unregistered number is the other silent
-  // failure mode with these exact symptoms (everything shows connected, bot never hears anything).
-  const pin = business.whatsappRegistrationPin ?? generateRegistrationPin();
-  const registration = await registerPhoneNumber(business.whatsappPhoneNumberId, accessToken, pin);
-  if (registration.ok && !business.whatsappRegistrationPin) {
-    await prisma.business.update({ where: { id: business.id }, data: { whatsappRegistrationPin: pin } });
-  }
-  if (!registration.ok) {
-    return res.status(502).json({ error: `Phone registration failed: ${registration.error}` });
+  // Register the number to the Cloud API only if it has never been registered — an unregistered
+  // number is the other silent failure mode with these symptoms (everything shows connected, bot
+  // hears nothing). Crucially, do NOT re-register an already-registered number: Meta rate-limits
+  // registration attempts hard (133016), and repeated "Fix connection" clicks would otherwise
+  // trip that lockout. Subscription (above) is the safe, idempotent part to repeat.
+  if (!business.whatsappRegisteredAt) {
+    const pin = business.whatsappRegistrationPin ?? generateRegistrationPin();
+    const registration = await registerPhoneNumber(business.whatsappPhoneNumberId, accessToken, pin);
+    if (!registration.ok) {
+      await prisma.business.update({ where: { id: business.id }, data: { whatsappRegistrationPin: pin } });
+      return res.status(502).json({ error: `Phone registration failed: ${registration.error}` });
+    }
+    await prisma.business.update({
+      where: { id: business.id },
+      data: { whatsappRegistrationPin: pin, whatsappRegisteredAt: new Date() },
+    });
   }
   res.json({ ok: true });
 });
