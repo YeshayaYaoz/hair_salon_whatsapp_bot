@@ -164,6 +164,9 @@ export async function runDigestJob() {
 
   const now = new Date();
   for (const biz of businesses) {
+    // notificationPhone passes the `not: null` filter as an empty string; Meta then rejects the
+    // send with "parameter to is required". Skip these rather than logging a failure every run.
+    if (!biz.notificationPhone?.trim()) continue;
     const tz = biz.timezone || "Asia/Jerusalem";
     const local = instantPartsInTz(now, tz);
     // Send once, in the 07:00 local hour.
@@ -231,6 +234,7 @@ export async function runRoiReportJob() {
 
   const now = new Date();
   for (const biz of businesses) {
+    if (!biz.notificationPhone?.trim()) continue; // empty-string phone slips past the null filter
     const tz = biz.timezone || "Asia/Jerusalem";
     const { year, month, day } = ymdInTz(now, tz);
     if (day !== 1) continue; // only fires on the 1st of the month, local time
