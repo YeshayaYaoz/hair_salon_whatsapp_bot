@@ -456,6 +456,12 @@ export default function WhatsAppPage() {
               <li>registered in our DB: <b>{diagnostics.ourRecord?.registeredAt ? "yes" : "no"}</b></li>
               <li>subscribed apps: <b>{(diagnostics.metaSubscribedApps?.apps ?? []).join(", ") || "none"}</b></li>
               <li>our app id: <b>{diagnostics.ourRecord?.appId ?? "—"}</b></li>
+              <li>subscription status: <b>{diagnostics.ourRecord?.subscriptionStatus ?? "—"}</b></li>
+              <li>account blocked: <b>{diagnostics.ourRecord?.blocked ? "yes" : "no"}</b></li>
+              <li className={diagnostics.ourRecord?.webhookWillProcess ? "text-green-700" : "text-red-600 font-semibold"}>
+                webhook will process messages: <b>{diagnostics.ourRecord?.webhookWillProcess ? "YES" : "NO — messages dropped here"}</b>
+              </li>
+              <li>app secret enforced: <b>{diagnostics.ourRecord?.appSecretConfigured ? "yes" : "no"}</b></li>
               {diagnostics.metaPhoneStatus?.error && <li className="text-red-600">phone error: {diagnostics.metaPhoneStatus.error}</li>}
               {diagnostics.metaSubscribedApps?.error && <li className="text-red-600">subs error: {diagnostics.metaSubscribedApps.error}</li>}
             </ul>

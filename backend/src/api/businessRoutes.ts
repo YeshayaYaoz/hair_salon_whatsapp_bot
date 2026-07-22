@@ -935,6 +935,14 @@ businessRouter.get("/me/whatsapp/diagnostics", async (req: AuthedRequest, res) =
       tokenValid: business.whatsappTokenValid,
       registeredAt: business.whatsappRegisteredAt,
       appId: process.env.META_APP_ID ?? null,
+      // The webhook drops every inbound message unless this is "trial"/"active" and the account
+      // isn't blocked — a silent failure mode that looks identical to "not connected".
+      subscriptionStatus: business.subscriptionStatus,
+      blocked: Boolean(business.blockedAt),
+      webhookWillProcess:
+        !business.blockedAt && ["trial", "active"].includes(business.subscriptionStatus),
+      // Whether Meta's app-secret signature check is even enforced on this deploy.
+      appSecretConfigured: Boolean(process.env.WHATSAPP_APP_SECRET),
     },
     metaPhoneStatus: phoneStatus,
     metaSubscribedApps: subscribedApps,
