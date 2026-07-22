@@ -9,7 +9,7 @@ import { captureError } from "../lib/errorMonitoring.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import { requireActiveSubscription } from "../lib/subscriptionGate.js";
 import { getAuthUrl, saveGoogleTokens, disconnectGoogleCalendar, deleteCalendarEvent, GoogleCalendarNotConfiguredError } from "../lib/googleCalendar.js";
-import { sendWhatsAppMessage, getWabaId, subscribeAppToWaba, registerPhoneNumber, createMessageTemplate, setWhatsAppProfilePicture, type CreateTemplateResult } from "../webhook/whatsappClient.js";
+import { sendWhatsAppMessage, getWabaId, subscribeAppToWaba, registerPhoneNumber, getPhoneNumberStatus, getSubscribedApps, createMessageTemplate, setWhatsAppProfilePicture, type CreateTemplateResult } from "../webhook/whatsappClient.js";
 import { reminderTemplate, reviewTemplate, REMINDER_TEMPLATE_BODY, REVIEW_TEMPLATE_BODY } from "../lib/whatsappTemplates.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
 import { appendTurn } from "../bot/conversationStore.js";
@@ -909,6 +909,36 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
   });
 
   res.json({ ok: true, phoneNumber: phone.display_phone_number, subscribed });
+});
+
+// Read-only health check: asks Meta directly for the number's live status and the WABA's
+// subscribed apps, so we can see whether a number that looks "connected" on our side is actually
+// registered + live on Meta's side (an unregistered/PENDING number silently receives no webhooks).
+businessRouter.get("/me/whatsapp/diagnostics", async (req: AuthedRequest, res) => {
+  const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! } });
+  if (!business.whatsappPhoneNumberId || !business.whatsappAccessToken) {
+    return res.status(400).json({ error: "Connect a WhatsApp number first" });
+  }
+  const accessToken = decryptSecret(business.whatsappAccessToken);
+  const phoneStatus = await getPhoneNumberStatus(business.whatsappPhoneNumberId, accessToken);
+
+  let wabaId = business.whatsappWabaId ?? undefined;
+  if (!wabaId) {
+    try { wabaId = await getWabaId(business.whatsappPhoneNumberId, accessToken); } catch { /* leave undefined */ }
+  }
+  const subscribedApps = wabaId ? await getSubscribedApps(wabaId, accessToken) : { apps: [], error: "no WABA id" };
+
+  res.json({
+    ourRecord: {
+      phoneNumberId: business.whatsappPhoneNumberId,
+      wabaId: wabaId ?? null,
+      tokenValid: business.whatsappTokenValid,
+      registeredAt: business.whatsappRegisteredAt,
+      appId: process.env.META_APP_ID ?? null,
+    },
+    metaPhoneStatus: phoneStatus,
+    metaSubscribedApps: subscribedApps,
+  });
 });
 
 // Re-subscribes this business's own app to its WABA's webhook events, using the access token

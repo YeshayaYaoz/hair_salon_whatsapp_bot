@@ -134,6 +134,46 @@ export async function registerPhoneNumber(phoneNumberId: string, accessToken: st
   return { ok: false, error };
 }
 
+export interface PhoneNumberStatus {
+  id?: string;
+  display_phone_number?: string;
+  verified_name?: string;
+  code_verification_status?: string; // VERIFIED / NOT_VERIFIED / EXPIRED
+  name_status?: string;
+  quality_rating?: string;
+  platform_type?: string; // CLOUD_API / ON_PREMISE / NOT_APPLICABLE — ON_PREMISE on a Cloud number is a legacy-flag problem
+  throughput?: { level?: string };
+  status?: string; // CONNECTED / PENDING / etc. — the live registration state
+  error?: string;
+}
+
+/**
+ * Reads Meta's live status fields for a phone number — the ground truth for "is this number
+ * actually registered and live on the Cloud API". Used for diagnostics: a number can show as
+ * "connected" in our own DB (token valid, WABA subscribed) yet still be PENDING/unregistered on
+ * Meta's side, in which case it silently receives no inbound webhooks.
+ */
+export async function getPhoneNumberStatus(phoneNumberId: string, accessToken: string): Promise<PhoneNumberStatus> {
+  const fields = "id,display_phone_number,verified_name,code_verification_status,name_status,quality_rating,platform_type,throughput,status";
+  const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${phoneNumberId}?fields=${fields}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const body = (await res.json().catch(() => ({}))) as PhoneNumberStatus & { error?: { message?: string } };
+  if (!res.ok) return { error: (body as any).error?.message ?? `HTTP ${res.status}` };
+  return body;
+}
+
+/** Lists the app IDs currently subscribed to a WABA's webhooks — confirms our app is actually on the list. */
+export async function getSubscribedApps(wabaId: string, accessToken: string): Promise<{ apps: string[]; error?: string }> {
+  const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${wabaId}/subscribed_apps`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const body = (await res.json().catch(() => ({}))) as { data?: Array<{ whatsapp_business_api_data?: { name?: string; id?: string } }>; error?: { message?: string } };
+  if (!res.ok) return { apps: [], error: body.error?.message ?? `HTTP ${res.status}` };
+  const apps = (body.data ?? []).map((d) => d.whatsapp_business_api_data?.id ?? d.whatsapp_business_api_data?.name ?? "unknown");
+  return { apps };
+}
+
 export async function getWabaId(phoneNumberId: string, accessToken: string): Promise<string> {
   const url = `https://graph.facebook.com/${GRAPH_VERSION}/${phoneNumberId}?fields=whatsapp_business_account`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });

@@ -142,6 +142,22 @@ export default function WhatsAppPage() {
   const [templateResults, setTemplateResults] = useState<{ name: string; submitted: boolean; status?: string; error?: string }[] | null>(null);
   const [resubscribing, setResubscribing] = useState(false);
   const [resubscribed, setResubscribed] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<any>(null);
+  const [diagLoading, setDiagLoading] = useState(false);
+
+  async function runDiagnostics() {
+    setDiagLoading(true);
+    setError(null);
+    setDiagnostics(null);
+    try {
+      const data = await apiFetch<any>("/api/business/me/whatsapp/diagnostics");
+      setDiagnostics(data);
+    } catch (err: any) {
+      setError(err?.message ?? "Diagnostics failed");
+    } finally {
+      setDiagLoading(false);
+    }
+  }
 
   // Fixes a specific failure mode: the dashboard shows "connected" (valid token, phone number
   // saved) but the bot never receives incoming messages, because Meta only pushes webhook events
@@ -410,6 +426,14 @@ export default function WhatsAppPage() {
                 {resubscribing ? "..." : (lang === "he" ? "תיקון חיבור" : "Fix connection")}
               </button>
               <button
+                onClick={runDiagnostics}
+                disabled={diagLoading}
+                className="text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50 transition font-medium"
+                title={lang === "he" ? "בדיקה מול מטא של מצב המספר האמיתי" : "Ask Meta for the number's real live status"}
+              >
+                {diagLoading ? "..." : (lang === "he" ? "אבחון" : "Diagnostics")}
+              </button>
+              <button
                 onClick={disconnect}
                 disabled={disconnecting}
                 className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50 transition font-medium"
@@ -419,6 +443,24 @@ export default function WhatsAppPage() {
             </div>
           )}
         </div>
+        {diagnostics && (
+          <div className="mt-3 bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs">
+            <p className="font-semibold text-gray-700 mb-1">
+              {lang === "he" ? "מצב אמיתי מול מטא:" : "Live status from Meta:"}
+            </p>
+            <ul className="text-gray-600 space-y-0.5" dir="ltr">
+              <li>status: <b>{diagnostics.metaPhoneStatus?.status ?? "—"}</b></li>
+              <li>platform_type: <b>{diagnostics.metaPhoneStatus?.platform_type ?? "—"}</b></li>
+              <li>code_verification_status: <b>{diagnostics.metaPhoneStatus?.code_verification_status ?? "—"}</b></li>
+              <li>name_status: <b>{diagnostics.metaPhoneStatus?.name_status ?? "—"}</b></li>
+              <li>registered in our DB: <b>{diagnostics.ourRecord?.registeredAt ? "yes" : "no"}</b></li>
+              <li>subscribed apps: <b>{(diagnostics.metaSubscribedApps?.apps ?? []).join(", ") || "none"}</b></li>
+              <li>our app id: <b>{diagnostics.ourRecord?.appId ?? "—"}</b></li>
+              {diagnostics.metaPhoneStatus?.error && <li className="text-red-600">phone error: {diagnostics.metaPhoneStatus.error}</li>}
+              {diagnostics.metaSubscribedApps?.error && <li className="text-red-600">subs error: {diagnostics.metaSubscribedApps.error}</li>}
+            </ul>
+          </div>
+        )}
         {connected && (
           <p className="text-xs text-gray-500 mt-2">
             {lang === "he"
