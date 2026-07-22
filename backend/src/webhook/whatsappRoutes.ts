@@ -168,11 +168,6 @@ async function recordWhatsAppBillingStatuses(phoneNumberId: string, statuses: an
 }
 
 whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => {
-  // Unconditional receipt log — proves whether Meta is delivering real events here at all, before
-  // any of our own checks can drop them. Distinguishes "message never arrived" (routing/override
-  // problem) from "arrived but we dropped it" (signature/subscription/processing).
-  console.log(`[whatsapp webhook] INBOUND HIT: ${req.body?.length ?? 0} bytes, signature ${req.headers["x-hub-signature-256"] ? "present" : "MISSING"}`);
-
   // Verify Meta's HMAC signature before processing.
   const signature = req.headers["x-hub-signature-256"] as string | undefined;
   const rawBody: Buffer = Buffer.isBuffer(req.body)

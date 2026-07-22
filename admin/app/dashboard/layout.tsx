@@ -261,12 +261,18 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   // Single source of truth for the /me lookup — TrialBanner, the sidebar, and the mobile "More"
   // sheet all need bits of it, so fetch once here and pass down instead of three separate calls.
   useEffect(() => {
-    apiFetch<{ isSuperAdmin?: boolean; subscriptionStatus: string; createdAt: string }>("/api/business/me")
+    apiFetch<{ isSuperAdmin?: boolean; subscriptionStatus: string; createdAt: string; businessTypeChosenAt?: string | null }>("/api/business/me")
       .then((me) => {
         setIsSuperAdmin(Boolean(me.isSuperAdmin));
         setTrial({ status: me.subscriptionStatus, createdAt: me.createdAt });
+        // First-login category picker: if the owner hasn't chosen a vertical yet, send them to the
+        // onboarding cards once (skip if they're already there, to avoid a redirect loop).
+        if (!me.businessTypeChosenAt && pathname !== "/dashboard/onboarding") {
+          router.replace("/dashboard/onboarding");
+        }
       })
       .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

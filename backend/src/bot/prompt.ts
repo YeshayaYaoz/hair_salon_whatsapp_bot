@@ -1,6 +1,6 @@
 import type { BusinessHours, Service, StaffMember, FaqEntry } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
-import { instantPartsInTz, zonedDateParts } from "../lib/timezone.js";
+import { instantPartsInTz, zonedDateParts, dayOfWeekForDate } from "../lib/timezone.js";
 
 export async function buildSystemPrompt(businessId: string, customerPhone?: string): Promise<string> {
   const [business, customer] = await Promise.all([
@@ -60,6 +60,22 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
   const dateParts = zonedDateParts(now, tz);
   const todayIso = `${dateParts.year}-${String(dateParts.month).padStart(2, "0")}-${String(dateParts.day).padStart(2, "0")}`;
   const nowHHMM = fmtMin(nowParts.minutes);
+
+  // Deterministic date lookup for the next two weeks, so the model never has to compute a calendar
+  // date from a weekday name (e.g. "יום שני") — that arithmetic is a known source of wrong-day
+  // bookings (the model once gave two different dates for the same "Monday" in one conversation).
+  const upcomingDates: string[] = [];
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(Date.UTC(dateParts.year, dateParts.month - 1, dateParts.day + i));
+    const y = d.getUTCFullYear();
+    const m = d.getUTCMonth() + 1;
+    const day = d.getUTCDate();
+    const iso = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const dow = dayOfWeekForDate(y, m, day);
+    const rel = i === 0 ? " (היום)" : i === 1 ? " (מחר)" : "";
+    upcomingDates.push(`${iso} = יום ${dayNames[dow]}${rel}`);
+  }
+  const dateTable = upcomingDates.join("\n");
   const todayHours = business.hours.find((h: BusinessHours) => h.dayOfWeek === nowParts.dayOfWeek);
   let openNowNote: string;
   if (!todayHours) {
@@ -79,6 +95,8 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
   return `אתה עוזר ההזמנות של "${business.name}" בוואטסאפ.
 היום: ${todayIso} (יום ${dayNames[nowParts.dayOfWeek]}), השעה כעת: ${nowHHMM} (שעון ישראל). ${openNowNote}
 אל תנקוב בשעה הנוכחית אחרת מזו — זו השעה האמיתית.
+טבלת תאריכים לשבועיים הקרובים (השתמש בה תמיד כשלקוח נוקב ביום בשבוע כמו "יום שני" — אל תחשב תאריך בעצמך):
+${dateTable}
 ענה תמיד בשפה שבה הלקוח כותב (עברית או אנגלית). היה ידידותי, קצר וממוקד — משפט-שניים לכל תגובה.
 אל תמציא מידע שאינו רשום כאן. אם אינך יודע — אמור זאת והצע העברה לבן אדם.
 ${cancellationNote}${personalityNote}${greeting}${crmNote}
