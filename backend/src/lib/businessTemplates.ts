@@ -11,7 +11,7 @@
  * list once those models exist.
  */
 
-export const BUSINESS_TYPES = ["salon", "barber", "clinic", "aesthetics"] as const;
+export const BUSINESS_TYPES = ["salon", "barber", "clinic", "aesthetics", "bnb"] as const;
 export type BusinessType = (typeof BUSINESS_TYPES)[number];
 
 export function isBusinessType(v: unknown): v is BusinessType {
@@ -45,6 +45,9 @@ export interface TemplatePresets {
   depositEnabled: boolean;
   depositAmountIls: number;
   depositHoldMinutes: number;
+  // "slot" = live booking via the slot engine; "inquiry" = info + owner-callback (no live booking).
+  bookingModel: "slot" | "inquiry";
+  availabilityInfo: string; // only meaningful in inquiry mode; the general availability the bot quotes
 }
 
 export interface BusinessTemplate {
@@ -77,6 +80,8 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
       depositEnabled: false,
       depositAmountIls: 0,
       depositHoldMinutes: 30,
+      bookingModel: "slot",
+      availabilityInfo: "",
     },
     seedServices: [
       { name: "תספורת", durationMin: 30, priceCents: 8000, color: "#8b5cf6" },
@@ -103,6 +108,8 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
       depositEnabled: false,
       depositAmountIls: 0,
       depositHoldMinutes: 30,
+      bookingModel: "slot",
+      availabilityInfo: "",
     },
     seedServices: [
       { name: "תספורת גבר", durationMin: 30, priceCents: 7000, color: "#0ea5e9" },
@@ -130,6 +137,8 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
       depositEnabled: true,
       depositAmountIls: 100,
       depositHoldMinutes: 60,
+      bookingModel: "slot",
+      availabilityInfo: "",
     },
     seedServices: [
       { name: "ייעוץ ראשוני", durationMin: 30, priceCents: 30000, color: "#3b82f6" },
@@ -156,6 +165,8 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
       depositEnabled: true,
       depositAmountIls: 50,
       depositHoldMinutes: 45,
+      bookingModel: "slot",
+      availabilityInfo: "",
     },
     seedServices: [
       { name: "ניקוי פנים", durationMin: 60, priceCents: 28000, color: "#f472b6" },
@@ -163,6 +174,34 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
       { name: "מניקור/פדיקור", durationMin: 45, priceCents: 12000, color: "#fb7185" },
     ],
     vocabulary: { customer: "לקוחה", customerPlural: "לקוחות", staff: "קוסמטיקאית", service: "טיפול" },
+  },
+
+  bnb: {
+    type: "bnb",
+    emoji: "🏡",
+    labelHe: "צימרים / אירוח",
+    labelEn: "B&B / Vacation Rental",
+    descriptionHe: "אירוח ולינה. הבוט מוסר מחירים וזמינות כללית, וכשאורח רוצה להזמין — שולח לך התראה עם המספר לחזור אליו (ללא קביעת הזמנה אוטומטית).",
+    presets: {
+      botPersonality:
+        "דבר/י בטון חם, מסביר פנים ואירוחי. גרום/גרמי לאורח להרגיש רצוי. מסור/מסרי מידע על היחידות והמחירים, וכשמבקשים להזמין — אסוף/אספי פרטים והעבר/העבירי למארח.",
+      cancellationPolicy: "מדיניות הביטול נמסרת על ידי המארח בעת אישור ההזמנה.",
+      referralText: "",
+      remindersEnabled: false,
+      reviewsEnabled: false,
+      digestEnabled: true,
+      depositEnabled: false,
+      depositAmountIls: 0,
+      depositHoldMinutes: 30,
+      bookingModel: "inquiry",
+      availabilityInfo: "הזמינות משתנה — מומלץ להזמין מראש. סופי שבוע וחגים נתפסים מהר. המארח ימסור זמינות מדויקת בשיחה.",
+    },
+    seedServices: [
+      { name: "לילה — יחידה זוגית", durationMin: 1440, priceCents: 90000, color: "#0ea5e9" },
+      { name: "לילה — יחידה משפחתית", durationMin: 1440, priceCents: 130000, color: "#22c55e" },
+      { name: "חבילת סוף שבוע (2 לילות)", durationMin: 2880, priceCents: 170000, color: "#f59e0b" },
+    ],
+    vocabulary: { customer: "אורח", customerPlural: "אורחים", staff: "המארח/ת", service: "יחידת אירוח" },
   },
 };
 

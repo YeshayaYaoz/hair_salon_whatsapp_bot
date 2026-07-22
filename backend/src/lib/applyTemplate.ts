@@ -47,6 +47,10 @@ export async function applyTemplate(businessId: string, type: BusinessType): Pro
     data.referralText = template.presets.referralText;
     appliedPresets.push("referralText");
   }
+  if (isEmpty(business.availabilityInfo) && template.presets.availabilityInfo) {
+    data.availabilityInfo = template.presets.availabilityInfo;
+    appliedPresets.push("availabilityInfo");
+  }
 
   // Toggles/amounts: only on the very first selection, so re-picking never flips an owner's setting.
   if (firstTime) {
@@ -56,13 +60,15 @@ export async function applyTemplate(businessId: string, type: BusinessType): Pro
     data.depositEnabled = template.presets.depositEnabled;
     data.depositAmountIls = template.presets.depositAmountIls;
     data.depositHoldMinutes = template.presets.depositHoldMinutes;
+    data.bookingModel = template.presets.bookingModel;
     appliedPresets.push(
       "remindersEnabled",
       "reviewsEnabled",
       "digestEnabled",
       "depositEnabled",
       "depositAmountIls",
-      "depositHoldMinutes"
+      "depositHoldMinutes",
+      "bookingModel"
     );
   }
 

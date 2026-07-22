@@ -425,6 +425,7 @@ const profileSchema = z.object({
   depositEnabled: z.boolean().optional(),
   depositAmountIls: z.number().int().nonnegative().max(100000).optional(),
   depositHoldMinutes: z.number().int().min(5).max(1440).optional(),
+  availabilityInfo: z.string().max(600).optional(),
 });
 
 businessRouter.put("/me", async (req: AuthedRequest, res) => {

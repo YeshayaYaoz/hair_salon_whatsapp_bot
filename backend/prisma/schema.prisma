@@ -65,6 +65,12 @@ model Business {
   // the onboarding template that pre-fills settings and the vocabulary the bot/dashboard use.
   businessType              String?
   businessTypeChosenAt      DateTime? // when the owner first picked a category — gates the first-login picker
+  // How the bot handles booking. "slot" (default): real-time availability + booking via the slot
+  // engine (salon/clinic/etc). "inquiry": the bot only answers prices/availability info and, when
+  // the customer wants to book, alerts the owner to call the customer back — no live booking engine
+  // (for verticals like B&B where availability is per-unit/overnight and not slot-based).
+  bookingModel              String    @default("slot")
+  availabilityInfo          String? // free-text availability summary the bot quotes in "inquiry" mode
   botGreeting               String? // custom greeting override
   botPersonality            String? // tone/personality instructions for the bot
   googleMapsUrl             String? // linked in post-visit review requests

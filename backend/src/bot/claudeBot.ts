@@ -116,6 +116,29 @@ const tools: Anthropic.Tool[] = [
   },
 ];
 
+// Tool used only in "inquiry" booking mode (e.g. B&B): instead of booking a slot, the bot collects
+// what the customer wants and alerts the owner to call them back to finalize. No slot engine involved.
+const requestBookingCallbackTool: Anthropic.Tool = {
+  name: "request_booking_callback",
+  description:
+    "Use when the customer wants to book/reserve and this business handles bookings by callback (not live). Collect and pass the details you have; the owner is alerted to call the customer back to confirm. Do NOT claim the booking is confirmed — only that the owner will call back.",
+  input_schema: {
+    type: "object",
+    properties: {
+      details: { type: "string", description: "What the customer wants: dates/nights, unit/service, number of guests, and any preferences — as much as is known." },
+      customerName: { type: "string", description: "Customer's name if known" },
+    },
+    required: ["details"],
+  },
+};
+
+// Inquiry mode exposes only info + handoff tools — no check_availability/book_appointment/etc.,
+// since there is no live booking engine for these verticals.
+const inquiryTools: Anthropic.Tool[] = [
+  requestBookingCallbackTool,
+  tools.find((t) => t.name === "request_human_followup")!,
+];
+
 // Prompt caching: the tool definitions never change between calls (they're a module-level
 // constant), and each business's system prompt is byte-identical across consecutive messages in
 // the same conversation unless the owner just edited their services/hours/etc. Marking the last
@@ -125,9 +148,10 @@ const tools: Anthropic.Tool[] = [
 // cacheable prefix is 1024 tokens on Sonnet, 4096 on Haiku 4.5 — below that Anthropic silently
 // skips caching rather than erroring, so a small business's system prompt on Haiku may just not
 // hit the minimum yet; nothing breaks either way, it only sometimes doesn't save money.
-const cachedTools: Anthropic.Tool[] = tools.map((tool, i) =>
-  i === tools.length - 1 ? { ...tool, cache_control: { type: "ephemeral" } } : tool
-);
+const markCache = (arr: Anthropic.Tool[]): Anthropic.Tool[] =>
+  arr.map((tool, i) => (i === arr.length - 1 ? { ...tool, cache_control: { type: "ephemeral" } } : tool));
+const cachedTools: Anthropic.Tool[] = markCache(tools);
+const cachedInquiryTools: Anthropic.Tool[] = markCache(inquiryTools);
 
 export interface BotResult {
   text: string;
@@ -464,6 +488,22 @@ async function runTool(
     return JSON.stringify({ addedToWaitlist: true, service: service.name });
   }
 
+  if (name === "request_booking_callback") {
+    const label = (input.customerName as string | undefined) ?? customerPhone;
+    const notified = await notifyOwner(
+      businessId,
+      `📞 בקשת הזמנה חדשה — יש לחזור ללקוח!\nלקוח: ${label}\nטלפון לחזרה: ${customerPhone}\nפרטים: ${input.details}`
+    );
+    if (!notified) {
+      return JSON.stringify({
+        notified: false,
+        error:
+          "No owner notification phone is configured, so the owner was NOT alerted. Do NOT promise the customer a callback. Apologize that booking isn't available right now and, if a contact/address is known, suggest they reach the business directly.",
+      });
+    }
+    return JSON.stringify({ notified: true, tellCustomer: "The owner will call the customer back shortly to confirm the booking." });
+  }
+
   if (name === "request_human_followup") {
     const label = (input.customerName as string | undefined) ?? customerPhone;
     const notified = await notifyOwner(businessId, `🙋 לקוח ${label} ביקש המשך טיפול אנושי:\n${input.reason}`);
@@ -510,7 +550,8 @@ async function makeApiCall(
   customerPhone: string,
   model: string,
   system: string,
-  messages: Anthropic.MessageParam[]
+  messages: Anthropic.MessageParam[],
+  activeTools: Anthropic.Tool[] = cachedTools
 ): Promise<Anthropic.Message> {
   const cachedSystem: Anthropic.TextBlockParam[] = [{ type: "text", text: system, cache_control: { type: "ephemeral" } }];
 
@@ -519,7 +560,7 @@ async function makeApiCall(
       model,
       max_tokens: 1024,
       system: cachedSystem,
-      tools: cachedTools,
+      tools: activeTools,
       messages,
     })) as Anthropic.Message;
     await recordUsage(businessId, customerPhone, model, response);
@@ -535,7 +576,7 @@ async function makeApiCall(
       model,
       max_tokens: 1024,
       system: cachedSystem,
-      tools: cachedTools,
+      tools: activeTools,
       messages,
     })) as Anthropic.Message;
     await recordUsage(businessId, customerPhone, model, response);
@@ -549,6 +590,11 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   const systemText = await buildSystemPrompt(businessId, customerPhone);
   const system = systemText;
   const history = await getHistory(businessId, customerPhone);
+
+  // "inquiry" businesses (e.g. B&B) have no live booking engine — the bot answers info and hands
+  // booking intent to the owner, so it gets a reduced tool set with no slot/booking tools.
+  const biz = await prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { bookingModel: true } });
+  const activeTools = biz.bookingModel === "inquiry" ? cachedInquiryTools : cachedTools;
 
   const messages: Anthropic.MessageParam[] = [
     ...history.map((t: Turn) => ({ role: t.role, content: t.content }) as Anthropic.MessageParam),
@@ -567,7 +613,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
 
   let response: Anthropic.Message;
   try {
-    response = await makeApiCall(businessId, customerPhone, model, system, messages);
+    response = await makeApiCall(businessId, customerPhone, model, system, messages, activeTools);
   } catch (err) {
     if (err instanceof APIError) console.error(`Anthropic API error ${err.status}:`, err.message);
     else console.error("Unexpected Anthropic error:", err);
@@ -611,7 +657,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     messages.push({ role: "user", content: toolResults });
 
     try {
-      response = await makeApiCall(businessId, customerPhone, model, system, messages);
+      response = await makeApiCall(businessId, customerPhone, model, system, messages, activeTools);
     } catch (err) {
       if (err instanceof APIError) console.error(`Anthropic API error ${err.status} (tool loop):`, err.message);
       else console.error("Unexpected Anthropic error (tool loop):", err);
@@ -638,7 +684,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
       content: `(מערכתי: ניסיון הקביעה/שינוי האחרון נכשל בפועל (${unconfirmedBookingFailure}) — שום תור לא נשמר. אל תגיד ללקוח שהתור נקבע. הסבר לו בקצרה שהמועד לא זמין/קרתה תקלה, והצע לבדוק זמינות אחרת או לנסות שוב.)`,
     });
     try {
-      const corrected = await makeApiCall(businessId, customerPhone, model, system, messages);
+      const corrected = await makeApiCall(businessId, customerPhone, model, system, messages, activeTools);
       const correctedText = corrected.content
         .filter((b): b is Anthropic.TextBlock => b.type === "text")
         .map((b) => b.text)
@@ -661,7 +707,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     messages.push({ role: "assistant", content: response.content });
     messages.push({ role: "user", content: "(תן ללקוח סיכום קצר של מה שקרה כרגע, במשפט אחד.)" });
     try {
-      const followUp = await makeApiCall(businessId, customerPhone, model, system, messages);
+      const followUp = await makeApiCall(businessId, customerPhone, model, system, messages, activeTools);
       replyText = followUp.content
         .filter((b): b is Anthropic.TextBlock => b.type === "text")
         .map((b) => b.text)

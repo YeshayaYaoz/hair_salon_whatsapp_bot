@@ -1,0 +1,2 @@
+ALTER TABLE "Business" ADD COLUMN IF NOT EXISTS "bookingModel" TEXT NOT NULL DEFAULT 'slot';
+ALTER TABLE "Business" ADD COLUMN IF NOT EXISTS "availabilityInfo" TEXT;

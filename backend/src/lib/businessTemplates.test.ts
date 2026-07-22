@@ -45,7 +45,8 @@ describe("business templates config", () => {
 
   it("isBusinessType guards correctly", () => {
     expect(isBusinessType("salon")).toBe(true);
-    expect(isBusinessType("bnb")).toBe(false);
+    expect(isBusinessType("bnb")).toBe(true);
+    expect(isBusinessType("nonsense")).toBe(false);
     expect(isBusinessType(null)).toBe(false);
   });
 });
