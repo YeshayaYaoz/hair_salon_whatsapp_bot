@@ -56,6 +56,10 @@ model Business {
   // on every reconnect/"Fix connection" click — Meta rate-limits registration attempts hard
   // (error 133016, "too many attempts"), and a registered number never needs registering again.
   whatsappRegisteredAt      DateTime?
+  // Timestamp of the last /register attempt. Meta's 133016 lockout is a ROLLING 72h window that
+  // every new attempt restarts — so we refuse to attempt again within 72h of the last one, which
+  // is the only way to actually let the lockout expire instead of endlessly resetting it.
+  whatsappRegisterAttemptedAt DateTime?
   notificationPhone         String? // owner's personal phone for booking alerts
   botGreeting               String? // custom greeting override
   botPersonality            String? // tone/personality instructions for the bot

@@ -939,6 +939,12 @@ businessRouter.get("/me/whatsapp/diagnostics", async (req: AuthedRequest, res) =
       // isn't blocked — a silent failure mode that looks identical to "not connected".
       subscriptionStatus: business.subscriptionStatus,
       blocked: Boolean(business.blockedAt),
+      // When the last /register attempt was made and the earliest safe retry (last + 72h), so the
+      // Meta 133016 rolling lockout can be waited out instead of endlessly reset.
+      lastRegisterAttempt: business.whatsappRegisterAttemptedAt,
+      registerRetryAfter: business.whatsappRegisterAttemptedAt
+        ? new Date(business.whatsappRegisterAttemptedAt.getTime() + 72 * 60 * 60 * 1000)
+        : null,
       webhookWillProcess:
         !business.blockedAt && ["trial", "active"].includes(business.subscriptionStatus),
       // Whether Meta's app-secret signature check is even enforced on this deploy.
@@ -983,15 +989,28 @@ businessRouter.post("/me/whatsapp/resubscribe", async (req: AuthedRequest, res) 
   // registration attempts hard (133016), and repeated "Fix connection" clicks would otherwise
   // trip that lockout. Subscription (above) is the safe, idempotent part to repeat.
   if (!business.whatsappRegisteredAt) {
+    // Meta's 133016 lockout is a rolling 72h window that every attempt restarts. Refuse to attempt
+    // again within 72h of the last try so the lockout can actually expire instead of resetting.
+    const COOLDOWN_MS = 72 * 60 * 60 * 1000;
+    const lastAttempt = business.whatsappRegisterAttemptedAt?.getTime();
+    if (lastAttempt && Date.now() - lastAttempt < COOLDOWN_MS) {
+      const readyAt = new Date(lastAttempt + COOLDOWN_MS);
+      return res.status(429).json({
+        error: `WhatsApp blocked new registration attempts for this number (Meta error 133016). To let the block expire you must not retry until ${readyAt.toISOString().slice(0, 16).replace("T", " ")} UTC. Every earlier attempt reset this 72-hour clock.`,
+      });
+    }
     const pin = business.whatsappRegistrationPin ?? generateRegistrationPin();
     const registration = await registerPhoneNumber(business.whatsappPhoneNumberId, accessToken, pin);
     if (!registration.ok) {
-      await prisma.business.update({ where: { id: business.id }, data: { whatsappRegistrationPin: pin } });
+      await prisma.business.update({
+        where: { id: business.id },
+        data: { whatsappRegistrationPin: pin, whatsappRegisterAttemptedAt: new Date() },
+      });
       return res.status(502).json({ error: `Phone registration failed: ${registration.error}` });
     }
     await prisma.business.update({
       where: { id: business.id },
-      data: { whatsappRegistrationPin: pin, whatsappRegisteredAt: new Date() },
+      data: { whatsappRegistrationPin: pin, whatsappRegisteredAt: new Date(), whatsappRegisterAttemptedAt: new Date() },
     });
   }
   res.json({ ok: true });
