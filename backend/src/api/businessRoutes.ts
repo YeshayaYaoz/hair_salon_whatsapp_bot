@@ -16,6 +16,8 @@ import { appendTurn } from "../bot/conversationStore.js";
 import { createAppointment, OutsideBusinessHoursError, SlotUnavailableError } from "../booking/availability.js";
 import { parseBookingTime } from "../lib/timezone.js";
 import { getJobStatuses } from "../lib/jobStatus.js";
+import { listTemplates, BUSINESS_TYPES } from "../lib/businessTemplates.js";
+import { applyTemplate } from "../lib/applyTemplate.js";
 import { getPaymentProvider, PAYMENT_PROVIDERS, UnknownPaymentProviderError } from "../lib/payments/index.js";
 import { getInvoiceProvider, INVOICE_PROVIDERS, UnknownInvoiceProviderError, resolveInvoiceCredentials } from "../lib/invoices/index.js";
 
@@ -430,6 +432,35 @@ businessRouter.put("/me", async (req: AuthedRequest, res) => {
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   await prisma.business.update({ where: { id: req.businessId! }, data: parsed.data });
   res.json({ ok: true });
+});
+
+// --- Category templates (vertical onboarding) ---
+
+// Lists the selectable categories for the onboarding picker — display metadata only, no secrets.
+businessRouter.get("/me/templates", async (_req: AuthedRequest, res) => {
+  res.json({
+    templates: listTemplates().map((t) => ({
+      type: t.type,
+      emoji: t.emoji,
+      labelHe: t.labelHe,
+      labelEn: t.labelEn,
+      descriptionHe: t.descriptionHe,
+      depositEnabled: t.presets.depositEnabled,
+      depositAmountIls: t.presets.depositAmountIls,
+      reviewsEnabled: t.presets.reviewsEnabled,
+      sampleServices: t.seedServices.map((s) => s.name),
+    })),
+  });
+});
+
+const applyTemplateSchema = z.object({ type: z.enum(BUSINESS_TYPES) });
+
+// Applies a category template: sets businessType and pre-fills untouched settings + seed services.
+businessRouter.post("/me/apply-template", async (req: AuthedRequest, res) => {
+  const parsed = applyTemplateSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const result = await applyTemplate(req.businessId!, parsed.data.type);
+  res.json({ ok: true, ...result });
 });
 
 businessRouter.put("/me/whatsapp", async (req: AuthedRequest, res) => {
