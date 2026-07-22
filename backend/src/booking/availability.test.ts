@@ -7,7 +7,7 @@ const mockPrisma = {
   service: { findUniqueOrThrow: vi.fn() },
   businessHours: { findUnique: vi.fn() },
   staffMember: { findMany: vi.fn() },
-  appointment: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn() },
+  appointment: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), count: vi.fn() },
   blockedTime: { findMany: vi.fn(), findFirst: vi.fn() },
   customer: { upsert: vi.fn() },
 };
@@ -205,5 +205,72 @@ describe("createAppointment", () => {
     expect(mockPrisma.customer.upsert).toHaveBeenCalledWith(
       expect.objectContaining({ update: {} })
     );
+  });
+});
+
+describe("capacity (group classes)", () => {
+  it("keeps offering a class slot until it reaches capacity, then hides it", async () => {
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ timezone: TZ });
+    mockPrisma.service.findUniqueOrThrow.mockResolvedValue({ durationMin: 60, capacity: 3 });
+    // Thursday 2026-07-09, open 09:00-10:00 local → exactly one 60-min class slot at 09:00 (06:00Z).
+    mockPrisma.businessHours.findUnique.mockResolvedValue({ openMin: 9 * 60, closeMin: 10 * 60 });
+    mockPrisma.staffMember.findMany.mockResolvedValue([]);
+    mockPrisma.blockedTime.findMany.mockResolvedValue([]);
+
+    // 2 of 3 spots taken → still offered.
+    mockPrisma.appointment.findMany.mockResolvedValue([
+      { serviceId: SERVICE_ID, startTime: new Date("2026-07-09T06:00:00.000Z"), endTime: new Date("2026-07-09T07:00:00.000Z"), staffId: null },
+      { serviceId: SERVICE_ID, startTime: new Date("2026-07-09T06:00:00.000Z"), endTime: new Date("2026-07-09T07:00:00.000Z"), staffId: null },
+    ]);
+    let slots = await findAvailableSlots(BUSINESS_ID, SERVICE_ID, "2026-07-09");
+    expect(slots.map((s) => s.startTime)).toEqual(["2026-07-09T06:00:00.000Z"]);
+
+    // 3 of 3 taken → full, no longer offered.
+    mockPrisma.appointment.findMany.mockResolvedValue([
+      { serviceId: SERVICE_ID, startTime: new Date("2026-07-09T06:00:00.000Z"), endTime: new Date("2026-07-09T07:00:00.000Z"), staffId: null },
+      { serviceId: SERVICE_ID, startTime: new Date("2026-07-09T06:00:00.000Z"), endTime: new Date("2026-07-09T07:00:00.000Z"), staffId: null },
+      { serviceId: SERVICE_ID, startTime: new Date("2026-07-09T06:00:00.000Z"), endTime: new Date("2026-07-09T07:00:00.000Z"), staffId: null },
+    ]);
+    slots = await findAvailableSlots(BUSINESS_ID, SERVICE_ID, "2026-07-09");
+    expect(slots).toEqual([]);
+  });
+
+  it("does not count a DIFFERENT service's bookings against a class's capacity", async () => {
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ timezone: TZ });
+    mockPrisma.service.findUniqueOrThrow.mockResolvedValue({ durationMin: 60, capacity: 2 });
+    mockPrisma.businessHours.findUnique.mockResolvedValue({ openMin: 9 * 60, closeMin: 10 * 60 });
+    mockPrisma.staffMember.findMany.mockResolvedValue([]);
+    mockPrisma.blockedTime.findMany.mockResolvedValue([]);
+    // An overlapping booking for ANOTHER service should not consume this class's spots.
+    mockPrisma.appointment.findMany.mockResolvedValue([
+      { serviceId: "other-svc", startTime: new Date("2026-07-09T06:00:00.000Z"), endTime: new Date("2026-07-09T07:00:00.000Z"), staffId: null },
+    ]);
+    const slots = await findAvailableSlots(BUSINESS_ID, SERVICE_ID, "2026-07-09");
+    expect(slots.map((s) => s.startTime)).toEqual(["2026-07-09T06:00:00.000Z"]);
+  });
+
+  it("rejects a class booking once the slot is full (createAppointment)", async () => {
+    mockPrisma.service.findUniqueOrThrow.mockResolvedValue({ durationMin: 60, capacity: 2 });
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ timezone: TZ });
+    mockPrisma.businessHours.findUnique.mockResolvedValue({ openMin: 9 * 60, closeMin: 17 * 60 });
+    mockPrisma.blockedTime.findFirst.mockResolvedValue(null);
+    mockPrisma.customer.upsert.mockResolvedValue({ id: "cust1" });
+    mockPrisma.appointment.count.mockResolvedValue(2); // already full
+    await expect(
+      createAppointment({ businessId: BUSINESS_ID, serviceId: SERVICE_ID, customerPhone: "972500000000", startTime: new Date("2026-07-09T07:00:00.000Z") })
+    ).rejects.toThrow(SlotUnavailableError);
+  });
+
+  it("allows a class booking when the slot still has room (createAppointment)", async () => {
+    mockPrisma.service.findUniqueOrThrow.mockResolvedValue({ durationMin: 60, capacity: 5 });
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ timezone: TZ });
+    mockPrisma.businessHours.findUnique.mockResolvedValue({ openMin: 9 * 60, closeMin: 17 * 60 });
+    mockPrisma.blockedTime.findFirst.mockResolvedValue(null);
+    mockPrisma.customer.upsert.mockResolvedValue({ id: "cust1" });
+    mockPrisma.appointment.count.mockResolvedValue(1); // room for more
+    mockPrisma.appointment.create.mockImplementation(({ data }: any) => Promise.resolve({ id: "appt1", ...data }));
+    const appt = await createAppointment({ businessId: BUSINESS_ID, serviceId: SERVICE_ID, customerPhone: "972500000000", startTime: new Date("2026-07-09T07:00:00.000Z") });
+    expect(appt.id).toBe("appt1");
+    expect(mockPrisma.appointment.findFirst).not.toHaveBeenCalled(); // used capacity count, not 1:1 overlap
   });
 });

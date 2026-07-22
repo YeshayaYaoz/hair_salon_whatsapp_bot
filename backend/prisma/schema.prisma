@@ -147,6 +147,10 @@ model Service {
   priceCents      Int
   durationMin     Int
   color           String          @default("#8b5cf6")
+  // How many people can book the SAME slot of this service at once. 1 = a normal 1:1 appointment
+  // (every existing service). >1 = a group class (yoga/fitness) where the slot holds multiple
+  // attendees up to this capacity. Kept as a plain per-service count so the 1:1 path is unchanged.
+  capacity        Int             @default(1)
   appointments    Appointment[]
   waitlistEntries WaitlistEntry[]
 

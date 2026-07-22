@@ -66,6 +66,7 @@ export async function findAvailableSlots(
   ]);
 
   const durationMin = overrideDurationMin ?? service.durationMin;
+  const capacity = service.capacity ?? 1;
   // If the customer asked for a specific staff member, only offer times that person is free —
   // don't silently substitute someone else. Otherwise any staff member (or unassigned) will do.
   const staffOptions: (string | null)[] = preferredStaffId
@@ -83,6 +84,20 @@ export async function findAvailableSlots(
     // Skip slots that overlap an owner-defined closure (vacation, break, holiday).
     if (dayBlocks.some((b) => slotStart < b.endTime && slotEnd > b.startTime)) continue;
 
+    if (capacity > 1) {
+      // Group class: the slot holds up to `capacity` attendees of THIS service. Staff identity
+      // doesn't gate a class (one instructor runs it), so we count how many are already booked
+      // into this service's slot and offer it until it's full.
+      const booked = dayAppointments.filter(
+        (a: Appointment) => a.serviceId === serviceId && slotStart < a.endTime && slotEnd > a.startTime
+      ).length;
+      if (booked < capacity) {
+        slots.push({ startTime: slotStart.toISOString(), endTime: slotEnd.toISOString(), staffId: preferredStaffId ?? null });
+      }
+      continue;
+    }
+
+    // 1:1 appointment (every existing service): a slot is free if some staff option has no overlap.
     for (const staffId of staffOptions) {
       const conflict = dayAppointments.some(
         (a: Appointment) =>
@@ -143,18 +158,33 @@ export async function createAppointment(params: {
     create: { businessId: params.businessId, phone: params.customerPhone, name: params.customerName },
   });
 
-  // Guard against double-booking: reject if any confirmed appointment overlaps this window
-  // (for the same staff member, or salon-wide when no staff is assigned).
-  const overlap = await prisma.appointment.findFirst({
-    where: {
-      businessId: params.businessId,
-      status: { in: SLOT_BLOCKING_STATUSES },
-      ...(params.staffId ? { staffId: params.staffId } : {}),
-      startTime: { lt: endTime },
-      endTime: { gt: params.startTime },
-    },
-  });
-  if (overlap) throw new SlotUnavailableError();
+  const capacity = service.capacity ?? 1;
+  if (capacity > 1) {
+    // Group class: allow up to `capacity` attendees in the same slot of this service; reject once full.
+    const booked = await prisma.appointment.count({
+      where: {
+        businessId: params.businessId,
+        serviceId: params.serviceId,
+        status: { in: SLOT_BLOCKING_STATUSES },
+        startTime: { lt: endTime },
+        endTime: { gt: params.startTime },
+      },
+    });
+    if (booked >= capacity) throw new SlotUnavailableError();
+  } else {
+    // 1:1 appointment: reject if any blocking appointment overlaps this window (for the same staff
+    // member, or business-wide when no staff is assigned).
+    const overlap = await prisma.appointment.findFirst({
+      where: {
+        businessId: params.businessId,
+        status: { in: SLOT_BLOCKING_STATUSES },
+        ...(params.staffId ? { staffId: params.staffId } : {}),
+        startTime: { lt: endTime },
+        endTime: { gt: params.startTime },
+      },
+    });
+    if (overlap) throw new SlotUnavailableError();
+  }
 
   return prisma.appointment.create({
     data: {
