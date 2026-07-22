@@ -163,15 +163,27 @@ export async function getPhoneNumberStatus(phoneNumberId: string, accessToken: s
   return body;
 }
 
-/** Lists the app IDs currently subscribed to a WABA's webhooks — confirms our app is actually on the list. */
-export async function getSubscribedApps(wabaId: string, accessToken: string): Promise<{ apps: string[]; error?: string }> {
+/**
+ * Lists the app IDs currently subscribed to a WABA's webhooks — confirms our app is actually on the
+ * list — and any per-app override_callback_uri. An override silently routes THIS WABA's real
+ * messages to a different URL than the app-level callback that Meta's "Test" button uses, which
+ * looks exactly like "everything is configured but no messages arrive".
+ */
+export async function getSubscribedApps(
+  wabaId: string,
+  accessToken: string
+): Promise<{ apps: string[]; overrides: string[]; error?: string }> {
   const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${wabaId}/subscribed_apps`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  const body = (await res.json().catch(() => ({}))) as { data?: Array<{ whatsapp_business_api_data?: { name?: string; id?: string } }>; error?: { message?: string } };
-  if (!res.ok) return { apps: [], error: body.error?.message ?? `HTTP ${res.status}` };
+  const body = (await res.json().catch(() => ({}))) as {
+    data?: Array<{ whatsapp_business_api_data?: { name?: string; id?: string }; override_callback_uri?: string }>;
+    error?: { message?: string };
+  };
+  if (!res.ok) return { apps: [], overrides: [], error: body.error?.message ?? `HTTP ${res.status}` };
   const apps = (body.data ?? []).map((d) => d.whatsapp_business_api_data?.id ?? d.whatsapp_business_api_data?.name ?? "unknown");
-  return { apps };
+  const overrides = (body.data ?? []).map((d) => d.override_callback_uri).filter((u): u is string => Boolean(u));
+  return { apps, overrides };
 }
 
 export async function getWabaId(phoneNumberId: string, accessToken: string): Promise<string> {

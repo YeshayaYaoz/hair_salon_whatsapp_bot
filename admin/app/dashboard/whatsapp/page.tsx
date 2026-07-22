@@ -455,6 +455,9 @@ export default function WhatsAppPage() {
               <li>name_status: <b>{diagnostics.metaPhoneStatus?.name_status ?? "—"}</b></li>
               <li>registered in our DB: <b>{diagnostics.ourRecord?.registeredAt ? "yes" : "no"}</b></li>
               <li>subscribed apps: <b>{(diagnostics.metaSubscribedApps?.apps ?? []).join(", ") || "none"}</b></li>
+              <li className={(diagnostics.metaSubscribedApps?.overrides ?? []).length ? "text-red-600 font-semibold" : ""}>
+                callback override: <b>{(diagnostics.metaSubscribedApps?.overrides ?? []).join(", ") || "none (good)"}</b>
+              </li>
               <li>our app id: <b>{diagnostics.ourRecord?.appId ?? "—"}</b></li>
               <li>subscription status: <b>{diagnostics.ourRecord?.subscriptionStatus ?? "—"}</b></li>
               <li>account blocked: <b>{diagnostics.ourRecord?.blocked ? "yes" : "no"}</b></li>
