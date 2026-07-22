@@ -15,6 +15,7 @@ interface BotProfile {
   cancellationPolicy?: string;
   referralText?: string;
   digestEnabled?: boolean;
+  availabilityInfo?: string;
 }
 
 function VoicePhoneSection() {
@@ -127,15 +128,16 @@ export default function BotPage() {
   const [fields, setFields] = useState<BotProfile>({
     botGreeting: "", botPersonality: "",
     remindersEnabled: true, reviewsEnabled: true,
-    cancellationPolicy: "", referralText: "", digestEnabled: true,
+    cancellationPolicy: "", referralText: "", digestEnabled: true, availabilityInfo: "",
   });
+  const [bookingModel, setBookingModel] = useState<string>("slot");
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch<BotProfile>("/api/business/me").then((me) => {
+    apiFetch<BotProfile & { bookingModel?: string }>("/api/business/me").then((me) => {
       setFields({
         botGreeting: me.botGreeting ?? "",
         botPersonality: me.botPersonality ?? "",
@@ -144,7 +146,9 @@ export default function BotPage() {
         cancellationPolicy: me.cancellationPolicy ?? "",
         referralText: me.referralText ?? "",
         digestEnabled: me.digestEnabled ?? true,
+        availabilityInfo: me.availabilityInfo ?? "",
       });
+      setBookingModel(me.bookingModel ?? "slot");
       setLoaded(true);
     });
   }, []);
@@ -237,6 +241,20 @@ export default function BotPage() {
               className="w-full"
             />
           </Field>
+          {bookingModel === "inquiry" && (
+            <Field
+              label={he ? "מידע זמינות" : "Availability info"}
+              hint={he ? "מה שהבוט מוסר על זמינות כשלקוח שואל. במצב זה הבוט לא קובע הזמנות — הוא מוסר מידע ומעביר בקשות הזמנה אליך." : "What the bot tells customers about availability. In this mode the bot doesn't book — it shares info and forwards booking requests to you."}
+            >
+              <textarea
+                rows={3}
+                placeholder={he ? "לדוגמה: זמינות משתנה — מומלץ להזמין מראש, סופי שבוע נתפסים מהר." : "e.g. Availability varies — book ahead, weekends fill up fast."}
+                value={fields.availabilityInfo}
+                onChange={(e) => set("availabilityInfo", e.target.value)}
+                className="w-full"
+              />
+            </Field>
+          )}
         </Section>
 
         <Section title={t.automatedMessages} description={t.automatedMessagesDesc}>

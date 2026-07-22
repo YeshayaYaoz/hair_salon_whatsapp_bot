@@ -24,6 +24,7 @@ interface Service {
   priceCents: number;
   durationMin: number;
   color?: string;
+  capacity?: number;
 }
 
 interface EditState {
@@ -32,6 +33,7 @@ interface EditState {
   price: string;
   duration: string;
   color: string;
+  capacity: string;
 }
 
 export default function ServicesPage() {
@@ -39,11 +41,12 @@ export default function ServicesPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editState, setEditState] = useState<EditState>({ name: "", description: "", price: "", duration: "", color: COLORS[0].hex });
+  const [editState, setEditState] = useState<EditState>({ name: "", description: "", price: "", duration: "", color: COLORS[0].hex, capacity: "1" });
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [newDuration, setNewDuration] = useState("");
+  const [newCapacity, setNewCapacity] = useState("1");
   const [newColor, setNewColor] = useState(COLORS[0].hex);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -64,6 +67,7 @@ export default function ServicesPage() {
       price: (s.priceCents / 100).toFixed(0),
       duration: String(s.durationMin),
       color: s.color ?? COLORS[0].hex,
+      capacity: String(s.capacity ?? 1),
     });
   }
 
@@ -78,6 +82,7 @@ export default function ServicesPage() {
           priceCents: Math.round(Number(editState.price) * 100),
           durationMin: Number(editState.duration),
           color: editState.color,
+          capacity: Math.max(1, Number(editState.capacity) || 1),
         }),
       });
       setEditingId(null);
@@ -102,9 +107,10 @@ export default function ServicesPage() {
           priceCents: Math.round(Number(newPrice) * 100),
           durationMin: Number(newDuration),
           color: newColor,
+          capacity: Math.max(1, Number(newCapacity) || 1),
         }),
       });
-      setNewName(""); setNewDescription(""); setNewPrice(""); setNewDuration(""); setNewColor(COLORS[0].hex);
+      setNewName(""); setNewDescription(""); setNewPrice(""); setNewDuration(""); setNewCapacity("1"); setNewColor(COLORS[0].hex);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add service");
@@ -180,6 +186,7 @@ export default function ServicesPage() {
                     <input value={editState.name} onChange={(e) => setEditState((p) => ({ ...p, name: e.target.value }))} placeholder={t.serviceName} className="flex-1 min-w-32 text-sm" />
                     <input value={editState.price} onChange={(e) => setEditState((p) => ({ ...p, price: e.target.value }))} placeholder={t.price} type="number" className="w-24 text-sm" />
                     <input value={editState.duration} onChange={(e) => setEditState((p) => ({ ...p, duration: e.target.value }))} placeholder={t.duration} type="number" className="w-28 text-sm" />
+                    <input value={editState.capacity} onChange={(e) => setEditState((p) => ({ ...p, capacity: e.target.value }))} placeholder={t.capacity} title={t.capacityHint} type="number" min="1" className="w-24 text-sm" />
                   </div>
                   <input value={editState.description} onChange={(e) => setEditState((p) => ({ ...p, description: e.target.value }))} placeholder={t.descriptionOptional} className="w-full text-sm mb-2" />
                   <div className="flex items-center justify-between">
@@ -228,6 +235,7 @@ export default function ServicesPage() {
             <input placeholder={t.serviceName} value={newName} onChange={(e) => setNewName(e.target.value)} required className="flex-1 min-w-32" />
             <input placeholder={t.price} type="number" step="1" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} required className="w-28" />
             <input placeholder={t.duration} type="number" value={newDuration} onChange={(e) => setNewDuration(e.target.value)} required className="w-32" />
+            <input placeholder={t.capacity} title={t.capacityHint} type="number" min="1" value={newCapacity} onChange={(e) => setNewCapacity(e.target.value)} className="w-28" />
           </div>
           <input placeholder={t.descriptionOptional} value={newDescription} onChange={(e) => setNewDescription(e.target.value)} className="w-full" />
           <div className="flex items-center justify-between mt-1">

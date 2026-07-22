@@ -37,6 +37,7 @@ const translations = {
     // Services
     servicesTitle: "Services", addService: "Add a service",
     serviceName: "Service name", price: "Price (₪)", duration: "Duration (min)",
+    capacity: "Spots", capacityHint: "How many people can book the same slot (1 = a normal 1:1 appointment; higher = a group class)",
     descriptionOptional: "Description (optional)",
     noServices: "No services yet. Add one below.",
     servicesSubtitle: "Add the services your salon offers.",
@@ -172,6 +173,7 @@ const translations = {
     // Services
     servicesTitle: "שירותים", addService: "הוספת שירות",
     serviceName: "שם השירות", price: "מחיר (₪)", duration: "משך (דקות)",
+    capacity: "מקומות", capacityHint: "כמה אנשים יכולים להזמין את אותו מועד (1 = תור רגיל אחד-על-אחד; יותר = שיעור קבוצתי)",
     descriptionOptional: "תיאור (לא חובה)",
     noServices: "עוד לא הוספתם שירותים — זה השלב הראשון, יאללה 👇",
     servicesSubtitle: "מה אתם מציעים? תספורת, צבע, טיפול פנים — הכל נכנס לפה.",
