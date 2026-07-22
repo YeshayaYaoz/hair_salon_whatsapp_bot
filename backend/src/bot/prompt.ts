@@ -1,6 +1,7 @@
 import type { BusinessHours, Service, StaffMember, FaqEntry } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { instantPartsInTz, zonedDateParts, dayOfWeekForDate } from "../lib/timezone.js";
+import { TEMPLATES, isBusinessType } from "../lib/businessTemplates.js";
 
 export async function buildSystemPrompt(businessId: string, customerPhone?: string): Promise<string> {
   const [business, customer] = await Promise.all([
@@ -20,7 +21,7 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
   const hoursText = business.hours
     .sort((a: BusinessHours, b: BusinessHours) => a.dayOfWeek - b.dayOfWeek)
     .map((h: BusinessHours) => `יום ${dayNames[h.dayOfWeek]}: ${fmtMin(h.openMin)}-${fmtMin(h.closeMin)}`)
-    .join("\n") || "שעות עבודה לא הוגדרו — הפנה את הלקוח לפנות ישירות למספר הסלון.";
+    .join("\n") || "שעות עבודה לא הוגדרו — הפנה את הלקוח לפנות ישירות למספר העסק.";
 
   const servicesText = business.services
     .map((s: Service) => `• ${s.name}: ₪${(s.priceCents / 100).toFixed(0)} (${s.durationMin} דקות)${s.description ? ` — ${s.description}` : ""}`)
@@ -79,17 +80,27 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
   const todayHours = business.hours.find((h: BusinessHours) => h.dayOfWeek === nowParts.dayOfWeek);
   let openNowNote: string;
   if (!todayHours) {
-    openNowNote = `הסלון סגור היום (יום ${dayNames[nowParts.dayOfWeek]}). אם לקוח מבקש תור "עכשיו" או "היום" — הסבר בנימוס והצע יום אחר.`;
+    openNowNote = `העסק סגור היום (יום ${dayNames[nowParts.dayOfWeek]}). אם לקוח מבקש תור "עכשיו" או "היום" — הסבר בנימוס והצע יום אחר.`;
   } else if (nowParts.minutes < todayHours.openMin) {
-    openNowNote = `הסלון עדיין סגור כרגע — נפתח היום ב-${fmtMin(todayHours.openMin)}.`;
+    openNowNote = `העסק עדיין סגור כרגע — נפתח היום ב-${fmtMin(todayHours.openMin)}.`;
   } else if (nowParts.minutes >= todayHours.closeMin) {
-    openNowNote = `הסלון כבר סגור להיום (נסגר ב-${fmtMin(todayHours.closeMin)}). אפשר לקבוע תורים לימים הבאים.`;
+    openNowNote = `העסק כבר סגור להיום (נסגר ב-${fmtMin(todayHours.closeMin)}). אפשר לקבוע תורים לימים הבאים.`;
   } else {
-    openNowNote = `הסלון פתוח כרגע (עד ${fmtMin(todayHours.closeMin)} היום).`;
+    openNowNote = `העסק פתוח כרגע (עד ${fmtMin(todayHours.closeMin)} היום).`;
   }
 
   const cancellationNote = business.cancellationPolicy
     ? `\nמדיניות ביטולים: ${business.cancellationPolicy}\nכאשר לקוח מבטל תור — הזכר את המדיניות בנימוס.\n`
+    : "";
+
+  // Vertical vocabulary: tell the bot which words to use for this business's category, so a clinic
+  // bot says "מטופל" and a B&B bot wouldn't say "לקוח" like a salon. Falls back to generic terms
+  // when no category was chosen.
+  const vocabNote = isBusinessType(business.businessType)
+    ? (() => {
+        const v = TEMPLATES[business.businessType as keyof typeof TEMPLATES].vocabulary;
+        return `\nמינוח לעסק זה: פנה אל מי שמזמין כ"${v.customer}" (רבים: "${v.customerPlural}"), התייחס לאיש/אשת הצוות כ"${v.staff}", ולשירות/פעולה כ"${v.service}". השתמש במונחים האלה באופן טבעי.\n`;
+      })()
     : "";
 
   return `אתה עוזר ההזמנות של "${business.name}" בוואטסאפ.
@@ -99,7 +110,7 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
 ${dateTable}
 ענה תמיד בשפה שבה הלקוח כותב (עברית או אנגלית). היה ידידותי, קצר וממוקד — משפט-שניים לכל תגובה.
 אל תמציא מידע שאינו רשום כאן. אם אינך יודע — אמור זאת והצע העברה לבן אדם.
-${cancellationNote}${personalityNote}${greeting}${crmNote}
+${cancellationNote}${vocabNote}${personalityNote}${greeting}${crmNote}
 שירותים ומחירים:
 ${servicesText}
 
