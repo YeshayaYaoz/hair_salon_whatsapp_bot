@@ -42,7 +42,8 @@ export default function OnboardingPage() {
         method: "POST",
         body: JSON.stringify({ type: selected }),
       });
-      router.replace("/dashboard");
+      // A freshly-onboarded business's natural next step is connecting WhatsApp.
+      router.replace("/dashboard/whatsapp");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to apply");
       setApplying(false);
