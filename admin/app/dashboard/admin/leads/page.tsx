@@ -486,15 +486,18 @@ const DEFAULT_BROADCAST_BODY =
 
 function BroadcastModal({
   campaignId,
-  eligibleCount,
+  emailEligible,
+  phoneEligible,
   onClose,
   onSent,
 }: {
   campaignId: string;
-  eligibleCount: number;
+  emailEligible: number;
+  phoneEligible: number;
   onClose: () => void;
   onSent: () => void;
 }) {
+  const [channel, setChannel] = useState<"email" | "whatsapp">("email");
   const [subject, setSubject] = useState(DEFAULT_BROADCAST_SUBJECT);
   const [body, setBody] = useState(DEFAULT_BROADCAST_BODY);
   const [sending, setSending] = useState(false);
@@ -502,13 +505,15 @@ function BroadcastModal({
   const [result, setResult] = useState<BroadcastResult | null>(null);
   const [confirming, setConfirming] = useState(false);
 
+  const eligibleCount = channel === "whatsapp" ? phoneEligible : emailEligible;
+
   async function send() {
     setSending(true);
     setErr(null);
     try {
       const res = await apiFetch<BroadcastResult>(`/api/leadfinder/campaigns/${campaignId}/outreach/broadcast`, {
         method: "POST",
-        body: JSON.stringify({ subject, body }),
+        body: JSON.stringify({ subject, body, channel }),
       });
       setResult(res);
       onSent();
@@ -547,11 +552,33 @@ function BroadcastModal({
           </div>
         ) : (
           <>
-            <p className="text-gray-600 text-sm mb-4">
-              ההודעה תישלח בדיוק כפי שכתובה כאן — אין ניסוח אוטומטי לכל עסק בנפרד. יש
+            <div className="flex gap-2 mb-3">
+              {(["email", "whatsapp"] as const).map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => { setChannel(c); setConfirming(false); }}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition ${
+                    channel === c ? "bg-[#1B7FA0] text-white border-transparent" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  {c === "email" ? "מייל" : "וואטסאפ"}
+                </button>
+              ))}
+            </div>
+
+            <p className="text-gray-600 text-sm mb-3">
+              יש
               <span className="font-medium text-gray-700"> {eligibleCount} </span>
-              עסקים בקמפיין הזה עם כתובת מייל ידועה (מי שכבר קיבל הודעת תפוצה בעבר או ביקש הסרה ידולג אוטומטית, גם אם נכלל במספר הזה).
+              עסקים בקמפיין עם {channel === "whatsapp" ? "מספר טלפון ידוע" : "כתובת מייל ידועה"} (מי שכבר קיבל תפוצה בערוץ הזה או ביקש הסרה ידולג אוטומטית).
             </p>
+
+            {channel === "whatsapp" && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2.5 mb-3 leading-relaxed">
+                ⚠️ וואטסאפ אוסר על שליחת טקסט חופשי למספרים קרים. ההודעה נשלחת דרך <b>תבנית שיווקית מאושרת מראש</b> של תורי (עם שם העסק כמשתנה) — הטקסט למטה משמש לתיעוד בלבד, לא נשלח כמות שהוא. דורש הגדרת <code dir="ltr">TORI_OUTREACH_*</code> בשרת. שים לב: תפוצה שיווקית לא מבוקשת בוואטסאפ נושאת סיכון לחסימת המספר וחשופה לחוק הספאם — שלח בזהירות ובנפחים קטנים.
+              </div>
+            )}
+
             {err && <div className="bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg px-3 py-2 mb-3">{err}</div>}
             <div className="flex flex-col gap-3">
               <div>
@@ -561,12 +588,16 @@ function BroadcastModal({
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">תוכן ההודעה</label>
                 <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={10} className="text-sm w-full" />
-                <p className="text-[11px] text-gray-600 mt-1">שורת הסרה מרשימת התפוצה תתווסף אוטומטית בסוף ההודעה.</p>
+                {channel === "email" && (
+                  <p className="text-[11px] text-gray-600 mt-1">שורת הסרה מרשימת התפוצה תתווסף אוטומטית בסוף ההודעה.</p>
+                )}
               </div>
 
               {eligibleCount === 0 ? (
                 <div className="text-xs text-gray-600">
-                  אין כרגע עסקים עם כתובת מייל בקמפיין הזה. כתובות מייל מתגלות אוטומטית מהאתר של כל עסק — הרץ סריקה נוספת אם עברו עסקים בלי אתר ידוע קודם לכן.
+                  {channel === "whatsapp"
+                    ? "אין עסקים עם מספר טלפון בקמפיין הזה."
+                    : "אין כרגע עסקים עם כתובת מייל בקמפיין הזה. כתובות מייל מתגלות אוטומטית מהאתר של כל עסק — הרץ סריקה נוספת אם עברו עסקים בלי אתר ידוע קודם לכן."}
                 </div>
               ) : !confirming ? (
                 <button
@@ -682,7 +713,7 @@ function CampaignDetailView({
         </div>
         <div className="flex items-center gap-2">
           <button
-            disabled={!leads || leads.filter((l) => l.email).length === 0}
+            disabled={!leads || leads.filter((l) => l.email || l.phone).length === 0}
             onClick={() => setShowBroadcast(true)}
             className="px-4 py-2 rounded-lg text-sm font-medium text-teal-700 bg-teal-50 border border-teal-200 hover:bg-teal-100 disabled:opacity-50"
           >
@@ -704,7 +735,8 @@ function CampaignDetailView({
       {showBroadcast && (
         <BroadcastModal
           campaignId={campaignId}
-          eligibleCount={leads?.filter((l) => l.email).length ?? 0}
+          emailEligible={leads?.filter((l) => l.email).length ?? 0}
+          phoneEligible={leads?.filter((l) => l.phone).length ?? 0}
           onClose={() => setShowBroadcast(false)}
           onSent={loadLeads}
         />

@@ -10,6 +10,7 @@ import { loadScoringWeights, DEFAULT_SCORING_CONFIG_KEY } from "./scoring.js";
 import { APP_URL, sendTrialAccountCreatedEmail } from "../lib/email.js";
 import { nameSimilarity } from "./matching.js";
 import { generateOutreachDraft } from "./outreach.js";
+import { sendWhatsAppTemplate } from "../webhook/whatsappClient.js";
 import { sendOutreachEmail } from "../lib/email.js";
 
 export const leadFinderRouter = Router();
@@ -411,25 +412,51 @@ leadFinderRouter.post("/outreach/:id/send", async (req: AuthedRequest, res) => {
 // re-spam whoever already went out). Paced with a short delay between sends rather than
 // Promise.all — this is unsolicited outreach, so hammering Resend/the recipients' mail servers in
 // a burst is exactly the pattern that gets a sending domain flagged.
+// The WhatsApp channel sends from Tori's OWN outreach WABA (env-configured, not a salon's number)
+// and MUST use a pre-approved MARKETING template — Meta blocks free-form business-initiated
+// messages to cold numbers (error 131047). The template takes one body variable: the lead's name.
+// The template itself must carry an opt-out line to satisfy Meta policy + Israeli spam law, so no
+// footer is appended here (unlike email, where the body is arbitrary and we add one).
+function toriOutreachConfig() {
+  const phoneNumberId = process.env.TORI_OUTREACH_PHONE_NUMBER_ID;
+  const accessToken = process.env.TORI_OUTREACH_ACCESS_TOKEN;
+  const templateName = process.env.TORI_OUTREACH_TEMPLATE_NAME;
+  const languageCode = process.env.TORI_OUTREACH_TEMPLATE_LANG || "he";
+  if (!phoneNumberId || !accessToken || !templateName) return null;
+  return { phoneNumberId, accessToken, templateName, languageCode };
+}
+
 const broadcastSchema = z.object({
   subject: z.string().min(1),
   body: z.string().min(1),
   leadIds: z.array(z.string()).optional(),
+  channel: z.enum(["email", "whatsapp"]).default("email"),
 });
 leadFinderRouter.post("/campaigns/:id/outreach/broadcast", async (req: AuthedRequest, res) => {
   const parsed = broadcastSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const isWhatsapp = parsed.data.channel === "whatsapp";
 
   const campaign = await prisma.leadCampaign.findUnique({ where: { id: req.params.id }, select: { id: true } });
   if (!campaign) return res.status(404).json({ error: "Campaign not found" });
 
+  const waConfig = isWhatsapp ? toriOutreachConfig() : null;
+  if (isWhatsapp && !waConfig) {
+    return res.status(400).json({
+      error:
+        "WhatsApp outreach isn't configured. Set TORI_OUTREACH_PHONE_NUMBER_ID, TORI_OUTREACH_ACCESS_TOKEN and TORI_OUTREACH_TEMPLATE_NAME (a Meta-approved MARKETING template with one {{1}} name variable and an opt-out line).",
+    });
+  }
+
+  // Contact field differs by channel: email needs a discovered email, WhatsApp needs a phone
+  // (which Google Places provides for most leads — far higher coverage than email).
   const leads = await prisma.lead.findMany({
     where: {
       campaignId: req.params.id,
-      email: { not: null },
+      ...(isWhatsapp ? { phone: { not: null } } : { email: { not: null } }),
       ...(parsed.data.leadIds ? { id: { in: parsed.data.leadIds } } : {}),
     },
-    select: { id: true, email: true },
+    select: { id: true, email: true, phone: true, name: true },
   });
 
   if (leads.length === 0) {
@@ -440,7 +467,8 @@ leadFinderRouter.post("/campaigns/:id/outreach/broadcast", async (req: AuthedReq
   const [optedOutLogs, alreadySentMessages] = await Promise.all([
     prisma.consentLog.findMany({ where: { leadId: { in: leadIds }, event: "opted_out" }, select: { leadId: true } }),
     prisma.outreachMessage.findMany({
-      where: { leadId: { in: leadIds }, angle: "broadcast", sentAt: { not: null } },
+      // Scope "already sent" per channel so an email broadcast doesn't block a later WhatsApp one.
+      where: { leadId: { in: leadIds }, angle: "broadcast", channel: parsed.data.channel, sentAt: { not: null } },
       select: { leadId: true },
     }),
   ]);
@@ -448,7 +476,7 @@ leadFinderRouter.post("/campaigns/:id/outreach/broadcast", async (req: AuthedReq
   const alreadySentSet = new Set(alreadySentMessages.map((m) => m.leadId));
 
   const footer = '\n\n—\nלהסרה מרשימת התפוצה, השיבו למייל זה במילה "הסר".';
-  const fullBody = `${parsed.data.body}${footer}`;
+  const fullBody = isWhatsapp ? parsed.data.body : `${parsed.data.body}${footer}`;
 
   let sent = 0;
   let failed = 0;
@@ -459,11 +487,22 @@ leadFinderRouter.post("/campaigns/:id/outreach/broadcast", async (req: AuthedReq
   for (const lead of leads) {
     if (optedOutSet.has(lead.id) || alreadySentSet.has(lead.id)) continue;
     try {
-      await sendOutreachEmail(lead.email!, parsed.data.subject, fullBody);
+      if (isWhatsapp) {
+        await sendWhatsAppTemplate({
+          phoneNumberId: waConfig!.phoneNumberId,
+          accessToken: waConfig!.accessToken,
+          to: lead.phone!,
+          templateName: waConfig!.templateName,
+          languageCode: waConfig!.languageCode,
+          bodyParams: [lead.name ?? "בעל/ת העסק"],
+        });
+      } else {
+        await sendOutreachEmail(lead.email!, parsed.data.subject, fullBody);
+      }
       await prisma.outreachMessage.create({
         data: {
           leadId: lead.id,
-          channel: "email",
+          channel: parsed.data.channel,
           angle: "broadcast",
           subject: parsed.data.subject,
           body: fullBody,
@@ -477,7 +516,8 @@ leadFinderRouter.post("/campaigns/:id/outreach/broadcast", async (req: AuthedReq
       failedLeads.push({ leadId: lead.id, error: err instanceof Error ? err.message : "Unknown error" });
       console.error(`[leadfinder] Broadcast send failed for lead ${lead.id}:`, err);
     }
-    await new Promise((r) => setTimeout(r, 350));
+    // Pace sends: bursting unsolicited outreach is exactly what flags a sending domain / WABA.
+    await new Promise((r) => setTimeout(r, isWhatsapp ? 600 : 350));
   }
 
   res.json({ sent, skippedOptedOut, skippedAlreadySent, failed, failedLeads, totalEligible: leads.length });
