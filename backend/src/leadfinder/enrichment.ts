@@ -116,11 +116,60 @@ export async function enrichWebsite(website: string | null): Promise<EnrichmentR
 
   const lowerHtml = html.toLowerCase();
 
+  // Emails almost never sit on the homepage — they live on a contact/about page. If the homepage
+  // has none, follow up to two likely contact pages (preferring ones the homepage links to, then
+  // common fixed paths) before giving up. Bounded to keep per-lead enrichment fast.
+  let email = extractEmail(html);
+  if (!email) email = await findEmailOnContactPages(url, html);
+
   return {
     hasOnlineBooking: BOOKING_SIGNALS.some((s) => lowerHtml.includes(s.toLowerCase())),
     hasContactForm: /<form[\s>]/i.test(html),
     whatsappDetected: WHATSAPP_SIGNALS.some((s) => lowerHtml.includes(s.toLowerCase())),
     websiteStale: detectStaleWebsite(html),
-    email: extractEmail(html),
+    email,
   };
+}
+
+// Anchor text / hrefs that signal a contact page, in Hebrew and English.
+const CONTACT_LINK_HINTS = ["contact", "צור-קשר", "צור קשר", "יצירת-קשר", "about", "אודות", "מי-אנחנו"];
+// Fixed fallback paths tried if the homepage doesn't link an obvious contact page.
+const CONTACT_FALLBACK_PATHS = ["/contact", "/contact-us", "/about", "/צור-קשר"];
+const MAX_CONTACT_PAGES = 2;
+
+/** Collects up to a couple of likely contact-page URLs (from homepage links, then fixed paths),
+ * fetches them, and returns the first real email found. Best-effort, never throws. */
+async function findEmailOnContactPages(homepageUrl: string, homepageHtml: string): Promise<string | null> {
+  const base = new URL(homepageUrl);
+  const targets: string[] = [];
+
+  // 1) Links on the homepage whose href or text looks like a contact/about page.
+  const anchorRe = /<a\b[^>]*href=["']([^"'#]+)["'][^>]*>(.*?)<\/a>/gis;
+  for (const m of homepageHtml.matchAll(anchorRe)) {
+    const href = m[1];
+    const text = m[2].replace(/<[^>]+>/g, " ").toLowerCase();
+    const hay = `${href.toLowerCase()} ${text}`;
+    if (CONTACT_LINK_HINTS.some((h) => hay.includes(h))) {
+      try {
+        const abs = new URL(href, base).toString();
+        if (abs.startsWith("http") && !targets.includes(abs)) targets.push(abs);
+      } catch { /* malformed href — skip */ }
+    }
+    if (targets.length >= MAX_CONTACT_PAGES) break;
+  }
+
+  // 2) Fill remaining slots with fixed fallback paths on the same origin.
+  for (const path of CONTACT_FALLBACK_PATHS) {
+    if (targets.length >= MAX_CONTACT_PAGES) break;
+    const abs = `${base.origin}${path}`;
+    if (!targets.includes(abs)) targets.push(abs);
+  }
+
+  for (const target of targets.slice(0, MAX_CONTACT_PAGES)) {
+    const html = await fetchWithTimeout(target);
+    if (!html) continue;
+    const email = extractEmail(html);
+    if (email) return email;
+  }
+  return null;
 }
