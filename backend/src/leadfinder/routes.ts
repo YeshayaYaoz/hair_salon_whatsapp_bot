@@ -130,6 +130,33 @@ leadFinderRouter.get("/runs/:id", async (req: AuthedRequest, res) => {
 
 // --- Leads ---
 
+const createLeadSchema = z.object({
+  name: z.string().min(1),
+  phone: z.string().optional(),
+  email: z.string().email().optional().or(z.literal("")),
+  address: z.string().optional(),
+  website: z.string().optional(),
+  category: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+// Manual entry point for leads that didn't come from a Places search run — e.g. a referral, a
+// walk-in conversation, or a business the owner spotted themselves. Skips placeId (no Google
+// dedupe key) and scoring (nothing to score without enrichment data).
+leadFinderRouter.post("/campaigns/:id/leads", async (req: AuthedRequest, res) => {
+  const campaign = await prisma.leadCampaign.findUnique({ where: { id: req.params.id } });
+  if (!campaign) return res.status(404).json({ error: "Campaign not found" });
+
+  const parsed = createLeadSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const { email, ...rest } = parsed.data;
+  const lead = await prisma.lead.create({
+    data: { ...rest, email: email || undefined, campaignId: campaign.id },
+  });
+  res.status(201).json(lead);
+});
+
 leadFinderRouter.get("/campaigns/:id/leads", async (req: AuthedRequest, res) => {
   const statusFilter = typeof req.query.status === "string" ? req.query.status : undefined;
   const leads = await prisma.lead.findMany({

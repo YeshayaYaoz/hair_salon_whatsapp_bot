@@ -484,6 +484,96 @@ const DEFAULT_BROADCAST_SUBJECT = "בוט AI שקובע לכם תורים אוט
 const DEFAULT_BROADCAST_BODY =
   "היי,\n\nראיתי את העסק שלכם וחשבתי שזה יכול לעניין אתכם: בנינו את תורי — בוט AI שיושב על הוואטסאפ העסקי ומנהל לבד את קביעת התורים, 24/7, בלי שתצטרכו לענות לכל הודעה בעצמכם.\n\nאם זה נשמע רלוונטי, אשמח לתאם דמו קצר של 5 דקות.\n\nתודה,\nצוות תורי";
 
+function AddLeadModal({
+  campaignId,
+  onClose,
+  onAdded,
+}: {
+  campaignId: string;
+  onClose: () => void;
+  onAdded: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [address, setAddress] = useState("");
+  const [website, setWebsite] = useState("");
+  const [category, setCategory] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function save() {
+    setSaving(true);
+    setErr(null);
+    try {
+      await apiFetch(`/api/leadfinder/campaigns/${campaignId}/leads`, {
+        method: "POST",
+        body: JSON.stringify({ name, phone, email, address, website, category, notes }),
+      });
+      onAdded();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "שגיאה בהוספת ליד");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl max-w-md w-full p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-bold text-gray-900 mb-1">הוספת ליד ידנית</h2>
+        <p className="text-gray-600 text-sm mb-3">לידים שלא הגיעו מסריקה — הפניה, שיחה, או עסק שאיתרת בעצמך.</p>
+
+        {err && <div className="bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg px-3 py-2 mb-3">{err}</div>}
+
+        <div className="flex flex-col gap-3">
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">שם העסק *</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} className="text-sm w-full" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">טלפון</label>
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} className="text-sm w-full" dir="ltr" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">מייל</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="text-sm w-full" dir="ltr" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">כתובת</label>
+            <input value={address} onChange={(e) => setAddress(e.target.value)} className="text-sm w-full" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">אתר</label>
+            <input value={website} onChange={(e) => setWebsite(e.target.value)} className="text-sm w-full" dir="ltr" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">קטגוריה</label>
+            <input value={category} onChange={(e) => setCategory(e.target.value)} className="text-sm w-full" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">הערות</label>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="text-sm w-full" />
+          </div>
+
+          <div className="flex gap-2 mt-1">
+            <button
+              disabled={saving || !name.trim()}
+              onClick={save}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50"
+              style={{ background: "#1B7FA0" }}
+            >
+              {saving ? "מוסיף…" : "הוסף ליד"}
+            </button>
+            <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-gray-600">ביטול</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BroadcastModal({
   campaignId,
   emailEligible,
@@ -651,6 +741,7 @@ function CampaignDetailView({
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showBroadcast, setShowBroadcast] = useState(false);
+  const [showAddLead, setShowAddLead] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadCampaign = useCallback(() => {
@@ -713,6 +804,12 @@ function CampaignDetailView({
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setShowAddLead(true)}
+            className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 hover:bg-gray-100"
+          >
+            + הוסף ליד ידנית
+          </button>
+          <button
             disabled={!leads || leads.filter((l) => l.email || l.phone).length === 0}
             onClick={() => setShowBroadcast(true)}
             className="px-4 py-2 rounded-lg text-sm font-medium text-teal-700 bg-teal-50 border border-teal-200 hover:bg-teal-100 disabled:opacity-50"
@@ -731,6 +828,17 @@ function CampaignDetailView({
       </div>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3 mb-4">{error}</div>}
+
+      {showAddLead && (
+        <AddLeadModal
+          campaignId={campaignId}
+          onClose={() => setShowAddLead(false)}
+          onAdded={() => {
+            setShowAddLead(false);
+            loadLeads();
+          }}
+        />
+      )}
 
       {showBroadcast && (
         <BroadcastModal
