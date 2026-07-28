@@ -58,13 +58,13 @@ function SystemStatusSection() {
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
       <h2 className="text-sm font-semibold text-gray-900 mb-0.5">{he ? "בריאות המערכת" : "System health"}</h2>
-      <p className="text-xs text-gray-400 mb-4">
+      <p className="text-xs text-gray-600 mb-4">
         {he ? "מעקב אחרי תהליכים אוטומטיים שרצים ברקע" : "Status of automated jobs running in the background"}
       </p>
       {jobs === null ? (
         <SkeletonCard lines={4} />
       ) : jobs.length === 0 ? (
-        <p className="text-xs text-gray-400">{he ? "עדיין אין נתונים — הריצה הראשונה עוד לא הושלמה" : "No data yet — jobs haven't completed a first run"}</p>
+        <p className="text-xs text-gray-600">{he ? "עדיין אין נתונים — הריצה הראשונה עוד לא הושלמה" : "No data yet — jobs haven't completed a first run"}</p>
       ) : (
         <div className="flex flex-col gap-2">
           {jobs.map((j) => {
@@ -80,7 +80,7 @@ function SystemStatusSection() {
                   {!ok && j.lastError && (
                     <span className="text-[11px] text-red-500 max-w-[200px] truncate" title={j.lastError}>{j.lastError}</span>
                   )}
-                  <span className="text-xs text-gray-400 tabular-nums">{relativeTime(j.lastRunAt)}</span>
+                  <span className="text-xs text-gray-600 tabular-nums">{relativeTime(j.lastRunAt)}</span>
                 </div>
               </div>
             );
@@ -170,7 +170,7 @@ export default function SettingsPage() {
     <div className="animate-fade-in">
       <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-gray-900">{t.settingsTitle}</h1>
-        <p className="text-gray-500 text-sm mt-1">{t.settingsSubtitle}</p>
+        <p className="text-gray-600 text-sm mt-1">{t.settingsSubtitle}</p>
       </div>
 
       <form onSubmit={save}>
@@ -224,7 +224,7 @@ export default function SettingsPage() {
           }
         >
           {!fields.paymentConnected ? (
-            <div className="bg-gray-50 border border-gray-200 text-gray-500 text-xs rounded-lg px-3 py-2.5">
+            <div className="bg-gray-50 border border-gray-200 text-gray-600 text-xs rounded-lg px-3 py-2.5">
               {he
                 ? "יש לחבר קודם ספק סליקה בעמוד סליקה וחשבוניות כדי להפעיל מקדמות."
                 : "Connect a payment provider on the Payments page first to enable deposits."}

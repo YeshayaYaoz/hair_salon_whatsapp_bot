@@ -52,7 +52,7 @@ export default function WaitlistPage() {
     <div className="animate-fade-in">
       <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-gray-900">{t.waitlistTitle}</h1>
-        <p className="text-gray-500 text-sm mt-1">{t.waitlistSubtitle}</p>
+        <p className="text-gray-600 text-sm mt-1">{t.waitlistSubtitle}</p>
       </div>
 
       {entries.length === 0 ? (
@@ -69,7 +69,7 @@ export default function WaitlistPage() {
         <>
           {pending.length > 0 && (
             <div className="mb-6">
-              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">{t.pendingWaitlist} — {pending.length}</h2>
+              <h2 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-3">{t.pendingWaitlist} — {pending.length}</h2>
               <div className="bg-white border border-gray-200 rounded-xl divide-y divide-zinc-800/60">
                 {pending.map((e) => (
                   <div key={e.id} className="flex items-center justify-between px-4 py-3 gap-4">
@@ -78,8 +78,8 @@ export default function WaitlistPage() {
                         {(e.customer.name ?? e.customer.phone).charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <div className="text-gray-700 text-sm font-medium">{e.customer.name ?? <span className="text-gray-400 italic">—</span>}</div>
-                        <div className="text-gray-400 text-xs"><span dir="ltr">{formatPhone(e.customer.phone)}</span> · {e.service.name}</div>
+                        <div className="text-gray-700 text-sm font-medium">{e.customer.name ?? <span className="text-gray-600 italic">—</span>}</div>
+                        <div className="text-gray-600 text-xs"><span dir="ltr">{formatPhone(e.customer.phone)}</span> · {e.service.name}</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -94,7 +94,7 @@ export default function WaitlistPage() {
                       <button
                         onClick={() => remove(e.id)}
                         disabled={loadingId === e.id}
-                        className="text-xs text-gray-400 hover:text-red-600 disabled:opacity-50 px-2 py-1.5 rounded-lg hover:bg-red-950/30 transition"
+                        className="text-xs text-gray-600 hover:text-red-600 disabled:opacity-50 px-2 py-1.5 rounded-lg hover:bg-red-950/30 transition"
                       >
                         {t.remove}
                       </button>
@@ -107,16 +107,16 @@ export default function WaitlistPage() {
 
           {notified.length > 0 && (
             <div>
-              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">{t.notifiedWaitlist} — {notified.length}</h2>
+              <h2 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-3">{t.notifiedWaitlist} — {notified.length}</h2>
               <div className="bg-white border border-gray-200 rounded-xl divide-y divide-zinc-800/60 opacity-60">
                 {notified.map((e) => (
                   <div key={e.id} className="flex items-center justify-between px-4 py-3 gap-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 font-semibold text-sm shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-semibold text-sm shrink-0">
                         {(e.customer.name ?? e.customer.phone).charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <div className="text-gray-500 text-sm">{e.customer.name ?? <span dir="ltr">{formatPhone(e.customer.phone)}</span>}</div>
+                        <div className="text-gray-600 text-sm">{e.customer.name ?? <span dir="ltr">{formatPhone(e.customer.phone)}</span>}</div>
                         <div className="text-zinc-600 text-xs"><span dir="ltr">{formatPhone(e.customer.phone)}</span> · {e.service.name}</div>
                       </div>
                     </div>

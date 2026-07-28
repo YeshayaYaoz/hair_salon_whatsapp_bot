@@ -53,14 +53,14 @@ export default function FaqPage() {
     <div className="animate-fade-in">
       <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-gray-900">{t.faqTitle}</h1>
-        <p className="text-gray-500 text-sm mt-1">{t.faqSubtitle}</p>
+        <p className="text-gray-600 text-sm mt-1">{t.faqSubtitle}</p>
       </div>
 
       <div className="flex flex-col gap-3 mb-6">
         {!loaded ? (
           <><SkeletonCard lines={2} /><SkeletonCard lines={2} /></>
         ) : entries.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-xl px-6 py-10 text-center text-gray-400 text-sm">
+          <div className="bg-white border border-gray-200 rounded-xl px-6 py-10 text-center text-gray-600 text-sm">
             {t.noFaq}
           </div>
         ) : (
@@ -69,11 +69,11 @@ export default function FaqPage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-gray-800 font-medium text-sm mb-1">{entry.question}</p>
-                  <p className="text-gray-500 text-sm">{entry.answer}</p>
+                  <p className="text-gray-600 text-sm">{entry.answer}</p>
                 </div>
                 <button
                   onClick={() => remove(entry.id)}
-                  className="shrink-0 text-xs text-gray-400 hover:text-red-600 transition px-2 py-1 rounded hover:bg-red-950/30"
+                  className="shrink-0 text-xs text-gray-600 hover:text-red-600 transition px-2 py-1 rounded hover:bg-red-950/30"
                 >
                   {t.delete}
                 </button>

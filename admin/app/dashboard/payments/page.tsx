@@ -120,7 +120,7 @@ function ConnectedPill({ connected, he }: { connected: boolean; he: boolean }) {
   return (
     <span
       className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${
-        connected ? "bg-green-50 text-green-700 border border-green-200" : "bg-gray-100 text-gray-500 border border-gray-200"
+        connected ? "bg-green-50 text-green-700 border border-green-200" : "bg-gray-100 text-gray-600 border border-gray-200"
       }`}
     >
       <span className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-green-400" : "bg-gray-300"}`} />
@@ -186,7 +186,7 @@ function ProviderCard<T extends string>({
         <ProviderIcon color={info.color} monogram={info.monogram} />
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
-          <p className="text-xs text-gray-400 truncate">{info.label}</p>
+          <p className="text-xs text-gray-600 truncate">{info.label}</p>
         </div>
         <ConnectedPill connected={connected} he={he} />
         {saved && <SavedBadge text={he ? "נשמר" : "Saved"} />}
@@ -216,10 +216,10 @@ function ProviderCard<T extends string>({
 
         {info.instructions && (
           <div className="flex gap-2.5 bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-3 mb-4">
-            <svg className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-4 h-4 text-gray-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <p className="text-xs text-gray-500 leading-relaxed">
+            <p className="text-xs text-gray-600 leading-relaxed">
               {he ? info.instructions.he : info.instructions.en}
               {info.instructionsUrl && (
                 <>
@@ -239,11 +239,11 @@ function ProviderCard<T extends string>({
           <form onSubmit={submit} className="flex flex-col gap-3">
             <div className="grid sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">API Key</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">API Key</label>
                 <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="API Key" required className="w-full" dir="ltr" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">API Secret</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">API Secret</label>
                 <input value={apiSecret} onChange={(e) => setApiSecret(e.target.value)} placeholder="API Secret" required className="w-full" dir="ltr" type="password" />
               </div>
             </div>
@@ -337,7 +337,7 @@ export default function PaymentsPage() {
     <div className="animate-fade-in">
       <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-gray-900">{he ? "סליקה וחשבוניות" : "Payments & Invoicing"}</h1>
-        <p className="text-gray-500 text-sm mt-1 max-w-xl">
+        <p className="text-gray-600 text-sm mt-1 max-w-xl">
           {he
             ? "חבר את חשבון הסליקה וחשבון החשבוניות שכבר יש לך — הכסף עובר ישירות אליך, אנחנו רק מתאמים בין הצדדים ומפיקים קבלות אוטומטית."
             : "Connect the payment and invoicing accounts you already have — money goes straight to you, we just orchestrate between them and issue receipts automatically."}
@@ -423,7 +423,7 @@ export default function PaymentsPage() {
           <p className="text-xs font-semibold text-gray-700 mb-1.5">
             {he ? "כתובת Webhook — להגדרה בממשק הספק" : "Webhook URL — set this in your provider's dashboard"}
           </p>
-          <p className="text-xs text-gray-400 mb-2.5">
+          <p className="text-xs text-gray-600 mb-2.5">
             {he
               ? "כדי שתורים עם מקדמה יאושרו אוטומטית וקבלות יופקו לאחר תשלום מוצלח, הדבק כתובת זו בהגדרות ה-Webhook/Notify של " + PAYMENT_META[me.paymentProvider as PaymentProviderName].label + ". הכתובת כוללת מפתח סודי — אל תשתף אותה."
               : `So deposit-appointments get confirmed automatically and receipts get issued on a successful payment, paste this into ${PAYMENT_META[me.paymentProvider as PaymentProviderName].label}'s Webhook/Notify settings. The URL includes a secret key — don't share it.`}

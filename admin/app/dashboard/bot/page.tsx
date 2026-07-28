@@ -69,7 +69,7 @@ function VoicePhoneSection() {
       <div className="flex items-center gap-2 mb-0.5">
         <h2 className="text-sm font-semibold text-gray-900">{he ? "בוט טלפוני (שיחות קוליות)" : "Voice bot (phone calls)"}</h2>
         {current === null ? (
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
             {he ? "לא מחובר" : "Not connected"}
           </span>
         ) : current ? (
@@ -78,7 +78,7 @@ function VoicePhoneSection() {
           </span>
         ) : null}
       </div>
-      <p className="text-xs text-gray-400 mb-4">
+      <p className="text-xs text-gray-600 mb-4">
         {he
           ? "מספר הטלפון שסופק ע\"י Cartesia עבור העסק שלך — שיחות נכנסות למספר הזה ייענו ע\"י הבוט הקולי."
           : "The phone number Cartesia provisioned for your business — incoming calls to this number are answered by the voice bot."}
@@ -88,7 +88,7 @@ function VoicePhoneSection() {
       ) : (
         <form onSubmit={save} className="flex items-end gap-2 flex-wrap">
           <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">{he ? "מספר טלפון" : "Phone number"}</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "מספר טלפון" : "Phone number"}</label>
             <input
               value={value}
               onChange={(e) => setValue(e.target.value)}
@@ -206,7 +206,7 @@ export default function BotPage() {
     <div className="animate-fade-in">
       <div className="mb-4 animate-fade-up">
         <h1 className="text-2xl font-bold text-gray-900">{t.botTabTitle}</h1>
-        <p className="text-gray-500 text-sm mt-1">{t.botTabSubtitle}</p>
+        <p className="text-gray-600 text-sm mt-1">{t.botTabSubtitle}</p>
       </div>
 
       {/* Master on/off switch, kept above the settings form: when the bot is off none of the

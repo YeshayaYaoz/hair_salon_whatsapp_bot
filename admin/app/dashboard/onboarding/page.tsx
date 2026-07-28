@@ -99,7 +99,7 @@ export default function OnboardingPage() {
                     </span>
                   ))}
                 </div>
-                <div className="flex gap-3 mt-3 text-xs text-gray-500">
+                <div className="flex gap-3 mt-3 text-xs text-gray-600">
                   {tpl.depositEnabled && <span>💳 {he ? `מקדמה ₪${tpl.depositAmountIls}` : `Deposit ₪${tpl.depositAmountIls}`}</span>}
                   {tpl.reviewsEnabled && <span>⭐ {he ? "בקשת ביקורת" : "Review requests"}</span>}
                 </div>

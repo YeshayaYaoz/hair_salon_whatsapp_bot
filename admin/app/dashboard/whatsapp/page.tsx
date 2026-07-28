@@ -392,7 +392,7 @@ export default function WhatsAppPage() {
     <div className="animate-fade-in">
       <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-gray-900">{t.whatsappTitle}</h1>
-        <p className="text-gray-500 text-sm mt-1">{t.whatsappSubtitle}</p>
+        <p className="text-gray-600 text-sm mt-1">{t.whatsappSubtitle}</p>
       </div>
 
       {/* Broken-connection warning (token expired/revoked) */}
@@ -439,7 +439,7 @@ export default function WhatsAppPage() {
               <button
                 onClick={fixConnection}
                 disabled={resubscribing}
-                className="text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50 transition font-medium"
+                className="text-xs text-gray-600 hover:text-gray-700 disabled:opacity-50 transition font-medium"
                 title={lang === "he" ? "הבוט לא עונה? זה מתקן חיבור webhook שנשבר בשקט" : "Bot not answering? Fixes a webhook subscription that can silently break"}
               >
                 {resubscribing ? "..." : (lang === "he" ? "תיקון חיבור" : "Fix connection")}
@@ -455,7 +455,7 @@ export default function WhatsAppPage() {
               <button
                 onClick={runDiagnostics}
                 disabled={diagLoading}
-                className="text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50 transition font-medium"
+                className="text-xs text-gray-600 hover:text-gray-700 disabled:opacity-50 transition font-medium"
                 title={lang === "he" ? "בדיקה מול מטא של מצב המספר האמיתי" : "Ask Meta for the number's real live status"}
               >
                 {diagLoading ? "..." : (lang === "he" ? "אבחון" : "Diagnostics")}
@@ -498,7 +498,7 @@ export default function WhatsAppPage() {
           </div>
         )}
         {connected && (
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-gray-600 mt-2">
             {lang === "he"
               ? "הבוט לא עונה בוואטסאפ למרות שהחיבור מוצג כתקין? נסה \"תיקון חיבור\" — לפעמים ההרשמה לקבלת הודעות נכשלת בשקט."
               : "Bot not answering on WhatsApp even though this shows connected? Try \"Fix connection\" — the subscription to receive messages can silently fail."}
@@ -560,7 +560,7 @@ export default function WhatsAppPage() {
         <div className="mb-4">
           <button
             onClick={() => setShowManual((v) => !v)}
-            className="text-xs text-gray-500 hover:text-gray-700 transition underline underline-offset-2"
+            className="text-xs text-gray-600 hover:text-gray-700 transition underline underline-offset-2"
           >
             {showManual
               ? (lang === "he" ? "← חזור לחיבור אוטומטי" : "← Back to automatic setup")
@@ -569,7 +569,7 @@ export default function WhatsAppPage() {
           {showManual && (
             <form onSubmit={saveManual} className="flex flex-col gap-3 mt-3 bg-gray-50 border border-gray-200 rounded-xl p-4">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">{t.phoneNumberId}</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">{t.phoneNumberId}</label>
                 <input
                   placeholder={t.phoneNumberIdPlaceholder}
                   value={phoneNumberId}
@@ -579,7 +579,7 @@ export default function WhatsAppPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">{t.accessToken}</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">{t.accessToken}</label>
                 <input
                   placeholder={t.accessTokenPlaceholder}
                   value={accessToken}
@@ -647,7 +647,7 @@ export default function WhatsAppPage() {
       {/* Profile picture */}
       {connected && tokenValid && <WhatsAppLogoSection />}
 
-      <p className="text-xs text-gray-400">{t.whatsappHint}</p>
+      <p className="text-xs text-gray-600">{t.whatsappHint}</p>
     </div>
   );
 }

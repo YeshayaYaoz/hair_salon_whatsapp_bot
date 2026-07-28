@@ -9,7 +9,7 @@ const STATUS_COLORS: Record<string, string> = {
   trial: "bg-amber-50 text-amber-700 border-amber-200",
   active: "bg-green-50 text-green-700 border-green-200",
   past_due: "bg-red-50 text-red-600 border-red-200",
-  canceled: "bg-gray-100 text-gray-500 border-gray-200",
+  canceled: "bg-gray-100 text-gray-600 border-gray-200",
 };
 
 const PLAN_PRICES: Record<"standard" | "premium", number> = { standard: 149, premium: 299 };
@@ -58,7 +58,7 @@ function SavingsCalculator({ lang, planPrice }: { lang: "he" | "en"; planPrice: 
         <span className="w-8 h-8 rounded-lg bg-[#1B7FA0]/10 flex items-center justify-center text-base flex-shrink-0">🧮</span>
         <h2 className="text-sm font-semibold text-gray-900">{he ? "מחשבון חיסכון" : "Savings calculator"}</h2>
       </div>
-      <p className="text-xs text-gray-500 mb-6 mr-10">
+      <p className="text-xs text-gray-600 mb-6 mr-10">
         {he ? "הזז את המחוונים לפי המספרים האמיתיים של העסק שלך" : "Adjust the sliders to match your business's real numbers"}
       </p>
 
@@ -76,7 +76,7 @@ function SavingsCalculator({ lang, planPrice }: { lang: "he" | "en"; planPrice: 
             onChange={(e) => setWeekly(+e.target.value)}
             className="w-full accent-[#1B7FA0]"
           />
-          <div className="flex justify-between text-[11px] text-gray-400 mt-1 tabular-nums">
+          <div className="flex justify-between text-[11px] text-gray-600 mt-1 tabular-nums">
             <span>10</span>
             <span>150</span>
           </div>
@@ -95,14 +95,14 @@ function SavingsCalculator({ lang, planPrice }: { lang: "he" | "en"; planPrice: 
             onChange={(e) => setPrice(+e.target.value)}
             className="w-full accent-[#1B7FA0]"
           />
-          <div className="flex justify-between text-[11px] text-gray-400 mt-1 tabular-nums">
+          <div className="flex justify-between text-[11px] text-gray-600 mt-1 tabular-nums">
             <span>₪50</span>
             <span>₪500</span>
           </div>
         </div>
       </div>
 
-      <p className="text-xs text-gray-500 mt-6 mb-3">
+      <p className="text-xs text-gray-600 mt-6 mb-3">
         {he
           ? `כלומר בערך ${monthlyBookings} תורים בחודש. תורי עוזרת לתפוס תורים שהיו הולכים לאיבוד מחוץ לשעות העבודה:`
           : `That's about ${monthlyBookings} appointments per month. Tori helps capture bookings that would otherwise be lost after-hours:`}
@@ -111,11 +111,11 @@ function SavingsCalculator({ lang, planPrice }: { lang: "he" | "en"; planPrice: 
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
           <div className="text-2xl font-extrabold text-gray-900 tabular-nums">₪{recoveredRevenue.toLocaleString()}</div>
-          <div className="text-[11px] text-gray-500 mt-1">{he ? "הכנסה משוחזרת לחודש" : "Recovered revenue / month"}</div>
+          <div className="text-[11px] text-gray-600 mt-1">{he ? "הכנסה משוחזרת לחודש" : "Recovered revenue / month"}</div>
         </div>
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
           <div className="text-2xl font-extrabold text-gray-900 tabular-nums">{hoursSaved}</div>
-          <div className="text-[11px] text-gray-500 mt-1">{he ? "שעות ניהול שנחסכו" : "Admin hours saved"}</div>
+          <div className="text-[11px] text-gray-600 mt-1">{he ? "שעות ניהול שנחסכו" : "Admin hours saved"}</div>
         </div>
       </div>
 
@@ -136,7 +136,7 @@ function SavingsCalculator({ lang, planPrice }: { lang: "he" | "en"; planPrice: 
         </p>
       )}
 
-      <p className="text-[11px] text-gray-400 mt-3 leading-relaxed">
+      <p className="text-[11px] text-gray-600 mt-3 leading-relaxed">
         {he
           ? `הערכה בהנחה ש-${Math.round(AFTER_HOURS_CAPTURE * 100)}% מהתורים נקבעים מחוץ לשעות העבודה, שאחרת היו אובדים. למטרות המחשה בלבד.`
           : `Estimate assumes ${Math.round(AFTER_HOURS_CAPTURE * 100)}% of bookings happen after-hours and would otherwise be lost. For illustration only.`}
@@ -271,7 +271,7 @@ export default function BillingPage() {
     <div className="animate-fade-in">
       <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-gray-900">{t.billingTitle}</h1>
-        <p className="text-gray-500 text-sm mt-1">{t.billingSubtitle}</p>
+        <p className="text-gray-600 text-sm mt-1">{t.billingSubtitle}</p>
       </div>
 
       {!whatsappConnected && status !== null && (
@@ -306,7 +306,7 @@ export default function BillingPage() {
                   </span>
                 )}
               </div>
-              <p className="text-xs text-gray-500 mt-0.5">{info?.description}</p>
+              <p className="text-xs text-gray-600 mt-0.5">{info?.description}</p>
             </div>
           </div>
 
@@ -323,10 +323,10 @@ export default function BillingPage() {
                   </span>
                   <div className="flex items-baseline gap-1">
                     {loyaltyDiscountIls > 0 && (
-                      <span className="text-xs text-gray-400 line-through tabular-nums">₪{PLAN_PRICES[activePlan]}</span>
+                      <span className="text-xs text-gray-600 line-through tabular-nums">₪{PLAN_PRICES[activePlan]}</span>
                     )}
                     <span className="text-lg font-extrabold text-gray-900 tabular-nums">₪{realMonthlyPrice}</span>
-                    <span className="text-xs text-gray-400">{lang === "he" ? "/חודש" : "/month"}</span>
+                    <span className="text-xs text-gray-600">{lang === "he" ? "/חודש" : "/month"}</span>
                   </div>
                 </div>
                 {loyaltyDiscountIls > 0 ? (
@@ -334,7 +334,7 @@ export default function BillingPage() {
                     🎁 {lang === "he" ? "הנחת נאמנות מוחלת אוטומטית" : "Loyalty discount applied automatically"}
                   </p>
                 ) : (
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="text-xs text-gray-600 mt-0.5">
                     {lang === "he"
                       ? `עד ${MESSAGE_QUOTA_BY_PLAN[activePlan].toLocaleString()} הודעות תזכורת/ביקורת בחודש`
                       : `Up to ${MESSAGE_QUOTA_BY_PLAN[activePlan].toLocaleString()} reminder/review messages/month`}
@@ -380,10 +380,10 @@ export default function BillingPage() {
                   <span className="text-sm font-bold text-gray-900 mb-2">{p === "standard" ? "Standard" : "Premium"}</span>
                   <div className="flex items-baseline gap-1 mb-1">
                     {p === plan && loyaltyDiscountIls > 0 && (
-                      <span className="text-base text-gray-400 line-through tabular-nums">₪{PLAN_PRICES[p]}</span>
+                      <span className="text-base text-gray-600 line-through tabular-nums">₪{PLAN_PRICES[p]}</span>
                     )}
                     <span className="text-3xl font-extrabold text-gray-900 tabular-nums">₪{priceAfterDiscount}</span>
-                    <span className="text-sm text-gray-400">{lang === "he" ? "/חודש" : "/month"}</span>
+                    <span className="text-sm text-gray-600">{lang === "he" ? "/חודש" : "/month"}</span>
                   </div>
                   {p === plan && loyaltyDiscountIls > 0 && (
                     <p className="text-xs font-medium text-green-600 mb-2">
@@ -409,7 +409,7 @@ export default function BillingPage() {
                         : `Up to ${MESSAGE_QUOTA_BY_PLAN[p].toLocaleString()} reminder/review messages/month`}
                     </li>
                     {p === "premium" && (
-                      <li className="flex items-center gap-2 text-sm text-gray-400">
+                      <li className="flex items-center gap-2 text-sm text-gray-600">
                         <span className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-amber-500">🔜</span>
                         <span>
                           {lang === "he" ? "מענה טלפוני חכם ב-AI" : "AI phone-call answering"}
@@ -433,7 +433,7 @@ export default function BillingPage() {
                         {checkoutLoading && isSelected ? t.redirecting : status === "trial" ? t.subscribeNow : t.reactivate}
                       </button>
                     ) : isCurrent ? (
-                      <button disabled className="w-full text-sm font-semibold px-4 py-2.5 rounded-lg bg-gray-50 text-gray-400 border border-gray-200 cursor-default">
+                      <button disabled className="w-full text-sm font-semibold px-4 py-2.5 rounded-lg bg-gray-50 text-gray-600 border border-gray-200 cursor-default">
                         {lang === "he" ? "התוכנית הנוכחית שלך" : "Your current plan"}
                       </button>
                     ) : (
@@ -486,7 +486,7 @@ export default function BillingPage() {
               </h2>
             </div>
             {billingCycle === "annual" ? (
-              <p className="text-sm text-gray-500 mt-3">
+              <p className="text-sm text-gray-600 mt-3">
                 {lang === "he" ? "אתה כבר במסלול השנתי — תודה! 🎉" : "You're already on the annual plan — thank you! 🎉"}
               </p>
             ) : (
@@ -523,7 +523,7 @@ export default function BillingPage() {
                 ₪{(walletBalanceAgorot / 100).toFixed(2)}
               </span>
             </div>
-            <p className="text-xs text-gray-500 mt-1 mb-4">
+            <p className="text-xs text-gray-600 mt-1 mb-4">
               {lang === "he" ? "יתרה לשימוש עתידי בהודעות/SMS נוספים מעבר למכסת המנוי." : "Prepaid balance for future extra WhatsApp/SMS sends beyond your plan quota."}
             </p>
             <div className="flex items-center gap-2">

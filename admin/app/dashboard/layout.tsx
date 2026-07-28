@@ -31,11 +31,10 @@ const ICONS = {
 // tells a story: get the bot connected and talking first, then the screens you check day to day,
 // then one-time business configuration, then account/money admin. WhatsApp leads every group —
 // nothing else on this dashboard does anything until it's connected.
+// Grouped for the RETURNING user, not the first-run one (the setup checklist handles onboarding).
+// Daily-driver items (analytics, appointments, customers) come first; one-time setup (WhatsApp,
+// billing) sinks to the bottom. Bot lives with the rest of the business config it resembles.
 const NAV_GROUPS: { titleKey: keyof ReturnType<typeof useLanguage>["t"]["navGroups"]; items: NavItem[] }[] = [
-  { titleKey: "setup", items: [
-    { href: "/dashboard/whatsapp", key: "whatsapp", icon: ICONS.whatsapp },
-    { href: "/dashboard/bot", key: "bot", icon: ICONS.bot },
-  ] },
   { titleKey: "overview", items: [{ href: "/dashboard/analytics", key: "analytics", icon: ICONS.analytics }] },
   { titleKey: "operations", items: [
     { href: "/dashboard/appointments", key: "appointments", icon: ICONS.appointments },
@@ -47,8 +46,10 @@ const NAV_GROUPS: { titleKey: keyof ReturnType<typeof useLanguage>["t"]["navGrou
     { href: "/dashboard/staff", key: "staff", icon: ICONS.staff },
     { href: "/dashboard/hours", key: "hours", icon: ICONS.hours },
     { href: "/dashboard/faq", key: "faq", icon: ICONS.faq },
+    { href: "/dashboard/bot", key: "bot", icon: ICONS.bot },
   ] },
   { titleKey: "account", items: [
+    { href: "/dashboard/whatsapp", key: "whatsapp", icon: ICONS.whatsapp },
     { href: "/dashboard/payments", key: "payments", icon: ICONS.payments },
     { href: "/dashboard/settings", key: "settings", icon: ICONS.settings },
     { href: "/dashboard/billing", key: "billing", icon: ICONS.billing },
@@ -379,7 +380,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               if (items.length === 0) return null;
               return (
                 <div key={group.titleKey}>
-                  <div className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                  <div className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-600">
                     {t.navGroups[group.titleKey]}
                   </div>
                   {items.map((item) => {
@@ -425,7 +426,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <div className="h-px bg-gray-100 my-2" />
             <button
               onClick={logout}
-              className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-gray-500 transition"
+              className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-gray-600 transition"
             >
               <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

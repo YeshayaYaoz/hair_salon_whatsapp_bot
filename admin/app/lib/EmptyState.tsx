@@ -27,7 +27,7 @@ export function EmptyState({
         {icon}
       </div>
       <p className="text-sm font-semibold text-gray-800">{title}</p>
-      {hint && <p className="text-xs text-gray-400 mt-1.5 max-w-xs mx-auto leading-relaxed">{hint}</p>}
+      {hint && <p className="text-xs text-gray-600 mt-1.5 max-w-xs mx-auto leading-relaxed">{hint}</p>}
       {actionLabel && actionHref && (
         <Link
           href={actionHref}

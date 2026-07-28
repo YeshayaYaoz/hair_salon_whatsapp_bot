@@ -80,7 +80,7 @@ const STATUS_COLORS: Record<string, string> = {
   trial: "bg-amber-50 text-amber-700 border-amber-200",
   active: "bg-green-50 text-green-700 border-green-200",
   past_due: "bg-red-50 text-red-600 border-red-200",
-  canceled: "bg-gray-100 text-gray-500 border-gray-200",
+  canceled: "bg-gray-100 text-gray-600 border-gray-200",
 };
 
 export default function AdminBusinessesPage() {
@@ -242,7 +242,7 @@ export default function AdminBusinessesPage() {
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3 animate-fade-up">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{he ? "כל העסקים" : "All businesses"}</h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <p className="text-gray-600 text-sm mt-1">
             {businesses ? (he ? `${businesses.length} עסקים רשומים` : `${businesses.length} registered businesses`) : "…"}
           </p>
         </div>
@@ -283,17 +283,17 @@ export default function AdminBusinessesPage() {
         <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4 animate-fade-up max-h-72 overflow-y-auto">
           <h2 className="text-sm font-semibold text-gray-800 mb-2">{he ? "פעולות אדמין אחרונות" : "Recent admin actions"}</h2>
           {globalAuditLog === null ? (
-            <div className="text-xs text-gray-400 py-4 text-center">…</div>
+            <div className="text-xs text-gray-600 py-4 text-center">…</div>
           ) : globalAuditLog.length === 0 ? (
-            <div className="text-xs text-gray-400 py-4 text-center">{he ? "אין פעולות עדיין" : "No actions yet"}</div>
+            <div className="text-xs text-gray-600 py-4 text-center">{he ? "אין פעולות עדיין" : "No actions yet"}</div>
           ) : (
             <ul className="text-xs text-gray-600 space-y-1.5">
               {globalAuditLog.map((entry) => (
                 <li key={entry.id} className="flex items-center gap-2 flex-wrap">
-                  <span className="text-gray-400 tabular-nums">{new Date(entry.createdAt).toLocaleString(he ? "he-IL" : "en-US")}</span>
+                  <span className="text-gray-600 tabular-nums">{new Date(entry.createdAt).toLocaleString(he ? "he-IL" : "en-US")}</span>
                   <span className="font-semibold text-gray-800">{entry.action}</span>
                   <span>{entry.targetBusinessName}</span>
-                  {entry.details && <span className="text-gray-400">— {entry.details}</span>}
+                  {entry.details && <span className="text-gray-600">— {entry.details}</span>}
                 </li>
               ))}
             </ul>
@@ -378,21 +378,21 @@ export default function AdminBusinessesPage() {
         {businesses === null ? (
           <div>{Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} cols={10} />)}</div>
         ) : filtered.length === 0 ? (
-          <div className="px-6 py-12 text-center text-gray-400 text-sm">{he ? "לא נמצאו עסקים" : "No businesses found"}</div>
+          <div className="px-6 py-12 text-center text-gray-600 text-sm">{he ? "לא נמצאו עסקים" : "No businesses found"}</div>
         ) : (
           <table className="w-full text-sm min-w-[1020px]">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="text-start px-4 py-3 text-gray-500 font-medium">{he ? "עסק" : "Business"}</th>
-                <th className="text-start px-4 py-3 text-gray-500 font-medium">{he ? "נרשם" : "Joined"}</th>
-                <th className="text-start px-4 py-3 text-gray-500 font-medium">{he ? "מנוי" : "Subscription"}</th>
-                <th className="text-start px-4 py-3 text-gray-500 font-medium">WhatsApp</th>
-                <th className="text-start px-4 py-3 text-gray-500 font-medium">{he ? "סליקה" : "Payment"}</th>
-                <th className="text-start px-4 py-3 text-gray-500 font-medium">{he ? "חשבוניות" : "Invoicing"}</th>
-                <th className="text-start px-4 py-3 text-gray-500 font-medium">{he ? "ארנק / שימוש" : "Wallet / usage"}</th>
-                <th className="text-end px-4 py-3 text-gray-500 font-medium">{he ? "עלות Claude (30 יום)" : "Claude cost (30d)"}</th>
-                <th className="text-end px-4 py-3 text-gray-500 font-medium">{he ? "תורים" : "Bookings"}</th>
-                <th className="text-end px-4 py-3 text-gray-500 font-medium">{he ? "לקוחות" : "Customers"}</th>
+                <th className="text-start px-4 py-3 text-gray-600 font-medium">{he ? "עסק" : "Business"}</th>
+                <th className="text-start px-4 py-3 text-gray-600 font-medium">{he ? "נרשם" : "Joined"}</th>
+                <th className="text-start px-4 py-3 text-gray-600 font-medium">{he ? "מנוי" : "Subscription"}</th>
+                <th className="text-start px-4 py-3 text-gray-600 font-medium">WhatsApp</th>
+                <th className="text-start px-4 py-3 text-gray-600 font-medium">{he ? "סליקה" : "Payment"}</th>
+                <th className="text-start px-4 py-3 text-gray-600 font-medium">{he ? "חשבוניות" : "Invoicing"}</th>
+                <th className="text-start px-4 py-3 text-gray-600 font-medium">{he ? "ארנק / שימוש" : "Wallet / usage"}</th>
+                <th className="text-end px-4 py-3 text-gray-600 font-medium">{he ? "עלות Claude (30 יום)" : "Claude cost (30d)"}</th>
+                <th className="text-end px-4 py-3 text-gray-600 font-medium">{he ? "תורים" : "Bookings"}</th>
+                <th className="text-end px-4 py-3 text-gray-600 font-medium">{he ? "לקוחות" : "Customers"}</th>
               </tr>
             </thead>
             <tbody>
@@ -411,15 +411,15 @@ export default function AdminBusinessesPage() {
                         </span>
                       )}
                     </div>
-                    <div className="text-gray-400 text-xs" dir="ltr">{b.email}</div>
+                    <div className="text-gray-600 text-xs" dir="ltr">{b.email}</div>
                   </td>
-                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{fmtDate(b.createdAt)}</td>
+                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(b.createdAt)}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_COLORS[b.subscriptionStatus] ?? ""}`}>
                       {b.subscriptionStatus}
                     </span>
                     {b.subscriptionPlan && (
-                      <span className="ms-1.5 text-xs text-gray-400">
+                      <span className="ms-1.5 text-xs text-gray-600">
                         {b.subscriptionPlan}{b.billingCycle === "annual" ? " · annual" : ""}
                       </span>
                     )}
@@ -431,10 +431,10 @@ export default function AdminBusinessesPage() {
                         {b.whatsappTokenValid ? (he ? "מחובר" : "Connected") : (he ? "נותק" : "Broken")}
                       </span>
                     ) : (
-                      <span className="text-xs text-gray-400">{he ? "לא מחובר" : "Not connected"}</span>
+                      <span className="text-xs text-gray-600">{he ? "לא מחובר" : "Not connected"}</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">
+                  <td className="px-4 py-3 text-gray-600 text-xs">
                     {b.paymentProvider ?? "—"}
                     {b.depositEnabled && (
                       <span className="ms-1.5 inline-flex text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
@@ -442,18 +442,18 @@ export default function AdminBusinessesPage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{b.invoiceProvider ?? "—"}</td>
+                  <td className="px-4 py-3 text-gray-600 text-xs">{b.invoiceProvider ?? "—"}</td>
                   <td className="px-4 py-3 text-xs whitespace-nowrap">
                     <span className={`font-medium tabular-nums ${b.walletBalanceAgorot < 0 ? "text-red-600" : "text-gray-700"}`}>
                       ₪{(b.walletBalanceAgorot / 100).toFixed(2)}
                     </span>
-                    <span className="text-gray-400 ms-1.5 tabular-nums">
+                    <span className="text-gray-600 ms-1.5 tabular-nums">
                       · {b.messagesUsedThisCycle}/{MESSAGE_QUOTA_BY_PLAN[b.subscriptionPlan ?? ""] ?? MESSAGE_QUOTA_BY_PLAN.standard}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-end tabular-nums text-gray-700">
                     ₪{(b.realClaudeCostAgorot30d / 100).toFixed(2)}
-                    <span className="text-gray-400 ms-1 text-xs">· {b.realClaudeTokens30d.toLocaleString()} tok</span>
+                    <span className="text-gray-600 ms-1 text-xs">· {b.realClaudeTokens30d.toLocaleString()} tok</span>
                   </td>
                   <td className="px-4 py-3 text-end tabular-nums text-gray-700">{b._count.appointments}</td>
                   <td className="px-4 py-3 text-end tabular-nums text-gray-700">{b._count.customers}</td>
@@ -475,7 +475,7 @@ export default function AdminBusinessesPage() {
           >
             <div className="flex items-center justify-between mb-1">
               <h2 className="text-lg font-bold text-gray-900">{drilldown.name}</h2>
-              <button onClick={() => setDrilldown(null)} className="text-gray-400 hover:text-gray-600 text-sm">
+              <button onClick={() => setDrilldown(null)} className="text-gray-600 hover:text-gray-600 text-sm">
                 {he ? "סגור" : "Close"}
               </button>
             </div>
@@ -504,7 +504,7 @@ export default function AdminBusinessesPage() {
                   return (
                     <span
                       key={key}
-                      className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border ${done ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}
+                      className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border ${done ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-600 border-gray-200"}`}
                     >
                       {done ? "✓" : "○"} {label}
                     </span>
@@ -557,7 +557,7 @@ export default function AdminBusinessesPage() {
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs text-gray-600">
                     {he ? "וואטסאפ" : "WhatsApp"}:{" "}
-                    <span className={drilldown.whatsappConnected ? "text-green-600 font-medium" : "text-gray-400"}>
+                    <span className={drilldown.whatsappConnected ? "text-green-600 font-medium" : "text-gray-600"}>
                       {drilldown.whatsappConnected
                         ? (drilldown.whatsappTokenValid ? (he ? "מחובר" : "connected") : (he ? "נותק" : "broken"))
                         : (he ? "לא מחובר" : "not connected")}
@@ -572,7 +572,7 @@ export default function AdminBusinessesPage() {
                 </div>
                 {showWaForm && (
                   <div className="flex flex-col gap-2 mt-2">
-                    <p className="text-[11px] text-gray-400">
+                    <p className="text-[11px] text-gray-600">
                       {he
                         ? "לעסק ללא פייסבוק: רשום את המספר שלו תחת ה-Business Manager שלך במטא, והדבק כאן את מזהה המספר והטוקן הקבוע."
                         : "For a business with no Facebook: register their number under your own Meta Business Manager, then paste its Phone Number ID and a permanent token here."}
@@ -692,10 +692,10 @@ export default function AdminBusinessesPage() {
             {bizAuditLog && bizAuditLog.length > 0 && (
               <div className="mb-4">
                 <h3 className="text-xs font-semibold text-gray-700 mb-1.5">{he ? "היסטוריית פעולות אדמין" : "Admin action history"}</h3>
-                <ul className="text-xs text-gray-500 space-y-1">
+                <ul className="text-xs text-gray-600 space-y-1">
                   {bizAuditLog.map((entry) => (
                     <li key={entry.id}>
-                      <span className="tabular-nums text-gray-400">{new Date(entry.createdAt).toLocaleString(he ? "he-IL" : "en-US")}</span>
+                      <span className="tabular-nums text-gray-600">{new Date(entry.createdAt).toLocaleString(he ? "he-IL" : "en-US")}</span>
                       {" · "}
                       <span className="font-medium text-gray-700">{entry.action}</span>
                       {entry.details && <span> — {entry.details}</span>}
@@ -705,23 +705,23 @@ export default function AdminBusinessesPage() {
               </div>
             )}
 
-            <p className="text-xs text-gray-500 mb-4">
+            <p className="text-xs text-gray-600 mb-4">
               {he ? "עלות בפועל, לפי מספר טלפון, 30 יום אחרונים" : "Real usage by phone number, last 30 days"}
             </p>
             {phoneRows === null ? (
-              <div className="text-sm text-gray-400 py-6 text-center">…</div>
+              <div className="text-sm text-gray-600 py-6 text-center">…</div>
             ) : phoneRows.length === 0 ? (
-              <div className="text-sm text-gray-400 py-6 text-center">
+              <div className="text-sm text-gray-600 py-6 text-center">
                 {he ? "אין פעילות רשומה ב-30 הימים האחרונים" : "No recorded activity in the last 30 days"}
               </div>
             ) : (
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    <th className="text-start py-2 text-gray-500 font-medium">{he ? "טלפון" : "Phone"}</th>
-                    <th className="text-end py-2 text-gray-500 font-medium">{he ? "עלות Claude" : "Claude cost"}</th>
-                    <th className="text-end py-2 text-gray-500 font-medium">{he ? "טוקנים" : "Tokens"}</th>
-                    <th className="text-end py-2 text-gray-500 font-medium">WhatsApp</th>
+                    <th className="text-start py-2 text-gray-600 font-medium">{he ? "טלפון" : "Phone"}</th>
+                    <th className="text-end py-2 text-gray-600 font-medium">{he ? "עלות Claude" : "Claude cost"}</th>
+                    <th className="text-end py-2 text-gray-600 font-medium">{he ? "טוקנים" : "Tokens"}</th>
+                    <th className="text-end py-2 text-gray-600 font-medium">WhatsApp</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -729,8 +729,8 @@ export default function AdminBusinessesPage() {
                     <tr key={r.customerPhone} className="border-b border-gray-100">
                       <td className="py-2 text-gray-800" dir="ltr">{r.customerPhone}</td>
                       <td className="py-2 text-end tabular-nums text-gray-700">₪{(r.claudeCostAgorot / 100).toFixed(2)}</td>
-                      <td className="py-2 text-end tabular-nums text-gray-500">{r.claudeTokens.toLocaleString()}</td>
-                      <td className="py-2 text-end tabular-nums text-gray-500">
+                      <td className="py-2 text-end tabular-nums text-gray-600">{r.claudeTokens.toLocaleString()}</td>
+                      <td className="py-2 text-end tabular-nums text-gray-600">
                         {r.whatsappBillableCount > 0
                           ? `${r.whatsappBillableCount} (${Object.entries(r.whatsappByCategory).map(([c, n]) => `${c}:${n}`).join(", ")})`
                           : "—"}
@@ -787,13 +787,13 @@ function MrrSparkline({ snapshots, he }: { snapshots: MrrSnapshot[]; he: boolean
 function KpiCard({ label, value, sub, tone }: { label: string; value: string; sub: string; tone?: "good" | "bad" }) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl px-4 py-3.5">
-      <div className="text-xs text-gray-500 font-medium mb-1">{label}</div>
+      <div className="text-xs text-gray-600 font-medium mb-1">{label}</div>
       <div
         className={`text-xl font-bold tabular-nums ${tone === "bad" ? "text-red-600" : tone === "good" ? "text-green-700" : "text-gray-900"}`}
       >
         {value}
       </div>
-      <div className="text-xs text-gray-400 mt-0.5">{sub}</div>
+      <div className="text-xs text-gray-600 mt-0.5">{sub}</div>
     </div>
   );
 }

@@ -50,14 +50,14 @@ export default function StaffPage() {
     <div className="animate-fade-in">
       <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-gray-900">{t.staffTitle}</h1>
-        <p className="text-gray-500 text-sm mt-1">{t.staffSubtitle}</p>
+        <p className="text-gray-600 text-sm mt-1">{t.staffSubtitle}</p>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-6 animate-fade-up stagger-2">
         {!loaded ? (
           <div><SkeletonRow cols={1} /><SkeletonRow cols={1} /><SkeletonRow cols={1} /></div>
         ) : staff.length === 0 ? (
-          <div className="px-6 py-10 text-center text-gray-400 text-sm">{t.noStaff}</div>
+          <div className="px-6 py-10 text-center text-gray-600 text-sm">{t.noStaff}</div>
         ) : (
           <ul>
             {staff.map((s, i) => (
@@ -73,7 +73,7 @@ export default function StaffPage() {
                 </div>
                 <button
                   onClick={() => remove(s.id)}
-                  className="text-xs text-gray-400 hover:text-red-600 transition px-2 py-1 rounded hover:bg-red-950/30"
+                  className="text-xs text-gray-600 hover:text-red-600 transition px-2 py-1 rounded hover:bg-red-950/30"
                 >
                   {t.remove}
                 </button>

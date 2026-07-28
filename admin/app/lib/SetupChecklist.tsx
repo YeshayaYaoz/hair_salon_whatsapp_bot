@@ -97,7 +97,7 @@ export function SetupChecklist() {
             <li key={step.key} className="flex items-start gap-3">
               <span
                 className={`mt-0.5 w-5 h-5 shrink-0 rounded-full flex items-center justify-center text-xs ${
-                  step.done ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"
+                  step.done ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
                 }`}
                 aria-hidden
               >
@@ -107,7 +107,7 @@ export function SetupChecklist() {
                 <a
                   href={meta.href}
                   className={`text-sm font-medium ${
-                    step.done ? "text-gray-400 line-through" : "text-[#1B7FA0] hover:underline"
+                    step.done ? "text-gray-600 line-through" : "text-[#1B7FA0] hover:underline"
                   }`}
                 >
                   {he ? meta.he : meta.en}

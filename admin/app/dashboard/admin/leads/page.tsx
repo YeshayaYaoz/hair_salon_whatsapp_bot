@@ -178,7 +178,7 @@ export default function LeadFinderPage() {
       .catch(() => router.replace("/dashboard"));
   }, [router]);
 
-  if (isSuperAdmin === null) return <div className="animate-fade-in text-gray-400 text-sm">טוען…</div>;
+  if (isSuperAdmin === null) return <div className="animate-fade-in text-gray-600 text-sm">טוען…</div>;
   if (!isSuperAdmin) return null;
 
   return (
@@ -247,8 +247,8 @@ function SuggestedMatchesPanel() {
                 <span className="font-medium">{m.leadName}</span> ({m.leadPhone ?? "—"})
                 {" ⟷ "}
                 <span className="font-medium">{m.businessName}</span>
-                <span className="text-gray-400" dir="ltr"> ({m.businessEmail})</span>
-                <span className="text-gray-400 ms-1.5">{m.score}%</span>
+                <span className="text-gray-600" dir="ltr"> ({m.businessEmail})</span>
+                <span className="text-gray-600 ms-1.5">{m.score}%</span>
               </span>
               <span className="flex gap-1.5 flex-shrink-0">
                 <button
@@ -260,7 +260,7 @@ function SuggestedMatchesPanel() {
                 </button>
                 <button
                   onClick={() => setDismissed((prev) => new Set(prev).add(key))}
-                  className="text-xs text-gray-400 hover:text-gray-700 px-2 py-1"
+                  className="text-xs text-gray-600 hover:text-gray-700 px-2 py-1"
                 >
                   התעלם
                 </button>
@@ -367,7 +367,7 @@ function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => 
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3 animate-fade-up">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">מציאת לידים</h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <p className="text-gray-600 text-sm mt-1">
             {campaigns ? `${campaigns.length} קמפיינים` : "…"}
           </p>
         </div>
@@ -417,7 +417,7 @@ function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => 
                 >
                   {editSaving ? "שומר…" : "שמור"}
                 </button>
-                <button onClick={() => setEditing(null)} className="px-4 py-2 rounded-lg text-sm text-gray-500">ביטול</button>
+                <button onClick={() => setEditing(null)} className="px-4 py-2 rounded-lg text-sm text-gray-600">ביטול</button>
               </div>
             </div>
           </div>
@@ -428,18 +428,18 @@ function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => 
         {campaigns === null ? (
           <div>{Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} cols={4} />)}</div>
         ) : campaigns.length === 0 ? (
-          <div className="px-6 py-12 text-center text-gray-400 text-sm">אין עדיין קמפיינים</div>
+          <div className="px-6 py-12 text-center text-gray-600 text-sm">אין עדיין קמפיינים</div>
         ) : (
           <table className="w-full text-sm min-w-[820px]">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="text-start px-4 py-3 text-gray-500 font-medium">קמפיין</th>
-                <th className="text-start px-4 py-3 text-gray-500 font-medium">קטגוריה</th>
-                <th className="text-start px-4 py-3 text-gray-500 font-medium">מיקום</th>
-                <th className="text-start px-4 py-3 text-gray-500 font-medium">סטטוס</th>
-                <th className="text-start px-4 py-3 text-gray-500 font-medium">נוצר</th>
-                <th className="text-end px-4 py-3 text-gray-500 font-medium">לידים</th>
-                <th className="text-end px-4 py-3 text-gray-500 font-medium"></th>
+                <th className="text-start px-4 py-3 text-gray-600 font-medium">קמפיין</th>
+                <th className="text-start px-4 py-3 text-gray-600 font-medium">קטגוריה</th>
+                <th className="text-start px-4 py-3 text-gray-600 font-medium">מיקום</th>
+                <th className="text-start px-4 py-3 text-gray-600 font-medium">סטטוס</th>
+                <th className="text-start px-4 py-3 text-gray-600 font-medium">נוצר</th>
+                <th className="text-end px-4 py-3 text-gray-600 font-medium">לידים</th>
+                <th className="text-end px-4 py-3 text-gray-600 font-medium"></th>
               </tr>
             </thead>
             <tbody>
@@ -449,21 +449,21 @@ function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => 
                   className={`hover:bg-gray-50 ${i !== campaigns.length - 1 ? "border-b border-gray-200/50" : ""}`}
                 >
                   <td className="px-4 py-3 text-gray-800 font-medium cursor-pointer" onClick={() => onOpenCampaign(c.id)}>{c.name}</td>
-                  <td className="px-4 py-3 text-gray-500 cursor-pointer" onClick={() => onOpenCampaign(c.id)}>{c.category}</td>
-                  <td className="px-4 py-3 text-gray-500 cursor-pointer" onClick={() => onOpenCampaign(c.id)}>{c.locationQuery}</td>
+                  <td className="px-4 py-3 text-gray-600 cursor-pointer" onClick={() => onOpenCampaign(c.id)}>{c.category}</td>
+                  <td className="px-4 py-3 text-gray-600 cursor-pointer" onClick={() => onOpenCampaign(c.id)}>{c.locationQuery}</td>
                   <td className="px-4 py-3 cursor-pointer" onClick={() => onOpenCampaign(c.id)}>
                     <span className="inline-flex text-xs font-medium px-2.5 py-1 rounded-full border bg-gray-50 text-gray-600 border-gray-200">
                       {CAMPAIGN_STATUS_LABELS_HE[c.status] ?? c.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-500 whitespace-nowrap cursor-pointer" onClick={() => onOpenCampaign(c.id)}>{fmtDate(c.createdAt)}</td>
+                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap cursor-pointer" onClick={() => onOpenCampaign(c.id)}>{fmtDate(c.createdAt)}</td>
                   <td className="px-4 py-3 text-end tabular-nums text-gray-700 cursor-pointer" onClick={() => onOpenCampaign(c.id)}>{c._count?.leads ?? 0}</td>
                   <td className="px-4 py-3 text-end whitespace-nowrap">
-                    <button onClick={() => openEdit(c)} className="text-xs text-gray-400 hover:text-gray-700 px-2 py-1">עריכה</button>
+                    <button onClick={() => openEdit(c)} className="text-xs text-gray-600 hover:text-gray-700 px-2 py-1">עריכה</button>
                     <button
                       disabled={deletingId === c.id}
                       onClick={() => deleteCampaign(c)}
-                      className="text-xs text-gray-400 hover:text-red-600 px-2 py-1 disabled:opacity-50"
+                      className="text-xs text-gray-600 hover:text-red-600 px-2 py-1 disabled:opacity-50"
                     >
                       {deletingId === c.id ? "מוחק…" : "מחיקה"}
                     </button>
@@ -531,7 +531,7 @@ function BroadcastModal({
               נשלח בהצלחה ל-{result.sent} מתוך {result.totalEligible} עסקים.
             </div>
             {(result.skippedAlreadySent > 0 || result.skippedOptedOut > 0) && (
-              <div className="text-xs text-gray-500 mb-2">
+              <div className="text-xs text-gray-600 mb-2">
                 {result.skippedAlreadySent > 0 && <div>דולג — כבר קיבלו הודעת תפוצה בעבר: {result.skippedAlreadySent}</div>}
                 {result.skippedOptedOut > 0 && <div>דולג — ביקשו הסרה: {result.skippedOptedOut}</div>}
               </div>
@@ -547,7 +547,7 @@ function BroadcastModal({
           </div>
         ) : (
           <>
-            <p className="text-gray-500 text-sm mb-4">
+            <p className="text-gray-600 text-sm mb-4">
               ההודעה תישלח בדיוק כפי שכתובה כאן — אין ניסוח אוטומטי לכל עסק בנפרד. יש
               <span className="font-medium text-gray-700"> {eligibleCount} </span>
               עסקים בקמפיין הזה עם כתובת מייל ידועה (מי שכבר קיבל הודעת תפוצה בעבר או ביקש הסרה ידולג אוטומטית, גם אם נכלל במספר הזה).
@@ -555,17 +555,17 @@ function BroadcastModal({
             {err && <div className="bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg px-3 py-2 mb-3">{err}</div>}
             <div className="flex flex-col gap-3">
               <div>
-                <label className="text-xs font-medium text-gray-500 mb-1 block">נושא</label>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">נושא</label>
                 <input value={subject} onChange={(e) => setSubject(e.target.value)} className="text-sm w-full" />
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-500 mb-1 block">תוכן ההודעה</label>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">תוכן ההודעה</label>
                 <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={10} className="text-sm w-full" />
-                <p className="text-[11px] text-gray-400 mt-1">שורת הסרה מרשימת התפוצה תתווסף אוטומטית בסוף ההודעה.</p>
+                <p className="text-[11px] text-gray-600 mt-1">שורת הסרה מרשימת התפוצה תתווסף אוטומטית בסוף ההודעה.</p>
               </div>
 
               {eligibleCount === 0 ? (
-                <div className="text-xs text-gray-400">
+                <div className="text-xs text-gray-600">
                   אין כרגע עסקים עם כתובת מייל בקמפיין הזה. כתובות מייל מתגלות אוטומטית מהאתר של כל עסק — הרץ סריקה נוספת אם עברו עסקים בלי אתר ידוע קודם לכן.
                 </div>
               ) : !confirming ? (
@@ -591,7 +591,7 @@ function BroadcastModal({
                     >
                       {sending ? "שולח…" : `כן, שלח ל-${eligibleCount} עסקים`}
                     </button>
-                    <button onClick={() => setConfirming(false)} className="px-4 py-2 rounded-lg text-sm text-gray-500">ביטול</button>
+                    <button onClick={() => setConfirming(false)} className="px-4 py-2 rounded-lg text-sm text-gray-600">ביטול</button>
                   </div>
                 </div>
               )}
@@ -673,12 +673,12 @@ function CampaignDetailView({
 
   return (
     <>
-      <button onClick={onBack} className="text-sm text-gray-500 mb-4 hover:text-gray-800">← חזרה לקמפיינים</button>
+      <button onClick={onBack} className="text-sm text-gray-600 mb-4 hover:text-gray-800">← חזרה לקמפיינים</button>
 
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{campaign?.name ?? "…"}</h1>
-          <p className="text-gray-500 text-sm mt-1">{campaign ? `${campaign.category} · ${campaign.locationQuery}` : ""}</p>
+          <p className="text-gray-600 text-sm mt-1">{campaign ? `${campaign.category} · ${campaign.locationQuery}` : ""}</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -718,7 +718,7 @@ function CampaignDetailView({
               <span className="text-xs text-red-500">{latestRun.errorMessage}</span>
             )}
           </div>
-          <div className="flex gap-6 text-xs text-gray-500">
+          <div className="flex gap-6 text-xs text-gray-600">
             <span>נמצאו: {latestRun.totalFound}</span>
             <span>הועשרו: {latestRun.totalEnriched}</span>
             <span>דורגו: {latestRun.totalScored}</span>
@@ -727,7 +727,7 @@ function CampaignDetailView({
       )}
 
       <div className="mb-3 flex items-center gap-2">
-        <span className="text-sm text-gray-500">סינון לפי סטטוס:</span>
+        <span className="text-sm text-gray-600">סינון לפי סטטוס:</span>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="text-sm">
           <option value="">הכל</option>
           {LEAD_STATUSES.map((s) => (
@@ -740,17 +740,17 @@ function CampaignDetailView({
         {leads === null ? (
           <div>{Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={6} />)}</div>
         ) : leads.length === 0 ? (
-          <div className="px-6 py-12 text-center text-gray-400 text-sm">אין עדיין לידים — התחל סריקה כדי לאתר עסקים</div>
+          <div className="px-6 py-12 text-center text-gray-600 text-sm">אין עדיין לידים — התחל סריקה כדי לאתר עסקים</div>
         ) : (
           <table className="w-full text-sm min-w-[820px]">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="text-start px-4 py-3 text-gray-500 font-medium">שם</th>
-                <th className="text-start px-4 py-3 text-gray-500 font-medium">טלפון</th>
-                <th className="text-start px-4 py-3 text-gray-500 font-medium">מייל</th>
-                <th className="text-start px-4 py-3 text-gray-500 font-medium">אתר</th>
-                <th className="text-start px-4 py-3 text-gray-500 font-medium">סטטוס</th>
-                <th className="text-end px-4 py-3 text-gray-500 font-medium">ניקוד</th>
+                <th className="text-start px-4 py-3 text-gray-600 font-medium">שם</th>
+                <th className="text-start px-4 py-3 text-gray-600 font-medium">טלפון</th>
+                <th className="text-start px-4 py-3 text-gray-600 font-medium">מייל</th>
+                <th className="text-start px-4 py-3 text-gray-600 font-medium">אתר</th>
+                <th className="text-start px-4 py-3 text-gray-600 font-medium">סטטוס</th>
+                <th className="text-end px-4 py-3 text-gray-600 font-medium">ניקוד</th>
               </tr>
             </thead>
             <tbody>
@@ -768,9 +768,9 @@ function CampaignDetailView({
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-gray-500" dir="ltr">{l.phone ?? "—"}</td>
-                  <td className="px-4 py-3 text-gray-500 truncate max-w-[180px]" dir="ltr">{l.email ?? "—"}</td>
-                  <td className="px-4 py-3 text-gray-500 truncate max-w-[200px]" dir="ltr">{l.website ?? "—"}</td>
+                  <td className="px-4 py-3 text-gray-600" dir="ltr">{l.phone ?? "—"}</td>
+                  <td className="px-4 py-3 text-gray-600 truncate max-w-[180px]" dir="ltr">{l.email ?? "—"}</td>
+                  <td className="px-4 py-3 text-gray-600 truncate max-w-[200px]" dir="ltr">{l.website ?? "—"}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_COLORS[l.status] ?? ""}`}>
                       {STATUS_LABELS_HE[l.status] ?? l.status}
@@ -863,11 +863,11 @@ function ConversionPanel({ lead, onChanged }: { lead: LeadDetail; onChanged: () 
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="text-sm text-gray-700">
             <span className="font-medium">{lead.linkedBusiness.name}</span>
-            <span className="text-gray-400 ms-2">
+            <span className="text-gray-600 ms-2">
               {lead.linkedBusiness.subscriptionStatus}{lead.linkedBusiness.subscriptionPlan ? ` · ${lead.linkedBusiness.subscriptionPlan}` : ""}
             </span>
           </div>
-          <button onClick={unlink} disabled={busy} className="text-xs text-gray-400 hover:text-red-600 border border-gray-200 hover:border-red-200 px-3 py-1.5 rounded-lg">
+          <button onClick={unlink} disabled={busy} className="text-xs text-gray-600 hover:text-red-600 border border-gray-200 hover:border-red-200 px-3 py-1.5 rounded-lg">
             הסר קישור
           </button>
         </div>
@@ -895,12 +895,12 @@ function ConversionPanel({ lead, onChanged }: { lead: LeadDetail; onChanged: () 
         <div className="flex flex-col gap-2">
           <input placeholder="שם העסק" value={nameOverride} onChange={(e) => setNameOverride(e.target.value)} className="text-xs" />
           <input placeholder="אימייל העסק" type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} className="text-xs" />
-          <p className="text-[11px] text-gray-400">ישלח לעסק מייל עם קישור לקביעת סיסמה והתחלה.</p>
+          <p className="text-[11px] text-gray-600">ישלח לעסק מייל עם קישור לקביעת סיסמה והתחלה.</p>
           <div className="flex gap-2">
             <button disabled={busy || !email} onClick={createAccount} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50">
               {busy ? "יוצר…" : "צור ושלח"}
             </button>
-            <button onClick={() => setMode("none")} className="text-xs text-gray-400">ביטול</button>
+            <button onClick={() => setMode("none")} className="text-xs text-gray-600">ביטול</button>
           </div>
         </div>
       )}
@@ -917,13 +917,13 @@ function ConversionPanel({ lead, onChanged }: { lead: LeadDetail; onChanged: () 
                   onClick={() => linkBusiness(b.id)}
                   className="w-full text-start px-3 py-2 text-xs hover:bg-gray-50 flex items-center justify-between"
                 >
-                  <span>{b.name} <span className="text-gray-400" dir="ltr">({b.email})</span></span>
-                  <span className="text-gray-400">{b.subscriptionStatus}</span>
+                  <span>{b.name} <span className="text-gray-600" dir="ltr">({b.email})</span></span>
+                  <span className="text-gray-600">{b.subscriptionStatus}</span>
                 </button>
               ))}
             </div>
           )}
-          <button onClick={() => setMode("none")} className="text-xs text-gray-400 self-start">ביטול</button>
+          <button onClick={() => setMode("none")} className="text-xs text-gray-600 self-start">ביטול</button>
         </div>
       )}
     </div>
@@ -1041,9 +1041,9 @@ function OutreachPanel({ leadId }: { leadId: string }) {
       </div>
 
       {messages === null ? (
-        <div className="text-xs text-gray-400 py-4 text-center">…</div>
+        <div className="text-xs text-gray-600 py-4 text-center">…</div>
       ) : messages.length === 0 ? (
-        <div className="text-xs text-gray-400 py-4 text-center">אין עדיין טיוטות — צור אחת למעלה</div>
+        <div className="text-xs text-gray-600 py-4 text-center">אין עדיין טיוטות — צור אחת למעלה</div>
       ) : (
         <div className="flex flex-col gap-3">
           {messages.map((m) => (
@@ -1051,14 +1051,14 @@ function OutreachPanel({ leadId }: { leadId: string }) {
               <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                 <div className="flex items-center gap-1.5 text-[11px]">
                   <span className="font-medium text-gray-600">{CHANNEL_LABELS_HE[m.channel]}</span>
-                  <span className="text-gray-400">· {m.angle === "follow_up_1" ? "מעקב" : "ראשונה"}</span>
+                  <span className="text-gray-600">· {m.angle === "follow_up_1" ? "מעקב" : "ראשונה"}</span>
                   <span
                     className={`inline-flex px-1.5 py-0.5 rounded-full border ${
                       m.approvalStatus === "approved"
                         ? "bg-green-50 text-green-700 border-green-200"
                         : m.approvalStatus === "rejected"
                           ? "bg-red-50 text-red-600 border-red-200"
-                          : "bg-gray-50 text-gray-500 border-gray-200"
+                          : "bg-gray-50 text-gray-600 border-gray-200"
                     }`}
                   >
                     {APPROVAL_LABELS_HE[m.approvalStatus]}
@@ -1066,7 +1066,7 @@ function OutreachPanel({ leadId }: { leadId: string }) {
                   {m.sentAt && <span className="text-green-600">✓ נשלח {new Date(m.sentAt).toLocaleDateString("he-IL")}</span>}
                 </div>
                 {!m.sentAt && editingId !== m.id && (
-                  <button onClick={() => startEdit(m)} className="text-[11px] text-gray-400 hover:text-gray-700">עריכה</button>
+                  <button onClick={() => startEdit(m)} className="text-[11px] text-gray-600 hover:text-gray-700">עריכה</button>
                 )}
               </div>
 
@@ -1084,7 +1084,7 @@ function OutreachPanel({ leadId }: { leadId: string }) {
                     >
                       שמור
                     </button>
-                    <button onClick={() => setEditingId(null)} className="text-xs text-gray-400">ביטול</button>
+                    <button onClick={() => setEditingId(null)} className="text-xs text-gray-600">ביטול</button>
                   </div>
                 </div>
               ) : (
@@ -1108,7 +1108,7 @@ function OutreachPanel({ leadId }: { leadId: string }) {
                       <button
                         disabled={busyId === m.id}
                         onClick={() => setApproval(m.id, "rejected")}
-                        className="text-xs text-gray-400 hover:text-red-600 px-2.5 py-1"
+                        className="text-xs text-gray-600 hover:text-red-600 px-2.5 py-1"
                       >
                         דחה
                       </button>
@@ -1178,8 +1178,8 @@ function LeadDetailView({ leadId, onBack }: { leadId: string; onBack: () => void
   if (!lead) {
     return (
       <>
-        <button onClick={onBack} className="text-sm text-gray-500 mb-4 hover:text-gray-800">← חזרה</button>
-        {error ? <div className="text-red-600 text-sm">{error}</div> : <div className="text-gray-400 text-sm">טוען…</div>}
+        <button onClick={onBack} className="text-sm text-gray-600 mb-4 hover:text-gray-800">← חזרה</button>
+        {error ? <div className="text-red-600 text-sm">{error}</div> : <div className="text-gray-600 text-sm">טוען…</div>}
       </>
     );
   }
@@ -1188,15 +1188,15 @@ function LeadDetailView({ leadId, onBack }: { leadId: string; onBack: () => void
 
   return (
     <>
-      <button onClick={onBack} className="text-sm text-gray-500 mb-4 hover:text-gray-800">← חזרה לקמפיין</button>
+      <button onClick={onBack} className="text-sm text-gray-600 mb-4 hover:text-gray-800">← חזרה לקמפיין</button>
 
       <div className="mb-6 flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{lead.name}</h1>
-          <p className="text-gray-500 text-sm mt-1">{lead.address ?? ""}</p>
+          <p className="text-gray-600 text-sm mt-1">{lead.address ?? ""}</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500">סטטוס:</span>
+          <span className="text-sm text-gray-600">סטטוס:</span>
           <select disabled={updating} value={lead.status} onChange={(e) => changeStatus(e.target.value)} className="text-sm">
             {LEAD_STATUSES.map((s) => (
               <option key={s} value={s}>{STATUS_LABELS_HE[s]}</option>
@@ -1248,7 +1248,7 @@ function LeadDetailView({ leadId, onBack }: { leadId: string; onBack: () => void
             </div>
           </>
         ) : (
-          <div className="text-gray-400 text-sm">טרם חושב ניקוד</div>
+          <div className="text-gray-600 text-sm">טרם חושב ניקוד</div>
         )}
       </div>
 
@@ -1263,13 +1263,13 @@ function LeadDetailView({ leadId, onBack }: { leadId: string; onBack: () => void
       <div className="bg-white border border-gray-200 rounded-xl p-4">
         <h2 className="text-sm font-semibold text-gray-700 mb-3">היסטוריית סטטוס</h2>
         {lead.statusEvents.length === 0 ? (
-          <div className="text-gray-400 text-sm">אין עדיין שינויי סטטוס</div>
+          <div className="text-gray-600 text-sm">אין עדיין שינויי סטטוס</div>
         ) : (
           <div className="flex flex-col gap-2 text-sm text-gray-600">
             {lead.statusEvents.map((e) => (
               <div key={e.id} className="flex justify-between">
                 <span>{e.fromStatus ? `${STATUS_LABELS_HE[e.fromStatus] ?? e.fromStatus} ← ` : ""}{STATUS_LABELS_HE[e.toStatus] ?? e.toStatus}</span>
-                <span className="text-gray-400 text-xs">{new Date(e.createdAt).toLocaleString("he-IL")}</span>
+                <span className="text-gray-600 text-xs">{new Date(e.createdAt).toLocaleString("he-IL")}</span>
               </div>
             ))}
           </div>

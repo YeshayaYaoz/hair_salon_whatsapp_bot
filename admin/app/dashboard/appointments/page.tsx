@@ -83,7 +83,7 @@ function GoogleCalendarSection() {
           <h2 className="text-sm font-semibold text-gray-900 mb-0.5 flex items-center gap-2">
             <span className="text-base">📅</span> Google Calendar
           </h2>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-600">
             {connected
               ? (he ? "כל תור שנקבע מסתנכרן אוטומטית לגוגל קלנדר שלך." : "Every booked appointment syncs to your Google Calendar automatically.")
               : (he ? "חבר את גוגל קלנדר כדי שתורים יופיעו שם אוטומטית." : "Connect Google Calendar so appointments show up there automatically.")}
@@ -100,7 +100,7 @@ function GoogleCalendarSection() {
               </span>
               <button
                 onClick={disconnect}
-                className="text-xs text-gray-400 hover:text-red-600 transition border border-gray-200 hover:border-red-200 px-3 py-1.5 rounded-lg"
+                className="text-xs text-gray-600 hover:text-red-600 transition border border-gray-200 hover:border-red-200 px-3 py-1.5 rounded-lg"
               >
                 {he ? "נתק" : "Disconnect"}
               </button>
@@ -167,29 +167,29 @@ function NewAppointmentModal({ tz, onClose, onCreated }: { tz: string; onClose: 
         <h2 className="text-lg font-bold text-gray-900">{he ? "תור חדש (ידני)" : "New appointment (manual)"}</h2>
 
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1.5">{he ? "שירות" : "Service"}</label>
+          <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "שירות" : "Service"}</label>
           <select value={serviceId} onChange={(e) => setServiceId(e.target.value)} required className="w-full">
             {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1.5">{he ? "שם הלקוח" : "Customer name"}</label>
+          <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "שם הלקוח" : "Customer name"}</label>
           <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} required className="w-full" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1.5">{he ? "טלפון" : "Phone"}</label>
+          <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "טלפון" : "Phone"}</label>
           <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} required placeholder="972501234567" className="w-full" dir="ltr" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1.5">{he ? "מועד" : "Date & time"}</label>
+          <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "מועד" : "Date & time"}</label>
           <input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} required className="w-full" dir="ltr" />
-          <p className="text-[11px] text-gray-400 mt-1">{he ? `לפי אזור הזמן ${tz}` : `In timezone ${tz}`}</p>
+          <p className="text-[11px] text-gray-600 mt-1">{he ? `לפי אזור הזמן ${tz}` : `In timezone ${tz}`}</p>
         </div>
 
         {error && <p className="text-red-600 text-sm">{error}</p>}
 
         <div className="flex items-center gap-2 justify-end">
-          <button type="button" onClick={onClose} className="text-sm text-gray-500 hover:text-gray-800 px-4 py-2">
+          <button type="button" onClick={onClose} className="text-sm text-gray-600 hover:text-gray-800 px-4 py-2">
             {he ? "ביטול" : "Cancel"}
           </button>
           <button type="submit" disabled={saving || !serviceId} className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
@@ -278,7 +278,7 @@ function WeekCalendar({
           const today = d.toDateString() === new Date().toDateString();
           return (
             <div key={d.toISOString()} className={`px-1 py-2 text-center border-e border-gray-100 last:border-e-0 ${today ? "bg-[#E0F5FB]" : ""}`}>
-              <div className="text-xs text-gray-400">{t.daysShort[d.getDay()]}</div>
+              <div className="text-xs text-gray-600">{t.daysShort[d.getDay()]}</div>
               <div className={`text-sm font-semibold ${today ? "text-[#1B7FA0]" : "text-gray-700"}`}>{d.getDate()}</div>
             </div>
           );
@@ -289,7 +289,7 @@ function WeekCalendar({
       <div>
         {hours.map((h) => (
           <div key={h} className="grid border-b border-gray-100/70 last:border-b-0" style={{ gridTemplateColumns: "3.5rem repeat(7, 1fr)", minHeight: 48 }}>
-            <div className="px-2 pt-1 text-xs text-gray-400 border-e border-gray-100 leading-none">{h}:00</div>
+            <div className="px-2 pt-1 text-xs text-gray-600 border-e border-gray-100 leading-none">{h}:00</div>
             {days.map((d) => {
               const appts = apptsByDay(d).filter((a) => partsInTz(a.startTime, tz).hour === h);
               const today = d.toDateString() === new Date().toDateString();
@@ -443,7 +443,7 @@ export default function AppointmentsPage() {
       <div className="mb-5 flex items-start justify-between flex-wrap gap-3 animate-fade-up">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{t.appointmentsTitle}</h1>
-          <p className="text-gray-500 text-sm mt-1">{t.appointmentsSubtitle}</p>
+          <p className="text-gray-600 text-sm mt-1">{t.appointmentsSubtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           {/* View toggle */}
@@ -452,7 +452,7 @@ export default function AppointmentsPage() {
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`text-xs font-medium px-3 py-1.5 rounded-md transition ${view === v ? "bg-[#1B7FA0] text-white" : "text-gray-500 hover:text-gray-800"}`}
+                className={`text-xs font-medium px-3 py-1.5 rounded-md transition ${view === v ? "bg-[#1B7FA0] text-white" : "text-gray-600 hover:text-gray-800"}`}
               >
                 {v === "list" ? t.listView : t.calendarView}
               </button>
@@ -496,7 +496,7 @@ export default function AppointmentsPage() {
               onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d); }}
               className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition"
             >
-              <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
@@ -507,7 +507,7 @@ export default function AppointmentsPage() {
               onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d); }}
               className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition"
             >
-              <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
@@ -554,7 +554,7 @@ export default function AppointmentsPage() {
                 <button
                   key={f.key}
                   onClick={() => setFilter(f.key)}
-                  className={`text-xs font-medium px-3 py-1.5 rounded-md transition ${filter === f.key ? "bg-[#1B7FA0] text-white" : "text-gray-500 hover:text-gray-800"}`}
+                  className={`text-xs font-medium px-3 py-1.5 rounded-md transition ${filter === f.key ? "bg-[#1B7FA0] text-white" : "text-gray-600 hover:text-gray-800"}`}
                 >
                   {f.label}
                 </button>
@@ -568,7 +568,7 @@ export default function AppointmentsPage() {
             />
             {selected.size > 0 && (
               <div className="flex items-center gap-2 ms-auto">
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-gray-600">
                   {lang === "he" ? `${selected.size} נבחרו` : `${selected.size} selected`}
                 </span>
                 <button
@@ -607,11 +607,11 @@ export default function AppointmentsPage() {
                         aria-label={lang === "he" ? "בחר הכל" : "Select all"}
                       />
                     </th>
-                    <th className="text-start px-2 py-3 text-gray-500 font-medium">{t.when}</th>
-                    <th className="text-start px-4 py-3 text-gray-500 font-medium">{t.customer}</th>
-                    <th className="text-start px-4 py-3 text-gray-500 font-medium">{t.service}</th>
-                    <th className="text-start px-4 py-3 text-gray-500 font-medium hidden md:table-cell">{t.staff}</th>
-                    <th className="text-start px-4 py-3 text-gray-500 font-medium">{t.status}</th>
+                    <th className="text-start px-2 py-3 text-gray-600 font-medium">{t.when}</th>
+                    <th className="text-start px-4 py-3 text-gray-600 font-medium">{t.customer}</th>
+                    <th className="text-start px-4 py-3 text-gray-600 font-medium">{t.service}</th>
+                    <th className="text-start px-4 py-3 text-gray-600 font-medium hidden md:table-cell">{t.staff}</th>
+                    <th className="text-start px-4 py-3 text-gray-600 font-medium">{t.status}</th>
                     <th className="px-4 py-3" />
                   </tr>
                 </thead>
@@ -638,14 +638,14 @@ export default function AppointmentsPage() {
                           </div>
                           <div className="min-w-0">
                             <div className="text-gray-700 font-medium text-sm truncate">{a.customer.name ?? "—"}</div>
-                            <div className="text-gray-400 text-xs" dir="ltr">{formatPhone(a.customer.phone)}</div>
+                            <div className="text-gray-600 text-xs" dir="ltr">{formatPhone(a.customer.phone)}</div>
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-gray-600 text-sm">{a.service.name}</td>
-                      <td className="px-4 py-3 text-gray-500 text-sm hidden md:table-cell">{a.staff?.name ?? "—"}</td>
+                      <td className="px-4 py-3 text-gray-600 text-sm hidden md:table-cell">{a.staff?.name ?? "—"}</td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLES[a.status] ?? "bg-gray-100 text-gray-500 border-gray-200"}`}>
+                        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLES[a.status] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
                           {a.status === "confirmed" ? (lang === "he" ? "מאושר" : "Confirmed")
                             : a.status === "cancelled" ? (lang === "he" ? "בוטל" : "Cancelled")
                             : a.status === "pending_payment" ? `⏳ ${lang === "he" ? "ממתין למקדמה" : "Awaiting deposit"}${a.depositAmountIls ? ` ₪${a.depositAmountIls}` : ""}`
@@ -656,7 +656,7 @@ export default function AppointmentsPage() {
                         <div className="flex items-center justify-end gap-1">
                           {a.status === "confirmed" && (
                             <a href={googleCalendarUrl(a)} target="_blank" rel="noopener noreferrer" title="Add to Google Calendar"
-                              className="text-gray-400 hover:text-[#1B7FA0] transition px-1.5 py-1 rounded hover:bg-[#E0F5FB]">
+                              className="text-gray-600 hover:text-[#1B7FA0] transition px-1.5 py-1 rounded hover:bg-[#E0F5FB]">
                               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                               </svg>
@@ -664,7 +664,7 @@ export default function AppointmentsPage() {
                           )}
                           {a.status === "confirmed" && new Date(a.startTime) >= new Date() && (
                             <button onClick={() => cancel(a.id)} disabled={cancellingId === a.id}
-                              className="text-xs text-gray-400 hover:text-red-600 disabled:opacity-50 transition px-2 py-1 rounded hover:bg-red-950/30">
+                              className="text-xs text-gray-600 hover:text-red-600 disabled:opacity-50 transition px-2 py-1 rounded hover:bg-red-950/30">
                               {cancellingId === a.id ? "…" : t.cancel}
                             </button>
                           )}

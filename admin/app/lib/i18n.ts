@@ -8,7 +8,7 @@ const translations = {
       blocked: "Time off", conversations: "Conversations",
       whatsapp: "WhatsApp", bot: "Bot", payments: "Payments", faq: "FAQ", settings: "Settings", billing: "Billing", logout: "Log out",
     },
-    navGroups: { setup: "Get started", overview: "Overview", operations: "Day-to-day", business: "Business setup", account: "Account" },
+    navGroups: { setup: "Get started", overview: "Home", operations: "Day-to-day", business: "My business", account: "Setup & account" },
     days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
     daysShort: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
 
@@ -144,7 +144,7 @@ const translations = {
       blocked: "חופשות", conversations: "שיחות",
       whatsapp: "וואטסאפ", bot: "בוט", payments: "סליקה וחשבוניות", faq: "שאלות נפוצות", settings: "הגדרות", billing: "תשלום", logout: "התנתקות",
     },
-    navGroups: { setup: "הפעלה ראשונית", overview: "סקירה", operations: "ניהול יומי", business: "הגדרות העסק", account: "חשבון" },
+    navGroups: { setup: "הפעלה ראשונית", overview: "ראשי", operations: "ניהול יומי", business: "העסק שלי", account: "הגדרות וחשבון" },
     days: ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"],
     daysShort: ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"],
 

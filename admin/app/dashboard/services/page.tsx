@@ -159,7 +159,7 @@ export default function ServicesPage() {
     <div className="animate-fade-in">
       <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-gray-900">{t.servicesTitle}</h1>
-        <p className="text-gray-500 text-sm mt-1">
+        <p className="text-gray-600 text-sm mt-1">
           {services.length === 0 ? t.servicesSubtitle : `${services.length} ${t.nav.services}`}
         </p>
       </div>
@@ -175,7 +175,7 @@ export default function ServicesPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </div>
-            <p className="text-gray-400 text-sm">{t.noServices}</p>
+            <p className="text-gray-600 text-sm">{t.noServices}</p>
           </div>
         ) : (
           <div className="divide-y divide-zinc-800/50">
@@ -192,7 +192,7 @@ export default function ServicesPage() {
                   <div className="flex items-center justify-between">
                     <ColorPicker value={editState.color} onChange={(hex) => setEditState((p) => ({ ...p, color: hex }))} />
                     <div className="flex gap-2">
-                      <button onClick={() => setEditingId(null)} className="text-xs text-gray-400 hover:text-gray-600 px-3 py-1.5 rounded-lg transition">{t.cancel}</button>
+                      <button onClick={() => setEditingId(null)} className="text-xs text-gray-600 hover:text-gray-600 px-3 py-1.5 rounded-lg transition">{t.cancel}</button>
                       <button onClick={() => saveEdit(s.id)} disabled={saving} className="text-xs bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white font-semibold px-3 py-1.5 rounded-lg transition">{saving ? t.saving : t.save}</button>
                     </div>
                   </div>
@@ -202,7 +202,7 @@ export default function ServicesPage() {
                   <div className="w-2 h-9 rounded-full shrink-0" style={{ backgroundColor: s.color ?? "#1B7FA0" }} />
                   <div className="flex-1 min-w-0">
                     <div className="text-gray-800 font-medium text-sm">{s.name}</div>
-                    {s.description && <div className="text-gray-400 text-xs truncate mt-0.5">{s.description}</div>}
+                    {s.description && <div className="text-gray-600 text-xs truncate mt-0.5">{s.description}</div>}
                   </div>
                   <span
                     className="text-xs font-bold shrink-0 tabular-nums px-2.5 py-1 rounded-full"
@@ -210,15 +210,15 @@ export default function ServicesPage() {
                   >
                     ₪{(s.priceCents / 100).toFixed(0)}
                   </span>
-                  <span className="text-gray-400 text-xs shrink-0 flex items-center gap-1 tabular-nums">
+                  <span className="text-gray-600 text-xs shrink-0 flex items-center gap-1 tabular-nums">
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     {s.durationMin}′
                   </span>
                   <div className="flex gap-1 shrink-0">
-                    <button onClick={() => startEdit(s)} className="text-xs text-gray-400 hover:text-[#1B7FA0] transition px-2 py-1 rounded hover:bg-[#E0F5FB]">{t.edit}</button>
-                    <button onClick={() => remove(s.id)} className="text-xs text-gray-400 hover:text-red-600 transition px-2 py-1 rounded hover:bg-red-50">{t.delete}</button>
+                    <button onClick={() => startEdit(s)} className="text-xs text-gray-600 hover:text-[#1B7FA0] transition px-2 py-1 rounded hover:bg-[#E0F5FB]">{t.edit}</button>
+                    <button onClick={() => remove(s.id)} className="text-xs text-gray-600 hover:text-red-600 transition px-2 py-1 rounded hover:bg-red-50">{t.delete}</button>
                   </div>
                 </div>
               )

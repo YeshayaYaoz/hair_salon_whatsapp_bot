@@ -73,7 +73,7 @@ function BlockedTimesSection() {
     <div className="mt-8">
       <div className="mb-4">
         <h2 className="text-lg font-bold text-gray-900">{he ? "חופשות וחסימות" : "Time off & blocks"}</h2>
-        <p className="text-gray-500 text-sm mt-1">
+        <p className="text-gray-600 text-sm mt-1">
           {he
             ? "חסום תאריכים ושעות שבהם הבוט לא יקבע תורים — חופשות, הפסקות או ימי חג."
             : "Block dates and times when the bot won't take bookings — vacations, breaks or holidays."}
@@ -83,16 +83,16 @@ function BlockedTimesSection() {
       <form onSubmit={add} className="bg-white border border-gray-200 rounded-xl p-5 mb-4 flex flex-col gap-3">
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">{he ? "מתחילת" : "From"}</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "מתחילת" : "From"}</label>
             <input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} required className="w-full" dir="ltr" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">{he ? "ועד" : "Until"}</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "ועד" : "Until"}</label>
             <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} required className="w-full" dir="ltr" />
           </div>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1.5">{he ? "סיבה (רשות)" : "Reason (optional)"}</label>
+          <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "סיבה (רשות)" : "Reason (optional)"}</label>
           <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={he ? "חופשה, הפסקת צהריים..." : "Vacation, lunch break..."} className="w-full" />
         </div>
         <div className="flex items-center gap-3">
@@ -105,7 +105,7 @@ function BlockedTimesSection() {
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         {blocks.length === 0 ? (
-          <div className="px-6 py-10 text-center text-gray-400 text-sm">
+          <div className="px-6 py-10 text-center text-gray-600 text-sm">
             {he ? "אין חסימות מתוזמנות" : "No scheduled blocks"}
           </div>
         ) : (
@@ -114,9 +114,9 @@ function BlockedTimesSection() {
               <li key={b.id} className={`flex items-center justify-between px-5 py-3.5 ${i !== blocks.length - 1 ? "border-b border-gray-100" : ""}`}>
                 <div>
                   <div className="text-sm font-medium text-gray-800">{fmt(b.startTime)} — {fmt(b.endTime)}</div>
-                  {b.reason && <div className="text-xs text-gray-400 mt-0.5">{b.reason}</div>}
+                  {b.reason && <div className="text-xs text-gray-600 mt-0.5">{b.reason}</div>}
                 </div>
-                <button onClick={() => remove(b.id)} className="text-xs text-gray-400 hover:text-red-600 transition px-2 py-1 rounded">
+                <button onClick={() => remove(b.id)} className="text-xs text-gray-600 hover:text-red-600 transition px-2 py-1 rounded">
                   {he ? "הסר" : "Remove"}
                 </button>
               </li>
@@ -178,7 +178,7 @@ export default function HoursPage() {
     <div className="animate-fade-in">
       <div className="mb-6 animate-fade-up">
         <h1 className="text-2xl font-bold text-gray-900">{t.hoursTitle}</h1>
-        <p className="text-gray-500 text-sm mt-1">{t.hoursSubtitle}</p>
+        <p className="text-gray-600 text-sm mt-1">{t.hoursSubtitle}</p>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-4">
@@ -204,7 +204,7 @@ export default function HoursPage() {
             />
             <span className="w-24 text-sm font-medium text-gray-700">{t.days[h.dayOfWeek]}</span>
             <div className="flex items-center gap-2 ms-auto" dir={lang === "he" ? "rtl" : "ltr"}>
-              <label className="text-gray-400 text-xs">{lang === "he" ? "מ־" : "from"}</label>
+              <label className="text-gray-600 text-xs">{lang === "he" ? "מ־" : "from"}</label>
               <input
                 type="time"
                 value={h.open}
@@ -213,7 +213,7 @@ export default function HoursPage() {
                 className="text-sm py-1.5 px-2"
                 dir="ltr"
               />
-              <span className="text-gray-400 text-sm">{t.to}</span>
+              <span className="text-gray-600 text-sm">{t.to}</span>
               <input
                 type="time"
                 value={h.close}
