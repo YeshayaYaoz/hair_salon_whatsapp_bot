@@ -454,6 +454,76 @@ businessRouter.get("/me/templates", async (_req: AuthedRequest, res) => {
   });
 });
 
+// --- Setup progress (onboarding checklist) ---
+
+/**
+ * Reports which first-run setup steps are done, so the dashboard can show a progress checklist and
+ * warn about the ones that silently break the product — most importantly notificationPhone: without
+ * it the owner never hears about new bookings or human-handoff requests, and the bot can even tell
+ * a customer "someone will call you back" when nobody was actually alerted.
+ */
+businessRouter.get("/me/setup-status", async (req: AuthedRequest, res) => {
+  const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! } });
+  const [serviceCount, hoursCount] = await Promise.all([
+    prisma.service.count({ where: { businessId: business.id } }),
+    prisma.businessHours.count({ where: { businessId: business.id } }),
+  ]);
+
+  const steps = [
+    { key: "category", done: Boolean(business.businessTypeChosenAt), critical: false },
+    { key: "whatsapp", done: Boolean(business.whatsappAccessToken) && business.whatsappTokenValid, critical: true },
+    { key: "notificationPhone", done: Boolean(business.notificationPhone?.trim()), critical: true },
+    { key: "services", done: serviceCount > 0, critical: true },
+    { key: "hours", done: hoursCount > 0, critical: true },
+  ];
+
+  res.json({
+    steps,
+    complete: steps.every((s) => s.done),
+    doneCount: steps.filter((s) => s.done).length,
+    totalCount: steps.length,
+    botEnabled: business.botEnabled,
+  });
+});
+
+// Business-wide bot on/off switch (holiday, emergency, "I'll answer manually today").
+businessRouter.put("/me/bot-enabled", async (req: AuthedRequest, res) => {
+  const parsed = z.object({ enabled: z.boolean() }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  await prisma.business.update({ where: { id: req.businessId! }, data: { botEnabled: parsed.data.enabled } });
+  res.json({ ok: true, botEnabled: parsed.data.enabled });
+});
+
+/**
+ * Sends a test WhatsApp message from the business's own number to a phone of their choosing
+ * (defaults to their notification phone), so an owner can prove the connection works without
+ * guessing. Note this only proves OUTBOUND sending; replies still depend on the webhook.
+ */
+businessRouter.post("/me/whatsapp/test-message", async (req: AuthedRequest, res) => {
+  const parsed = z.object({ to: z.string().min(6).optional() }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! } });
+  if (!business.whatsappPhoneNumberId || !business.whatsappAccessToken) {
+    return res.status(400).json({ error: "Connect a WhatsApp number first" });
+  }
+  const to = parsed.data.to?.trim() || business.notificationPhone?.trim();
+  if (!to) return res.status(400).json({ error: "No phone number to send to — set your notification phone first" });
+
+  try {
+    await sendWhatsAppMessage({
+      phoneNumberId: business.whatsappPhoneNumberId,
+      accessToken: decryptSecret(business.whatsappAccessToken),
+      to,
+      text: `✅ בדיקה מתורי — החיבור לוואטסאפ של "${business.name}" עובד. אם קיבלת את ההודעה הזו, שליחת ההודעות מוגדרת כמו שצריך.`,
+    });
+    res.json({ ok: true, to });
+  } catch (err) {
+    // Meta's own message is the useful part here (e.g. "24h window", bad number) — surface it.
+    res.status(502).json({ error: err instanceof Error ? err.message : "Failed to send test message" });
+  }
+});
+
 const applyTemplateSchema = z.object({ type: z.enum(BUSINESS_TYPES) });
 
 // Applies a category template: sets businessType and pre-fills untouched settings + seed services.

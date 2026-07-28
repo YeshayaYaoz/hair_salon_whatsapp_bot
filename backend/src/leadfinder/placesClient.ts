@@ -70,26 +70,56 @@ function getApiKey(): string {
   return key;
 }
 
+// Google returns ~20 results per page and caps Text Search at 3 pages (~60 results) total.
+const MAX_SEARCH_PAGES = 3;
+// A next_page_token isn't valid immediately — Google needs a moment to materialize the next page,
+// and querying too soon returns INVALID_REQUEST. This delay is required, not a politeness pause.
+const NEXT_PAGE_TOKEN_DELAY_MS = 2000;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /**
  * Text Search for businesses matching a category + free-text location query
- * (e.g. category="ספרים", locationQuery="חיפה"). Returns up to one page of results
- * (~20 places) — good enough for the foundation pass; pagination via next_page_token
- * can be added later if campaigns need more coverage per run.
+ * (e.g. category="ספרים", locationQuery="חיפה"). Follows next_page_token up to Google's 3-page
+ * limit so a campaign run covers ~60 places instead of only the first ~20. A failed or expired
+ * token stops pagination and returns what we have rather than failing the whole run.
  */
 async function textSearch(category: string, locationQuery: string): Promise<TextSearchResult[]> {
   const apiKey = getApiKey();
   const query = `${category} ${locationQuery}`;
-  const url = new URL(PLACES_TEXT_SEARCH_URL);
-  url.searchParams.set("query", query);
-  url.searchParams.set("key", apiKey);
+  const collected: TextSearchResult[] = [];
+  let pageToken: string | undefined;
 
-  const res = await fetch(url.toString());
-  if (!res.ok) throw new Error(`Google Places text search failed (${res.status}): ${await res.text()}`);
-  const body = (await res.json()) as TextSearchResponse;
-  if (body.status !== "OK" && body.status !== "ZERO_RESULTS") {
-    throw new Error(`Google Places text search returned ${body.status}: ${body.error_message ?? "unknown error"}`);
+  for (let page = 0; page < MAX_SEARCH_PAGES; page++) {
+    const url = new URL(PLACES_TEXT_SEARCH_URL);
+    url.searchParams.set("key", apiKey);
+    if (pageToken) url.searchParams.set("pagetoken", pageToken);
+    else url.searchParams.set("query", query);
+
+    const res = await fetch(url.toString());
+    if (!res.ok) {
+      // The first page failing is a real error; a later page failing just ends pagination.
+      if (page === 0) throw new Error(`Google Places text search failed (${res.status}): ${await res.text()}`);
+      console.warn(`[placesClient] Page ${page + 1} failed (${res.status}) — returning ${collected.length} results so far`);
+      break;
+    }
+
+    const body = (await res.json()) as TextSearchResponse;
+    if (body.status !== "OK" && body.status !== "ZERO_RESULTS") {
+      if (page === 0) {
+        throw new Error(`Google Places text search returned ${body.status}: ${body.error_message ?? "unknown error"}`);
+      }
+      console.warn(`[placesClient] Page ${page + 1} returned ${body.status} — stopping pagination`);
+      break;
+    }
+
+    collected.push(...(body.results ?? []));
+    if (!body.next_page_token) break;
+    pageToken = body.next_page_token;
+    await sleep(NEXT_PAGE_TOKEN_DELAY_MS);
   }
-  return body.results ?? [];
+
+  return collected;
 }
 
 /** Place Details lookup for a single place_id — fills in phone/website/rating/hours. */

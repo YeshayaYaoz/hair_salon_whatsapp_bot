@@ -61,6 +61,10 @@ model Business {
   // is the only way to actually let the lockout expire instead of endlessly resetting it.
   whatsappRegisterAttemptedAt DateTime?
   notificationPhone         String? // owner's personal phone for booking alerts
+  // Business-wide bot kill switch. When false the bot stays silent on every thread (holiday,
+  // emergency, "I'll handle it myself today") — distinct from Customer.botPaused, which only
+  // silences one conversation after the owner replies manually.
+  botEnabled                Boolean   @default(true)
   // Vertical/category this business belongs to (salon | barber | clinic | aesthetics | …). Drives
   // the onboarding template that pre-fills settings and the vocabulary the bot/dashboard use.
   businessType              String?

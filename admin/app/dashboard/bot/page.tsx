@@ -131,13 +131,15 @@ export default function BotPage() {
     cancellationPolicy: "", referralText: "", digestEnabled: true, availabilityInfo: "",
   });
   const [bookingModel, setBookingModel] = useState<string>("slot");
+  const [botEnabled, setBotEnabled] = useState(true);
+  const [togglingBot, setTogglingBot] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch<BotProfile & { bookingModel?: string }>("/api/business/me").then((me) => {
+    apiFetch<BotProfile & { bookingModel?: string; botEnabled?: boolean }>("/api/business/me").then((me) => {
       setFields({
         botGreeting: me.botGreeting ?? "",
         botPersonality: me.botPersonality ?? "",
@@ -149,9 +151,24 @@ export default function BotPage() {
         availabilityInfo: me.availabilityInfo ?? "",
       });
       setBookingModel(me.bookingModel ?? "slot");
+      setBotEnabled(me.botEnabled ?? true);
       setLoaded(true);
     });
   }, []);
+
+  async function toggleBot() {
+    const next = !botEnabled;
+    setTogglingBot(true);
+    setError(null);
+    try {
+      await apiFetch("/api/business/me/bot-enabled", { method: "PUT", body: JSON.stringify({ enabled: next }) });
+      setBotEnabled(next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update");
+    } finally {
+      setTogglingBot(false);
+    }
+  }
 
   function set(key: keyof BotProfile, value: string | boolean) {
     setFields((f) => ({ ...f, [key]: value }));
@@ -187,9 +204,42 @@ export default function BotPage() {
 
   return (
     <div className="animate-fade-in">
-      <div className="mb-6 animate-fade-up">
+      <div className="mb-4 animate-fade-up">
         <h1 className="text-2xl font-bold text-gray-900">{t.botTabTitle}</h1>
         <p className="text-gray-500 text-sm mt-1">{t.botTabSubtitle}</p>
+      </div>
+
+      {/* Master on/off switch, kept above the settings form: when the bot is off none of the
+          settings below have any effect, so the owner should see that state first. */}
+      <div
+        className={`rounded-xl border p-4 mb-5 flex items-center gap-4 ${
+          botEnabled ? "bg-white border-gray-200" : "bg-amber-50 border-amber-300"
+        }`}
+      >
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-gray-900">
+            {botEnabled
+              ? (he ? "🟢 הבוט פעיל" : "🟢 Bot is active")
+              : (he ? "⏸️ הבוט מושהה" : "⏸️ Bot is paused")}
+          </p>
+          <p className="text-xs text-gray-600 mt-0.5">
+            {botEnabled
+              ? (he ? "הבוט עונה ללקוחות בוואטסאפ ומקבל תורים." : "The bot answers customers on WhatsApp and takes bookings.")
+              : (he ? "הבוט לא עונה לאף לקוח. ההודעות עדיין נשמרות ותוכל לענות ידנית." : "The bot answers no one. Messages are still saved so you can reply manually.")}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={toggleBot}
+          disabled={togglingBot}
+          className={`text-xs font-semibold px-4 py-2 rounded-lg transition disabled:opacity-50 shrink-0 ${
+            botEnabled
+              ? "bg-gray-100 hover:bg-gray-200 text-gray-700"
+              : "bg-[#1B7FA0] hover:bg-[#2A9BBF] text-white"
+          }`}
+        >
+          {togglingBot ? "..." : botEnabled ? (he ? "השהה בוט" : "Pause bot") : (he ? "הפעל בוט" : "Resume bot")}
+        </button>
       </div>
 
       <form onSubmit={save}>

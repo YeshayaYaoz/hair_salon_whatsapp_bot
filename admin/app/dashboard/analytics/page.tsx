@@ -6,6 +6,7 @@ import { useLanguage } from "../../lib/LanguageContext";
 import { useCountUp } from "../../lib/useCountUp";
 import { formatTimeInTz, dayKeyInTz } from "../../lib/tz";
 import { SkeletonCard, SkeletonStatCard } from "../../lib/Skeleton";
+import { SetupChecklist } from "../../lib/SetupChecklist";
 import Link from "next/link";
 
 interface Analytics {
@@ -180,6 +181,8 @@ export default function AnalyticsPage() {
             : (lang === "he" ? `${todayAppts.length} תורים היום` : `${todayAppts.length} appointments today`)}
         </p>
       </div>
+
+      <SetupChecklist />
 
       {/* Today's schedule */}
       <div className="rounded-2xl p-6 mb-8 animate-fade-up" style={{ background: "#FFFFFF", border: "1px solid #E5E5F0" }}>

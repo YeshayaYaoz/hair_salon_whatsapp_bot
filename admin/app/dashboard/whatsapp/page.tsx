@@ -144,6 +144,25 @@ export default function WhatsAppPage() {
   const [resubscribed, setResubscribed] = useState(false);
   const [diagnostics, setDiagnostics] = useState<any>(null);
   const [diagLoading, setDiagLoading] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+
+  // Proves the connection actually works by sending a real WhatsApp message from the business's
+  // own number — far more convincing to an owner than a green "connected" badge.
+  async function sendTestMessage() {
+    setTesting(true);
+    setError(null);
+    setTestResult(null);
+    try {
+      const { to } = await apiFetch<{ to: string }>("/api/business/me/whatsapp/test-message", { method: "POST" });
+      setTestResult(to);
+      setTimeout(() => setTestResult(null), 8000);
+    } catch (err: any) {
+      setError(err?.message ?? "Test failed");
+    } finally {
+      setTesting(false);
+    }
+  }
 
   async function runDiagnostics() {
     setDiagLoading(true);
@@ -426,6 +445,14 @@ export default function WhatsAppPage() {
                 {resubscribing ? "..." : (lang === "he" ? "תיקון חיבור" : "Fix connection")}
               </button>
               <button
+                onClick={sendTestMessage}
+                disabled={testing}
+                className="text-xs text-[#1B7FA0] hover:text-[#2A9BBF] disabled:opacity-50 transition font-medium"
+                title={lang === "he" ? "שולח הודעת בדיקה אמיתית למספר ההתראות שלך" : "Sends a real test message to your notification phone"}
+              >
+                {testing ? "..." : (lang === "he" ? "שלח הודעת בדיקה" : "Send test message")}
+              </button>
+              <button
                 onClick={runDiagnostics}
                 disabled={diagLoading}
                 className="text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50 transition font-medium"
@@ -476,6 +503,14 @@ export default function WhatsAppPage() {
               ? "הבוט לא עונה בוואטסאפ למרות שהחיבור מוצג כתקין? נסה \"תיקון חיבור\" — לפעמים ההרשמה לקבלת הודעות נכשלת בשקט."
               : "Bot not answering on WhatsApp even though this shows connected? Try \"Fix connection\" — the subscription to receive messages can silently fail."}
           </p>
+        )}
+
+        {testResult && (
+          <div className="bg-green-50 border border-green-200 text-green-800 text-xs rounded-lg px-4 py-3 mt-3">
+            {lang === "he"
+              ? `✅ נשלחה הודעת בדיקה אל ${testResult} — בדוק את הוואטסאפ שלך. אם היא הגיעה, השליחה עובדת.`
+              : `✅ Test message sent to ${testResult} — check your WhatsApp. If it arrived, sending works.`}
+          </div>
         )}
 
         {error && connected && tokenValid && (

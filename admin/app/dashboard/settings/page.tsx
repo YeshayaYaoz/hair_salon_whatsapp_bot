@@ -190,6 +190,13 @@ export default function SettingsPage() {
         </Section>
 
         <Section title={t.bookingNotifications} description={t.bookingNotificationsDesc}>
+          {!fields.notificationPhone?.trim() && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-4 py-3 mb-3">
+              {lang === "he"
+                ? "⚠️ לא הוגדר מספר להתראות — לא תקבל התראה על תורים חדשים, בקשות לשיחה עם נציג, או בקשות הזמנה. מומלץ מאוד להגדיר."
+                : "⚠️ No notification phone set — you won't be alerted about new bookings, human-handoff requests, or booking enquiries. Strongly recommended."}
+            </div>
+          )}
           <Field label={t.notifPhone} hint={t.notifPhoneHint}>
             <input
               placeholder="972501234567"

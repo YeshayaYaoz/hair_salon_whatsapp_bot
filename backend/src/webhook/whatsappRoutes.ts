@@ -241,6 +241,20 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
     // If the owner has taken over this thread (sent a manual message from the dashboard), the
     // bot stays silent so it doesn't talk over a human mid-conversation — but the customer's
     // message is still persisted so it shows up in the transcript when the owner resumes the bot.
+    // Business-wide kill switch: the owner turned the bot off entirely (holiday, emergency, or
+    // they want to answer manually today). Still persist the message so nothing is lost from the
+    // transcript when they switch it back on.
+    if (!business.botEnabled) {
+      const preview =
+        extracted.kind === "text" ? extracted.text
+        : extracted.kind === "voiceNote" ? "[הודעה קולית]"
+        : extracted.kind === "reset" ? "[בקשת איפוס שיחה]"
+        : "[הודעה]";
+      await appendTurn(business.id, customerPhone, { role: "user", content: preview });
+      console.log(`[bot] business ${business.id} has the bot disabled — staying silent`);
+      return;
+    }
+
     const pausedCustomer = await prisma.customer.findUnique({
       where: { businessId_phone: { businessId: business.id, phone: customerPhone } },
       select: { botPaused: true },
