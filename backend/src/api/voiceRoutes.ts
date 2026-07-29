@@ -27,14 +27,28 @@ function normalizePhone(phone: string): string {
 }
 
 /** Resolves which salon a call belongs to from the dialed number — every voice tool needs this first. */
-async function resolveBusinessByCalledNumber(calledNumber: string): Promise<{ id: string; timezone: string } | null> {
+async function resolveBusinessByCalledNumber(calledNumber: string): Promise<{ id: string; timezone: string; bookingModel: string } | null> {
   const calledDigits = normalizePhone(calledNumber);
   // Prisma can't filter on a normalized expression without raw SQL, and voicePhoneNumber may be
   // stored with or without a leading "+" depending on how it was entered — fetch the (expected to
   // stay small) set of voice-enabled businesses and match on digits in memory instead.
-  const candidates = await prisma.business.findMany({ where: { voicePhoneNumber: { not: null } }, select: { id: true, voicePhoneNumber: true, timezone: true } });
+  const candidates = await prisma.business.findMany({
+    where: { voicePhoneNumber: { not: null } },
+    select: { id: true, voicePhoneNumber: true, timezone: true, bookingModel: true },
+  });
   const matched = candidates.find((b) => normalizePhone(b.voicePhoneNumber!) === calledDigits);
-  return matched ? { id: matched.id, timezone: matched.timezone } : null;
+  return matched ? { id: matched.id, timezone: matched.timezone, bookingModel: matched.bookingModel } : null;
+}
+
+// Inquiry-mode businesses (B&B etc.) close bookings only human-to-human — the voice agent briefs
+// the caller and transfers to the owner. Guard server-side too, so a misfiring agent can never
+// write a booking for them.
+function rejectIfInquiry(business: { bookingModel: string }, res: import("express").Response): boolean {
+  if (business.bookingModel !== "inquiry") return false;
+  res.status(409).json({
+    error: "This business does not take automated bookings. Brief the caller on prices and options, then transfer the call to the owner (ownerTransferNumber from /context).",
+  });
+  return true;
 }
 
 voiceRouter.use(requireCartesiaAuth);
@@ -54,7 +68,10 @@ voiceRouter.post("/context", async (req, res) => {
   const [full, hours, customers, services, faqEntries] = await Promise.all([
     prisma.business.findUniqueOrThrow({
       where: { id: business.id },
-      select: { name: true, timezone: true, address: true, botGreeting: true, botPersonality: true, cancellationPolicy: true, businessType: true },
+      select: {
+        name: true, timezone: true, address: true, botGreeting: true, botPersonality: true,
+        cancellationPolicy: true, businessType: true, bookingModel: true, availabilityInfo: true, notificationPhone: true,
+      },
     }),
     prisma.businessHours.findMany({ where: { businessId: business.id }, orderBy: { dayOfWeek: "asc" } }),
     prisma.customer.findMany({ where: { businessId: business.id }, select: { id: true, phone: true, name: true } }),
@@ -82,6 +99,12 @@ voiceRouter.post("/context", async (req, res) => {
     businessName: full.name,
     businessType: template ? { key: template.type, labelHe: template.labelHe, labelEn: template.labelEn } : null,
     vocabulary: template?.vocabulary ?? null,
+    // "slot" = the agent may book live via check-availability/book. "inquiry" (B&B etc.) = the
+    // agent must NOT book: it briefs the caller on prices/options/availabilityInfo and then
+    // transfers the call to ownerTransferNumber — bookings close only human-to-human.
+    bookingModel: full.bookingModel,
+    availabilityInfo: full.availabilityInfo,
+    ownerTransferNumber: full.bookingModel === "inquiry" ? full.notificationPhone : null,
     timezone: full.timezone,
     address: full.address,
     greeting: full.botGreeting,
@@ -113,6 +136,7 @@ voiceRouter.post("/check-availability", async (req, res) => {
 
   const business = await resolveBusinessByCalledNumber(parsed.data.calledNumber);
   if (!business) return res.status(404).json({ error: "No salon configured for this number" });
+  if (rejectIfInquiry(business, res)) return;
 
   const service = await prisma.service.findFirst({ where: { businessId: business.id, name: { equals: parsed.data.serviceName, mode: "insensitive" } } });
   if (!service) {
@@ -154,6 +178,7 @@ voiceRouter.post("/book", async (req, res) => {
 
   const business = await resolveBusinessByCalledNumber(parsed.data.calledNumber);
   if (!business) return res.status(404).json({ error: "No salon configured for this number" });
+  if (rejectIfInquiry(business, res)) return;
 
   const service = await prisma.service.findFirst({ where: { businessId: business.id, name: { equals: parsed.data.serviceName, mode: "insensitive" } } });
   if (!service) return res.status(404).json({ error: "Unknown service" });
@@ -219,6 +244,7 @@ voiceRouter.post("/reschedule", async (req, res) => {
 
   const business = await resolveBusinessByCalledNumber(parsed.data.calledNumber);
   if (!business) return res.status(404).json({ error: "No salon configured for this number" });
+  if (rejectIfInquiry(business, res)) return;
 
   let newServiceId: string | undefined;
   if (parsed.data.newServiceName) {

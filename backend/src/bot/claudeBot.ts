@@ -492,7 +492,7 @@ async function runTool(
     const label = (input.customerName as string | undefined) ?? customerPhone;
     const notified = await notifyOwner(
       businessId,
-      `📞 בקשת הזמנה חדשה — יש לחזור ללקוח!\nלקוח: ${label}\nטלפון לחזרה: ${customerPhone}\nפרטים: ${input.details}`
+      `📞 בקשת הזמנה חדשה — יש לחזור ללקוח!\nלקוח: ${label}\nטלפון לחזרה: ${customerPhone}\nוואטסאפ: https://wa.me/${customerPhone.replace(/\D/g, "")}\nפרטים: ${input.details}`
     );
     if (!notified) {
       return JSON.stringify({
@@ -501,7 +501,17 @@ async function runTool(
           "No owner notification phone is configured, so the owner was NOT alerted. Do NOT promise the customer a callback. Apologize that booking isn't available right now and, if a contact/address is known, suggest they reach the business directly.",
       });
     }
-    return JSON.stringify({ notified: true, tellCustomer: "The owner will call the customer back shortly to confirm the booking." });
+    // Give the customer a direct wa.me line to the owner too, so they don't have to wait passively
+    // for the callback — the inquiry vertical's whole model is "bot informs, humans close".
+    const biz = await prisma.business.findUnique({ where: { id: businessId }, select: { notificationPhone: true } });
+    const ownerWaLink = biz?.notificationPhone ? `https://wa.me/${biz.notificationPhone.replace(/\D/g, "")}` : null;
+    return JSON.stringify({
+      notified: true,
+      ownerWhatsappLink: ownerWaLink,
+      tellCustomer:
+        "The owner will call the customer back shortly to confirm the booking." +
+        (ownerWaLink ? ` Also share this direct WhatsApp link to the owner so the customer can message them right away: ${ownerWaLink}` : ""),
+    });
   }
 
   if (name === "request_human_followup") {
