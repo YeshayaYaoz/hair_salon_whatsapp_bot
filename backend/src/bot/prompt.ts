@@ -96,8 +96,14 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
   }
   const dateTable = upcomingDates.join("\n");
   const todayHours = business.hours.find((h: BusinessHours) => h.dayOfWeek === nowParts.dayOfWeek);
+  const isInquiry = business.bookingModel === "inquiry";
   let openNowNote: string;
-  if (!todayHours) {
+  if (isInquiry) {
+    // Inquiry-mode businesses (overnight rentals) don't open and close like an appointment
+    // business, and typically have no hours configured at all — which would otherwise make this
+    // announce "העסק סגור היום" to a guest asking about a stay next month.
+    openNowNote = "";
+  } else if (!todayHours) {
     openNowNote = `העסק סגור היום (יום ${dayNames[nowParts.dayOfWeek]}). אם לקוח מבקש תור "עכשיו" או "היום" — הסבר בנימוס והצע יום אחר.`;
   } else if (nowParts.minutes < todayHours.openMin) {
     openNowNote = `העסק עדיין סגור כרגע — נפתח היום ב-${fmtMin(todayHours.openMin)}.`;
@@ -215,10 +221,10 @@ ${cancellationNote}${pricingNote}${vocabNote}${personalityNote}${greeting}${crmN
 שירותים ומחירים:
 ${servicesText}
 
-שעות פעילות:
+${isInquiry ? "" : `שעות פעילות:
 ${hoursText}
 
-צוות: ${staffText}
+צוות: ${staffText}`}
 כתובת: ${business.address ?? "לא צוין."}
 ${business.googleMapsUrl
   ? `קישור לניווט (Google Maps): ${business.googleMapsUrl}\nכשלקוח מבקש הוראות הגעה, ניווט, מיקום או "קישור" — שלח לו את הקישור הזה. אל תאמר שאין לך קישור.`
@@ -226,7 +232,7 @@ ${business.googleMapsUrl
 ${faqText ? `\nשאלות נפוצות:\n${faqText}\n` : ""}
 ${bookingSection}`;
 
-  const volatile = `היום: ${todayIso} (יום ${dayNames[nowParts.dayOfWeek]}), השעה כעת: ${nowHHMM} (שעון ישראל). ${openNowNote}
+  const volatile = `היום: ${todayIso} (יום ${dayNames[nowParts.dayOfWeek]}), השעה כעת: ${nowHHMM} (שעון ישראל).${openNowNote ? ` ${openNowNote}` : ""}
 אל תנקוב בשעה הנוכחית אחרת מזו — זו השעה האמיתית.`;
 
   return { stable, volatile };

@@ -10,7 +10,15 @@ import { AuthGuard } from "../lib/AuthGuard";
 import { MobileSetupBar } from "../lib/MobileSetupBar";
 
 // One nav item. Icons are Heroicons outline path data.
-type NavItem = { href: string; key: keyof ReturnType<typeof useLanguage>["t"]["nav"]; icon: string };
+// hideFor: verticals where this destination is meaningless. An overnight rental has no staff
+// performing a service and no opening hours gating bookings — in inquiry mode there is no slot
+// engine for hours to constrain — so showing either is noise the owner has to learn to ignore.
+type NavItem = {
+  href: string;
+  key: keyof ReturnType<typeof useLanguage>["t"]["nav"];
+  icon: string;
+  hideFor?: string[];
+};
 
 const ICONS = {
   analytics: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z",
@@ -44,8 +52,8 @@ const NAV_GROUPS: { titleKey: keyof ReturnType<typeof useLanguage>["t"]["navGrou
   ] },
   { titleKey: "business", items: [
     { href: "/dashboard/services", key: "services", icon: ICONS.services },
-    { href: "/dashboard/staff", key: "staff", icon: ICONS.staff },
-    { href: "/dashboard/hours", key: "hours", icon: ICONS.hours },
+    { href: "/dashboard/staff", key: "staff", icon: ICONS.staff, hideFor: ["bnb"] },
+    { href: "/dashboard/hours", key: "hours", icon: ICONS.hours, hideFor: ["bnb"] },
     { href: "/dashboard/faq", key: "faq", icon: ICONS.faq },
     { href: "/dashboard/bot", key: "bot", icon: ICONS.bot },
   ] },
@@ -58,6 +66,10 @@ const NAV_GROUPS: { titleKey: keyof ReturnType<typeof useLanguage>["t"]["navGrou
 ];
 
 const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
+
+export function isVisibleFor(item: NavItem, businessType: string | null): boolean {
+  return !item.hideFor || !businessType || !item.hideFor.includes(businessType);
+}
 
 // Curated deliberately rather than taken as the first N of NAV_GROUPS: that ordering is grouped
 // for the desktop sidebar, and slicing it happened to hand a prime mobile tab to the waitlist
@@ -140,7 +152,7 @@ function TrialBanner({ status, createdAt }: { status: string | null; createdAt: 
 
 function SidebarContent({ pathname, isSuperAdmin }: { pathname: string; isSuperAdmin: boolean }) {
   const router = useRouter();
-  const { lang, setLang, t } = useLanguage();
+  const { lang, setLang, t, businessType } = useLanguage();
 
   function logout() {
     clearToken();
@@ -181,7 +193,7 @@ function SidebarContent({ pathname, isSuperAdmin }: { pathname: string; isSuperA
                 {t.navGroups[group.titleKey]}
               </span>
             </div>
-            {group.items.map((item) => {
+            {group.items.filter((i) => isVisibleFor(i, businessType)).map((item) => {
               const active = pathname === item.href;
               return (
                 <Link
@@ -263,7 +275,7 @@ function SidebarContent({ pathname, isSuperAdmin }: { pathname: string; isSuperA
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { t, lang } = useLanguage();
+  const { t, lang, businessType } = useLanguage();
   const he = lang === "he";
   const activeItem = NAV_ITEMS.find((item) => item.href === pathname);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -340,7 +352,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         className="md:hidden fixed bottom-0 start-0 end-0 z-30 flex items-stretch h-16"
         style={{ background: "rgba(255,255,255,0.97)", backdropFilter: "blur(12px)", borderTop: "1px solid #E5E7EB" }}
       >
-        {BOTTOM_TAB_ITEMS.map((item) => {
+        {BOTTOM_TAB_ITEMS.filter((i) => isVisibleFor(i, businessType)).map((item) => {
           const active = pathname === item.href;
           return (
             <Link
@@ -389,7 +401,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <div className="w-9 h-1 rounded-full bg-gray-200 mx-auto mb-2" />
             {/* Mirror the sidebar's grouping so the mobile sheet reads as sections, not a flat list */}
             {NAV_GROUPS.map((group) => {
-              const items = group.items.filter((i) => MORE_ITEMS.includes(i));
+              const items = group.items.filter((i) => MORE_ITEMS.includes(i) && isVisibleFor(i, businessType));
               if (items.length === 0) return null;
               return (
                 <div key={group.titleKey}>

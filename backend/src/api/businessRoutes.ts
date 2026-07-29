@@ -573,12 +573,18 @@ businessRouter.get("/me/setup-status", async (req: AuthedRequest, res) => {
     prisma.businessHours.count({ where: { businessId: business.id } }),
   ]);
 
+  // Opening hours exist to constrain the slot engine. An inquiry-mode business (a B&B) has no
+  // slot engine — the bot never books — so requiring hours there is not just noise: it's a step
+  // the owner cannot meaningfully complete, which would leave the checklist permanently unfinished
+  // and the mobile setup bar nagging forever.
+  const needsHours = business.bookingModel !== "inquiry";
+
   const steps = [
     { key: "category", done: Boolean(business.businessTypeChosenAt), critical: false },
     { key: "whatsapp", done: Boolean(business.whatsappAccessToken) && business.whatsappTokenValid, critical: true },
     { key: "notificationPhone", done: Boolean(business.notificationPhone?.trim()), critical: true },
     { key: "services", done: serviceCount > 0, critical: true },
-    { key: "hours", done: hoursCount > 0, critical: true },
+    ...(needsHours ? [{ key: "hours", done: hoursCount > 0, critical: true }] : []),
     // Carried over from the older inline checklist on the analytics page when that duplicate was
     // removed — it was the one step this list didn't already cover, and dropping it would have
     // silently lost the nudge for businesses still on a trial.
