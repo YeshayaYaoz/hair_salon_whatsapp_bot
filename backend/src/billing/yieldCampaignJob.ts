@@ -108,7 +108,7 @@ async function scanBusiness(
     createdAt: now.toISOString(),
   };
 
-  const text = `היי 👋 זיהיתי שמחר יש לך ${emptySlots} מקומות פנויים ביומן.\nרוצה שאשלח הצעה ל-${candidates.length} לקוחות שלא היו אצלך מעל ${LAPSED_DAYS} יום, עם ${DEFAULT_DISCOUNT_PERCENT}% הנחה אם יגיעו מחר?\n\nענה/י "כן" כדי לשלוח, או "לא" כדי לדלג.`;
+  const text = `היי 👋 זיהיתי שמחר יש לך ${emptySlots} מקומות פנויים ביומן.\nרוצה שאשלח הצעה ל-${candidates.length} לקוחות שלא היו אצלך מעל ${LAPSED_DAYS} יום, עם ${DEFAULT_DISCOUNT_PERCENT}% הנחה אם יגיעו מחר?\n\nיש לענות "כן" כדי לשלוח, או "לא" כדי לדלג.`;
 
   const accessToken = decryptSecret(biz.whatsappAccessToken!);
   await sendWhatsAppMessage({ phoneNumberId: biz.whatsappPhoneNumberId!, accessToken, to: biz.notificationPhone!, text });

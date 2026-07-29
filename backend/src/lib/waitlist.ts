@@ -29,7 +29,7 @@ export async function notifyWaitlist(businessId: string, serviceId: string, serv
 
   for (const entry of waitlist) {
     const name = entry.customer.name ? entry.customer.name.split(" ")[0] : "היי";
-    const text = `${name}! 🎉 פתח מקום ל${serviceName} ב-${when} אצל ${business.name}.\nרוצה לתפוס אותו? כתוב/י "כן" ואשריין לך את המקום!`;
+    const text = `${name}! 🎉 פתח מקום ל${serviceName} ב-${when} אצל ${business.name}.\nרוצה לתפוס אותו? אפשר לכתוב "כן" ואשמור לך את המקום!`;
     try {
       await sendWhatsAppMessage({ phoneNumberId: business.whatsappPhoneNumberId, accessToken, to: entry.customer.phone, text });
       await prisma.waitlistEntry.update({ where: { id: entry.id }, data: { notified: true } });

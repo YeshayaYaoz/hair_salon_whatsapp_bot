@@ -28,7 +28,13 @@ const RECOMMENDED: RequiredVar[] = [
   { name: "GOOGLE_LOGIN_REDIRECT_URI", description: "OAuth callback for \"Sign in with Google\" on the login page (unauthenticated) — must be a separate registered redirect URI from GOOGLE_REDIRECT_URI" },
   { name: "META_APP_ID", description: "same Meta app as WHATSAPP_APP_SECRET — required to exchange the WhatsApp Embedded Signup code for an access token" },
   { name: "CARTESIA_TOOL_SECRET", description: "shared bearer secret Cartesia's voice agent sends when calling POST /api/voice/context — without it, that endpoint rejects every request" },
-  { name: "OPENAI_API_KEY", description: "lets a business opt their WhatsApp bot into OpenAI instead of Claude (Bot settings page) — without it, that provider choice fails at send time" },
+  // Silently defaults to http://localhost:3000, so a production deploy without it still sends
+  // password-reset and email-verification mail successfully — with links nobody outside the server
+  // can open. The failure is invisible until an owner reports the link not working.
+  { name: "APP_URL", description: "public base URL used in every emailed link (password reset, email verification, trial signup) — without it links fall back to localhost and are unusable" },
+  { name: "TORI_OUTREACH_PHONE_NUMBER_ID", description: "Tori's own WABA for Lead Finder WhatsApp broadcasts — the whatsapp broadcast channel fails at send time without it" },
+  { name: "TORI_OUTREACH_ACCESS_TOKEN", description: "access token for Tori's own outreach WABA (Lead Finder WhatsApp broadcasts)" },
+  { name: "TORI_OUTREACH_TEMPLATE_NAME", description: "Meta-approved MARKETING template used for cold WhatsApp outreach — free-form text to a cold number is blocked (error 131047)" },
   { name: "DEEPSEEK_API_KEY", description: "lets a business opt their WhatsApp bot into DeepSeek instead of Claude (Bot settings page) — without it, that provider choice fails at send time" },
   { name: "WHATSAPP_APP_SECRET", description: "verifies WhatsApp webhook signatures, and (as the Meta app secret) exchanges the Embedded Signup code for an access token" },
   { name: "WHATSAPP_VERIFY_TOKEN", description: "required for Meta to verify the webhook URL" },
@@ -43,7 +49,7 @@ const RECOMMENDED: RequiredVar[] = [
   { name: "TORI_MANAGED_INVOICE_SECRET_KEY", description: "\"Managed\" invoicing option for salons without their own Green Invoice account" },
   { name: "SUPER_ADMIN_EMAIL", description: "your account email — unlocks the /dashboard/admin businesses list" },
   { name: "RESEND_API_KEY", description: "transactional emails (welcome, password reset)" },
-  { name: "OPENAI_API_KEY", description: "voice-note transcription in the WhatsApp bot (Whisper)" },
+  { name: "OPENAI_API_KEY", description: "two uses: voice-note transcription in the WhatsApp bot (Whisper), and the optional OpenAI provider choice on the Bot settings page" },
   { name: "GOOGLE_PLACES_API_KEY", description: "Lead Finder business discovery (Google Places API) — discovery fails with a clear error if unset" },
   { name: "WHATSAPP_REMINDER_TEMPLATE", description: "approved template name for appointment reminders — without it, reminders to customers outside the 24h window are not delivered" },
   { name: "WHATSAPP_REVIEW_TEMPLATE", description: "approved template name for post-visit review requests — without it, review requests outside the 24h window are not delivered" },

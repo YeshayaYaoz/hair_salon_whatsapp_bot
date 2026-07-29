@@ -141,7 +141,7 @@ async function handleYieldCampaignReply(
 
   await sendWhatsAppMessage({
     phoneNumberId, accessToken, to: business.notificationPhone,
-    text: `יש לי הצעה ממתינה לאישור: לשלוח הנחה ל-${campaign.candidateCustomerIds.length} לקוחות למילוי מקומות פנויים מחר. ענה/י "כן" או "לא".`,
+    text: `יש לי הצעה ממתינה לאישור: לשלוח הנחה ל-${campaign.candidateCustomerIds.length} לקוחות למילוי מקומות פנויים מחר. יש לענות "כן" או "לא".`,
   });
 }
 

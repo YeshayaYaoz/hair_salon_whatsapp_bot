@@ -72,7 +72,7 @@ export async function runReminderJob() {
     });
     const name = appt.customer.name ? appt.customer.name.split(" ")[0] : "היי";
     const addressLine = appt.business.address ? `\n📍 ${appt.business.address}` : "";
-    const text = `${name}! 👋 תזכורת לתור שלך ל${appt.service.name} מחר ב-${when} אצל ${appt.business.name}.${addressLine}\n\nלביטול כתוב/י "בטל תור".`;
+    const text = `${name}! 👋 תזכורת לתור שלך ל${appt.service.name} מחר ב-${when} אצל ${appt.business.name}.${addressLine}\n\nלביטול יש לכתוב "בטל תור".`;
 
     try {
       const outcome = await sendWithTemplateFallback(
@@ -119,7 +119,7 @@ export async function runReviewJob() {
     const accessToken = decryptSecret(appt.business.whatsappAccessToken);
     const name = appt.customer.name ? appt.customer.name.split(" ")[0] : "היי";
     const reviewLine = appt.business.googleMapsUrl
-      ? `\n\nנשמח אם תשאיר/י לנו ביקורת קצרה ⭐\n${appt.business.googleMapsUrl}`
+      ? `\n\nנשמח לביקורת קצרה ⭐\n${appt.business.googleMapsUrl}`
       : "";
     // Optional referral hook, e.g. "הזמן חבר וקבל 10% הנחה" — configured in settings.
     const referralLine = appt.business.referralText ? `\n\n🎁 ${appt.business.referralText}` : "";
@@ -265,7 +265,7 @@ export async function runRoiReportJob() {
     const monthName = heMonths[prevMonth - 1];
 
     const waitlistLine = waitlistFilled > 0 ? `\nמילאה ${waitlistFilled} ביטולים של הרגע האחרון דרך רשימת ההמתנה 🎯` : "";
-    const text = `📊 סיכום חודש ${monthName}!\n\nתורי החודש:\n✅ קבעה ${appointments.length} תורים\n💰 הכנסות שנסגרו דרך הבוט: ₪${revenueIls.toLocaleString()}\n⏱️ חסכה לך כ-${hoursSaved} שעות של סימוסים מול לקוחות${waitlistLine}\n\nתודה שאת/ה איתנו! 🙏`;
+    const text = `📊 סיכום חודש ${monthName}!\n\nתורי החודש:\n✅ קבעה ${appointments.length} תורים\n💰 הכנסות שנסגרו דרך הבוט: ₪${revenueIls.toLocaleString()}\n⏱️ חסכה לך כ-${hoursSaved} שעות של התכתבויות מול לקוחות${waitlistLine}\n\nתודה שאתם איתנו! 🙏`;
 
     try {
       const accessToken = decryptSecret(biz.whatsappAccessToken!);

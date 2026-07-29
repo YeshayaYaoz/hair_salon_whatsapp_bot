@@ -7,7 +7,7 @@ const MIN_DAYS_BETWEEN_MESSAGES = 21; // don't message the same customer more th
 
 function buildReengagementMessage(customerName: string | null, serviceName: string, businessName: string): string {
   const name = customerName ? customerName.split(" ")[0] : "היי";
-  return `${name}! 😊 עבר קצת זמן מאז שביקרת ב${businessName}.\nרוצה שאקבע לך תור ל${serviceName}? פשוט כתוב/י לי מתי נוח לך ואמצא לך זמן מתאים 📅`;
+  return `${name}! 😊 עבר קצת זמן מאז שביקרת ב${businessName}.\nרוצה שאקבע לך תור ל${serviceName}? אפשר לכתוב לי מתי נוח ואמצא זמן מתאים 📅`;
 }
 
 export async function runRetentionJob() {

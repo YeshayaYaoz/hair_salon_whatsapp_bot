@@ -15,7 +15,7 @@
  *   {{2}} service name
  *   {{3}} appointment date/time (localized string)
  *   {{4}} business name
- *   e.g. "שלום {{1}}! תזכורת לתור שלך ל{{2}} מחר ב-{{3}} אצל {{4}}. לביטול השב/י \"בטל תור\"."
+ *   e.g. "שלום {{1}}! תזכורת לתור שלך ל{{2}} מחר ב-{{3}} אצל {{4}}. לביטול יש להשיב \"בטל תור\"."
  *
  * Review template body (WHATSAPP_REVIEW_TEMPLATE):
  *   {{1}} customer first name
@@ -51,7 +51,13 @@ export function reviewTemplate(): TemplateConfig {
  * scheduledMessages.ts. Category UTILITY (not MARKETING) since these are transactional
  * appointment notices, which face much less restrictive delivery/opt-in rules under Meta's
  * policy and Israeli marketing-communications law alike.
+ *
+ * NOTE ON EDITING THESE STRINGS: the approved body text lives at Meta, not here — sending only
+ * passes the template name and params. So a change here applies to templates created from now on;
+ * businesses whose template Meta already approved keep the old wording until it is resubmitted.
+ * Sending is unaffected either way (name and variable order are what must match), so the two can
+ * safely diverge, but don't assume an edit here reaches existing businesses.
  */
 export const REMINDER_TEMPLATE_BODY =
-  'שלום {{1}}! תזכורת לתור שלך ל{{2}} ב-{{3}} אצל {{4}}. לביטול השב/י "בטל תור".';
+  'שלום {{1}}! תזכורת לתור שלך ל{{2}} ב-{{3}} אצל {{4}}. לביטול יש להשיב "בטל תור".';
 export const REVIEW_TEMPLATE_BODY = "{{1}}, תודה שביקרת ב{{2}} היום! מקווים שנהנית מה{{3}}.";
