@@ -9,12 +9,17 @@ interface LanguageContextValue {
   lang: Lang;
   setLang: (l: Lang) => void;
   t: Translations;
+  /** The business's vertical ("bnb", "clinic", …), or null before /me resolves. Exposed here
+   * because this provider already fetches it for the terminology overlay — pages that need to
+   * adapt units or labels per vertical can read it instead of issuing their own request. */
+  businessType: string | null;
 }
 
 const LanguageContext = createContext<LanguageContextValue>({
   lang: "en",
   setLang: () => {},
   t: translations.en,
+  businessType: null,
 });
 
 // Vertical-specific terminology overlays. A B&B owner thinks in guests and bookings, not
@@ -113,7 +118,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, [lang, businessType]);
 
   return (
-    <LanguageContext.Provider value={{ lang, setLang, t }}>
+    <LanguageContext.Provider value={{ lang, setLang, t, businessType }}>
       {children}
     </LanguageContext.Provider>
   );

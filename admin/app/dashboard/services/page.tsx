@@ -41,7 +41,15 @@ interface EditState {
 }
 
 export default function ServicesPage() {
-  const { t } = useLanguage();
+  const { t, businessType } = useLanguage();
+  // Overnight verticals price by night, not by the minute. Duration is still STORED in minutes
+  // (the slot engine's unit, shared by every vertical) — only the input is expressed in nights
+  // and converted at the boundary, so nothing downstream needs a special case.
+  const overnight = businessType === "bnb";
+  const MIN_PER_NIGHT = 1440;
+  const toDurationInput = (min: number) => String(overnight ? Math.max(1, Math.round(min / MIN_PER_NIGHT)) : min);
+  const fromDurationInput = (v: string) => (overnight ? Math.max(1, Number(v) || 1) * MIN_PER_NIGHT : Number(v));
+  const durationLabel = overnight ? "לילות" : t.duration;
   const [services, setServices] = useState<Service[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -71,7 +79,7 @@ export default function ServicesPage() {
       name: s.name,
       description: s.description ?? "",
       price: (s.priceCents / 100).toFixed(0),
-      duration: String(s.durationMin),
+      duration: toDurationInput(s.durationMin),
       color: s.color ?? COLORS[0].hex,
       capacity: String(s.capacity ?? 1),
       imageUrl: s.imageUrl ?? "",
@@ -88,7 +96,7 @@ export default function ServicesPage() {
           name: editState.name,
           description: editState.description || undefined,
           priceCents: Math.round(Number(editState.price) * 100),
-          durationMin: Number(editState.duration),
+          durationMin: fromDurationInput(editState.duration),
           color: editState.color,
           capacity: Math.max(1, Number(editState.capacity) || 1),
           imageUrl: editState.imageUrl || undefined,
@@ -115,7 +123,7 @@ export default function ServicesPage() {
           name: newName,
           description: newDescription || undefined,
           priceCents: Math.round(Number(newPrice) * 100),
-          durationMin: Number(newDuration),
+          durationMin: fromDurationInput(newDuration),
           color: newColor,
           capacity: Math.max(1, Number(newCapacity) || 1),
           imageUrl: newImageUrl || undefined,
@@ -197,7 +205,7 @@ export default function ServicesPage() {
                   <div className="flex flex-wrap gap-2 mb-2">
                     <input value={editState.name} onChange={(e) => setEditState((p) => ({ ...p, name: e.target.value }))} placeholder={t.serviceName} className="flex-1 min-w-32 text-sm" />
                     <input value={editState.price} onChange={(e) => setEditState((p) => ({ ...p, price: e.target.value }))} placeholder={t.price} type="number" className="w-24 text-sm" />
-                    <input value={editState.duration} onChange={(e) => setEditState((p) => ({ ...p, duration: e.target.value }))} placeholder={t.duration} type="number" className="w-28 text-sm" />
+                    <input value={editState.duration} onChange={(e) => setEditState((p) => ({ ...p, duration: e.target.value }))} placeholder={durationLabel} type="number" min="1" className="w-28 text-sm" />
                     <input value={editState.capacity} onChange={(e) => setEditState((p) => ({ ...p, capacity: e.target.value }))} placeholder={t.capacity} title={t.capacityHint} type="number" min="1" className="w-24 text-sm" />
                   </div>
                   <input value={editState.description} onChange={(e) => setEditState((p) => ({ ...p, description: e.target.value }))} placeholder={t.descriptionOptional} className="w-full text-sm mb-2" />
@@ -244,7 +252,7 @@ export default function ServicesPage() {
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    {s.durationMin}′
+                    {overnight ? toDurationInput(s.durationMin) + ' ל׳' : s.durationMin + '′'}
                   </span>
                   <div className="flex gap-1 shrink-0">
                     <button onClick={() => startEdit(s)} className="text-xs text-gray-600 hover:text-[#1B7FA0] transition px-2 py-1 rounded hover:bg-[#E0F5FB]">{t.edit}</button>
@@ -264,7 +272,7 @@ export default function ServicesPage() {
           <div className="flex gap-2 flex-wrap">
             <input placeholder={t.serviceName} value={newName} onChange={(e) => setNewName(e.target.value)} required className="flex-1 min-w-32" />
             <input placeholder={t.price} type="number" step="1" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} required className="w-28" />
-            <input placeholder={t.duration} type="number" value={newDuration} onChange={(e) => setNewDuration(e.target.value)} required className="w-32" />
+            <input placeholder={durationLabel} type="number" min="1" value={newDuration} onChange={(e) => setNewDuration(e.target.value)} required className="w-32" />
             <input placeholder={t.capacity} title={t.capacityHint} type="number" min="1" value={newCapacity} onChange={(e) => setNewCapacity(e.target.value)} className="w-28" />
           </div>
           <input placeholder={t.descriptionOptional} value={newDescription} onChange={(e) => setNewDescription(e.target.value)} className="w-full" />

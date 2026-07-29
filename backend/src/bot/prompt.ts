@@ -32,12 +32,16 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
     .map((h: BusinessHours) => `יום ${dayNames[h.dayOfWeek]}: ${fmtMin(h.openMin)}-${fmtMin(h.closeMin)}`)
     .join("\n") || "שעות עבודה לא הוגדרו — הפנה את הלקוח לפנות ישירות למספר העסק.";
 
+  // Overnight verticals measure stays in nights, not minutes. Without this the bot quoted real
+  // customers things like "לילה — יחידה זוגית: ₪900 (1440 דקות)", which reads as nonsense.
+  const isOvernight = business.businessType === "bnb";
+
   const servicesText = business.services
     .map((s: Service) => {
       const extras = [s.description, s.imageUrl ? `תמונה: ${s.imageUrl}` : null, s.linkUrl ? `מידע נוסף: ${s.linkUrl}` : null]
         .filter(Boolean)
         .join(" — ");
-      return `• ${s.name}: ₪${(s.priceCents / 100).toFixed(0)} (${s.durationMin} דקות)${extras ? ` — ${extras}` : ""}`;
+      return `• ${s.name}: ₪${(s.priceCents / 100).toFixed(0)} (${formatDuration(s.durationMin, isOvernight)})${extras ? ` — ${extras}` : ""}`;
     })
     .join("\n") || "לא הוגדרו שירותים עדיין.";
 
@@ -216,6 +220,17 @@ ${bookingSection}`;
 אל תנקוב בשעה הנוכחית אחרת מזו — זו השעה האמיתית.`;
 
   return { stable, volatile };
+}
+
+/** Duration is stored in minutes for every vertical (the slot engine's unit), but overnight
+ * businesses think and speak in nights — 1440 minutes is "לילה", not "1440 דקות". Falls back to
+ * minutes for a stay that isn't a whole number of nights, rather than rounding and misquoting. */
+export function formatDuration(durationMin: number, isOvernight: boolean): string {
+  if (isOvernight && durationMin % 1440 === 0 && durationMin >= 1440) {
+    const nights = durationMin / 1440;
+    return nights === 1 ? "לילה" : `${nights} לילות`;
+  }
+  return `${durationMin} דקות`;
 }
 
 function fmtMin(min: number): string {
