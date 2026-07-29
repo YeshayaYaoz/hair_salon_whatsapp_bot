@@ -3,7 +3,16 @@ import { prisma } from "../lib/prisma.js";
 import { instantPartsInTz, zonedDateParts, dayOfWeekForDate } from "../lib/timezone.js";
 import { TEMPLATES, isBusinessType } from "../lib/businessTemplates.js";
 
-export async function buildSystemPrompt(businessId: string, customerPhone?: string): Promise<string> {
+/** The system prompt, split so the large unchanging part can be prompt-cached. See the comment
+ * at the return statement for why the clock time must stay out of the cacheable block. */
+export interface SystemPrompt {
+  /** Big, cacheable: business info, services, hours, FAQ, rules. Stable across a conversation. */
+  stable: string;
+  /** Tiny, changes every minute (current time / open-now). Must go after the cache breakpoint. */
+  volatile: string;
+}
+
+export async function buildSystemPrompt(businessId: string, customerPhone?: string): Promise<SystemPrompt> {
   const [business, customer] = await Promise.all([
     prisma.business.findUniqueOrThrow({
       where: { id: businessId },
@@ -167,9 +176,15 @@ ${staffPromptNote}
 
   const bookingSection = business.bookingModel === "inquiry" ? inquiryBookingSection : slotBookingSection;
 
-  return `אתה עוזר ההזמנות של "${business.name}" בוואטסאפ.
-היום: ${todayIso} (יום ${dayNames[nowParts.dayOfWeek]}), השעה כעת: ${nowHHMM} (שעון ישראל). ${openNowNote}
-אל תנקוב בשעה הנוכחית אחרת מזו — זו השעה האמיתית.
+  // Split into a cacheable "stable" block and a tiny "volatile" suffix.
+  //
+  // Prompt caching matches on an exact prefix. The current clock time (HH:MM) changes every
+  // minute, so while it lived inside this block the cache could essentially never hit — we paid
+  // full input rate for the entire ~3k-token prompt on every single call, on every provider.
+  // Everything that changes per-minute now lives in `volatile`, which providers append AFTER the
+  // cache breakpoint; the date table stays here because it only rolls over daily, far longer than
+  // the cache TTL.
+  const stable = `אתה עוזר ההזמנות של "${business.name}" בוואטסאפ.
 טבלת תאריכים לשבועיים הקרובים (השתמש בה תמיד כשלקוח נוקב ביום בשבוע כמו "יום שני" — אל תחשב תאריך בעצמך):
 ${dateTable}
 ענה תמיד בשפה שבה הלקוח כותב (עברית או אנגלית). היה ידידותי, קצר וממוקד — משפט-שניים לכל תגובה.
@@ -188,6 +203,11 @@ ${hoursText}
 כתובת: ${business.address ?? "לא צוין."}
 ${faqText ? `\nשאלות נפוצות:\n${faqText}\n` : ""}
 ${bookingSection}`;
+
+  const volatile = `היום: ${todayIso} (יום ${dayNames[nowParts.dayOfWeek]}), השעה כעת: ${nowHHMM} (שעון ישראל). ${openNowNote}
+אל תנקוב בשעה הנוכחית אחרת מזו — זו השעה האמיתית.`;
+
+  return { stable, volatile };
 }
 
 function fmtMin(min: number): string {

@@ -1,5 +1,5 @@
 import OpenAI, { APIError } from "openai";
-import type { AiProvider, GenericTool, GenericTurn, GenericResponse } from "./types.js";
+import type { AiProvider, GenericTool, GenericTurn, GenericResponse, SystemPromptParts } from "./types.js";
 import { ProviderCallError } from "./types.js";
 
 const RETRYABLE_STATUSES = new Set([408, 409, 429, 500, 502, 503]);
@@ -16,8 +16,13 @@ function toOpenAiTools(tools: GenericTool[]): OpenAI.Chat.ChatCompletionTool[] {
 // to the assistant message that requested them, and each tool result as its own separate
 // role:"tool" message — a different shape from Anthropic's "tool_result content blocks grouped
 // into one user message", hence this conversion instead of reusing toAnthropicMessages.
-function toOpenAiMessages(system: string, turns: GenericTurn[]): OpenAI.Chat.ChatCompletionMessageParam[] {
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [{ role: "system", content: system }];
+function toOpenAiMessages(system: SystemPromptParts, turns: GenericTurn[]): OpenAI.Chat.ChatCompletionMessageParam[] {
+  // OpenAI and DeepSeek both do automatic prefix caching rather than explicit breakpoints, so the
+  // ordering still matters: the stable block goes first so it forms a cacheable prefix, and the
+  // per-minute clock text trails it.
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    { role: "system", content: `${system.stable}\n${system.volatile}` },
+  ];
   for (const turn of turns) {
     if (turn.role === "assistant") {
       messages.push({

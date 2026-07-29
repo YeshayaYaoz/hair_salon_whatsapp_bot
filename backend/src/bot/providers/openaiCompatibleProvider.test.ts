@@ -53,7 +53,7 @@ describe("openaiCompatibleProvider", () => {
       usage: { prompt_tokens: 100, completion_tokens: 20 },
     });
     const provider = makeProvider();
-    const res = await provider.send({ model: "cheap-model", system: "sys", tools: [], turns: [{ role: "user", text: "hi" }] });
+    const res = await provider.send({ model: "cheap-model", system: { stable: "stable-part", volatile: "volatile-part" }, tools: [], turns: [{ role: "user", text: "hi" }] });
     expect(res.stopReason).toBe("end");
     expect(res.text).toBe("Hello there");
     expect(res.toolCalls).toEqual([]);
@@ -75,7 +75,7 @@ describe("openaiCompatibleProvider", () => {
       usage: { prompt_tokens: 50, completion_tokens: 10 },
     });
     const provider = makeProvider();
-    const res = await provider.send({ model: "cheap-model", system: "sys", tools: [], turns: [] });
+    const res = await provider.send({ model: "cheap-model", system: { stable: "stable-part", volatile: "volatile-part" }, tools: [], turns: [] });
     expect(res.stopReason).toBe("tool_use");
     expect(res.toolCalls).toEqual([{ id: "call_1", name: "check_availability", input: { serviceName: "Haircut", date: "2026-08-01" } }]);
   });
@@ -86,7 +86,7 @@ describe("openaiCompatibleProvider", () => {
       usage: { prompt_tokens: 10, completion_tokens: 5 },
     });
     const provider = makeProvider();
-    const res = await provider.send({ model: "cheap-model", system: "sys", tools: [], turns: [] });
+    const res = await provider.send({ model: "cheap-model", system: { stable: "stable-part", volatile: "volatile-part" }, tools: [], turns: [] });
     expect(res.toolCalls).toEqual([{ id: "call_1", name: "book_appointment", input: {} }]);
   });
 
@@ -96,8 +96,25 @@ describe("openaiCompatibleProvider", () => {
       usage: { prompt_tokens: 200, completion_tokens: 30, prompt_cache_hit_tokens: 150 },
     });
     const provider = makeProvider();
-    const res = await provider.send({ model: "deepseek-chat", system: "sys", tools: [], turns: [] });
+    const res = await provider.send({ model: "deepseek-chat", system: { stable: "stable-part", volatile: "volatile-part" }, tools: [], turns: [] });
     expect(res.usage.cacheReadTokens).toBe(150);
+  });
+
+  // Ordering is the whole point of splitting the system prompt: the stable block must form the
+  // cacheable prefix, with the per-minute clock text trailing it. Reversing these silently
+  // destroys prefix caching (which is exactly the bug this split was introduced to fix), and
+  // nothing else in the suite would notice.
+  it("puts the stable system block before the volatile one so it forms a cacheable prefix", async () => {
+    mockCreate.mockResolvedValue({
+      choices: [{ message: { content: "ok", tool_calls: undefined } }],
+      usage: { prompt_tokens: 1, completion_tokens: 1 },
+    });
+    const provider = makeProvider();
+    await provider.send({ model: "cheap-model", system: { stable: "STABLE", volatile: "VOLATILE" }, tools: [], turns: [] });
+
+    const sent = mockCreate.mock.calls[0][0].messages[0];
+    expect(sent.role).toBe("system");
+    expect(sent.content.indexOf("STABLE")).toBeLessThan(sent.content.indexOf("VOLATILE"));
   });
 
   it("throws a non-retryable ProviderCallError when the API key env var is unset", async () => {
@@ -108,7 +125,7 @@ describe("openaiCompatibleProvider", () => {
       defaultCheapModel: "cheap-model",
       defaultSmartModel: "smart-model",
     });
-    await expect(provider.send({ model: "cheap-model", system: "sys", tools: [], turns: [] })).rejects.toMatchObject({
+    await expect(provider.send({ model: "cheap-model", system: { stable: "stable-part", volatile: "volatile-part" }, tools: [], turns: [] })).rejects.toMatchObject({
       name: "ProviderCallError",
       retryable: false,
     });
@@ -121,7 +138,7 @@ describe("openaiCompatibleProvider", () => {
       .mockRejectedValueOnce(new APIError(503, "overloaded"))
       .mockResolvedValueOnce({ choices: [{ message: { content: "recovered", tool_calls: undefined } }], usage: { prompt_tokens: 1, completion_tokens: 1 } });
     const provider = makeProvider();
-    const res = await provider.send({ model: "cheap-model", system: "sys", tools: [], turns: [] });
+    const res = await provider.send({ model: "cheap-model", system: { stable: "stable-part", volatile: "volatile-part" }, tools: [], turns: [] });
     expect(res.text).toBe("recovered");
     expect(mockCreate).toHaveBeenCalledTimes(2);
   }, 3000);

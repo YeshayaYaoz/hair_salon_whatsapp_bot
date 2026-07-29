@@ -40,13 +40,21 @@ export interface GenericResponse {
   usage: GenericUsage;
 }
 
+/** System prompt split for prompt caching: `stable` is the large unchanging prefix providers may
+ * cache; `volatile` (current clock time) must be sent after the cache breakpoint, or it would
+ * change the cached prefix every minute and defeat caching entirely. */
+export interface SystemPromptParts {
+  stable: string;
+  volatile: string;
+}
+
 export interface AiProvider {
   /** Provider key as stored on Business.aiProvider — used for usage-ledger pricing lookups. */
   readonly key: string;
   /** Resolves the model id to bill/send: business.aiModel if set, else this provider's default
    * cheap or smart tier. */
   resolveModel(tier: "cheap" | "smart", override: string | null | undefined): string;
-  send(params: { model: string; system: string; tools: GenericTool[]; turns: GenericTurn[] }): Promise<GenericResponse>;
+  send(params: { model: string; system: SystemPromptParts; tools: GenericTool[]; turns: GenericTurn[] }): Promise<GenericResponse>;
 }
 
 export class ProviderCallError extends Error {

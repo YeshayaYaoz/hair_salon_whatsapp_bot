@@ -77,7 +77,12 @@ export const anthropicProvider: AiProvider = {
   },
 
   async send({ model, system, tools, turns }) {
-    const cachedSystem: Anthropic.TextBlockParam[] = [{ type: "text", text: system, cache_control: { type: "ephemeral" } }];
+    // Two system blocks: the cache breakpoint sits on the stable one, so the per-minute clock
+    // text in `volatile` trails it and never invalidates the cached prefix.
+    const cachedSystem: Anthropic.TextBlockParam[] = [
+      { type: "text", text: system.stable, cache_control: { type: "ephemeral" } },
+      { type: "text", text: system.volatile },
+    ];
     const anthropicTools = toAnthropicTools(tools);
     const messages = toAnthropicMessages(turns);
 
