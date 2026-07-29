@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { signBusinessToken } from "../lib/auth.js";
 import { rateLimit } from "../lib/rateLimit.js";
-import { APP_URL, sendPasswordResetEmail, sendWelcomeEmail, sendAdminAlertEmail } from "../lib/email.js";
+import { APP_URL, sendPasswordResetEmail, sendWelcomeEmail, sendAdminAlertEmail, sendEmailVerificationEmail } from "../lib/email.js";
 import {
   getAuthUrl,
   exchangeCode,
@@ -42,6 +42,11 @@ authRouter.post("/signup", authLimiter, async (req, res) => {
 
   // Send welcome email (non-fatal)
   sendWelcomeEmail(email, name).catch((err) => console.error("Welcome email failed:", err));
+
+  // Verification goes out with signup rather than waiting for the owner to hunt for a button —
+  // a mistyped address is only discoverable by trying to deliver to it. Non-fatal: a mail failure
+  // must not block account creation, and the address can always be re-verified from settings.
+  issueVerificationEmail(business.id, email).catch((err) => console.error("Verification email failed:", err));
   sendAdminAlertEmail(
     `🎉 עסק חדש נרשם — ${name}`,
     `<h2 style="color:#fff;margin-bottom:8px;">${name} נרשם/ה לתורי</h2><p style="color:#a1a1aa;">${email}</p>`
@@ -71,6 +76,73 @@ authRouter.post("/login", authLimiter, async (req, res) => {
   }
 
   res.json({ token: signBusinessToken(business.id) });
+});
+
+/** Tokens are stored hashed, so a leaked backup can't be replayed into account verifications. */
+function hashVerificationToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** Mints a token, stores its hash, and emails the link. Shared by signup and the resend endpoints. */
+async function issueVerificationEmail(businessId: string, email: string): Promise<void> {
+  const token = crypto.randomBytes(32).toString("hex");
+  await prisma.emailVerificationToken.create({
+    data: {
+      businessId,
+      tokenHash: hashVerificationToken(token),
+      email,
+      expiresAt: new Date(Date.now() + VERIFICATION_TTL_MS),
+    },
+  });
+  await sendEmailVerificationEmail(email, `${APP_URL}/verify-email?token=${token}`);
+}
+
+/**
+ * Issues a fresh email-verification link. Public and rate-limited rather than session-gated,
+ * because the most common case is an owner who mistyped their address at signup and now can't
+ * receive anything — including a password reset — so requiring a working login first would be
+ * circular.
+ *
+ * Always responds ok, whether or not the address exists: a differing response would turn this into
+ * a way to enumerate which businesses are registered.
+ */
+authRouter.post("/send-verification", authLimiter, async (req, res) => {
+  const parsed = z.object({ email: z.string().email() }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "כתובת אימייל לא תקינה" });
+
+  const business = await prisma.business.findUnique({ where: { email: parsed.data.email } });
+  if (business && !business.emailVerifiedAt) {
+    await issueVerificationEmail(business.id, business.email).catch((err) =>
+      console.error("Verification email failed:", err)
+    );
+  }
+  res.json({ ok: true });
+});
+
+authRouter.post("/verify-email", authLimiter, async (req, res) => {
+  const parsed = z.object({ token: z.string().min(1) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "קישור אימות לא תקין" });
+
+  const record = await prisma.emailVerificationToken.findUnique({
+    where: { tokenHash: hashVerificationToken(parsed.data.token) },
+    include: { business: { select: { id: true, email: true, emailVerifiedAt: true } } },
+  });
+  if (!record || record.usedAt || record.expiresAt < new Date()) {
+    return res.status(400).json({ error: "קישור האימות פג תוקף או כבר נוצל" });
+  }
+  // The token records the address it was issued for. If the owner has since changed their email,
+  // confirming an old link must not mark the *new* address verified.
+  if (record.email !== record.business.email) {
+    return res.status(400).json({ error: "כתובת האימייל שונתה מאז — יש לשלוח קישור אימות חדש" });
+  }
+
+  await prisma.$transaction([
+    prisma.business.update({ where: { id: record.businessId }, data: { emailVerifiedAt: new Date() } }),
+    prisma.emailVerificationToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
+  ]);
+  res.json({ ok: true, alreadyVerified: Boolean(record.business.emailVerifiedAt) });
 });
 
 authRouter.post("/forgot-password", authLimiter, async (req, res) => {
@@ -153,8 +225,10 @@ authRouter.post("/google/callback", authLimiter, async (req, res) => {
       // hash so password login simply fails "invalid credentials" rather than the field being
       // nullable (which would touch every other code path that assumes passwordHash exists).
       const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
+      // Google already asserted verified_email above, so there's nothing for our own email
+      // round-trip to add — sending one would just ask the owner to re-prove what Google proved.
       business = await prisma.business.create({
-        data: { name: profile.name || profile.email, email: profile.email, passwordHash },
+        data: { name: profile.name || profile.email, email: profile.email, passwordHash, emailVerifiedAt: new Date() },
       });
     }
 
@@ -166,6 +240,12 @@ authRouter.post("/google/callback", authLimiter, async (req, res) => {
     }
 
     await saveGoogleTokensFromResponse(business.id, tokens);
+
+    // Covers the existing password account whose owner later signs in with the same Google
+    // address: Google's assertion verifies it just as well as clicking our link would.
+    if (!business.emailVerifiedAt) {
+      await prisma.business.update({ where: { id: business.id }, data: { emailVerifiedAt: new Date() } });
+    }
 
     if (isNewAccount) {
       sendWelcomeEmail(profile.email, business.name).catch((err) => console.error("Welcome email failed:", err));

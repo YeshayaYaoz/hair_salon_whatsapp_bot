@@ -61,6 +61,9 @@ model Business {
   // is the only way to actually let the lockout expire instead of endlessly resetting it.
   whatsappRegisterAttemptedAt DateTime?
   notificationPhone         String? // owner's personal phone for booking alerts
+  // Set once the owner clicks the link we email them. Null means unverified — which is the state
+  // every existing account starts in, so nothing may *require* this to be non-null.
+  emailVerifiedAt           DateTime?
   // Business-wide bot kill switch. When false the bot stays silent on every thread (holiday,
   // emergency, "I'll handle it myself today") — distinct from Customer.botPaused, which only
   // silences one conversation after the owner replies manually.
@@ -134,6 +137,7 @@ model Business {
   faqEntries          FaqEntry[]
   waitlistEntries     WaitlistEntry[]
   passwordResetTokens PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
   googleCalendar      GoogleCalendarToken?
   blockedTimes        BlockedTime[]
   linkedLeads         Lead[] // Lead Finder prospects that turned into this real, paying account
@@ -366,6 +370,24 @@ model BusinessMetricSnapshot {
   pastDueCount   Int
   canceledCount  Int
   createdAt      DateTime @default(now())
+}
+
+// Proves the owner actually controls the address they signed up with. Without it a typo'd email
+// silently swallows password resets and every operational notice we send, and the owner has no
+// way to tell — the address looks right in settings.
+model EmailVerificationToken {
+  id         String   @id @default(cuid())
+  business   Business @relation(fields: [businessId], references: [id])
+  businessId String
+  // Stored as a SHA-256 hash, not plaintext: this token grants a state change on the account, so
+  // a leaked database backup shouldn't hand over usable verification links.
+  tokenHash  String   @unique
+  email      String // the address being verified — verifying then changing the email must not carry over
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([businessId])
 }
 
 model PasswordResetToken {

@@ -91,6 +91,67 @@ function SystemStatusSection() {
   );
 }
 
+/**
+ * Verification state for the login address, with a resend.
+ *
+ * Surfaced next to the email rather than buried in a banner because an unverified address fails
+ * silently: password resets and every operational notice go to an inbox nobody reads, and the
+ * address still *looks* correct in this form. Showing the state where the value lives is the only
+ * place an owner would think to check.
+ */
+function EmailVerificationRow({ email, verified, he }: { email: string; verified: boolean; he: boolean }) {
+  const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  if (verified) {
+    return (
+      <p className="text-xs flex items-center gap-1.5 -mt-1" style={{ color: "#15803D" }}>
+        <span aria-hidden>✓</span>
+        {he ? "כתובת האימייל מאומתת" : "Email address verified"}
+      </p>
+    );
+  }
+
+  async function resend() {
+    setSending(true);
+    try {
+      await apiFetch("/api/auth/send-verification", { method: "POST", body: JSON.stringify({ email }) });
+      setSent(true);
+    } catch {
+      // The endpoint always reports success (it must not reveal which addresses are registered),
+      // so a rejection here is a network/rate-limit problem — showing "sent" anyway would be a lie.
+      setSent(false);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 -mt-1">
+      <p className="text-xs text-amber-800 leading-relaxed">
+        {he
+          ? "כתובת האימייל עדיין לא אומתה. בלי אימות, איפוס סיסמה והודעות חשובות על החשבון עלולים לא להגיע אליך."
+          : "This email isn't verified yet. Without it, password resets and important account notices may never reach you."}
+      </p>
+      {sent ? (
+        <p className="text-xs font-medium mt-1.5" style={{ color: "#15803D" }}>
+          {he ? "✓ נשלח קישור אימות — בדוק את תיבת הדואר." : "✓ Verification link sent — check your inbox."}
+        </p>
+      ) : (
+        <button
+          type="button"
+          onClick={resend}
+          disabled={sending}
+          className="text-xs font-semibold mt-1.5 underline disabled:opacity-50"
+          style={{ color: "#B45309" }}
+        >
+          {sending ? (he ? "שולח…" : "Sending…") : he ? "שליחת קישור אימות" : "Send verification link"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { t, lang } = useLanguage();
   const he = lang === "he";
@@ -103,9 +164,10 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emailVerified, setEmailVerified] = useState(true); // assume verified until told otherwise, so the warning never flashes on load
 
   useEffect(() => {
-    apiFetch<BusinessProfile>("/api/business/me").then((me) => {
+    apiFetch<BusinessProfile & { emailVerifiedAt?: string | null }>("/api/business/me").then((me) => {
       setFields({
         name: me.name,
         address: me.address ?? "",
@@ -118,6 +180,7 @@ export default function SettingsPage() {
         depositHoldMinutes: me.depositHoldMinutes ?? 30,
         paymentConnected: me.paymentConnected ?? false,
       });
+      setEmailVerified(Boolean(me.emailVerifiedAt));
       setLoaded(true);
     });
   }, []);
@@ -187,6 +250,7 @@ export default function SettingsPage() {
           <Field label={t.loginEmail}>
             <input value={fields.email} disabled className="w-full opacity-60 cursor-not-allowed" />
           </Field>
+          <EmailVerificationRow email={fields.email} verified={emailVerified} he={lang === "he"} />
         </Section>
 
         <Section title={t.bookingNotifications} description={t.bookingNotificationsDesc}>

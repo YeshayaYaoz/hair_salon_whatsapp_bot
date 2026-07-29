@@ -116,6 +116,22 @@ export async function sendOutreachEmail(to: string, subject: string, bodyText: s
   });
 }
 
+export async function sendEmailVerificationEmail(to: string, verifyUrl: string) {
+  await resendSend({
+    from: "תורי-אונליין <noreply@torionline.com>",
+    to,
+    subject: "אימות כתובת האימייל — תורי-אונליין",
+    html: `
+      <div dir="rtl" style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#09090b;color:#e4e4e7;border-radius:12px;">
+        <h2 style="color:#fff;margin-bottom:8px;">אימות כתובת האימייל</h2>
+        <p style="color:#a1a1aa;margin-bottom:24px;">כדי שנוכל לשלוח לך התראות והודעות חשובות על החשבון, יש לאשר שכתובת האימייל הזו שייכת לך:</p>
+        <a href="${verifyUrl}" style="display:inline-block;background:#1B7FA0;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;">אימות כתובת האימייל</a>
+        <p style="color:#71717a;margin-top:24px;font-size:12px;">הקישור תקף ל-24 שעות. אם לא ביקשת זאת, אפשר להתעלם מההודעה.</p>
+      </div>
+    `,
+  });
+}
+
 export async function sendWelcomeEmail(to: string, name: string) {
   await resendSend({
     from: "תורי-אונליין <noreply@torionline.com>",
