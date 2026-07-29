@@ -50,10 +50,15 @@ voiceRouter.post("/context", async (req, res) => {
   if (!business) return res.status(404).json({ error: "No salon configured for this number" });
 
   const callerDigits = normalizePhone(parsed.data.callerNumber);
-  const [full, hours, customers] = await Promise.all([
-    prisma.business.findUniqueOrThrow({ where: { id: business.id }, select: { name: true, timezone: true, address: true, botGreeting: true } }),
+  const [full, hours, customers, services, faqEntries] = await Promise.all([
+    prisma.business.findUniqueOrThrow({
+      where: { id: business.id },
+      select: { name: true, timezone: true, address: true, botGreeting: true, botPersonality: true, cancellationPolicy: true },
+    }),
     prisma.businessHours.findMany({ where: { businessId: business.id }, orderBy: { dayOfWeek: "asc" } }),
     prisma.customer.findMany({ where: { businessId: business.id }, select: { id: true, phone: true, name: true } }),
+    prisma.service.findMany({ where: { businessId: business.id }, select: { name: true, description: true, priceCents: true, durationMin: true } }),
+    prisma.faqEntry.findMany({ where: { businessId: business.id }, select: { question: true, answer: true } }),
   ]);
   const caller = customers.find((c) => normalizePhone(c.phone) === callerDigits);
 
@@ -72,7 +77,11 @@ voiceRouter.post("/context", async (req, res) => {
     timezone: full.timezone,
     address: full.address,
     greeting: full.botGreeting,
+    personality: full.botPersonality,
+    cancellationPolicy: full.cancellationPolicy,
     hours: hours.map((h) => ({ dayOfWeek: h.dayOfWeek, openMin: h.openMin, closeMin: h.closeMin })),
+    services: services.map((s) => ({ name: s.name, description: s.description, priceIls: s.priceCents / 100, durationMin: s.durationMin })),
+    faq: faqEntries,
     caller: caller
       ? { isKnownCustomer: true, name: caller.name, upcomingAppointment }
       : { isKnownCustomer: false, name: null, upcomingAppointment: null },

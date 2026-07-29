@@ -9,6 +9,7 @@ const mockPrisma = {
   appointment: { findFirst: vi.fn() },
   service: { findFirst: vi.fn(), findMany: vi.fn() },
   staffMember: { findFirst: vi.fn(), findMany: vi.fn() },
+  faqEntry: { findMany: vi.fn() },
 };
 
 const mockFindAvailableSlots = vi.fn();
@@ -70,6 +71,8 @@ describe("POST /api/voice/context", () => {
     mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ name: "Salon Dana", timezone: "Asia/Jerusalem", address: null, botGreeting: null });
     mockPrisma.businessHours.findMany.mockResolvedValue([]);
     mockPrisma.customer.findMany.mockResolvedValue([]);
+    mockPrisma.service.findMany.mockResolvedValue([]);
+    mockPrisma.faqEntry.findMany.mockResolvedValue([]);
 
     const res = await request(app)
       .post("/api/voice/context")
@@ -86,6 +89,8 @@ describe("POST /api/voice/context", () => {
     mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ name: "Salon Dana", timezone: "Asia/Jerusalem", address: null, botGreeting: null });
     mockPrisma.businessHours.findMany.mockResolvedValue([]);
     mockPrisma.customer.findMany.mockResolvedValue([{ id: "cust1", phone: "972502222222", name: "Yael" }]);
+    mockPrisma.service.findMany.mockResolvedValue([]);
+    mockPrisma.faqEntry.findMany.mockResolvedValue([]);
     mockPrisma.appointment.findFirst.mockResolvedValue({
       id: "appt1",
       startTime: new Date("2026-08-01T10:00:00Z"),
