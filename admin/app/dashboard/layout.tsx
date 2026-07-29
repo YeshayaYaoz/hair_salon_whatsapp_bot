@@ -7,6 +7,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { clearToken, apiFetch, decodeToken, exitImpersonation } from "../lib/api";
 import { useLanguage } from "../lib/LanguageContext";
 import { AuthGuard } from "../lib/AuthGuard";
+import { MobileSetupBar } from "../lib/MobileSetupBar";
 
 // One nav item. Icons are Heroicons outline path data.
 type NavItem = { href: string; key: keyof ReturnType<typeof useLanguage>["t"]["nav"]; icon: string };
@@ -57,8 +58,17 @@ const NAV_GROUPS: { titleKey: keyof ReturnType<typeof useLanguage>["t"]["navGrou
 ];
 
 const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
-const BOTTOM_TAB_ITEMS = NAV_ITEMS.slice(0, 5);
-const MORE_ITEMS = NAV_ITEMS.slice(5);
+
+// Curated deliberately rather than taken as the first N of NAV_GROUPS: that ordering is grouped
+// for the desktop sidebar, and slicing it happened to hand a prime mobile tab to the waitlist
+// while burying everything else. These four are the daily drivers; setup destinations are reached
+// via MobileSetupBar (while setup is incomplete) and the More sheet. Four tabs + More also leaves
+// noticeably bigger touch targets than five did.
+const BOTTOM_TAB_KEYS: NavItem["key"][] = ["analytics", "appointments", "customers", "services"];
+const BOTTOM_TAB_ITEMS = BOTTOM_TAB_KEYS
+  .map((key) => NAV_ITEMS.find((i) => i.key === key))
+  .filter((i): i is NavItem => Boolean(i));
+const MORE_ITEMS = NAV_ITEMS.filter((i) => !BOTTOM_TAB_KEYS.includes(i.key));
 
 function ImpersonationBanner() {
   const router = useRouter();
@@ -253,7 +263,8 @@ function SidebarContent({ pathname, isSuperAdmin }: { pathname: string; isSuperA
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const he = lang === "he";
   const activeItem = NAV_ITEMS.find((item) => item.href === pathname);
   const [moreOpen, setMoreOpen] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -322,6 +333,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         {children}
       </main>
 
+      <MobileSetupBar />
+
       {/* Mobile bottom tab bar */}
       <nav
         className="md:hidden fixed bottom-0 start-0 end-0 z-30 flex items-stretch h-16"
@@ -361,7 +374,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
-          <span>עוד</span>
+          <span>{he ? "עוד" : "More"}</span>
         </button>
       </nav>
 

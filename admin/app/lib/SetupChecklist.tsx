@@ -4,20 +4,23 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "./api";
 import { useLanguage } from "./LanguageContext";
 
-interface SetupStep {
+export interface SetupStep {
   key: string;
   done: boolean;
   critical: boolean;
 }
 
-interface SetupStatus {
+export interface SetupStatus {
   steps: SetupStep[];
   complete: boolean;
   doneCount: number;
   totalCount: number;
 }
 
-const STEP_META: Record<string, { he: string; en: string; href: string; whyHe: string; whyEn: string }> = {
+// Exported so the mobile "next step" bar in the dashboard layout links to the same page and
+// uses the same wording as this checklist — two places telling an owner different things about
+// the same step is worse than either alone.
+export const STEP_META: Record<string, { he: string; en: string; href: string; whyHe: string; whyEn: string }> = {
   category: {
     he: "בחירת סוג העסק",
     en: "Choose your business type",
