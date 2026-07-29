@@ -34,84 +34,83 @@ const SHARED_FEATURES_EN = [
   "Unlimited technical support",
 ];
 
-const WEEKS_PER_MONTH = 4.33;
 const AFTER_HOURS_CAPTURE = 0.15; // share of bookings recovered by answering 24/7
 const MINUTES_SAVED_PER_BOOKING = 4; // manual admin time saved per booking
 
-// planPrice is the business's actual current monthly cost (real plan price, minus any loyalty
-// discount actually applied to their account) — not a fixed constant — so the "net savings after
-// subscription" figure below is honest about what this specific business pays, not a generic quote.
-function SavingsCalculator({ lang, planPrice }: { lang: "he" | "en"; planPrice: number }) {
-  const [weekly, setWeekly] = useState(30);
-  const [price, setPrice] = useState(120);
+// Minimum real bookings before a savings figure is shown at all. Below this the percentage-based
+// estimate swings wildly on one or two bookings, and an owner who sees a number that jumps around
+// (or an implausible one) stops trusting every other number on the page.
+const MIN_BOOKINGS_FOR_ESTIMATE = 15;
+
+/**
+ * Reports estimated savings from the business's OWN booking data.
+ *
+ * This replaced a slider-driven calculator. Sliders made the owner invent their own inputs, so the
+ * output was really just a reflection of whatever they dragged to — persuasive on a landing page,
+ * but meaningless inside an account where the real figures are already known. Everything here is
+ * derived from confirmed bookings and their actual prices.
+ *
+ * planPrice is this business's real current monthly cost (their plan, minus any loyalty discount
+ * actually applied), so the net figure is honest about what they specifically pay.
+ */
+function SavingsSummary({
+  lang,
+  planPrice,
+  confirmedThisMonth,
+  revenueThisMonthCents,
+}: {
+  lang: "he" | "en";
+  planPrice: number;
+  confirmedThisMonth: number;
+  revenueThisMonthCents: number;
+}) {
   const he = lang === "he";
 
-  const monthlyBookings = Math.round(weekly * WEEKS_PER_MONTH);
-  const recoveredRevenue = Math.round(monthlyBookings * AFTER_HOURS_CAPTURE * price);
-  const hoursSaved = Math.max(1, Math.round((monthlyBookings * MINUTES_SAVED_PER_BOOKING) / 60));
+  if (confirmedThisMonth < MIN_BOOKINGS_FOR_ESTIMATE) {
+    const remaining = MIN_BOOKINGS_FOR_ESTIMATE - confirmedThisMonth;
+    return (
+      <div className="bg-white border border-gray-200 rounded-xl p-6 mt-4">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="w-8 h-8 rounded-lg bg-[#1B7FA0]/10 flex items-center justify-center text-base flex-shrink-0" aria-hidden>📈</span>
+          <h2 className="text-sm font-semibold text-gray-900">{he ? "החיסכון שלך" : "Your savings"}</h2>
+        </div>
+        <p className="text-xs text-gray-600 mt-2 leading-relaxed">
+          {he
+            ? `נציג כאן כמה תורי חסכה לך, מחושב מהתורים האמיתיים שלך. צריך עוד ${remaining} תורים החודש כדי שהחישוב יהיה אמין.`
+            : `We'll show what Tori saved you here, calculated from your real bookings. ${remaining} more booking${remaining === 1 ? "" : "s"} this month before the estimate is reliable.`}
+        </p>
+      </div>
+    );
+  }
+
+  const avgPrice = revenueThisMonthCents / confirmedThisMonth / 100;
+  const recoveredRevenue = Math.round(confirmedThisMonth * AFTER_HOURS_CAPTURE * avgPrice);
+  const hoursSaved = Math.max(1, Math.round((confirmedThisMonth * MINUTES_SAVED_PER_BOOKING) / 60));
   const netSavings = Math.max(0, recoveredRevenue - planPrice);
-  const coversSubscription = recoveredRevenue >= planPrice;
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-6 mt-4">
       <div className="flex items-center gap-2 mb-1">
-        <span className="w-8 h-8 rounded-lg bg-[#1B7FA0]/10 flex items-center justify-center text-base flex-shrink-0">🧮</span>
-        <h2 className="text-sm font-semibold text-gray-900">{he ? "מחשבון חיסכון" : "Savings calculator"}</h2>
+        <span className="w-8 h-8 rounded-lg bg-[#1B7FA0]/10 flex items-center justify-center text-base flex-shrink-0" aria-hidden>📈</span>
+        <h2 className="text-sm font-semibold text-gray-900">{he ? "החיסכון שלך" : "Your savings"}</h2>
       </div>
-      <p className="text-xs text-gray-600 mb-6 mr-10">
-        {he ? "הזז את המחוונים לפי המספרים האמיתיים של העסק שלך" : "Adjust the sliders to match your business's real numbers"}
-      </p>
-
-      <div className="flex flex-col gap-6">
-        <div>
-          <div className="flex items-center justify-between text-sm mb-2">
-            <span className="text-gray-600">{he ? "תורים בשבוע" : "Appointments per week"}</span>
-            <span className="font-bold text-[#1B7FA0] tabular-nums bg-[#1B7FA0]/10 px-2.5 py-0.5 rounded-md">{weekly}</span>
-          </div>
-          <input
-            type="range"
-            min={10}
-            max={150}
-            value={weekly}
-            onChange={(e) => setWeekly(+e.target.value)}
-            className="w-full accent-[#1B7FA0]"
-          />
-          <div className="flex justify-between text-[11px] text-gray-600 mt-1 tabular-nums">
-            <span>10</span>
-            <span>150</span>
-          </div>
-        </div>
-        <div>
-          <div className="flex items-center justify-between text-sm mb-2">
-            <span className="text-gray-600">{he ? "מחיר ממוצע לתור" : "Average price per appointment"}</span>
-            <span className="font-bold text-[#1B7FA0] tabular-nums bg-[#1B7FA0]/10 px-2.5 py-0.5 rounded-md">₪{price}</span>
-          </div>
-          <input
-            type="range"
-            min={50}
-            max={500}
-            step={10}
-            value={price}
-            onChange={(e) => setPrice(+e.target.value)}
-            className="w-full accent-[#1B7FA0]"
-          />
-          <div className="flex justify-between text-[11px] text-gray-600 mt-1 tabular-nums">
-            <span>₪50</span>
-            <span>₪500</span>
-          </div>
-        </div>
-      </div>
-
-      <p className="text-xs text-gray-600 mt-6 mb-3">
+      <p className="text-xs text-gray-600 mb-5 mr-10">
         {he
-          ? `כלומר בערך ${monthlyBookings} תורים בחודש. תורי עוזרת לתפוס תורים שהיו הולכים לאיבוד מחוץ לשעות העבודה:`
-          : `That's about ${monthlyBookings} appointments per month. Tori helps capture bookings that would otherwise be lost after-hours:`}
+          ? `לפי ${confirmedThisMonth} תורים שנקבעו החודש, במחיר ממוצע של ₪${Math.round(avgPrice)}`
+          : `Based on ${confirmedThisMonth} bookings this month, averaging ₪${Math.round(avgPrice)}`}
       </p>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="bg-[#1B7FA0]/10 border border-[#1B7FA0]/30 rounded-lg p-5 text-center">
+        <div className="text-3xl font-extrabold text-[#1B7FA0] tabular-nums">₪{netSavings.toLocaleString()}</div>
+        <div className="text-xs text-gray-600 mt-1 font-medium">
+          {he ? `חיסכון נטו החודש (אחרי עלות המנוי ₪${planPrice})` : `Net savings this month (after the ₪${planPrice} subscription)`}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mt-3">
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
           <div className="text-2xl font-extrabold text-gray-900 tabular-nums">₪{recoveredRevenue.toLocaleString()}</div>
-          <div className="text-[11px] text-gray-600 mt-1">{he ? "הכנסה משוחזרת לחודש" : "Recovered revenue / month"}</div>
+          <div className="text-[11px] text-gray-600 mt-1">{he ? "הכנסה משוחזרת" : "Recovered revenue"}</div>
         </div>
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
           <div className="text-2xl font-extrabold text-gray-900 tabular-nums">{hoursSaved}</div>
@@ -119,27 +118,10 @@ function SavingsCalculator({ lang, planPrice }: { lang: "he" | "en"; planPrice: 
         </div>
       </div>
 
-      <div className="bg-[#1B7FA0]/10 border border-[#1B7FA0]/30 rounded-lg p-4 text-center mt-3">
-        <div className="text-3xl font-extrabold text-[#1B7FA0] tabular-nums">
-          {coversSubscription ? `₪${netSavings.toLocaleString()}` : "₪0"}
-        </div>
-        <div className="text-xs text-gray-600 mt-1 font-medium">
-          {he ? `חיסכון נטו לחודש (אחרי עלות המנוי ₪${planPrice})` : `Net monthly savings (after the ₪${planPrice} subscription)`}
-        </div>
-      </div>
-
-      {!coversSubscription && (
-        <p className="text-[11px] text-amber-600 mt-3 leading-relaxed">
-          {he
-            ? "בנפח נמוך מאוד ההחזר עדיין קטן — הגדל את המחוון כדי לראות איך התשואה גדלה ככל שיש יותר תורים."
-            : "At very low volume the return is still small — try increasing the slider to see how it grows with more bookings."}
-        </p>
-      )}
-
       <p className="text-[11px] text-gray-600 mt-3 leading-relaxed">
         {he
-          ? `הערכה בהנחה ש-${Math.round(AFTER_HOURS_CAPTURE * 100)}% מהתורים נקבעים מחוץ לשעות העבודה, שאחרת היו אובדים. למטרות המחשה בלבד.`
-          : `Estimate assumes ${Math.round(AFTER_HOURS_CAPTURE * 100)}% of bookings happen after-hours and would otherwise be lost. For illustration only.`}
+          ? `הערכה בהנחה ש-${Math.round(AFTER_HOURS_CAPTURE * 100)}% מהתורים נקבעו מחוץ לשעות העבודה והיו אובדים אחרת. מספר התורים והמחיר הממוצע לקוחים מהנתונים האמיתיים שלך.`
+          : `Estimate assumes ${Math.round(AFTER_HOURS_CAPTURE * 100)}% of bookings happened after-hours and would otherwise be lost. Booking count and average price come from your real data.`}
       </p>
     </div>
   );
@@ -160,6 +142,7 @@ export default function BillingPage() {
   const [annualLoading, setAnnualLoading] = useState(false);
   const [topupAmount, setTopupAmount] = useState(50);
   const [topupLoading, setTopupLoading] = useState(false);
+  const [bookingStats, setBookingStats] = useState<{ confirmedThisMonth: number; revenueThisMonth: number } | null>(null);
 
   async function load() {
     const me = await apiFetch<{
@@ -174,6 +157,12 @@ export default function BillingPage() {
     setBillingCycle(me.billingCycle ?? "monthly");
     setLoyaltyDiscountIls(me.loyaltyDiscountIls ?? 0);
     setWalletBalanceAgorot(me.walletBalanceAgorot ?? 0);
+
+    // Savings are derived from real bookings, so this page needs the analytics figures too.
+    // Non-fatal: a failure here should hide the savings card, never block billing itself.
+    apiFetch<{ confirmedThisMonth: number; revenueThisMonth: number }>("/api/business/analytics")
+      .then(setBookingStats)
+      .catch(() => {});
   }
 
   useEffect(() => {
@@ -542,7 +531,14 @@ export default function BillingPage() {
         </div>
       )}
 
-      <SavingsCalculator lang={lang} planPrice={realMonthlyPrice} />
+      {bookingStats && (
+        <SavingsSummary
+          lang={lang}
+          planPrice={realMonthlyPrice}
+          confirmedThisMonth={bookingStats.confirmedThisMonth}
+          revenueThisMonthCents={bookingStats.revenueThisMonth}
+        />
+      )}
     </div>
   );
 }
