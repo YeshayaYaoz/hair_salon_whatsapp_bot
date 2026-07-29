@@ -4,7 +4,7 @@ const translations = {
   en: {
     nav: {
       analytics: "Analytics", appointments: "Appointments", customers: "Customers",
-      waitlist: "Waitlist", services: "Services", staff: "Staff", hours: "Schedule",
+      waitlist: "Waitlist", services: "Pricing & Services", staff: "Staff", hours: "Schedule",
       blocked: "Time off", conversations: "Conversations",
       whatsapp: "WhatsApp", bot: "Bot", payments: "Payments", faq: "FAQ", settings: "Settings", billing: "Billing", logout: "Log out",
     },
@@ -35,7 +35,7 @@ const translations = {
     subNewCustomers: "booked this month", subAllTime: "confirmed total",
 
     // Services
-    servicesTitle: "Services", addService: "Add a service",
+    servicesTitle: "Pricing & Services", addService: "Add a service",
     serviceName: "Service name", price: "Price (₪)", duration: "Duration (min)",
     capacity: "Spots", capacityHint: "How many people can book the same slot (1 = a normal 1:1 appointment; higher = a group class)",
     descriptionOptional: "Description (optional)",
@@ -90,7 +90,7 @@ const translations = {
     botPersonalityTitle: "Bot personality",
     botPersonalityDesc: "Customize how the bot introduces itself and speaks to customers.",
     salonName: "Salon name", address: "Address", timezone: "Timezone", loginEmail: "Login email",
-    notifPhone: "Your WhatsApp number", notifPhoneHint: "Include country code, e.g. 972501234567.",
+    notifPhone: "Your personal phone (owner) — not the bot's number", notifPhoneHint: "This is YOUR own WhatsApp number, where you'll get alerts about new bookings and customer requests. It is different from the business number the bot answers on. Include country code, e.g. 972501234567.",
     googleMapsUrl: "Google Maps review link", googleMapsUrlHint: "Sent with post-visit thank-you messages. Find it in Google Business Profile → Share → Copy link.",
     greeting: "Opening greeting", personality: "Personality & tone",
     greetingPlaceholder: "e.g. Hello! Welcome to Shir's salon 💇‍♀️ How can I help?",
@@ -140,7 +140,7 @@ const translations = {
   he: {
     nav: {
       analytics: "סטטיסטיקות", appointments: "תורים", customers: "לקוחות",
-      waitlist: "רשימת המתנה", services: "שירותים", staff: "צוות", hours: "לוח זמנים",
+      waitlist: "רשימת המתנה", services: "מחירים ושירותים", staff: "צוות", hours: "לוח זמנים",
       blocked: "חופשות", conversations: "שיחות",
       whatsapp: "וואטסאפ", bot: "בוט", payments: "סליקה וחשבוניות", faq: "שאלות נפוצות", settings: "הגדרות", billing: "תשלום", logout: "התנתקות",
     },
@@ -171,7 +171,7 @@ const translations = {
     subNewCustomers: "הזמינו החודש", subAllTime: "סה\"כ מאושרות",
 
     // Services
-    servicesTitle: "שירותים", addService: "הוספת שירות",
+    servicesTitle: "מחירים ושירותים", addService: "הוספת שירות",
     serviceName: "שם השירות", price: "מחיר (₪)", duration: "משך (דקות)",
     capacity: "מקומות", capacityHint: "כמה אנשים יכולים להזמין את אותו מועד (1 = תור רגיל אחד-על-אחד; יותר = שיעור קבוצתי)",
     descriptionOptional: "תיאור (לא חובה)",
@@ -226,7 +226,7 @@ const translations = {
     botPersonalityTitle: "אישיות הבוט",
     botPersonalityDesc: "איך הבוט מדבר? רשמי, קליל, עם אימוג׳ים — אתם קובעים.",
     salonName: "שם הסלון", address: "כתובת", timezone: "אזור זמן", loginEmail: "אימייל כניסה",
-    notifPhone: "מספר הוואטסאפ שלך", notifPhoneHint: "כולל קידומת מדינה, לדוג׳ 972501234567.",
+    notifPhone: "המספר האישי שלך (בעל/ת העסק) — לא מספר הבוט", notifPhoneHint: "זהו מספר הוואטסאפ האישי שלך, שאליו יגיעו התראות על תורים חדשים ובקשות מלקוחות. זה שונה מהמספר העסקי שהבוט עונה עליו. כולל קידומת מדינה, לדוג׳ 972501234567.",
     googleMapsUrl: "קישור לביקורת Google Maps", googleMapsUrlHint: "יישלח עם הודעות תודה לאחר הביקור. מצא אותו בפרופיל העסק Google ← שתף ← העתק קישור.",
     greeting: "ברכת פתיחה", personality: "אישיות וטון",
     greetingPlaceholder: "לדוג׳ שלום! ברוכים הבאים לסלון שיר 💇‍♀️ במה אוכל לעזור?",
