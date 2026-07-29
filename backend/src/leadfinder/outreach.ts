@@ -3,6 +3,18 @@ import Anthropic from "@anthropic-ai/sdk";
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = "claude-sonnet-5";
 
+/**
+ * Higher than the booking bot's 0.2, deliberately.
+ *
+ * The bot quotes prices and confirms times, where any variation is a liability. This writes cold
+ * outreach, where the entire premise is that each message references something specific about that
+ * business and doesn't read like a template — at 0.2 every message would come out near-identical,
+ * which is exactly what makes outreach look like spam. Left creative, with the Hebrew-correctness
+ * rules in SYSTEM_PROMPT carrying the load instead: previously there were none, so this had the
+ * same invented-Hebrew exposure as the bot, on the copy that forms a prospect's first impression.
+ */
+const TEMPERATURE = 0.7;
+
 export interface OutreachLeadContext {
   name: string;
   category: string | null;
@@ -29,7 +41,8 @@ const SYSTEM_PROMPT = `אתה כותב הודעות יזומות (cold outreach)
 - התייחס לפרט קונקרטי אחד מהעסק (למשל: "ראיתי שאין לכם מערכת הזמנות אונליין", "שמתי לב שיש לכם המון ביקורות אבל האתר לא עודכן") — לא רשימת תכונות של תורי.
 - קצר. הודעת מייל = 4-6 משפטים. תסריט שיחה = נקודות קצרות, לא נאום.
 - אל תבטיח דברים לא נכונים (מחירים ספציפיים, לוחות זמנים) — המטרה היא לעורר עניין ולקבוע שיחה/דמו, לא לסגור עסקה בהודעה אחת.
-- סיום עם קריאה לפעולה ברורה אחת (למשל: "רוצה שאראה לך דמו קצר של 5 דקות?").`;
+- סיום עם קריאה לפעולה ברורה אחת (למשל: "רוצה שאראה לך דמו קצר של 5 דקות?").
+- עברית תקנית בלבד: השתמש רק במילים וצורות קיימות, ואל תמציא הטיות. ביטויים קבועים ("ברוך הבא", "נעים להכיר", "בשעה טובה") נכתבים תמיד בדיוק כמו שהם — וריאציה על ביטוי קבוע היא שגיאה גם אם היא נשמעת תקנית. אם אינך בטוח בהטיה של מילה — נסח פשוט יותר במקום לנחש.`;
 
 function buildLeadSummary(lead: OutreachLeadContext, scoreBreakdown: Record<string, number> | null): string {
   const facts: string[] = [
@@ -78,6 +91,7 @@ export async function generateOutreachDraft(
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 600,
+    temperature: TEMPERATURE,
     system: SYSTEM_PROMPT,
     messages: [
       {

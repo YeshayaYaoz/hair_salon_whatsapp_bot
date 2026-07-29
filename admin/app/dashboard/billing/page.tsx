@@ -13,6 +13,9 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const PLAN_PRICES: Record<"standard" | "premium", number> = { standard: 149, premium: 299 };
+// Must match ANNUAL_MONTHS_CHARGED in backend/src/billing/payplusSubscription.ts — the annual term
+// charges this many months for 12 months of service.
+const ANNUAL_MONTHS_CHARGED = 10;
 
 // Must match MESSAGE_QUOTA_BY_PLAN in backend/src/lib/wallet.ts — display-only, not authoritative.
 const MESSAGE_QUOTA_BY_PLAN: Record<"standard" | "premium", number> = { standard: 300, premium: 1000 };
@@ -250,11 +253,20 @@ export default function BillingPage() {
     trialDaysLeft = Math.max(0, Math.ceil((trialEnd - Date.now()) / (24 * 60 * 60 * 1000)));
   }
 
-  // The business's actual current monthly cost: their real plan (once subscribed) minus any
-  // loyalty discount actually applied — falls back to the pre-checkout selected plan's list price
-  // before a subscription exists, so the calculator below is never showing a fabricated number.
+  // The business's actual current monthly cost: their real plan (once subscribed), spread over the
+  // annual cycle where applicable, minus any loyalty discount actually applied — falls back to the
+  // pre-checkout selected plan's list price before a subscription exists, so the savings card below
+  // is never showing a fabricated number.
+  //
+  // The annual term charges ANNUAL_MONTHS_CHARGED months for 12 months of service, so an annual
+  // subscriber's effective monthly cost is lower than the list price. Omitting that overstated
+  // their cost by ~17% and therefore understated the savings from the very discount they bought.
   const activePlan = (status === "active" && currentPlan === "premium" ? "premium" : status === "active" ? "standard" : plan) as "standard" | "premium";
-  const realMonthlyPrice = Math.max(0, PLAN_PRICES[activePlan] - (status === "active" ? loyaltyDiscountIls : 0));
+  const listMonthlyPrice =
+    billingCycle === "annual"
+      ? (PLAN_PRICES[activePlan] * ANNUAL_MONTHS_CHARGED) / 12
+      : PLAN_PRICES[activePlan];
+  const realMonthlyPrice = Math.max(0, Math.round(listMonthlyPrice - (status === "active" ? loyaltyDiscountIls : 0)));
 
   return (
     <div className="animate-fade-in">
