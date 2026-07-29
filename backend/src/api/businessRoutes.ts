@@ -76,6 +76,10 @@ businessRouter.get("/admin/businesses", requireSuperAdmin, async (_req: AuthedRe
   const businesses = await prisma.business.findMany({
     select: {
       id: true, name: true, email: true, createdAt: true,
+      // The owner's personal number and email-verification state: this list is the operator's
+      // starting point for proactively calling a business that's stuck mid-setup, and an
+      // unverified email means email outreach silently won't reach them at all.
+      notificationPhone: true, emailVerifiedAt: true,
       subscriptionStatus: true, subscriptionPlan: true, billingCycle: true,
       whatsappPhoneNumberId: true, whatsappTokenValid: true,
       paymentProvider: true, invoiceProvider: true, depositEnabled: true,

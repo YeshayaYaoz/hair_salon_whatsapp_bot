@@ -11,6 +11,8 @@ interface AdminBusiness {
   name: string;
   email: string;
   createdAt: string;
+  notificationPhone: string | null;
+  emailVerifiedAt: string | null;
   subscriptionStatus: string;
   subscriptionPlan: string | null;
   billingCycle: string;
@@ -177,7 +179,19 @@ export default function AdminBusinessesPage() {
   }, [showAuditLog, globalAuditLog]);
 
   const filtered = (businesses ?? [])
-    .filter((b) => b.name.toLowerCase().includes(search.toLowerCase()) || b.email.toLowerCase().includes(search.toLowerCase()))
+    .filter((b) => {
+      const q = search.toLowerCase().trim();
+      if (!q) return true;
+      // Digits-only comparison for the phone so a search for "0501234567" still matches a stored
+      // "+972-50-123-4567" — the operator types what they see on their own call log.
+      const phoneDigits = (b.notificationPhone ?? "").replace(/\D/g, "");
+      const qDigits = q.replace(/\D/g, "");
+      return (
+        b.name.toLowerCase().includes(q) ||
+        b.email.toLowerCase().includes(q) ||
+        (qDigits.length >= 3 && phoneDigits.includes(qDigits))
+      );
+    })
     .filter((b) => {
       if (statusFilter === "all") return true;
       if (statusFilter === "blocked") return Boolean(b.blockedAt);
@@ -191,13 +205,13 @@ export default function AdminBusinessesPage() {
   function exportCsv() {
     const rows = businesses ?? [];
     const header = [
-      "name", "email", "createdAt", "subscriptionStatus", "subscriptionPlan", "billingCycle",
+      "name", "email", "emailVerified", "ownerPhone", "createdAt", "subscriptionStatus", "subscriptionPlan", "billingCycle",
       "blocked", "whatsappConnected", "paymentProvider", "invoiceProvider", "walletBalanceIls",
       "claudeCost30dIls", "appointments", "customers",
     ];
     const lines = rows.map((b) =>
       [
-        b.name, b.email, b.createdAt, b.subscriptionStatus, b.subscriptionPlan ?? "", b.billingCycle,
+        b.name, b.email, b.emailVerifiedAt ? "yes" : "no", b.notificationPhone ?? "", b.createdAt, b.subscriptionStatus, b.subscriptionPlan ?? "", b.billingCycle,
         b.blockedAt ? "yes" : "no", b.whatsappConnected ? "yes" : "no", b.paymentProvider ?? "", b.invoiceProvider ?? "",
         (b.walletBalanceAgorot / 100).toFixed(2), (b.realClaudeCostAgorot30d / 100).toFixed(2),
         b._count.appointments, b._count.customers,
@@ -258,7 +272,7 @@ export default function AdminBusinessesPage() {
             <option value="attention">{he ? "דורש תשומת לב" : "Needs attention"}</option>
           </select>
           <input
-            placeholder={he ? "חיפוש לפי שם או אימייל" : "Search by name or email"}
+            placeholder={he ? "חיפוש לפי שם, אימייל או טלפון" : "Search by name, email or phone"}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-56"
@@ -386,6 +400,7 @@ export default function AdminBusinessesPage() {
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="text-start px-4 py-3 text-gray-600 font-medium">{he ? "עסק" : "Business"}</th>
+                <th className="text-start px-4 py-3 text-gray-600 font-medium">{he ? "יצירת קשר" : "Contact"}</th>
                 <th className="text-start px-4 py-3 text-gray-600 font-medium">{he ? "נרשם" : "Joined"}</th>
                 <th className="text-start px-4 py-3 text-gray-600 font-medium">{he ? "מנוי" : "Subscription"}</th>
                 <th className="text-start px-4 py-3 text-gray-600 font-medium">WhatsApp</th>
@@ -413,7 +428,45 @@ export default function AdminBusinessesPage() {
                         </span>
                       )}
                     </div>
-                    <div className="text-gray-600 text-xs" dir="ltr">{b.email}</div>
+                    <div className="text-gray-600 text-xs flex items-center gap-1" dir="ltr">
+                      {b.email}
+                      {/* An unverified address means email outreach silently never lands, so it's
+                          flagged right next to the address rather than in a separate column. */}
+                      {!b.emailVerifiedAt && (
+                        <span title={he ? "האימייל לא אומת — הודעות אליו עלולות לא להגיע" : "Email unverified — messages may not arrive"} className="text-amber-600">⚠</span>
+                      )}
+                    </div>
+                  </td>
+                  {/* Contact: stopPropagation so tapping a phone link dials instead of opening the
+                      row's drill-down, which would swallow the tap. */}
+                  <td className="px-4 py-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                    {b.notificationPhone ? (
+                      <div className="flex items-center gap-2" dir="ltr">
+                        <a
+                          href={`tel:${b.notificationPhone}`}
+                          className="text-[#1B7FA0] hover:underline tabular-nums text-xs font-medium"
+                        >
+                          {b.notificationPhone}
+                        </a>
+                        <a
+                          href={`https://wa.me/${b.notificationPhone.replace(/\D/g, "")}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={he ? "פתיחת וואטסאפ" : "Open WhatsApp"}
+                          title={he ? "פתיחת וואטסאפ" : "Open WhatsApp"}
+                          className="text-green-600 hover:text-green-700 text-sm leading-none"
+                        >
+                          ⌾
+                        </a>
+                      </div>
+                    ) : (
+                      <span
+                        className="text-xs text-amber-700"
+                        title={he ? "לא הוגדר מספר — אין דרך להתקשר, וגם ההתראות שלו לא עובדות" : "No phone set — no way to call, and their own alerts don't work either"}
+                      >
+                        {he ? "אין מספר" : "no phone"}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(b.createdAt)}</td>
                   <td className="px-4 py-3">
@@ -476,8 +529,33 @@ export default function AdminBusinessesPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-1">
-              <h2 className="text-lg font-bold text-gray-900">{drilldown.name}</h2>
-              <button onClick={() => setDrilldown(null)} className="text-gray-600 hover:text-gray-600 text-sm">
+              <div className="min-w-0">
+                <h2 className="text-lg font-bold text-gray-900">{drilldown.name}</h2>
+                {/* Reachability up top: the whole point of this panel is diagnosing a business and
+                    then actually contacting the owner about it. hover:text-gray-900 because the
+                    Close button's hover previously matched its base colour. */}
+                <div className="flex items-center gap-3 mt-1 text-xs flex-wrap" dir="ltr">
+                  <span className="text-gray-600">{drilldown.email}</span>
+                  {drilldown.notificationPhone ? (
+                    <>
+                      <a href={`tel:${drilldown.notificationPhone}`} className="text-[#1B7FA0] hover:underline font-medium tabular-nums">
+                        📞 {drilldown.notificationPhone}
+                      </a>
+                      <a
+                        href={`https://wa.me/${drilldown.notificationPhone.replace(/\D/g, "")}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-green-600 hover:underline font-medium"
+                      >
+                        WhatsApp
+                      </a>
+                    </>
+                  ) : (
+                    <span className="text-amber-700">{he ? "לא הוגדר מספר טלפון" : "No phone number set"}</span>
+                  )}
+                </div>
+              </div>
+              <button onClick={() => setDrilldown(null)} className="text-gray-600 hover:text-gray-900 text-sm shrink-0">
                 {he ? "סגור" : "Close"}
               </button>
             </div>
