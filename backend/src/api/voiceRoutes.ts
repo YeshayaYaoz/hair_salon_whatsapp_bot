@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma.js";
 import { findAvailableSlots, SlotUnavailableError, OutsideBusinessHoursError } from "../booking/availability.js";
 import { bookAppointmentWithSideEffects, cancelAppointmentById, rescheduleAppointmentById, AppointmentNotFoundError } from "../booking/actions.js";
 import { parseBookingTime, instantPartsInTz } from "../lib/timezone.js";
+import { TEMPLATES, isBusinessType } from "../lib/businessTemplates.js";
 
 export const voiceRouter = Router();
 
@@ -53,7 +54,7 @@ voiceRouter.post("/context", async (req, res) => {
   const [full, hours, customers, services, faqEntries] = await Promise.all([
     prisma.business.findUniqueOrThrow({
       where: { id: business.id },
-      select: { name: true, timezone: true, address: true, botGreeting: true, botPersonality: true, cancellationPolicy: true },
+      select: { name: true, timezone: true, address: true, botGreeting: true, botPersonality: true, cancellationPolicy: true, businessType: true },
     }),
     prisma.businessHours.findMany({ where: { businessId: business.id }, orderBy: { dayOfWeek: "asc" } }),
     prisma.customer.findMany({ where: { businessId: business.id }, select: { id: true, phone: true, name: true } }),
@@ -72,8 +73,15 @@ voiceRouter.post("/context", async (req, res) => {
     if (appt) upcomingAppointment = { id: appt.id, serviceName: appt.service.name, startTime: appt.startTime, staffName: appt.staff?.name ?? null };
   }
 
+  // businessType drives the vocabulary the agent should speak in (e.g. call the customer "מטופל"
+  // at a clinic vs "לקוח" at a salon) — same TEMPLATES source of truth the WhatsApp bot's prompt
+  // reads from, so the two channels never disagree on what kind of business this is.
+  const template = isBusinessType(full.businessType) ? TEMPLATES[full.businessType] : null;
+
   res.json({
     businessName: full.name,
+    businessType: template ? { key: template.type, labelHe: template.labelHe, labelEn: template.labelEn } : null,
+    vocabulary: template?.vocabulary ?? null,
     timezone: full.timezone,
     address: full.address,
     greeting: full.botGreeting,
