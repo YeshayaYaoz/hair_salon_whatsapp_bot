@@ -24,7 +24,12 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
     .join("\n") || "שעות עבודה לא הוגדרו — הפנה את הלקוח לפנות ישירות למספר העסק.";
 
   const servicesText = business.services
-    .map((s: Service) => `• ${s.name}: ₪${(s.priceCents / 100).toFixed(0)} (${s.durationMin} דקות)${s.description ? ` — ${s.description}` : ""}`)
+    .map((s: Service) => {
+      const extras = [s.description, s.imageUrl ? `תמונה: ${s.imageUrl}` : null, s.linkUrl ? `מידע נוסף: ${s.linkUrl}` : null]
+        .filter(Boolean)
+        .join(" — ");
+      return `• ${s.name}: ₪${(s.priceCents / 100).toFixed(0)} (${s.durationMin} דקות)${extras ? ` — ${extras}` : ""}`;
+    })
     .join("\n") || "לא הוגדרו שירותים עדיין.";
 
   const staffText = business.staff.map((s: StaffMember) => s.name).join(", ") || "לא צוין.";
@@ -170,6 +175,7 @@ ${dateTable}
 ענה תמיד בשפה שבה הלקוח כותב (עברית או אנגלית). היה ידידותי, קצר וממוקד — משפט-שניים לכל תגובה.
 אל תמציא מידע שאינו רשום כאן. אם אינך יודע — אמור זאת והצע העברה לבן אדם.
 כשאתה מתייחס לעצמך, כתוב תמיד בלשון זכר יחיד ("אני מצטער", לא "מצטערים" או "מצטער/ת"). אל תשתמש בצורות עם לוכסן ("בעל/ת", "ישמע/ת" וכדומה) — אלה לא נשמעות טבעי בכתיבה. כתוב עברית פשוטה, טבעית וישירה, כמו שבן אדם באמת כותב בוואטסאפ — לא ניסוח מתורגם או מסורבל.
+אם לשירות ברשימה למטה יש "תמונה" או "מידע נוסף" — שלח את הקישור כשהלקוח שואל על אותו שירות/יחידה, מבקש לראות תמונות, או כשזה טבעי בהקשר השיחה (למשל בהצגת אפשרויות).
 ${cancellationNote}${vocabNote}${personalityNote}${greeting}${crmNote}
 שירותים ומחירים:
 ${servicesText}

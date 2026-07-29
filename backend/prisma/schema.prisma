@@ -161,6 +161,13 @@ model Service {
   // (every existing service). >1 = a group class (yoga/fitness) where the slot holds multiple
   // attendees up to this capacity. Kept as a plain per-service count so the 1:1 path is unchanged.
   capacity        Int             @default(1)
+  // Optional visual/reference links shown alongside the listing — most useful for verticals like
+  // B&B where a "service" is really a rentable unit customers want to see photos of before asking.
+  // Plain URLs (an image link, or a page with more photos/details) rather than hosted uploads —
+  // no object storage exists in this app yet, and a URL field matches the existing googleMapsUrl
+  // pattern rather than introducing new upload infrastructure for this alone.
+  imageUrl        String?
+  linkUrl         String?
   appointments    Appointment[]
   waitlistEntries WaitlistEntry[]
 

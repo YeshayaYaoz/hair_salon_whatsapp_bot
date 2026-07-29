@@ -25,6 +25,8 @@ interface Service {
   durationMin: number;
   color?: string;
   capacity?: number;
+  imageUrl?: string;
+  linkUrl?: string;
 }
 
 interface EditState {
@@ -34,6 +36,8 @@ interface EditState {
   duration: string;
   color: string;
   capacity: string;
+  imageUrl: string;
+  linkUrl: string;
 }
 
 export default function ServicesPage() {
@@ -41,13 +45,15 @@ export default function ServicesPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editState, setEditState] = useState<EditState>({ name: "", description: "", price: "", duration: "", color: COLORS[0].hex, capacity: "1" });
+  const [editState, setEditState] = useState<EditState>({ name: "", description: "", price: "", duration: "", color: COLORS[0].hex, capacity: "1", imageUrl: "", linkUrl: "" });
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [newDuration, setNewDuration] = useState("");
   const [newCapacity, setNewCapacity] = useState("1");
   const [newColor, setNewColor] = useState(COLORS[0].hex);
+  const [newImageUrl, setNewImageUrl] = useState("");
+  const [newLinkUrl, setNewLinkUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -68,6 +74,8 @@ export default function ServicesPage() {
       duration: String(s.durationMin),
       color: s.color ?? COLORS[0].hex,
       capacity: String(s.capacity ?? 1),
+      imageUrl: s.imageUrl ?? "",
+      linkUrl: s.linkUrl ?? "",
     });
   }
 
@@ -83,6 +91,8 @@ export default function ServicesPage() {
           durationMin: Number(editState.duration),
           color: editState.color,
           capacity: Math.max(1, Number(editState.capacity) || 1),
+          imageUrl: editState.imageUrl || undefined,
+          linkUrl: editState.linkUrl || undefined,
         }),
       });
       setEditingId(null);
@@ -108,9 +118,11 @@ export default function ServicesPage() {
           durationMin: Number(newDuration),
           color: newColor,
           capacity: Math.max(1, Number(newCapacity) || 1),
+          imageUrl: newImageUrl || undefined,
+          linkUrl: newLinkUrl || undefined,
         }),
       });
-      setNewName(""); setNewDescription(""); setNewPrice(""); setNewDuration(""); setNewCapacity("1"); setNewColor(COLORS[0].hex);
+      setNewName(""); setNewDescription(""); setNewPrice(""); setNewDuration(""); setNewCapacity("1"); setNewColor(COLORS[0].hex); setNewImageUrl(""); setNewLinkUrl("");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add service");
@@ -189,6 +201,10 @@ export default function ServicesPage() {
                     <input value={editState.capacity} onChange={(e) => setEditState((p) => ({ ...p, capacity: e.target.value }))} placeholder={t.capacity} title={t.capacityHint} type="number" min="1" className="w-24 text-sm" />
                   </div>
                   <input value={editState.description} onChange={(e) => setEditState((p) => ({ ...p, description: e.target.value }))} placeholder={t.descriptionOptional} className="w-full text-sm mb-2" />
+                  <div className="flex gap-2 mb-2">
+                    <input value={editState.imageUrl} onChange={(e) => setEditState((p) => ({ ...p, imageUrl: e.target.value }))} placeholder={t.imageUrlOptional} dir="ltr" className="flex-1 min-w-32 text-sm" />
+                    <input value={editState.linkUrl} onChange={(e) => setEditState((p) => ({ ...p, linkUrl: e.target.value }))} placeholder={t.linkUrlOptional} dir="ltr" className="flex-1 min-w-32 text-sm" />
+                  </div>
                   <div className="flex items-center justify-between">
                     <ColorPicker value={editState.color} onChange={(hex) => setEditState((p) => ({ ...p, color: hex }))} />
                     <div className="flex gap-2">
@@ -199,9 +215,23 @@ export default function ServicesPage() {
                 </div>
               ) : (
                 <div key={s.id} className="flex items-center gap-3 px-4 py-3.5 group">
-                  <div className="w-2 h-9 rounded-full shrink-0" style={{ backgroundColor: s.color ?? "#1B7FA0" }} />
+                  {s.imageUrl ? (
+                    /* eslint-disable-next-line @next/next/no-img-element -- arbitrary owner-pasted URL, not a local/optimizable asset */
+                    <img src={s.imageUrl} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                  ) : (
+                    <div className="w-2 h-9 rounded-full shrink-0" style={{ backgroundColor: s.color ?? "#1B7FA0" }} />
+                  )}
                   <div className="flex-1 min-w-0">
-                    <div className="text-gray-800 font-medium text-sm">{s.name}</div>
+                    <div className="text-gray-800 font-medium text-sm flex items-center gap-1.5">
+                      {s.name}
+                      {s.linkUrl && (
+                        <a href={s.linkUrl} target="_blank" rel="noopener noreferrer" className="text-[#1B7FA0] hover:text-[#145F78]" title={s.linkUrl}>
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </a>
+                      )}
+                    </div>
                     {s.description && <div className="text-gray-600 text-xs truncate mt-0.5">{s.description}</div>}
                   </div>
                   <span
@@ -238,6 +268,10 @@ export default function ServicesPage() {
             <input placeholder={t.capacity} title={t.capacityHint} type="number" min="1" value={newCapacity} onChange={(e) => setNewCapacity(e.target.value)} className="w-28" />
           </div>
           <input placeholder={t.descriptionOptional} value={newDescription} onChange={(e) => setNewDescription(e.target.value)} className="w-full" />
+          <div className="flex gap-2">
+            <input placeholder={t.imageUrlOptional} value={newImageUrl} onChange={(e) => setNewImageUrl(e.target.value)} dir="ltr" className="flex-1 min-w-32" />
+            <input placeholder={t.linkUrlOptional} value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} dir="ltr" className="flex-1 min-w-32" />
+          </div>
           <div className="flex items-center justify-between mt-1">
             <ColorPicker value={newColor} onChange={setNewColor} />
             <button type="submit" disabled={adding} className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">

@@ -1160,6 +1160,8 @@ const serviceSchema = z.object({
   durationMin: z.number().int().positive(),
   color: z.string().optional(),
   capacity: z.number().int().min(1).max(500).optional(), // >1 = group class; omitted keeps default 1
+  imageUrl: z.string().optional(),
+  linkUrl: z.string().optional(),
 });
 
 businessRouter.get("/services", async (req: AuthedRequest, res) => {
