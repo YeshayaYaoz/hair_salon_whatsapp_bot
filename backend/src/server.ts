@@ -122,8 +122,14 @@ runTrackedJob("yieldCampaign", runYieldCampaignJob);
 
 // Deposit holds are short-lived (default 30 min) — check often so a slot isn't stuck blocked
 // long after the customer abandoned the payment link.
-const FIVE_MINUTES = 5 * 60 * 1000;
-setInterval(() => runTrackedJob("depositExpiry", runDepositExpiryJob), FIVE_MINUTES);
+//
+// Six minutes, not five: managed Postgres (Neon) suspends the compute after about five minutes
+// without a query, so a five-minute tick lands right on that boundary and can keep the database
+// awake around the clock — which is what exhausted a monthly compute allowance mid-month. The job
+// itself now skips the query entirely when no hold is due (see depositExpiryJob.ts), so this is
+// belt-and-braces; the cost is at most one extra minute before an abandoned hold frees its slot.
+const SIX_MINUTES = 6 * 60 * 1000;
+setInterval(() => runTrackedJob("depositExpiry", runDepositExpiryJob), SIX_MINUTES);
 runTrackedJob("depositExpiry", runDepositExpiryJob);
 
 const ONE_DAY = 24 * 60 * 60 * 1000;
