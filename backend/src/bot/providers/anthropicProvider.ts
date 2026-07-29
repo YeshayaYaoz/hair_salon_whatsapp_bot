@@ -22,6 +22,14 @@ const MODEL_SMART = "claude-sonnet-5";
  */
 const TEMPERATURE = 0.2;
 
+/** Keeps the HTTP status and model id in the message: a 404 (model not enabled for this account)
+ * and a 529 (overloaded) look identical once flattened to a bare string, but need opposite fixes. */
+function providerError(err: unknown, model: string): ProviderCallError {
+  const status = err instanceof APIError ? err.status : undefined;
+  const detail = err instanceof Error ? err.message : String(err);
+  return new ProviderCallError(`[${model}]${status ? ` HTTP ${status}` : ""} ${detail}`, false);
+}
+
 const RETRYABLE_STATUSES = new Set([408, 409, 429, 500, 502, 503, 529]);
 const RETRY_DELAY_MS = 700;
 
@@ -104,13 +112,13 @@ export const anthropicProvider: AiProvider = {
       return fromAnthropicResponse(await call());
     } catch (err) {
       const retryable = err instanceof APIError ? RETRYABLE_STATUSES.has(err.status ?? 0) : true;
-      if (!retryable) throw new ProviderCallError(err instanceof Error ? err.message : String(err), false);
+      if (!retryable) throw providerError(err, model);
       console.warn(`[anthropicProvider] call failed (${err instanceof APIError ? err.status : "network"}), retrying once...`);
       await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
       try {
         return fromAnthropicResponse(await call());
       } catch (err2) {
-        throw new ProviderCallError(err2 instanceof Error ? err2.message : String(err2), false);
+        throw providerError(err2, model);
       }
     }
   },

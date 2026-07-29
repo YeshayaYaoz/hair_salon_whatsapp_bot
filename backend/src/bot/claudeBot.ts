@@ -622,9 +622,29 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   try {
     response = await call(model);
   } catch (err) {
-    console.error(`[bot] ${provider.key} call failed:`, err instanceof ProviderCallError ? err.message : err);
+    // Fall back to the cheap tier before giving up. The smart tier used to be unreachable (the old
+    // chooseTier returned "cheap" on every path), so making it the default put every reply behind a
+    // model that had never actually served production traffic — and anything account-level, like the
+    // model not being enabled on this API key, then took the bot down completely rather than
+    // degrading it. A worse reply beats no reply.
+    const fallbackModel = provider.resolveModel("cheap", biz.aiModel);
+    const canFallBack = fallbackModel !== model;
+    console.error(
+      `[bot] ${provider.key} call failed on ${model}${canFallBack ? ` — falling back to ${fallbackModel}` : ""}:`,
+      err instanceof ProviderCallError ? err.message : err
+    );
     captureError(err, { businessId, customerPhone, model, provider: provider.key });
-    return { text: AI_UNAVAILABLE_HE };
+
+    if (!canFallBack) return { text: AI_UNAVAILABLE_HE };
+    try {
+      model = fallbackModel;
+      tier = "cheap";
+      response = await call(model);
+    } catch (fallbackErr) {
+      console.error(`[bot] fallback to ${model} also failed:`, fallbackErr instanceof ProviderCallError ? fallbackErr.message : fallbackErr);
+      captureError(fallbackErr, { businessId, customerPhone, model, provider: provider.key, phase: "cheap fallback" });
+      return { text: AI_UNAVAILABLE_HE };
+    }
   }
 
   let toolLoopCount = 0;
