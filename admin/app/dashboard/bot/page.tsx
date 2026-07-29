@@ -80,8 +80,8 @@ function VoicePhoneSection() {
       </div>
       <p className="text-xs text-gray-600 mb-4">
         {he
-          ? "מספר הטלפון שסופק ע\"י Cartesia עבור העסק שלך — שיחות נכנסות למספר הזה ייענו ע\"י הבוט הקולי."
-          : "The phone number Cartesia provisioned for your business — incoming calls to this number are answered by the voice bot."}
+          ? "מספר הטלפון שאליו שיחות נכנסות ייענו ע\"י הבוט הקולי. מתמלא אוטומטית עם מספר הוואטסאפ שלך בעת החיבור — ניתן לשנות ידנית אם יש לך מספר קולי נפרד."
+          : "The phone number incoming calls to are answered by the voice bot. Auto-filled with your WhatsApp number once connected — change it manually if you use a separate voice line."}
       </p>
       {current === undefined ? (
         <SkeletonCard lines={1} />

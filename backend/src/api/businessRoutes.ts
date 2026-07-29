@@ -361,7 +361,7 @@ businessRouter.post("/admin/businesses/:id/whatsapp", requireSuperAdmin, async (
   const parsed = adminWhatsappSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const business = await prisma.business.findUnique({ where: { id: req.params.id }, select: { id: true, name: true } });
+  const business = await prisma.business.findUnique({ where: { id: req.params.id }, select: { id: true, name: true, voicePhoneNumber: true } });
   if (!business) return res.status(404).json({ error: "Not found" });
 
   // Verify the token can actually read this phone number before persisting — catches a typo'd id,
@@ -380,14 +380,23 @@ businessRouter.post("/admin/businesses/:id/whatsapp", requireSuperAdmin, async (
     return res.status(502).json({ error: "Could not reach Meta to verify credentials — try again." });
   }
 
-  await prisma.business.update({
-    where: { id: business.id },
-    data: {
-      whatsappPhoneNumberId: parsed.data.phoneNumberId,
-      whatsappAccessToken: encryptSecret(parsed.data.accessToken),
-      whatsappTokenValid: true,
-    },
-  });
+  try {
+    await prisma.business.update({
+      where: { id: business.id },
+      data: {
+        whatsappPhoneNumberId: parsed.data.phoneNumberId,
+        whatsappAccessToken: encryptSecret(parsed.data.accessToken),
+        whatsappTokenValid: true,
+        ...(!business.voicePhoneNumber && displayNumber ? { voicePhoneNumber: displayNumber } : {}),
+      },
+    });
+  } catch (err: any) {
+    if (err?.code !== "P2002") throw err;
+    await prisma.business.update({
+      where: { id: business.id },
+      data: { whatsappPhoneNumberId: parsed.data.phoneNumberId, whatsappAccessToken: encryptSecret(parsed.data.accessToken), whatsappTokenValid: true },
+    });
+  }
   await logAdminAction({
     actorEmail: process.env.SUPER_ADMIN_EMAIL!,
     action: "connect_whatsapp",
@@ -982,7 +991,7 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
   // rate-limits registration attempts (133016), so we never re-register a working number.
   const existing = await prisma.business.findUniqueOrThrow({
     where: { id: req.businessId! },
-    select: { whatsappRegistrationPin: true, whatsappRegisteredAt: true, whatsappPhoneNumberId: true },
+    select: { whatsappRegistrationPin: true, whatsappRegisteredAt: true, whatsappPhoneNumberId: true, voicePhoneNumber: true },
   });
   const pin = existing.whatsappRegistrationPin ?? generateRegistrationPin();
   const alreadyRegistered = existing.whatsappRegisteredAt !== null && existing.whatsappPhoneNumberId === phone.id;
@@ -998,17 +1007,41 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
     }
   }
 
-  await prisma.business.update({
-    where: { id: req.businessId! },
-    data: {
-      whatsappPhoneNumberId: phone.id,
-      whatsappAccessToken: encryptSecret(userToken),
-      whatsappTokenValid: true,
-      whatsappRegistrationPin: pin,
-      whatsappRegisteredAt: registeredAt,
-      ...(wabaId ? { whatsappWabaId: wabaId } : {}),
-    },
-  });
+  try {
+    await prisma.business.update({
+      where: { id: req.businessId! },
+      data: {
+        whatsappPhoneNumberId: phone.id,
+        whatsappAccessToken: encryptSecret(userToken),
+        whatsappTokenValid: true,
+        whatsappRegistrationPin: pin,
+        whatsappRegisteredAt: registeredAt,
+        ...(wabaId ? { whatsappWabaId: wabaId } : {}),
+        // Most salons want one number for both channels — default the voice bot to the same number
+        // they just connected on WhatsApp, but only the first time: never override a number the
+        // owner already set manually via PUT /me/voice-phone.
+        ...(!existing.voicePhoneNumber && phone.display_phone_number ? { voicePhoneNumber: phone.display_phone_number } : {}),
+      },
+    });
+  } catch (err: any) {
+    // voicePhoneNumber is unique — in the rare case another business already claimed this exact
+    // number as their voice line, retry without it rather than failing the whole WhatsApp connect.
+    if (err?.code === "P2002") {
+      await prisma.business.update({
+        where: { id: req.businessId! },
+        data: {
+          whatsappPhoneNumberId: phone.id,
+          whatsappAccessToken: encryptSecret(userToken),
+          whatsappTokenValid: true,
+          whatsappRegistrationPin: pin,
+          whatsappRegisteredAt: registeredAt,
+          ...(wabaId ? { whatsappWabaId: wabaId } : {}),
+        },
+      });
+    } else {
+      throw err;
+    }
+  }
 
   res.json({ ok: true, phoneNumber: phone.display_phone_number, subscribed });
 });
