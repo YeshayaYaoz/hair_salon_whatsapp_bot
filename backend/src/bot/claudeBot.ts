@@ -594,7 +594,7 @@ async function makeApiCall(
   }
 }
 
-const AI_UNAVAILABLE_HE = "מצטערים, הבוט אינו זמין כרגע. אנא נסו שוב בעוד כמה דקות, או צרו קשר ישיר עם העסק.";
+const AI_UNAVAILABLE_HE = "מצטער, הבוט אינו זמין כרגע. נסה שוב בעוד כמה דקות, או צור קשר ישיר עם העסק.";
 
 export async function handleIncomingMessage(businessId: string, customerPhone: string, messageText: string): Promise<BotResult> {
   const systemText = await buildSystemPrompt(businessId, customerPhone);

@@ -29,7 +29,7 @@ export interface SeedService {
 export interface Vocabulary {
   customer: string; // singular, e.g. "לקוח" / "מטופל"
   customerPlural: string;
-  staff: string; // e.g. "מטפל/ת" / "רופא/ה"
+  staff: string; // e.g. "מטפל" / "רופא"
   service: string; // e.g. "טיפול" / "בדיקה"
 }
 
@@ -70,10 +70,10 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
     descriptionHe: "תספורות, צבע, פן וטיפולי שיער. תזכורות יום לפני ובקשת ביקורת אחרי הביקור.",
     presets: {
       botPersonality:
-        "דבר/י בטון חברותי, חם ועדכני. השתמש/י באימוג'ים במידה. הלקוחות מגיעים לפינוק — תעביר/י תחושה נעימה ומזמינה.",
+        "דבר בטון חברותי, חם ועדכני. השתמש באימוג'ים במידה. הלקוחות מגיעים לפינוק — תעביר תחושה נעימה ומזמינה.",
       cancellationPolicy:
         "ניתן לבטל או לשנות תור עד 24 שעות מראש ללא עלות. ביטול מאוחר יותר עלול להיות כרוך בחיוב.",
-      referralText: "אהבת/ה? ספר/י לחברים — קבל/י הנחה על הביקור הבא כשחבר/ה מגיע/ה בהמלצתך 💇",
+      referralText: "אהבת? ספר לחברים — קבל הנחה על הביקור הבא כשחבר מגיע בהמלצתך 💇",
       remindersEnabled: true,
       reviewsEnabled: true,
       digestEnabled: true,
@@ -88,7 +88,7 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
       { name: "צבע", durationMin: 90, priceCents: 25000, color: "#ec4899" },
       { name: "פן", durationMin: 45, priceCents: 12000, color: "#f59e0b" },
     ],
-    vocabulary: { customer: "לקוח", customerPlural: "לקוחות", staff: "מספר/ית", service: "טיפול" },
+    vocabulary: { customer: "לקוח", customerPlural: "לקוחות", staff: "ספר", service: "טיפול" },
   },
 
   barber: {
@@ -99,7 +99,7 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
     descriptionHe: "תספורות גברים, זקן וגילוח. מהיר, ישיר, עם תזכורות יום לפני.",
     presets: {
       botPersonality:
-        "דבר/י בטון ישיר, קליל וחברי. תכל'ס ולעניין, בלי יותר מדי מילים. הלקוחות רוצים לקבוע מהר ולזוז.",
+        "דבר בטון ישיר, קליל וחברי. תכל'ס ולעניין, בלי יותר מדי מילים. הלקוחות רוצים לקבוע מהר ולזוז.",
       cancellationPolicy: "אפשר לבטל או להזיז תור עד 12 שעות מראש. ביטול של הרגע האחרון פוגע בתור של מישהו אחר.",
       referralText: "מרוצה? תביא חבר וקבל הנחה על הבא בתור ✂️",
       remindersEnabled: true,
@@ -127,7 +127,7 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
     descriptionHe: "בדיקות, ייעוצים וטיפולים. טון מקצועי ודיסקרטי, תזכורות עם הנחיות הכנה, ותשלום על אי-הגעה.",
     presets: {
       botPersonality:
-        "דבר/י בטון רגוע, מקצועי ודיסקרטי. שמור/י על פרטיות המטופל, הימנע/י משאלות רפואיות מפורטות, והפנה/י לצוות בכל מקרה שאינו קביעת/שינוי תור.",
+        "דבר בטון רגוע, מקצועי ודיסקרטי. שמור על פרטיות המטופל, הימנע משאלות רפואיות מפורטות, והפנה לצוות בכל מקרה שאינו קביעה או שינוי של תור.",
       cancellationPolicy:
         "ביטול עד 48 שעות מראש ללא עלות. אי-הגעה או ביטול מאוחר עלולים להיות כרוכים בדמי ביטול.",
       referralText: "",
@@ -145,7 +145,7 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
       { name: "בדיקה", durationMin: 20, priceCents: 25000, color: "#22c55e" },
       { name: "טיפול המשך", durationMin: 45, priceCents: 40000, color: "#6366f1" },
     ],
-    vocabulary: { customer: "מטופל", customerPlural: "מטופלים", staff: "רופא/ה", service: "בדיקה" },
+    vocabulary: { customer: "מטופל", customerPlural: "מטופלים", staff: "רופא", service: "בדיקה" },
   },
 
   aesthetics: {
@@ -156,9 +156,9 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
     descriptionHe: "טיפולי פנים, לייזר וקוסמטיקה. טון מלוטש ואכפתי, תזכורות עם הנחיות הכנה ומקדמה קטנה.",
     presets: {
       botPersonality:
-        "דבר/י בטון מלוטש, אכפתי ומרגיע. הדגש/י תוצאה ופינוק, והקפד/י על מקצועיות. במידת הצורך ציין/י הנחיות הכנה לטיפול.",
+        "דבר בטון מלוטש, אכפתי ומרגיע. הדגש תוצאה ופינוק, והקפד על מקצועיות. במידת הצורך ציין הנחיות הכנה לטיפול.",
       cancellationPolicy: "ניתן לבטל או לשנות תור עד 48 שעות מראש. ביטול מאוחר יותר עלול להיות כרוך בדמי ביטול.",
-      referralText: "אהבת/ה את התוצאה? הזמיני חברה וקבלו שתיכן הנחה על הטיפול הבא ✨",
+      referralText: "אהבת את התוצאה? הזמיני חברה וקבלו שתיכן הנחה על הטיפול הבא ✨",
       remindersEnabled: true,
       reviewsEnabled: true,
       digestEnabled: true,
@@ -184,7 +184,7 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
     descriptionHe: "אירוח ולינה. הבוט מוסר מחירים וזמינות כללית, וכשאורח רוצה להזמין — שולח לך התראה עם המספר לחזור אליו (ללא קביעת הזמנה אוטומטית).",
     presets: {
       botPersonality:
-        "דבר/י בטון חם, מסביר פנים ואירוחי. גרום/גרמי לאורח להרגיש רצוי. מסור/מסרי מידע על היחידות והמחירים, וכשמבקשים להזמין — אסוף/אספי פרטים והעבר/העבירי למארח.",
+        "דבר בטון חם, מסביר פנים ואירוחי. גרום לאורח להרגיש רצוי. מסור מידע על היחידות והמחירים, וכשמבקשים להזמין — אסוף פרטים והעבר למארח.",
       cancellationPolicy: "מדיניות הביטול נמסרת על ידי המארח בעת אישור ההזמנה.",
       referralText: "",
       remindersEnabled: false,
@@ -201,7 +201,7 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
       { name: "לילה — יחידה משפחתית", durationMin: 1440, priceCents: 130000, color: "#22c55e" },
       { name: "חבילת סוף שבוע (2 לילות)", durationMin: 2880, priceCents: 170000, color: "#f59e0b" },
     ],
-    vocabulary: { customer: "אורח", customerPlural: "אורחים", staff: "המארח/ת", service: "יחידת אירוח" },
+    vocabulary: { customer: "אורח", customerPlural: "אורחים", staff: "המארח", service: "יחידת אירוח" },
   },
 };
 
