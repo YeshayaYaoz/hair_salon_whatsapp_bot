@@ -9,12 +9,12 @@ import { SkeletonRow } from "../../lib/Skeleton";
 // (similar chroma/lightness) so any combination of service tags looks intentional, not like a
 // crayon box. Named for what they read as, not by CSS keyword.
 const COLORS = [
-  { hex: "#1B7FA0", name: "תכלת (ברירת מחדל)" }, // brand teal
-  { hex: "#7C6FDB", name: "לילך" },
-  { hex: "#D4708A", name: "אשכולית" },
-  { hex: "#C99A3E", name: "זהב" },
-  { hex: "#3FA98A", name: "אזמרגד" },
-  { hex: "#5B7FBF", name: "אינדיגו" },
+  { hex: "#1B7FA0", he: "תכלת (ברירת מחדל)", en: "Teal (default)" }, // brand teal
+  { hex: "#7C6FDB", he: "לילך", en: "Lilac" },
+  { hex: "#D4708A", he: "אשכולית", en: "Grapefruit" },
+  { hex: "#C99A3E", he: "זהב", en: "Gold" },
+  { hex: "#3FA98A", he: "אזמרגד", en: "Emerald" },
+  { hex: "#5B7FBF", he: "אינדיגו", en: "Indigo" },
 ];
 
 interface Service {
@@ -41,7 +41,7 @@ interface EditState {
 }
 
 export default function ServicesPage() {
-  const { t, businessType } = useLanguage();
+  const { t, lang, businessType } = useLanguage();
   // Overnight verticals price by night, not by the minute. Duration is still STORED in minutes
   // (the slot engine's unit, shared by every vertical) — only the input is expressed in nights
   // and converted at the boundary, so nothing downstream needs a special case.
@@ -49,7 +49,7 @@ export default function ServicesPage() {
   const MIN_PER_NIGHT = 1440;
   const toDurationInput = (min: number) => String(overnight ? Math.max(1, Math.round(min / MIN_PER_NIGHT)) : min);
   const fromDurationInput = (v: string) => (overnight ? Math.max(1, Number(v) || 1) * MIN_PER_NIGHT : Number(v));
-  const durationLabel = overnight ? "לילות" : t.duration;
+  const durationLabel = overnight ? t.durationNights : t.duration;
   const [services, setServices] = useState<Service[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -153,7 +153,7 @@ export default function ServicesPage() {
             <button
               key={c.hex}
               type="button"
-              title={c.name}
+              title={lang === "he" ? c.he : c.en}
               onClick={() => onChange(c.hex)}
               className="relative w-7 h-7 rounded-full transition-transform hover:scale-110"
               style={{
@@ -252,7 +252,7 @@ export default function ServicesPage() {
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    {overnight ? toDurationInput(s.durationMin) + ' ל׳' : s.durationMin + '′'}
+                    {overnight ? `${toDurationInput(s.durationMin)} ${t.nightsAbbrev}` : `${s.durationMin}′`}
                   </span>
                   <div className="flex gap-1 shrink-0">
                     <button onClick={() => startEdit(s)} className="text-xs text-gray-600 hover:text-[#1B7FA0] transition px-2 py-1 rounded hover:bg-[#E0F5FB]">{t.edit}</button>

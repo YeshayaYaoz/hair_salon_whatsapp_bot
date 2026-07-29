@@ -28,7 +28,7 @@ export default function WaitlistPage() {
   }
 
   useEffect(() => {
-    load().catch((e) => setError(e instanceof Error ? e.message : "שגיאה בטעינה"));
+    load().catch((e) => setError(e instanceof Error ? e.message : lang === "he" ? "שגיאה בטעינה" : "Failed to load"));
   }, []);
 
   async function markNotified(id: string) {
@@ -38,7 +38,7 @@ export default function WaitlistPage() {
       await apiFetch(`/api/business/waitlist/${id}/notify`, { method: "PATCH" });
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "הפעולה נכשלה");
+      setError(e instanceof Error ? e.message : lang === "he" ? "הפעולה נכשלה" : "Action failed");
     } finally {
       setLoadingId(null);
     }
@@ -51,7 +51,7 @@ export default function WaitlistPage() {
       await apiFetch(`/api/business/waitlist/${id}`, { method: "DELETE" });
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "הפעולה נכשלה");
+      setError(e instanceof Error ? e.message : lang === "he" ? "הפעולה נכשלה" : "Action failed");
     } finally {
       setLoadingId(null);
     }

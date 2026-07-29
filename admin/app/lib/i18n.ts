@@ -37,6 +37,7 @@ const translations = {
     // Services
     servicesTitle: "Pricing & Services", addService: "Add a service",
     serviceName: "Service name", price: "Price (₪)", duration: "Duration (min)",
+    durationNights: "Nights", nightsAbbrev: "n",
     capacity: "Spots", capacityHint: "How many people can book the same slot (1 = a normal 1:1 appointment; higher = a group class)",
     descriptionOptional: "Description (optional)",
     imageUrlOptional: "Photo link (optional)",
@@ -175,6 +176,7 @@ const translations = {
     // Services
     servicesTitle: "מחירים ושירותים", addService: "הוספת שירות",
     serviceName: "שם השירות", price: "מחיר (₪)", duration: "משך (דקות)",
+    durationNights: "לילות", nightsAbbrev: "ל׳",
     capacity: "מקומות", capacityHint: "כמה אנשים יכולים להזמין את אותו מועד (1 = תור רגיל אחד-על-אחד; יותר = שיעור קבוצתי)",
     descriptionOptional: "תיאור (לא חובה)",
     imageUrlOptional: "קישור לתמונה (לא חובה)",
