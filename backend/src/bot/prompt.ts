@@ -107,6 +107,14 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
     ? `\nמדיניות ביטולים: ${business.cancellationPolicy}\nכאשר לקוח מבטל תור — הזכר את המדיניות בנימוס.\n`
     : "";
 
+  // Prices are quoted, never computed. Real pricing here is not linear — a 2-night package can
+  // cost less than 2x the nightly rate, and some seasons/dates are excluded entirely — so any
+  // total the model derives itself is likely to be confidently wrong and quoted to a customer as
+  // fact. The rule below is deliberately absolute: quote a listed price, or defer to the owner.
+  const pricingNote = `\nכלל מחירים מחייב: מסור אך ורק מחירים שמופיעים ברשימה למטה, בדיוק כפי שהם כתובים. אסור לך לחשב מחירים בעצמך — אל תכפיל מחיר ללילה במספר לילות, אל תחבר ואל תיתן הנחה. אם הלקוח מבקש שילוב שלא מופיע ברשימה (למשל מספר לילות אחר, חג, או תאריך מיוחד) — אמור שהמחיר המדויק ייקבע מול בעל העסק ואל תנקוב בסכום.${
+    business.pricingNotes ? `\nכללי תמחור נוספים שחשוב למסור כשרלוונטי: ${business.pricingNotes}` : ""
+  }\n`;
+
   // Vertical vocabulary: tell the bot which words to use for this business's category, so a clinic
   // bot says "מטופל" and a B&B bot wouldn't say "לקוח" like a salon. Falls back to generic terms
   // when no category was chosen.
@@ -192,7 +200,7 @@ ${dateTable}
 כשאתה מתייחס לעצמך, כתוב תמיד בלשון זכר יחיד ("אני מצטער", לא "מצטערים" או "מצטער/ת"). אל תשתמש בצורות עם לוכסן ("בעל/ת", "ישמע/ת" וכדומה) — אלה לא נשמעות טבעי בכתיבה. כתוב עברית פשוטה, טבעית וישירה, כמו שבן אדם באמת כותב בוואטסאפ — לא ניסוח מתורגם או מסורבל.
 כלל חשוב: השתמש רק במילים עבריות אמיתיות וקיימות. אל תמציא הטיות. אם אתה לא בטוח איך נוטה מילה — בחר ניסוח פשוט יותר במקום לנחש. דוגמאות לשגיאות אמיתיות שקרו ואסור לחזור עליהן: "יתאשר" (הנכון: "יאשר"), "משתניים" (הנכון: "מהשתיים" או "משתיהן"). עדיף משפט פשוט ונכון על פני משפט מתוחכם ושגוי.
 אם לשירות ברשימה למטה יש "תמונה" או "מידע נוסף" — שלח את הקישור כשהלקוח שואל על אותו שירות/יחידה, מבקש לראות תמונות, או כשזה טבעי בהקשר השיחה (למשל בהצגת אפשרויות).
-${cancellationNote}${vocabNote}${personalityNote}${greeting}${crmNote}
+${cancellationNote}${pricingNote}${vocabNote}${personalityNote}${greeting}${crmNote}
 שירותים ומחירים:
 ${servicesText}
 

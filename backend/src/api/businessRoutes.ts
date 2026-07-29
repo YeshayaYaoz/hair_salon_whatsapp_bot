@@ -511,6 +511,7 @@ const profileSchema = z.object({
   depositAmountIls: z.number().int().nonnegative().max(100000).optional(),
   depositHoldMinutes: z.number().int().min(5).max(1440).optional(),
   availabilityInfo: z.string().max(600).optional(),
+  pricingNotes: z.string().max(600).optional(),
   aiProvider: z.enum(AI_PROVIDER_KEYS).optional(),
   aiModel: z.string().max(100).nullable().optional(),
 });

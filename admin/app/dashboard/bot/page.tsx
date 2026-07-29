@@ -16,6 +16,7 @@ interface BotProfile {
   referralText?: string;
   digestEnabled?: boolean;
   availabilityInfo?: string;
+  pricingNotes?: string;
   aiProvider?: string;
   aiModel?: string | null;
 }
@@ -138,7 +139,7 @@ export default function BotPage() {
     botGreeting: "", botPersonality: "",
     remindersEnabled: true, reviewsEnabled: true,
     cancellationPolicy: "", referralText: "", digestEnabled: true, availabilityInfo: "",
-    aiProvider: "anthropic", aiModel: null,
+    pricingNotes: "", aiProvider: "anthropic", aiModel: null,
   });
   const [bookingModel, setBookingModel] = useState<string>("slot");
   const [botEnabled, setBotEnabled] = useState(true);
@@ -160,6 +161,7 @@ export default function BotPage() {
         referralText: me.referralText ?? "",
         digestEnabled: me.digestEnabled ?? true,
         availabilityInfo: me.availabilityInfo ?? "",
+        pricingNotes: me.pricingNotes ?? "",
         aiProvider: me.aiProvider ?? "anthropic",
         aiModel: me.aiModel ?? null,
       });
@@ -340,6 +342,26 @@ export default function BotPage() {
               placeholder={he ? "לדוגמה: ביטול עד 24 שעות מראש ללא עלות." : "e.g. Free cancellation up to 24h in advance."}
               value={fields.cancellationPolicy}
               onChange={(e) => set("cancellationPolicy", e.target.value)}
+              className="w-full"
+            />
+          </Field>
+          <Field
+            label={he ? "כללי תמחור והחרגות" : "Pricing rules & exclusions"}
+            hint={
+              he
+                ? "כל מה שלא נכנס למחיר בודד ברשימת המחירים: חבילות, עונות שבהן אין הנחה, ותאריכים שלא כלולים. הבוט לעולם לא מחשב מחירים בעצמו — הוא מוסר רק מחירים שרשומים, ולכל דבר אחר מפנה אליך."
+                : "Anything a single listed price can't express: packages, seasons where a discount doesn't apply, excluded dates. The bot never calculates prices itself — it quotes only listed prices and defers everything else to you."
+            }
+          >
+            <textarea
+              rows={3}
+              placeholder={
+                he
+                  ? 'לדוגמה: בבין הזמנים המחיר מלא לכל לילה. המחירים לא כוללים ראש השנה ול"ג בעומר.'
+                  : "e.g. Peak season is full price per night. Prices exclude holidays."
+              }
+              value={fields.pricingNotes}
+              onChange={(e) => set("pricingNotes", e.target.value)}
               className="w-full"
             />
           </Field>
