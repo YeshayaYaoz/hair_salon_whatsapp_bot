@@ -1,6 +1,7 @@
 import type { StaffMember, Appointment } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { zonedWallTimeToUtc, parseDateString, dayOfWeekForDate, instantPartsInTz } from "../lib/timezone.js";
+import { noteDepositHoldCreated } from "../lib/depositExpiryJob.js";
 
 const SLOT_STEP_MIN = 30;
 
@@ -186,7 +187,7 @@ export async function createAppointment(params: {
     if (overlap) throw new SlotUnavailableError();
   }
 
-  return prisma.appointment.create({
+  const appointment = await prisma.appointment.create({
     data: {
       businessId: params.businessId,
       customerId: customer.id,
@@ -199,6 +200,12 @@ export async function createAppointment(params: {
       ...(params.depositExpiresAt ? { depositExpiresAt: params.depositExpiresAt } : {}),
     },
   });
+
+  // Tell the expiry job when to wake, so it can skip the database on every other tick — see the
+  // nextExpiryAt comment in depositExpiryJob.ts for why that matters on usage-billed Postgres.
+  if (params.depositExpiresAt) noteDepositHoldCreated(params.depositExpiresAt);
+
+  return appointment;
 }
 
 /** Attaches the generated payment link to a pending-deposit appointment, once we have it. */
