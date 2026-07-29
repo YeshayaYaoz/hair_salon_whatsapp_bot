@@ -20,9 +20,9 @@ async function resendSend(payload: { from: string; to: string; subject: string; 
 
 export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   await resendSend({
-    from: "תורי <noreply@torionline.com>",
+    from: "תורי-אונליין <noreply@torionline.com>",
     to,
-    subject: "איפוס סיסמה — תורי",
+    subject: "איפוס סיסמה — תורי-אונליין",
     html: `
       <div dir="rtl" style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#09090b;color:#e4e4e7;border-radius:12px;">
         <h2 style="color:#fff;margin-bottom:8px;">איפוס סיסמה</h2>
@@ -36,9 +36,9 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string) {
 
 export async function sendWhatsAppTokenExpiredEmail(to: string, businessName: string) {
   await resendSend({
-    from: "תורי <noreply@torionline.com>",
+    from: "תורי-אונליין <noreply@torionline.com>",
     to,
-    subject: "⚠️ חיבור הוואטסאפ נותק — תורי",
+    subject: "⚠️ חיבור הוואטסאפ נותק — תורי-אונליין",
     html: `
       <div dir="rtl" style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#09090b;color:#e4e4e7;border-radius:12px;">
         <h2 style="color:#fff;margin-bottom:8px;">חיבור הוואטסאפ של ${businessName} נותק</h2>
@@ -55,7 +55,7 @@ export async function sendAdminAlertEmail(subject: string, bodyHtml: string) {
   const adminEmail = process.env.SUPER_ADMIN_EMAIL;
   if (!adminEmail) return; // no admin configured — nothing to alert
   await resendSend({
-    from: "תורי <noreply@torionline.com>",
+    from: "תורי-אונליין <noreply@torionline.com>",
     to: adminEmail,
     subject,
     html: `
@@ -71,7 +71,7 @@ export async function sendAdminAlertEmail(subject: string, bodyHtml: string) {
  * admin panel's "send message" action has no WhatsApp number to fall back to. */
 export async function sendBusinessNoticeEmail(to: string, businessName: string, text: string) {
   await resendSend({
-    from: "תורי <noreply@torionline.com>",
+    from: "תורי-אונליין <noreply@torionline.com>",
     to,
     subject: `הודעה מ-Tori עבור ${businessName}`,
     html: `
@@ -87,12 +87,12 @@ export async function sendBusinessNoticeEmail(to: string, businessName: string, 
  * same token flow as forgot-password) to claim the account. */
 export async function sendTrialAccountCreatedEmail(to: string, businessName: string, setPasswordUrl: string) {
   await resendSend({
-    from: "תורי <noreply@torionline.com>",
+    from: "תורי-אונליין <noreply@torionline.com>",
     to,
-    subject: `${businessName} — הצטרפות לתורי`,
+    subject: `${businessName} — הצטרפות לתורי-אונליין`,
     html: `
       <div dir="rtl" style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#09090b;color:#e4e4e7;border-radius:12px;">
-        <h2 style="color:#fff;margin-bottom:8px;">פתחנו לך חשבון ניסיון בתורי!</h2>
+        <h2 style="color:#fff;margin-bottom:8px;">פתחנו לך חשבון ניסיון בתורי-אונליין!</h2>
         <p style="color:#a1a1aa;margin-bottom:24px;">כדי להתחיל להשתמש בבוט הוואטסאפ שינהל את התורים של ${businessName}, קבע/י סיסמה לחשבון:</p>
         <a href="${setPasswordUrl}" style="display:inline-block;background:#7c3aed;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;">קביעת סיסמה והתחלה</a>
         <p style="color:#71717a;margin-top:24px;font-size:13px;">הקישור תקף ל-7 ימים.</p>
@@ -109,7 +109,7 @@ export async function sendOutreachEmail(to: string, subject: string, bodyText: s
     .map((para) => `<p style="margin:0 0 14px;">${para.replace(/\n/g, "<br/>")}</p>`)
     .join("");
   await resendSend({
-    from: "תורי <noreply@torionline.com>",
+    from: "תורי-אונליין <noreply@torionline.com>",
     to,
     subject,
     html: `<div dir="rtl" style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:8px;color:#1a1a1a;font-size:14px;line-height:1.6;">${bodyHtml}</div>`,
@@ -118,12 +118,12 @@ export async function sendOutreachEmail(to: string, subject: string, bodyText: s
 
 export async function sendWelcomeEmail(to: string, name: string) {
   await resendSend({
-    from: "תורי <noreply@torionline.com>",
+    from: "תורי-אונליין <noreply@torionline.com>",
     to,
-    subject: "ברוך הבא לתורי!",
+    subject: "ברוך הבא לתורי-אונליין!",
     html: `
       <div dir="rtl" style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#09090b;color:#e4e4e7;border-radius:12px;">
-        <h2 style="color:#fff;margin-bottom:8px;">ברוך הבא לתורי, ${name}!</h2>
+        <h2 style="color:#fff;margin-bottom:8px;">ברוך הבא לתורי-אונליין, ${name}!</h2>
         <p style="color:#a1a1aa;margin-bottom:16px;">החשבון שלך נוצר בהצלחה. הנה מה שצריך לעשות כדי להפעיל את הבוט:</p>
         <ol style="color:#a1a1aa;margin:0 0 24px;padding-right:20px;line-height:2;">
           <li>הוסף שירותים בדשבורד</li>
