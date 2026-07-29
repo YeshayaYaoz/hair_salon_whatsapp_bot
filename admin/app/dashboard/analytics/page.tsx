@@ -42,7 +42,7 @@ function StatCard({
       <div className="flex items-center justify-between">
         <span
           className="text-xs font-semibold tracking-wide uppercase"
-          style={{ color: "#9CA3AF", letterSpacing: "0.08em" }}
+          style={{ color: "#6B7280", letterSpacing: "0.08em" }}
         >
           {label}
         </span>
@@ -60,7 +60,7 @@ function StatCard({
       </div>
       <div>
         <p className="text-3xl font-extrabold text-gray-900 tracking-tight leading-none">{value}</p>
-        {sub && <p className="text-xs mt-1.5" style={{ color: "#9CA3AF" }}>{sub}</p>}
+        {sub && <p className="text-xs mt-1.5" style={{ color: "#6B7280" }}>{sub}</p>}
       </div>
     </div>
   );
@@ -124,7 +124,7 @@ export default function AnalyticsPage() {
       <div className="animate-fade-in">
         <div className="mb-8">
           <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">{t.analyticsTitle}</h1>
-          <p className="text-sm mt-1" style={{ color: "#9CA3AF" }}>{t.analyticsSubtitle}</p>
+          <p className="text-sm mt-1" style={{ color: "#6B7280" }}>{t.analyticsSubtitle}</p>
         </div>
         <SkeletonCard lines={3} />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-8">
@@ -148,7 +148,7 @@ export default function AnalyticsPage() {
         <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">
           {greetingFor(lang)}{businessName ? `, ${businessName}` : ""} 👋
         </h1>
-        <p className="text-sm mt-1" style={{ color: "#9CA3AF" }}>
+        <p className="text-sm mt-1" style={{ color: "#6B7280" }}>
           {new Date().toLocaleDateString(lang === "he" ? "he-IL" : "en-US", { weekday: "long", day: "numeric", month: "long" })}
           {" · "}
           {todayAppts.length === 0
@@ -170,7 +170,7 @@ export default function AnalyticsPage() {
         {todayAppts.length === 0 ? (
           <div className="text-center py-8">
             <div className="text-3xl mb-2">🗓️</div>
-            <p className="text-sm" style={{ color: "#9CA3AF" }}>
+            <p className="text-sm" style={{ color: "#6B7280" }}>
               {lang === "he" ? "אין תורים מתוזמנים להיום" : "No appointments scheduled today"}
             </p>
           </div>
@@ -187,7 +187,7 @@ export default function AnalyticsPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{a.customer.name || a.customer.phone}</p>
-                  <p className="text-xs truncate" style={{ color: "#9CA3AF" }}>{a.service.name}</p>
+                  <p className="text-xs truncate" style={{ color: "#6B7280" }}>{a.service.name}</p>
                 </div>
               </div>
             ))}
@@ -293,7 +293,7 @@ export default function AnalyticsPage() {
         >
           <h2 className="text-sm font-semibold text-gray-900 mb-5">{t.topServices}</h2>
           {data.topServices.length === 0 ? (
-            <p className="text-sm" style={{ color: "#9CA3AF" }}>{t.noBookings}</p>
+            <p className="text-sm" style={{ color: "#6B7280" }}>{t.noBookings}</p>
           ) : (
             <div className="flex flex-col gap-4">
               {data.topServices.map(({ name, count }, i) => {

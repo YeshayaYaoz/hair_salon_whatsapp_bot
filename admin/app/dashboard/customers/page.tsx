@@ -160,7 +160,7 @@ function ConversationPanel({
                 {he ? "השתקת בוט" : "Mute bot"}
               </button>
             )}
-            <button onClick={onClose} className="text-gray-600 hover:text-gray-600 transition p-1">
+            <button onClick={onClose} aria-label={he ? "סגירה" : "Close"} className="text-gray-600 hover:text-gray-900 transition p-1">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -290,7 +290,7 @@ function BulkMessageModal({ customers, onClose, onSent }: { customers: Customer[
             <h2 className="text-sm font-semibold text-gray-900">{he ? "הודעה קבוצתית" : "Bulk message"}</h2>
             <p className="text-xs text-gray-600">{he ? `אל ${customers.length} לקוחות` : `To ${customers.length} customers`}</p>
           </div>
-          <button onClick={onClose} className="text-gray-600 hover:text-gray-600 transition">
+          <button onClick={onClose} aria-label={he ? "סגירה" : "Close"} className="text-gray-600 hover:text-gray-900 transition">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>

@@ -31,12 +31,19 @@ export function Section({ title, description, children }: { title: string; descr
   );
 }
 
+/**
+ * The label wraps the control rather than sitting beside it. Previously it was a sibling <label>
+ * with no htmlFor and no id on the input, so the two were never associated — every settings field
+ * in the dashboard was announced by screen readers as an unlabelled text box, with the visible
+ * label read as loose text somewhere nearby. Nesting the control gives implicit association with
+ * no id plumbing through arbitrary children, and as a bonus makes the label text click-to-focus.
+ */
 export function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1.5">{label}</label>
+    <label className="block">
+      <span className="block text-xs font-medium text-gray-600 mb-1.5">{label}</span>
       {children}
-      {hint && <p className="text-xs text-zinc-600 mt-1">{hint}</p>}
-    </div>
+      {hint && <span className="block text-xs text-zinc-600 mt-1">{hint}</span>}
+    </label>
   );
 }

@@ -48,7 +48,9 @@ const NAV_GROUPS: { titleKey: keyof ReturnType<typeof useLanguage>["t"]["navGrou
   { titleKey: "operations", items: [
     { href: "/dashboard/appointments", key: "appointments", icon: ICONS.appointments },
     { href: "/dashboard/customers", key: "customers", icon: ICONS.customers },
-    { href: "/dashboard/waitlist", key: "waitlist", icon: ICONS.waitlist },
+    // Inquiry mode has no add_to_waitlist tool (see bot/claudeBot.ts inquiryTools), so this page
+    // can never be anything but empty for an overnight rental.
+    { href: "/dashboard/waitlist", key: "waitlist", icon: ICONS.waitlist, hideFor: ["bnb"] },
   ] },
   { titleKey: "business", items: [
     { href: "/dashboard/services", key: "services", icon: ICONS.services },
@@ -359,14 +361,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               key={item.href}
               href={item.href}
               className="flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition"
-              style={{ color: active ? "#1B7FA0" : "#9CA3AF" }}
+              style={{ color: active ? "#1B7FA0" : "#6B7280" }}
             >
               <svg
                 className="w-5 h-5 transition"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
-                style={{ color: active ? "#1B7FA0" : "#9CA3AF" }}
+                style={{ color: active ? "#1B7FA0" : "#6B7280" }}
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.5 : 1.75} d={item.icon} />
               </svg>
@@ -381,7 +383,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           type="button"
           onClick={() => setMoreOpen((v) => !v)}
           className="flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition"
-          style={{ color: moreOpen || moreActive ? "#1B7FA0" : "#9CA3AF" }}
+          style={{ color: moreOpen || moreActive ? "#1B7FA0" : "#6B7280" }}
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 6h16M4 12h16M4 18h16" />

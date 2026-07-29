@@ -31,6 +31,41 @@
     transition-property: color, background-color, border-color, opacity, box-shadow, transform;
     transition-duration: 150ms;
   }
+
+  /* Keyboard focus was invisible everywhere outside the login page: `outline-none` is set on every
+     input above, and buttons/links had no focus style at all, so a keyboard or switch-control user
+     had no way to tell where they were. :focus-visible (not :focus) means pointer users never see
+     a ring on click — only keyboard navigation surfaces it. */
+  a:focus-visible,
+  button:focus-visible,
+  [role="switch"]:focus-visible,
+  [tabindex]:not([tabindex="-1"]):focus-visible {
+    outline: 2px solid #1B7FA0;
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  input:focus-visible, textarea:focus-visible, select:focus-visible {
+    border-color: #1B7FA0;
+    /* Thicker than the :focus ring above so keyboard focus stays distinguishable from a click. */
+    box-shadow: 0 0 0 3px rgba(27,127,160,0.28);
+  }
+
+  /* Placeholder text at gray-400 sits near 2.5:1 on white — under the 4.5:1 WCAG AA needs. It
+     carries real instructions here (formats, examples), so it has to be legible, not decorative. */
+  input::placeholder, textarea::placeholder {
+    color: #6B7280;
+  }
+
+  /* Respect an OS-level request to reduce motion: the dashboard leans on staggered fade-ups, and
+     for motion-sensitive users those are a symptom trigger, not polish. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 @layer utilities {
