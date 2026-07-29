@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch, setToken } from "../lib/api";
+import { apiFetch, setToken, friendlyError } from "../lib/api";
 import { useLanguage } from "../lib/LanguageContext";
 
 export default function LoginPage() {
@@ -18,6 +18,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set alongside `error` when the failure has a known one-click fix — "wrong password" often
+  // really means "you never signed up", and "email taken" often means "you already have an
+  // account". Rather than make people guess, offer the other mode directly.
+  const [switchHint, setSwitchHint] = useState<"try-signup" | "try-login" | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -30,6 +34,7 @@ export default function LoginPage() {
     setMode(next);
     setSignupStep(1);
     setError(null);
+    setSwitchHint(null);
   }
 
   // Step 1 → 2: validate credentials client-side before advancing so the user doesn't fill in
@@ -37,6 +42,7 @@ export default function LoginPage() {
   function continueToBusinessStep(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setSwitchHint(null);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setError(he ? "כתובת אימייל לא תקינה" : "Invalid email address");
       return;
@@ -51,6 +57,7 @@ export default function LoginPage() {
   async function signInWithGoogle() {
     setGoogleLoading(true);
     setError(null);
+    setSwitchHint(null);
     try {
       const { url } = await apiFetch<{ url: string }>("/api/auth/google/url");
       window.location.href = url;
@@ -64,6 +71,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSwitchHint(null);
     try {
       const path = mode === "login" ? "/api/auth/login" : "/api/auth/signup";
       const body = mode === "login" ? { email, password } : { name, email, password };
@@ -71,7 +79,16 @@ export default function LoginPage() {
       setToken(token);
       router.push("/dashboard/analytics");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      const message = err instanceof Error ? err.message : "Something went wrong";
+      setError(message);
+      // "Wrong password" on login is very often actually "never signed up" — and "email taken"
+      // on signup is very often "already have an account". Point people at the fix instead of
+      // leaving them to retype the same thing that just failed.
+      if (mode === "login" && message === friendlyError("Invalid credentials")) {
+        setSwitchHint("try-signup");
+      } else if (mode === "signup" && message === friendlyError("Email already registered")) {
+        setSwitchHint("try-login");
+      }
     } finally {
       setLoading(false);
     }
@@ -466,11 +483,19 @@ export default function LoginPage() {
         }
 
         .login-error {
-          display: flex; align-items: center; gap: 8px;
+          display: flex; align-items: flex-start; gap: 8px;
           background: #FEF2F2; border: 1px solid #FECACA;
           border-radius: 10px; padding: 11px 14px;
           font-size: 14px; color: #DC2626; margin-bottom: 14px;
+          line-height: 1.5;
         }
+        .login-error-action {
+          background: none; border: none; padding: 0; cursor: pointer;
+          color: #B91C1C; font-weight: 700; font-size: 14px;
+          font-family: inherit; text-decoration: underline; text-underline-offset: 2px;
+        }
+        .login-error-action:hover { color: #7F1D1D; }
+        .login-error-action:focus-visible { outline: 2px solid #DC2626; outline-offset: 2px; border-radius: 3px; }
 
         .login-google-btn {
           width: 100%;
@@ -781,7 +806,22 @@ export default function LoginPage() {
                   <Link href="/forgot-password" className="login-forgot">{he ? "שכחתם סיסמה?" : "Forgot password?"}</Link>
                 )}
 
-                {error && <div className="login-error" role="alert"><span aria-hidden="true">⚠️</span> {error}</div>}
+                {error && (
+                  <div className="login-error" role="alert">
+                    <span aria-hidden="true">⚠️</span>
+                    <span>
+                      {error}
+                      {switchHint === "try-signup" && (
+                        <>
+                          {" "}
+                          <button type="button" className="login-error-action" onClick={() => switchMode("signup")}>
+                            {he ? "אין לכם חשבון? הרשמו כאן" : "No account yet? Sign up here"}
+                          </button>
+                        </>
+                      )}
+                    </span>
+                  </div>
+                )}
 
                 <button type="submit" disabled={loading} className="login-submit">
                   {mode === "login"
@@ -815,7 +855,22 @@ export default function LoginPage() {
                   <p className="login-field-hint">{he ? "ככה הבוט יציג את עצמו ללקוחות שלכם" : "This is how the bot will introduce itself to your customers"}</p>
                 </div>
 
-                {error && <div className="login-error" role="alert"><span aria-hidden="true">⚠️</span> {error}</div>}
+                {error && (
+                  <div className="login-error" role="alert">
+                    <span aria-hidden="true">⚠️</span>
+                    <span>
+                      {error}
+                      {switchHint === "try-login" && (
+                        <>
+                          {" "}
+                          <button type="button" className="login-error-action" onClick={() => switchMode("login")}>
+                            {he ? "כבר יש לכם חשבון? התחברו כאן" : "Already have an account? Sign in here"}
+                          </button>
+                        </>
+                      )}
+                    </span>
+                  </div>
+                )}
 
                 <button type="submit" disabled={loading} className="login-submit">
                   {loading ? (he ? "רגע..." : "One sec...") : (he ? "יצירת חשבון וסיום 🎉" : "Create account & finish 🎉")}
