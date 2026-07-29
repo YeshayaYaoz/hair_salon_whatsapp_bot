@@ -75,6 +75,10 @@ model Business {
   // (for verticals like B&B where availability is per-unit/overnight and not slot-based).
   bookingModel              String    @default("slot")
   availabilityInfo          String? // free-text availability summary the bot quotes in "inquiry" mode
+  // When false, the bot says nothing at all about availability in "inquiry" mode — it won't quote
+  // availabilityInfo or characterise how busy a period is, and always defers to the owner. For
+  // businesses where only the owner knows the real calendar, any hint from the bot is a liability.
+  availabilitySuggestionsEnabled Boolean @default(true)
   // Pricing caveats that don't fit a per-item price: package rules, seasons where a discount
   // doesn't apply, and excluded dates (e.g. "בין הזמנים — מחיר מלא לכל לילה", "לא כולל ראש השנה").
   // Deliberately separate from availabilityInfo: that answers "is there room?", this answers

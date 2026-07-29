@@ -17,6 +17,7 @@ interface BotProfile {
   digestEnabled?: boolean;
   availabilityInfo?: string;
   pricingNotes?: string;
+  availabilitySuggestionsEnabled?: boolean;
   aiProvider?: string;
   aiModel?: string | null;
 }
@@ -139,7 +140,7 @@ export default function BotPage() {
     botGreeting: "", botPersonality: "",
     remindersEnabled: true, reviewsEnabled: true,
     cancellationPolicy: "", referralText: "", digestEnabled: true, availabilityInfo: "",
-    pricingNotes: "", aiProvider: "anthropic", aiModel: null,
+    pricingNotes: "", availabilitySuggestionsEnabled: true, aiProvider: "anthropic", aiModel: null,
   });
   const [bookingModel, setBookingModel] = useState<string>("slot");
   const [botEnabled, setBotEnabled] = useState(true);
@@ -162,6 +163,7 @@ export default function BotPage() {
         digestEnabled: me.digestEnabled ?? true,
         availabilityInfo: me.availabilityInfo ?? "",
         pricingNotes: me.pricingNotes ?? "",
+        availabilitySuggestionsEnabled: me.availabilitySuggestionsEnabled ?? true,
         aiProvider: me.aiProvider ?? "anthropic",
         aiModel: me.aiModel ?? null,
       });
@@ -377,18 +379,38 @@ export default function BotPage() {
             />
           </Field>
           {bookingModel === "inquiry" && (
-            <Field
-              label={he ? "מידע זמינות" : "Availability info"}
-              hint={he ? "מה שהבוט מוסר על זמינות כשלקוח שואל. במצב זה הבוט לא קובע הזמנות — הוא מוסר מידע ומעביר בקשות הזמנה אליך." : "What the bot tells customers about availability. In this mode the bot doesn't book — it shares info and forwards booking requests to you."}
-            >
-              <textarea
-                rows={3}
-                placeholder={he ? "לדוגמה: זמינות משתנה — מומלץ להזמין מראש, סופי שבוע נתפסים מהר." : "e.g. Availability varies — book ahead, weekends fill up fast."}
-                value={fields.availabilityInfo}
-                onChange={(e) => set("availabilityInfo", e.target.value)}
-                className="w-full"
-              />
-            </Field>
+            <>
+              <label className="flex items-start justify-between gap-3">
+                <span className="min-w-0">
+                  <span className="block text-xs text-gray-700">
+                    {he ? "הבוט מוסר מידע על זמינות" : "Bot shares availability info"}
+                  </span>
+                  <span className="block text-[11px] text-gray-600 mt-0.5">
+                    {he
+                      ? "כשמכובה, הבוט לא יאמר כלום על זמינות — לא אם תאריך פנוי, לא כמה עמוס, ולא יציע מועדים. הוא ימסור רק מחירים ומידע, ויפנה אליך לכל שאלת זמינות."
+                      : "When off, the bot says nothing about availability — not whether a date is free, not how busy it is, and it won't suggest dates. It shares only prices and info, and defers every availability question to you."}
+                  </span>
+                </span>
+                <Toggle
+                  checked={fields.availabilitySuggestionsEnabled ?? true}
+                  onChange={(v) => set("availabilitySuggestionsEnabled", v)}
+                />
+              </label>
+              {fields.availabilitySuggestionsEnabled !== false && (
+                <Field
+                  label={he ? "מידע זמינות" : "Availability info"}
+                  hint={he ? "מה שהבוט מוסר על זמינות כשלקוח שואל. במצב זה הבוט לא קובע הזמנות — הוא מוסר מידע ומעביר בקשות הזמנה אליך." : "What the bot tells customers about availability. In this mode the bot doesn't book — it shares info and forwards booking requests to you."}
+                >
+                  <textarea
+                    rows={3}
+                    placeholder={he ? "לדוגמה: זמינות משתנה — מומלץ להזמין מראש, סופי שבוע נתפסים מהר." : "e.g. Availability varies — book ahead, weekends fill up fast."}
+                    value={fields.availabilityInfo}
+                    onChange={(e) => set("availabilityInfo", e.target.value)}
+                    className="w-full"
+                  />
+                </Field>
+              )}
+            </>
           )}
         </Section>
 
