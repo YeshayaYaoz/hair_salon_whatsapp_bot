@@ -16,6 +16,15 @@ interface BotProfile {
   referralText?: string;
   digestEnabled?: boolean;
   availabilityInfo?: string;
+  aiProvider?: string;
+  aiModel?: string | null;
+}
+
+interface AiProviderMeta {
+  key: string;
+  label: string;
+  configured: boolean;
+  defaultModels: string[];
 }
 
 function VoicePhoneSection() {
@@ -129,6 +138,7 @@ export default function BotPage() {
     botGreeting: "", botPersonality: "",
     remindersEnabled: true, reviewsEnabled: true,
     cancellationPolicy: "", referralText: "", digestEnabled: true, availabilityInfo: "",
+    aiProvider: "anthropic", aiModel: null,
   });
   const [bookingModel, setBookingModel] = useState<string>("slot");
   const [botEnabled, setBotEnabled] = useState(true);
@@ -137,6 +147,7 @@ export default function BotPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aiProviders, setAiProviders] = useState<AiProviderMeta[] | null>(null);
 
   useEffect(() => {
     apiFetch<BotProfile & { bookingModel?: string; botEnabled?: boolean }>("/api/business/me").then((me) => {
@@ -149,11 +160,16 @@ export default function BotPage() {
         referralText: me.referralText ?? "",
         digestEnabled: me.digestEnabled ?? true,
         availabilityInfo: me.availabilityInfo ?? "",
+        aiProvider: me.aiProvider ?? "anthropic",
+        aiModel: me.aiModel ?? null,
       });
       setBookingModel(me.bookingModel ?? "slot");
       setBotEnabled(me.botEnabled ?? true);
       setLoaded(true);
     });
+    apiFetch<{ providers: AiProviderMeta[] }>("/api/business/me/ai-providers")
+      .then((res) => setAiProviders(res.providers))
+      .catch(() => {});
   }, []);
 
   async function toggleBot() {
@@ -170,7 +186,7 @@ export default function BotPage() {
     }
   }
 
-  function set(key: keyof BotProfile, value: string | boolean) {
+  function set(key: keyof BotProfile, value: string | boolean | null) {
     setFields((f) => ({ ...f, [key]: value }));
   }
 
@@ -261,6 +277,53 @@ export default function BotPage() {
               onChange={(e) => set("botPersonality", e.target.value)}
               className="w-full"
             />
+          </Field>
+        </Section>
+
+        <Section
+          title={he ? "מנוע ה-AI" : "AI engine"}
+          description={he ? "איזה מודל שפה עונה ללקוחות שלכם בוואטסאפ" : "Which language model answers your customers on WhatsApp"}
+        >
+          {aiProviders && !aiProviders.find((p) => p.key === fields.aiProvider)?.configured && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2.5">
+              {he
+                ? "הספק הנבחר לא מוגדר בשרת כרגע — הבוט ימשיך לענות עד שיוגדר מפתח API עבורו."
+                : "The selected provider isn't configured on the server yet — the bot will fail to reply until an API key is set for it."}
+            </div>
+          )}
+          <Field label={he ? "ספק" : "Provider"}>
+            <select
+              value={fields.aiProvider ?? "anthropic"}
+              onChange={(e) => { set("aiProvider", e.target.value); set("aiModel", null); }}
+              className="w-full"
+            >
+              {(aiProviders ?? [{ key: "anthropic", label: "Claude (Anthropic)", configured: true, defaultModels: [] }]).map((p) => (
+                <option key={p.key} value={p.key}>
+                  {p.label}{!p.configured ? (he ? " — לא מוגדר" : " — not configured") : ""}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field
+            label={he ? "מודל (אופציונלי)" : "Model (optional)"}
+            hint={
+              he
+                ? "השאירו ריק כדי לתת לבוט לבחור אוטומטית בין מודל זול למהיר לבין מודל חכם יותר לפי הצורך. בחירת מודל ספציפי מבטלת את הבחירה האוטומטית."
+                : "Leave blank to let the bot auto-pick between a cheap/fast model and a smarter one as needed. Picking a specific model turns off that automatic switching."
+            }
+          >
+            <select
+              value={fields.aiModel ?? ""}
+              onChange={(e) => set("aiModel", e.target.value || null)}
+              className="w-full"
+            >
+              <option value="">{he ? "אוטומטי (מומלץ)" : "Automatic (recommended)"}</option>
+              {aiProviders
+                ?.find((p) => p.key === fields.aiProvider)
+                ?.defaultModels.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+            </select>
           </Field>
         </Section>
 

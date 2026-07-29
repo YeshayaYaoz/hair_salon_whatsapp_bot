@@ -1,4 +1,3 @@
-import Anthropic, { APIError } from "@anthropic-ai/sdk";
 import { prisma } from "../lib/prisma.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { appendTurn, getHistory, type Turn } from "./conversationStore.js";
@@ -11,25 +10,22 @@ import { syncAppointmentToCalendar, deleteCalendarEvent } from "../lib/googleCal
 import { captureError } from "../lib/errorMonitoring.js";
 import { logClaudeUsage } from "../lib/usageLedger.js";
 import { notifyOwner } from "../lib/ownerNotify.js";
+import { getAiProvider, ProviderCallError, type GenericTool, type GenericTurn } from "./providers/index.js";
 
-// maxRetries: 0 here because we do our own retry in makeApiCall below — that lets us log each
-// attempt and control the backoff explicitly, rather than relying on the SDK's opaque internal
-// retry (which also doesn't cover Anthropic's own "overloaded" (529) status).
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 0 });
+// Which LLM backend actually answers a message is resolved per-business (Business.aiProvider) in
+// handleIncomingMessage below — this file's tool definitions/loop are provider-agnostic; see
+// bot/providers/ for the Anthropic/OpenAI/DeepSeek adapters.
 
-const MODEL_CHEAP = "claude-haiku-4-5-20251001";
-const MODEL_SMART = "claude-sonnet-5";
-
-// Short messages with common simple patterns are handled by Haiku.
-// Anything ambiguous, containing tool errors, or long enough to need reasoning goes to Sonnet.
-function chooseModel(messageText: string, hadToolError: boolean): string {
-  if (hadToolError) return MODEL_SMART;
+// Short messages with common simple patterns are handled by the cheap tier.
+// Anything ambiguous, containing tool errors, or long enough to need reasoning goes to the smart tier.
+function chooseTier(messageText: string, hadToolError: boolean): "cheap" | "smart" {
+  if (hadToolError) return "smart";
   const simple = /^(היי|שלום|הי|hello|hi|בוקר טוב|ערב טוב|תודה|ok|כן|לא|מה השעות|מה הכתובת|כמה עולה|מחיר|bye|להתראות)/i;
-  if (simple.test(messageText.trim()) && messageText.length < 60) return MODEL_CHEAP;
-  return MODEL_CHEAP; // default to cheap; escalate only on retry
+  if (simple.test(messageText.trim()) && messageText.length < 60) return "cheap";
+  return "cheap"; // default to cheap; escalate only on retry
 }
 
-const tools: Anthropic.Tool[] = [
+const tools: GenericTool[] = [
   {
     name: "check_availability",
     description: "Find open appointment slots for a given service on a given date. If the customer requests a longer session (e.g. multiple hours), pass durationMin. If the customer asks for a specific staff member by name, pass staffName to only show that person's open times.",
@@ -118,7 +114,7 @@ const tools: Anthropic.Tool[] = [
 
 // Tool used only in "inquiry" booking mode (e.g. B&B): instead of booking a slot, the bot collects
 // what the customer wants and alerts the owner to call them back to finalize. No slot engine involved.
-const requestBookingCallbackTool: Anthropic.Tool = {
+const requestBookingCallbackTool: GenericTool = {
   name: "request_booking_callback",
   description:
     "Use when the customer wants to book/reserve and this business handles bookings by callback (not live). Collect and pass the details you have; the owner is alerted to call the customer back to confirm. Do NOT claim the booking is confirmed — only that the owner will call back.",
@@ -134,24 +130,10 @@ const requestBookingCallbackTool: Anthropic.Tool = {
 
 // Inquiry mode exposes only info + handoff tools — no check_availability/book_appointment/etc.,
 // since there is no live booking engine for these verticals.
-const inquiryTools: Anthropic.Tool[] = [
+const inquiryTools: GenericTool[] = [
   requestBookingCallbackTool,
   tools.find((t) => t.name === "request_human_followup")!,
 ];
-
-// Prompt caching: the tool definitions never change between calls (they're a module-level
-// constant), and each business's system prompt is byte-identical across consecutive messages in
-// the same conversation unless the owner just edited their services/hours/etc. Marking the last
-// tool and the system block as cache breakpoints lets Anthropic skip re-processing (and re-billing
-// at full input-token rate) that unchanged prefix on every turn — a real latency + cost win for
-// exactly the metered cost this app now tracks per business/phone (see usageLedger.ts). Minimum
-// cacheable prefix is 1024 tokens on Sonnet, 4096 on Haiku 4.5 — below that Anthropic silently
-// skips caching rather than erroring, so a small business's system prompt on Haiku may just not
-// hit the minimum yet; nothing breaks either way, it only sometimes doesn't save money.
-const markCache = (arr: Anthropic.Tool[]): Anthropic.Tool[] =>
-  arr.map((tool, i) => (i === arr.length - 1 ? { ...tool, cache_control: { type: "ephemeral" } } : tool));
-const cachedTools: Anthropic.Tool[] = markCache(tools);
-const cachedInquiryTools: Anthropic.Tool[] = markCache(inquiryTools);
 
 export interface BotResult {
   text: string;
@@ -546,79 +528,43 @@ async function runTool(
 const RETRYABLE_STATUSES = new Set([408, 409, 429, 500, 502, 503, 529]);
 const RETRY_DELAY_MS = 700;
 
-/** Logs the real token usage Anthropic reported for this call — never estimated. Failure to log
- * must never take down a live bot reply, so it's swallowed after being reported to error monitoring. */
-async function recordUsage(businessId: string, customerPhone: string, model: string, response: Anthropic.Message) {
-  try {
-    await logClaudeUsage({
-      businessId,
-      customerPhone,
-      model,
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens,
-      cacheCreationTokens: response.usage.cache_creation_input_tokens ?? undefined,
-      cacheReadTokens: response.usage.cache_read_input_tokens ?? undefined,
-    });
-  } catch (err) {
-    console.error("[bot] Failed to record Claude usage:", err);
-    captureError(err, { businessId, customerPhone, model, phase: "usage logging" });
-  }
-}
-
-async function makeApiCall(
+/** Logs the real token usage the provider reported for this call — never estimated. Failure to
+ * log must never take down a live bot reply, so it's swallowed after being reported to error
+ * monitoring. Kept as "claude usage" bucket (kind:"claude" in usageLedger) regardless of which
+ * provider actually ran — it's the app's one LLM-cost bucket, not an Anthropic-specific label;
+ * see usageLedger.ts's per-model pricing table, which already covers every provider's models. */
+async function recordUsage(
   businessId: string,
   customerPhone: string,
   model: string,
-  system: string,
-  messages: Anthropic.MessageParam[],
-  activeTools: Anthropic.Tool[] = cachedTools
-): Promise<Anthropic.Message> {
-  const cachedSystem: Anthropic.TextBlockParam[] = [{ type: "text", text: system, cache_control: { type: "ephemeral" } }];
-
+  usage: { inputTokens: number; outputTokens: number; cacheCreationTokens?: number; cacheReadTokens?: number }
+) {
   try {
-    const response = (await anthropic.messages.create({
-      model,
-      max_tokens: 1024,
-      system: cachedSystem,
-      tools: activeTools,
-      messages,
-    })) as Anthropic.Message;
-    await recordUsage(businessId, customerPhone, model, response);
-    return response;
+    await logClaudeUsage({ businessId, customerPhone, model, ...usage });
   } catch (err) {
-    const retryable = err instanceof APIError ? RETRYABLE_STATUSES.has(err.status ?? 0) : true; // network errors: also retry once
-    if (!retryable) throw err;
-
-    console.warn(`[bot] Anthropic call failed (${err instanceof APIError ? err.status : "network"}), retrying once...`);
-    await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
-
-    const response = (await anthropic.messages.create({
-      model,
-      max_tokens: 1024,
-      system: cachedSystem,
-      tools: activeTools,
-      messages,
-    })) as Anthropic.Message;
-    await recordUsage(businessId, customerPhone, model, response);
-    return response;
+    console.error("[bot] Failed to record AI usage:", err);
+    captureError(err, { businessId, customerPhone, model, phase: "usage logging" });
   }
 }
 
 const AI_UNAVAILABLE_HE = "מצטער, הבוט אינו זמין כרגע. נסה שוב בעוד כמה דקות, או צור קשר ישיר עם העסק.";
 
 export async function handleIncomingMessage(businessId: string, customerPhone: string, messageText: string): Promise<BotResult> {
-  const systemText = await buildSystemPrompt(businessId, customerPhone);
-  const system = systemText;
+  const system = await buildSystemPrompt(businessId, customerPhone);
   const history = await getHistory(businessId, customerPhone);
 
   // "inquiry" businesses (e.g. B&B) have no live booking engine — the bot answers info and hands
   // booking intent to the owner, so it gets a reduced tool set with no slot/booking tools.
-  const biz = await prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { bookingModel: true } });
-  const activeTools = biz.bookingModel === "inquiry" ? cachedInquiryTools : cachedTools;
+  const biz = await prisma.business.findUniqueOrThrow({
+    where: { id: businessId },
+    select: { bookingModel: true, aiProvider: true, aiModel: true },
+  });
+  const activeTools = biz.bookingModel === "inquiry" ? inquiryTools : tools;
+  const provider = getAiProvider(biz.aiProvider);
 
-  const messages: Anthropic.MessageParam[] = [
-    ...history.map((t: Turn) => ({ role: t.role, content: t.content }) as Anthropic.MessageParam),
-    { role: "user", content: messageText },
+  const turns: GenericTurn[] = [
+    ...history.map((t: Turn) => ({ role: t.role, text: t.content }) as GenericTurn),
+    { role: "user", text: messageText },
   ];
 
   const lastOfferedSlots: { value?: AvailableSlot[] } = {};
@@ -627,70 +573,72 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   // been followed by a success — guards against the model claiming "booked!" in its final
   // reply when the underlying tool call actually errored out (e.g. slot taken in the meantime).
   let unconfirmedBookingFailure: string | null = null;
-  let model = chooseModel(messageText, false);
+  let tier = chooseTier(messageText, false);
+  let model = provider.resolveModel(tier, biz.aiModel);
 
-  console.log(`[bot] model=${model} business=${businessId} phone=${customerPhone} msg="${messageText.slice(0, 80)}"`);
+  console.log(`[bot] provider=${provider.key} model=${model} business=${businessId} phone=${customerPhone} msg="${messageText.slice(0, 80)}"`);
 
-  let response: Anthropic.Message;
+  async function call(currentModel: string) {
+    const res = await provider.send({ model: currentModel, system, tools: activeTools, turns });
+    await recordUsage(businessId, customerPhone, currentModel, res.usage);
+    return res;
+  }
+
+  let response;
   try {
-    response = await makeApiCall(businessId, customerPhone, model, system, messages, activeTools);
+    response = await call(model);
   } catch (err) {
-    if (err instanceof APIError) console.error(`Anthropic API error ${err.status}:`, err.message);
-    else console.error("Unexpected Anthropic error:", err);
-    captureError(err, { businessId, customerPhone, model });
+    console.error(`[bot] ${provider.key} call failed:`, err instanceof ProviderCallError ? err.message : err);
+    captureError(err, { businessId, customerPhone, model, provider: provider.key });
     return { text: AI_UNAVAILABLE_HE };
   }
 
   let toolLoopCount = 0;
-  while (response.stop_reason === "tool_use") {
+  while (response.stopReason === "tool_use") {
     if (++toolLoopCount > 8) break; // safety guard — raised slightly since open-ended availability requests now scan multiple days
 
-    const toolResults: Anthropic.ToolResultBlockParam[] = [];
-    for (const block of response.content) {
-      if (block.type !== "tool_use") continue;
-
-      console.log(`[bot] tool=${block.name} input=${JSON.stringify(block.input)}`);
+    const toolResults: { toolCallId: string; content: string }[] = [];
+    for (const tc of response.toolCalls) {
+      console.log(`[bot] tool=${tc.name} input=${JSON.stringify(tc.input)}`);
       let result: string;
       try {
-        result = await runTool(businessId, customerPhone, block.name, block.input as Record<string, unknown>, lastOfferedSlots);
+        result = await runTool(businessId, customerPhone, tc.name, tc.input, lastOfferedSlots);
       } catch (toolErr) {
-        console.error(`[bot] tool ${block.name} threw:`, toolErr);
+        console.error(`[bot] tool ${tc.name} threw:`, toolErr);
         result = JSON.stringify({ error: String(toolErr) });
       }
-      console.log(`[bot] tool=${block.name} result=${result.slice(0, 200)}`);
+      console.log(`[bot] tool=${tc.name} result=${result.slice(0, 200)}`);
 
-      // If a tool returned an error and we're still on Haiku, escalate to Sonnet for the retry
-      if (result.includes('"error"') && model === MODEL_CHEAP) {
+      // If a tool returned an error and we're still on the cheap tier, escalate for the retry —
+      // but only if the business hasn't pinned a specific model override, in which case there's
+      // no cheap/smart pair to escalate between.
+      if (result.includes('"error"') && tier === "cheap" && !biz.aiModel) {
         hadToolError = true;
-        model = MODEL_SMART;
-        console.log(`[bot] tool error detected — escalating to ${MODEL_SMART}`);
+        tier = "smart";
+        model = provider.resolveModel(tier, biz.aiModel);
+        console.log(`[bot] tool error detected — escalating to ${model}`);
       }
 
-      if (block.name === "book_appointment" || block.name === "reschedule_appointment") {
+      if (tc.name === "book_appointment" || tc.name === "reschedule_appointment") {
         unconfirmedBookingFailure = result.includes('"error"') ? result : null;
       }
 
-      toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
+      toolResults.push({ toolCallId: tc.id, content: result });
     }
 
-    messages.push({ role: "assistant", content: response.content });
-    messages.push({ role: "user", content: toolResults });
+    turns.push({ role: "assistant", text: response.text || undefined, toolCalls: response.toolCalls });
+    turns.push({ role: "user", toolResults });
 
     try {
-      response = await makeApiCall(businessId, customerPhone, model, system, messages, activeTools);
+      response = await call(model);
     } catch (err) {
-      if (err instanceof APIError) console.error(`Anthropic API error ${err.status} (tool loop):`, err.message);
-      else console.error("Unexpected Anthropic error (tool loop):", err);
-      captureError(err, { businessId, customerPhone, model, phase: "tool loop" });
+      console.error(`[bot] ${provider.key} call failed (tool loop):`, err instanceof ProviderCallError ? err.message : err);
+      captureError(err, { businessId, customerPhone, model, provider: provider.key, phase: "tool loop" });
       return { text: AI_UNAVAILABLE_HE };
     }
   }
 
-  let replyText = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n")
-    .trim();
+  let replyText = response.text;
 
   // The model can (rarely) generate a confident "booked!" reply even though the last
   // book/reschedule tool call actually returned an error — e.g. the slot was taken in the
@@ -698,41 +646,32 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   // never told a booking succeeded when nothing was actually saved.
   if (unconfirmedBookingFailure) {
     console.warn("[bot] Booking attempt failed but wasn't retried — forcing an honest reply");
-    messages.push({ role: "assistant", content: response.content });
-    messages.push({
+    turns.push({ role: "assistant", text: response.text || undefined, toolCalls: response.toolCalls });
+    turns.push({
       role: "user",
-      content: `(מערכתי: ניסיון הקביעה/שינוי האחרון נכשל בפועל (${unconfirmedBookingFailure}) — שום תור לא נשמר. אל תגיד ללקוח שהתור נקבע. הסבר לו בקצרה שהמועד לא זמין/קרתה תקלה, והצע לבדוק זמינות אחרת או לנסות שוב.)`,
+      text: `(מערכתי: ניסיון הקביעה/שינוי האחרון נכשל בפועל (${unconfirmedBookingFailure}) — שום תור לא נשמר. אל תגיד ללקוח שהתור נקבע. הסבר לו בקצרה שהמועד לא זמין/קרתה תקלה, והצע לבדוק זמינות אחרת או לנסות שוב.)`,
     });
     try {
-      const corrected = await makeApiCall(businessId, customerPhone, model, system, messages, activeTools);
-      const correctedText = corrected.content
-        .filter((b): b is Anthropic.TextBlock => b.type === "text")
-        .map((b) => b.text)
-        .join("\n")
-        .trim();
-      if (correctedText) replyText = correctedText;
+      const corrected = await call(model);
+      if (corrected.text) replyText = corrected.text;
     } catch (err) {
       console.error("Corrective booking-failure call failed:", err);
     }
   }
 
-  // Claude sometimes ends a tool-use turn with no accompanying text (e.g. right after a
+  // The model sometimes ends a tool-use turn with no accompanying text (e.g. right after a
   // successful booking). An empty reply here is doubly bad: the customer sees nothing, AND
-  // storing an empty assistant turn in history would break the *next* API call (Anthropic
-  // rejects empty text content blocks), which is what caused "have to ask twice" — the
-  // following message would silently fail and fall back to the generic error text. Nudge the
-  // model once for an actual reply instead of ever sending/storing blank content.
+  // storing an empty assistant turn in history would break the *next* API call (some providers
+  // reject empty text content), which is what caused "have to ask twice" — the following message
+  // would silently fail and fall back to the generic error text. Nudge the model once for an
+  // actual reply instead of ever sending/storing blank content.
   if (!replyText) {
     console.warn("[bot] Model returned empty text after tool use — requesting a follow-up summary");
-    messages.push({ role: "assistant", content: response.content });
-    messages.push({ role: "user", content: "(תן ללקוח סיכום קצר של מה שקרה כרגע, במשפט אחד.)" });
+    turns.push({ role: "assistant", text: response.text || undefined, toolCalls: response.toolCalls });
+    turns.push({ role: "user", text: "(תן ללקוח סיכום קצר של מה שקרה כרגע, במשפט אחד.)" });
     try {
-      const followUp = await makeApiCall(businessId, customerPhone, model, system, messages, activeTools);
-      replyText = followUp.content
-        .filter((b): b is Anthropic.TextBlock => b.type === "text")
-        .map((b) => b.text)
-        .join("\n")
-        .trim();
+      const followUp = await call(model);
+      replyText = followUp.text;
     } catch (err) {
       console.error("Follow-up summary call failed:", err);
     }
@@ -743,7 +682,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   await appendTurn(businessId, customerPhone, { role: "assistant", content: replyText });
 
   if (hadToolError) {
-    console.log(`[bot] escalated to Sonnet for this turn (tool error recovery)`);
+    console.log(`[bot] escalated to ${model} for this turn (tool error recovery)`);
   }
 
   return { text: replyText, offeredSlots: lastOfferedSlots.value };

@@ -17,6 +17,7 @@ import { createAppointment, OutsideBusinessHoursError, SlotUnavailableError } fr
 import { parseBookingTime } from "../lib/timezone.js";
 import { getJobStatuses } from "../lib/jobStatus.js";
 import { listTemplates, BUSINESS_TYPES } from "../lib/businessTemplates.js";
+import { AI_PROVIDER_KEYS } from "../bot/providers/index.js";
 import { applyTemplate } from "../lib/applyTemplate.js";
 import { getPaymentProvider, PAYMENT_PROVIDERS, UnknownPaymentProviderError } from "../lib/payments/index.js";
 import { getInvoiceProvider, INVOICE_PROVIDERS, UnknownInvoiceProviderError, resolveInvoiceCredentials } from "../lib/invoices/index.js";
@@ -435,6 +436,21 @@ const profileSchema = z.object({
   depositAmountIls: z.number().int().nonnegative().max(100000).optional(),
   depositHoldMinutes: z.number().int().min(5).max(1440).optional(),
   availabilityInfo: z.string().max(600).optional(),
+  aiProvider: z.enum(AI_PROVIDER_KEYS).optional(),
+  aiModel: z.string().max(100).nullable().optional(),
+});
+
+// Display metadata for the Bot page's provider/model picker — which providers are actually
+// configured with an API key on this server (so the UI can warn before an owner picks one that
+// will just fail at send time), plus the default cheap/smart model ids for each.
+businessRouter.get("/me/ai-providers", async (_req: AuthedRequest, res) => {
+  res.json({
+    providers: [
+      { key: "anthropic", label: "Claude (Anthropic)", configured: Boolean(process.env.ANTHROPIC_API_KEY), defaultModels: ["claude-haiku-4-5-20251001", "claude-sonnet-5"] },
+      { key: "openai", label: "OpenAI (GPT)", configured: Boolean(process.env.OPENAI_API_KEY), defaultModels: ["gpt-4o-mini", "gpt-4o"] },
+      { key: "deepseek", label: "DeepSeek", configured: Boolean(process.env.DEEPSEEK_API_KEY), defaultModels: ["deepseek-chat", "deepseek-reasoner"] },
+    ],
+  });
 });
 
 businessRouter.put("/me", async (req: AuthedRequest, res) => {

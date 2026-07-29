@@ -1,14 +1,21 @@
 import { prisma } from "./prisma.js";
 
 /**
- * Official Anthropic per-token pricing (USD per million tokens), source: platform.claude.com/docs
- * pricing page, checked July 2026. Sonnet 5 is on introductory pricing through 2026-08-31, then
- * reverts to the standard $3/$15 rate — update CLAUDE_PRICING_USD_PER_MTOK when that happens (or
- * sooner, if Anthropic changes rates). This is the only place a rate needs to change.
+ * Published per-token pricing (USD per million tokens) across every LLM backend the bot can run
+ * on — Anthropic (platform.claude.com/docs pricing page), OpenAI (openai.com/api/pricing), and
+ * DeepSeek (api-docs.deepseek.com/quick_start/pricing), all checked July 2026. Sonnet 5 is on
+ * introductory pricing through 2026-08-31, then reverts to the standard $3/$15 rate — update here
+ * when that happens (or sooner, if any provider changes rates). This is the only place a rate
+ * needs to change. Keyed by model id alone (not provider+model) since ids are unique across
+ * providers already.
  */
 const CLAUDE_PRICING_USD_PER_MTOK: Record<string, { input: number; output: number }> = {
   "claude-haiku-4-5-20251001": { input: 1, output: 5 },
   "claude-sonnet-5": { input: 2, output: 10 }, // introductory rate through 2026-08-31
+  "gpt-4o-mini": { input: 0.15, output: 0.6 },
+  "gpt-4o": { input: 2.5, output: 10 },
+  "deepseek-chat": { input: 0.28, output: 0.42 },
+  "deepseek-reasoner": { input: 0.28, output: 0.42 },
 };
 
 // USD→ILS is only needed to express cost in shekels next to ILS subscription revenue — update

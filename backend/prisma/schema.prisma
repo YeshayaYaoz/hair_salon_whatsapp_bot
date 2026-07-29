@@ -75,6 +75,11 @@ model Business {
   // (for verticals like B&B where availability is per-unit/overnight and not slot-based).
   bookingModel              String    @default("slot")
   availabilityInfo          String? // free-text availability summary the bot quotes in "inquiry" mode
+  // Which LLM backend answers this business's WhatsApp bot — "anthropic" | "openai" | "deepseek".
+  // aiModel overrides the provider's default model id (e.g. "gpt-4o-mini", "deepseek-chat"); null
+  // means "use that provider's built-in cheap/smart pair" (see bot/providers/index.ts).
+  aiProvider                String    @default("anthropic")
+  aiModel                   String?
   botGreeting               String? // custom greeting override
   botPersonality            String? // tone/personality instructions for the bot
   googleMapsUrl             String? // linked in post-visit review requests
