@@ -10,6 +10,18 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetr
 const MODEL_CHEAP = "claude-haiku-4-5-20251001";
 const MODEL_SMART = "claude-sonnet-5";
 
+/**
+ * Low temperature, deliberately.
+ *
+ * This was previously unset, so it defaulted to maximum sampling variability — which is what
+ * produced invented Hebrew: the model would sample a novel phrasing instead of the fixed idiom,
+ * e.g. "מבורך הבא" in place of "ברוך הבא". Hebrew is full of fixed collocations where any variation
+ * is simply wrong, and nothing this bot does benefits from linguistic invention: it quotes prices,
+ * offers times, and confirms bookings. Not 0, so identical repeated questions don't produce
+ * word-for-word identical replies, which reads robotic in a chat thread.
+ */
+const TEMPERATURE = 0.2;
+
 const RETRYABLE_STATUSES = new Set([408, 409, 429, 500, 502, 503, 529]);
 const RETRY_DELAY_MS = 700;
 
@@ -86,7 +98,7 @@ export const anthropicProvider: AiProvider = {
     const anthropicTools = toAnthropicTools(tools);
     const messages = toAnthropicMessages(turns);
 
-    const call = () => anthropic.messages.create({ model, max_tokens: 1024, system: cachedSystem, tools: anthropicTools, messages });
+    const call = () => anthropic.messages.create({ model, max_tokens: 1024, temperature: TEMPERATURE, system: cachedSystem, tools: anthropicTools, messages });
 
     try {
       return fromAnthropicResponse(await call());
