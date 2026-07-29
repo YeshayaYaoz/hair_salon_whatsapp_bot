@@ -13,8 +13,12 @@ jobs:
       run:
         working-directory: backend
     env:
-      # Dummy value so `prisma generate` and type-checking can run without a real database.
+      # Dummy values so `prisma generate` and type-checking can run without a real database.
       DATABASE_URL: "postgresql://user:pass@localhost:5432/db"
+      # schema.prisma declares directUrl, and Prisma errors on an unset env var whenever it
+      # resolves the datasource. `prisma generate` happens not to, but any future `prisma validate`
+      # or `migrate` step here would fail confusingly without this.
+      DIRECT_URL: "postgresql://user:pass@localhost:5432/db"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

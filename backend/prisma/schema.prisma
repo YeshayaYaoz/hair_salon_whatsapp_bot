@@ -6,6 +6,11 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  // Neon's non-pooled connection, used only for migrations. Without it declared here Prisma never
+  // reads DIRECT_URL at all, so `prisma migrate deploy` (which runs on every start) went through
+  // the pooled URL — and PgBouncer doesn't hold the session-level advisory lock that migrate takes,
+  // so a migration can hang or fail there. The runtime client still uses the pooled DATABASE_URL.
+  directUrl = env("DIRECT_URL")
 }
 
 model Business {
