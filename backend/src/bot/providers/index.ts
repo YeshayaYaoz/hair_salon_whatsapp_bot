@@ -12,12 +12,17 @@ const openaiProvider = createOpenAiCompatibleProvider({
   defaultSmartModel: "gpt-4o",
 });
 
+// Both tiers deliberately point at deepseek-chat. deepseek-reasoner is the stronger model, but
+// DeepSeek documents it as not supporting function calling — and this bot is entirely tool-driven
+// (check_availability / book_appointment / ...), so routing to it would not merely degrade replies,
+// it would break booking outright. Revisit only after confirming tool support against a live key;
+// until then the tool-capable model is the only safe choice on this provider.
 const deepseekProvider = createOpenAiCompatibleProvider({
   key: "deepseek",
   apiKeyEnvVar: "DEEPSEEK_API_KEY",
   baseURL: "https://api.deepseek.com",
   defaultCheapModel: "deepseek-chat",
-  defaultSmartModel: "deepseek-reasoner",
+  defaultSmartModel: "deepseek-chat",
 });
 
 const PROVIDERS: Record<string, AiProvider> = {

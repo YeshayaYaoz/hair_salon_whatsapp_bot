@@ -14,8 +14,13 @@ const CLAUDE_PRICING_USD_PER_MTOK: Record<string, { input: number; output: numbe
   "claude-sonnet-5": { input: 2, output: 10 }, // introductory rate through 2026-08-31
   "gpt-4o-mini": { input: 0.15, output: 0.6 },
   "gpt-4o": { input: 2.5, output: 10 },
+  // UNVERIFIED: these two were entered from memory and could not be checked against DeepSeek's
+  // live pricing page (blocked from the dev environment). They affect only cost *reporting*, never
+  // bot behavior — a wrong figure silently under/over-states spend in the dashboard. Confirm at
+  // api-docs.deepseek.com/quick_start/pricing before relying on DeepSeek cost numbers. Note also
+  // that DeepSeek bills cache-hit input at a lower rate than cache-miss, which this flat
+  // input/output shape does not model.
   "deepseek-chat": { input: 0.28, output: 0.42 },
-  "deepseek-reasoner": { input: 0.28, output: 0.42 },
 };
 
 // USD→ILS is only needed to express cost in shekels next to ILS subscription revenue — update

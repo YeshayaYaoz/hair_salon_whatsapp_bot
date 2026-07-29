@@ -448,7 +448,9 @@ businessRouter.get("/me/ai-providers", async (_req: AuthedRequest, res) => {
     providers: [
       { key: "anthropic", label: "Claude (Anthropic)", configured: Boolean(process.env.ANTHROPIC_API_KEY), defaultModels: ["claude-haiku-4-5-20251001", "claude-sonnet-5"] },
       { key: "openai", label: "OpenAI (GPT)", configured: Boolean(process.env.OPENAI_API_KEY), defaultModels: ["gpt-4o-mini", "gpt-4o"] },
-      { key: "deepseek", label: "DeepSeek", configured: Boolean(process.env.DEEPSEEK_API_KEY), defaultModels: ["deepseek-chat", "deepseek-reasoner"] },
+      // deepseek-reasoner is intentionally not offered — it does not support function calling,
+      // which this bot depends on entirely. See bot/providers/index.ts.
+      { key: "deepseek", label: "DeepSeek", configured: Boolean(process.env.DEEPSEEK_API_KEY), defaultModels: ["deepseek-chat"] },
     ],
   });
 });
