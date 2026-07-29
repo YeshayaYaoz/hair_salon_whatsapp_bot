@@ -16,13 +16,25 @@ import { getAiProvider, ProviderCallError, type GenericTool, type GenericTurn } 
 // handleIncomingMessage below — this file's tool definitions/loop are provider-agnostic; see
 // bot/providers/ for the Anthropic/OpenAI/DeepSeek adapters.
 
-// Short messages with common simple patterns are handled by the cheap tier.
-// Anything ambiguous, containing tool errors, or long enough to need reasoning goes to the smart tier.
-function chooseTier(messageText: string, hadToolError: boolean): "cheap" | "smart" {
-  if (hadToolError) return "smart";
-  const simple = /^(היי|שלום|הי|hello|hi|בוקר טוב|ערב טוב|תודה|ok|כן|לא|מה השעות|מה הכתובת|כמה עולה|מחיר|bye|להתראות)/i;
-  if (simple.test(messageText.trim()) && messageText.length < 60) return "cheap";
-  return "cheap"; // default to cheap; escalate only on retry
+/**
+ * Every customer-facing reply uses the smart tier.
+ *
+ * This used to default to the cheap tier (Haiku) for everything — the previous "simple message"
+ * regex was dead code, since both branches returned "cheap". That produced a steady trickle of
+ * invented Hebrew words in real conversations ("יתאשר" instead of "יאשר", "משתניים" — literally
+ * "variables" — instead of "מהשתיים"), which no amount of prompt wording fixed, because it's a
+ * model-capability limit rather than an instruction-following one: Hebrew morphology is simply
+ * weaker on the small model.
+ *
+ * The tradeoff is lopsided. Measured spend was well under ₪1/month per business at Haiku rates,
+ * so the smart tier costs a few extra agorot a month — while malformed Hebrew is visible to the
+ * business's own customers and makes the business look unprofessional. Quality wins.
+ *
+ * hadToolError is kept as a parameter (rather than dropped) because the escalation path in the
+ * tool loop still calls this, and a future cheap tier for non-Hebrew businesses would want it.
+ */
+function chooseTier(_messageText: string, _hadToolError: boolean): "cheap" | "smart" {
+  return "smart";
 }
 
 const tools: GenericTool[] = [
@@ -611,7 +623,9 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
 
       // If a tool returned an error and we're still on the cheap tier, escalate for the retry —
       // but only if the business hasn't pinned a specific model override, in which case there's
-      // no cheap/smart pair to escalate between.
+      // no cheap/smart pair to escalate between. Currently inert: chooseTier always returns
+      // "smart" (see its comment), so there's nothing to escalate from. Kept because it's the
+      // correct behavior the moment any cheap tier is reintroduced.
       if (result.includes('"error"') && tier === "cheap" && !biz.aiModel) {
         hadToolError = true;
         tier = "smart";
