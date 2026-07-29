@@ -560,6 +560,27 @@ async function recordUsage(
   }
 }
 
+/**
+ * Rewrites Markdown emphasis into WhatsApp's own markup before a reply goes out.
+ *
+ * WhatsApp bolds with a single asterisk (*bold*), not Markdown's double — so `**text**` reaches
+ * the customer with literal asterisks around it. The system prompt says this, but models emit
+ * Markdown out of habit often enough that a prompt rule alone isn't a guarantee, and this is
+ * customer-visible on every price list. Deterministic post-processing is, so it belongs here
+ * rather than relying on instruction-following.
+ */
+export function toWhatsAppFormatting(text: string): string {
+  return (
+    text
+      // **bold** / __bold__ -> *bold*. Non-greedy, no newlines inside, so it can't swallow the
+      // gap between two separately-bolded items on different lines.
+      .replace(/\*\*([^*\n]+)\*\*/g, "*$1*")
+      .replace(/__([^_\n]+)__/g, "*$1*")
+      // Markdown headings have no WhatsApp equivalent — bold the line instead of leaving "## ".
+      .replace(/^#{1,6}\s+(.+)$/gm, "*$1*")
+  );
+}
+
 const AI_UNAVAILABLE_HE = "מצטער, הבוט אינו זמין כרגע. נסה שוב בעוד כמה דקות, או צור קשר ישיר עם העסק.";
 
 export async function handleIncomingMessage(businessId: string, customerPhone: string, messageText: string): Promise<BotResult> {
@@ -692,6 +713,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     }
   }
   if (!replyText) replyText = "בוצע! ✅"; // last-resort guarantee — never send/store an empty message
+  replyText = toWhatsAppFormatting(replyText);
 
   await appendTurn(businessId, customerPhone, { role: "user", content: messageText });
   await appendTurn(businessId, customerPhone, { role: "assistant", content: replyText });
