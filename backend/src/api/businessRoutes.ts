@@ -167,6 +167,81 @@ businessRouter.get("/admin/usage-by-phone", requireSuperAdmin, async (req: Authe
   res.json(Array.from(byPhone.values()).sort((a, b) => b.claudeCostAgorot - a.claudeCostAgorot));
 });
 
+/**
+ * Head-to-head comparison of the AI providers/models actually serving traffic, from the real
+ * usage ledger — every row is a recorded API call, never an estimate or a synthetic benchmark.
+ *
+ * This is what makes a provider switch a measured decision instead of a guess: cost per reply is
+ * the number that matters commercially, and cacheHitRate is what proves prompt caching is working
+ * (a healthy conversation reads far more cached tokens than it writes). Rows with a null cost are
+ * counted separately rather than treated as free — an unpriced model would otherwise silently
+ * look like the cheapest option.
+ */
+businessRouter.get("/admin/provider-stats", requireSuperAdmin, async (req: AuthedRequest, res) => {
+  const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365);
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  const events = await prisma.apiUsageEvent.findMany({
+    where: { kind: "claude", createdAt: { gte: since } },
+    select: {
+      businessId: true, provider: true, model: true, costAgorot: true,
+      inputTokens: true, outputTokens: true, cacheReadTokens: true, cacheWriteTokens: true,
+    },
+  });
+
+  interface Row {
+    provider: string; model: string; calls: number;
+    inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number;
+    costAgorot: number; unpricedCalls: number; businesses: Set<string>;
+  }
+  const rows = new Map<string, Row>();
+
+  for (const e of events) {
+    // Rows predating multi-provider support have no provider recorded; infer from the model id
+    // so historical Claude traffic still shows up correctly rather than as "unknown".
+    const provider = e.provider ?? (e.model?.startsWith("claude") ? "anthropic" : "unknown");
+    const model = e.model ?? "unknown";
+    const key = `${provider}|${model}`;
+    if (!rows.has(key)) {
+      rows.set(key, {
+        provider, model, calls: 0, inputTokens: 0, outputTokens: 0,
+        cacheReadTokens: 0, cacheWriteTokens: 0, costAgorot: 0, unpricedCalls: 0, businesses: new Set(),
+      });
+    }
+    const r = rows.get(key)!;
+    r.calls += 1;
+    r.inputTokens += e.inputTokens ?? 0;
+    r.outputTokens += e.outputTokens ?? 0;
+    r.cacheReadTokens += e.cacheReadTokens ?? 0;
+    r.cacheWriteTokens += e.cacheWriteTokens ?? 0;
+    if (e.costAgorot === null) r.unpricedCalls += 1;
+    else r.costAgorot += e.costAgorot;
+    r.businesses.add(e.businessId);
+  }
+
+  res.json({
+    days,
+    rows: Array.from(rows.values())
+      .map((r) => ({
+        provider: r.provider,
+        model: r.model,
+        calls: r.calls,
+        businesses: r.businesses.size,
+        inputTokens: r.inputTokens,
+        outputTokens: r.outputTokens,
+        costAgorot: r.costAgorot,
+        unpricedCalls: r.unpricedCalls,
+        // Agorot per API call — the directly comparable unit across providers.
+        avgCostAgorotPerCall: r.calls > 0 ? r.costAgorot / r.calls : 0,
+        avgOutputTokensPerCall: r.calls > 0 ? Math.round(r.outputTokens / r.calls) : 0,
+        // Share of billed input served from cache. Low here on a large prompt means caching is
+        // silently not engaging — which is exactly the failure that made every call full-price.
+        cacheHitRate: r.inputTokens > 0 ? r.cacheReadTokens / r.inputTokens : null,
+      }))
+      .sort((a, b) => b.calls - a.calls),
+  });
+});
+
 // Block/suspend a business: independent of subscriptionStatus (see schema comment) — locks out
 // dashboard login and stops the WhatsApp bot from replying, without touching billing state, so a
 // support/fraud suspension doesn't get silently undone by the next successful charge.
@@ -502,6 +577,10 @@ businessRouter.get("/me/setup-status", async (req: AuthedRequest, res) => {
     { key: "notificationPhone", done: Boolean(business.notificationPhone?.trim()), critical: true },
     { key: "services", done: serviceCount > 0, critical: true },
     { key: "hours", done: hoursCount > 0, critical: true },
+    // Carried over from the older inline checklist on the analytics page when that duplicate was
+    // removed — it was the one step this list didn't already cover, and dropping it would have
+    // silently lost the nudge for businesses still on a trial.
+    { key: "billing", done: business.subscriptionStatus === "active", critical: false },
   ];
 
   res.json({

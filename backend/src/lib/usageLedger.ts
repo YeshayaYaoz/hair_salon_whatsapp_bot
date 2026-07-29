@@ -43,6 +43,8 @@ const CACHE_READ_MULTIPLIER = 0.1;
 export async function logClaudeUsage(params: {
   businessId: string;
   customerPhone: string;
+  /** "anthropic" | "openai" | "deepseek" — optional so older callers/tests stay valid. */
+  provider?: string;
   model: string;
   inputTokens: number;
   outputTokens: number;
@@ -65,8 +67,11 @@ export async function logClaudeUsage(params: {
       businessId: params.businessId,
       customerPhone: params.customerPhone,
       kind: "claude",
+      provider: params.provider,
       model: params.model,
       inputTokens: totalInputTokens,
+      cacheReadTokens: params.cacheReadTokens,
+      cacheWriteTokens: params.cacheCreationTokens,
       outputTokens: params.outputTokens,
       costAgorot,
     },

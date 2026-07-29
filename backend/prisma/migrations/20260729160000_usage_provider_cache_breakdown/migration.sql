@@ -1,0 +1,3 @@
+ALTER TABLE "ApiUsageEvent" ADD COLUMN IF NOT EXISTS "provider" TEXT;
+ALTER TABLE "ApiUsageEvent" ADD COLUMN IF NOT EXISTS "cacheReadTokens" INTEGER;
+ALTER TABLE "ApiUsageEvent" ADD COLUMN IF NOT EXISTS "cacheWriteTokens" INTEGER;

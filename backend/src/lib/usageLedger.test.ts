@@ -76,6 +76,29 @@ describe("logClaudeUsage", () => {
     expect(call.data.costAgorot).toBeNull();
   });
 
+  // The provider comparison panel groups on `provider` and computes cache-hit rate from
+  // cacheReadTokens/inputTokens — if these aren't persisted, that whole view reads as empty or
+  // as 0% cache hits, which would look identical to caching being broken.
+  it("persists the provider and the cache-token breakdown alongside the input total", async () => {
+    await logClaudeUsage({
+      businessId: "biz1",
+      customerPhone: "0500000000",
+      provider: "deepseek",
+      model: "deepseek-chat",
+      inputTokens: 100,
+      outputTokens: 50,
+      cacheCreationTokens: 40,
+      cacheReadTokens: 900,
+    });
+
+    const call = mockPrisma.apiUsageEvent.create.mock.calls[0][0];
+    expect(call.data.provider).toBe("deepseek");
+    expect(call.data.cacheReadTokens).toBe(900);
+    expect(call.data.cacheWriteTokens).toBe(40);
+    // inputTokens stays the all-in total, so the two buckets must not be added on top of it.
+    expect(call.data.inputTokens).toBe(1040);
+  });
+
   it("tags the event kind as claude", async () => {
     await logClaudeUsage({
       businessId: "biz1",

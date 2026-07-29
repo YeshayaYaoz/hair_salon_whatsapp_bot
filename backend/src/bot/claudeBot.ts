@@ -548,11 +548,12 @@ const RETRY_DELAY_MS = 700;
 async function recordUsage(
   businessId: string,
   customerPhone: string,
+  providerKey: string,
   model: string,
   usage: { inputTokens: number; outputTokens: number; cacheCreationTokens?: number; cacheReadTokens?: number }
 ) {
   try {
-    await logClaudeUsage({ businessId, customerPhone, model, ...usage });
+    await logClaudeUsage({ businessId, customerPhone, provider: providerKey, model, ...usage });
   } catch (err) {
     console.error("[bot] Failed to record AI usage:", err);
     captureError(err, { businessId, customerPhone, model, phase: "usage logging" });
@@ -592,7 +593,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
 
   async function call(currentModel: string) {
     const res = await provider.send({ model: currentModel, system, tools: activeTools, turns });
-    await recordUsage(businessId, customerPhone, currentModel, res.usage);
+    await recordUsage(businessId, customerPhone, provider.key, currentModel, res.usage);
     return res;
   }
 

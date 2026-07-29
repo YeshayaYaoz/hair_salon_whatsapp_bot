@@ -53,6 +53,13 @@ const STEP_META: Record<string, { he: string; en: string; href: string; whyHe: s
     whyHe: "הבוט קובע תורים רק בתוך שעות הפעילות",
     whyEn: "The bot only books inside your opening hours",
   },
+  billing: {
+    he: "הפעלת מנוי",
+    en: "Activate subscription",
+    href: "/dashboard/billing",
+    whyHe: "בסיום תקופת הניסיון הבוט יפסיק לענות ללקוחות עד שיופעל מנוי",
+    whyEn: "When the trial ends the bot stops answering customers until a subscription is active",
+  },
 };
 
 /**

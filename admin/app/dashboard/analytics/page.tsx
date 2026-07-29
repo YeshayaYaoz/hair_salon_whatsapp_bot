@@ -25,13 +25,6 @@ interface Me {
   whatsappConnected: boolean;
 }
 
-interface SetupState {
-  hasServices: boolean;
-  hasHours: boolean;
-  whatsappConnected: boolean;
-  subscriptionActive: boolean;
-}
-
 function StatCard({
   label, value, sub, icon, delay = 0, accent = false,
 }: {
@@ -101,7 +94,6 @@ function greetingFor(lang: "he" | "en"): string {
 export default function AnalyticsPage() {
   const { t, lang } = useLanguage();
   const [data, setData] = useState<Analytics | null>(null);
-  const [setup, setSetup] = useState<SetupState | null>(null);
   const [todayAppts, setTodayAppts] = useState<Appt[]>([]);
   const [tz, setTz] = useState("Asia/Jerusalem");
   const [businessName, setBusinessName] = useState<string | null>(null);
@@ -110,20 +102,14 @@ export default function AnalyticsPage() {
     Promise.all([
       apiFetch<Analytics>("/api/business/analytics"),
       apiFetch<Me & { timezone?: string; name?: string }>("/api/business/me"),
-      apiFetch<{ id: string }[]>("/api/business/services"),
-      apiFetch<{ id: string }[]>("/api/business/hours"),
       apiFetch<Appt[]>("/api/business/appointments"),
-    ]).then(([analytics, me, services, hours, appts]) => {
+      // /services and /hours used to be fetched here purely to drive the inline setup checklist
+      // that has since been removed; SetupChecklist gets that state from /me/setup-status itself.
+    ]).then(([analytics, me, appts]) => {
       setData(analytics);
       setBusinessName(me.name ?? null);
       const businessTz = me.timezone || "Asia/Jerusalem";
       setTz(businessTz);
-      setSetup({
-        hasServices: services.length > 0,
-        hasHours: hours.length > 0,
-        whatsappConnected: me.whatsappConnected,
-        subscriptionActive: me.subscriptionStatus === "active",
-      });
       const todayKey = dayKeyInTz(new Date(), businessTz);
       setTodayAppts(
         appts
@@ -132,17 +118,6 @@ export default function AnalyticsPage() {
       );
     });
   }, []);
-
-  const allComplete = setup && setup.hasServices && setup.hasHours && setup.whatsappConnected && setup.subscriptionActive;
-
-  const setupSteps = setup ? [
-    { done: setup.hasServices,        label: t.stepServices, hint: t.stepServicesHint, href: "/dashboard/services" },
-    { done: setup.hasHours,           label: t.stepHours,    hint: t.stepHoursHint,    href: "/dashboard/hours" },
-    { done: setup.whatsappConnected,  label: t.stepWhatsapp, hint: t.stepWhatsappHint, href: "/dashboard/whatsapp" },
-    { done: setup.subscriptionActive, label: t.stepBilling,  hint: t.stepBillingHint,  href: "/dashboard/billing" },
-  ] : [];
-
-  const doneCount = setupSteps.filter(s => s.done).length;
 
   if (!data) {
     return (
@@ -220,75 +195,6 @@ export default function AnalyticsPage() {
         )}
       </div>
 
-      {/* Onboarding checklist */}
-      {setup && !allComplete && (
-        <div
-          className="rounded-2xl p-6 mb-8 animate-fade-up stagger-2"
-          style={{ background: "#FFFFFF", border: "1px solid rgba(27,127,160,0.15)" }}
-        >
-          <div className="flex items-start justify-between gap-4 mb-1">
-            <div>
-              <h2 className="text-base font-bold text-gray-900">{t.setupChecklist}</h2>
-              <p className="text-xs mt-0.5" style={{ color: "#9CA3AF" }}>{t.setupSubtitle}</p>
-            </div>
-            <span
-              className="text-xs font-bold px-2.5 py-1 rounded-full shrink-0"
-              style={{ background: "rgba(27,127,160,0.12)", color: "#1B7FA0" }}
-            >
-              {doneCount}/{setupSteps.length}
-            </span>
-          </div>
-          <div className="h-1.5 rounded-full my-4 overflow-hidden" style={{ background: "#E5E5F0" }}>
-            <div
-              className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${(doneCount / setupSteps.length) * 100}%`, background: "linear-gradient(to right, #145F78, #1B7FA0)" }}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            {setupSteps.map((step, i) => (
-              <Link
-                key={step.href}
-                href={step.href}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all animate-fade-up"
-                style={{
-                  animationDelay: `${(i + 3) * 60}ms`,
-                  background: step.done ? "transparent" : "rgba(27,127,160,0.04)",
-                  border: step.done ? "1px solid transparent" : "1px solid rgba(27,127,160,0.15)",
-                }}
-              >
-                <div
-                  className="w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all"
-                  style={step.done
-                    ? { background: "#1B7FA0", borderColor: "#1B7FA0" }
-                    : { borderColor: "rgba(245,158,11,0.4)" }
-                  }
-                >
-                  {step.done ? (
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="#000">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    <span className="text-xs font-bold" style={{ color: "#1B7FA0" }}>{i + 1}</span>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium" style={step.done ? { color: "#9CA3AF", textDecoration: "line-through" } : { color: "#1A1A2E" }}>
-                    {step.label}
-                  </p>
-                  {!step.done && step.hint && (
-                    <p className="text-xs mt-0.5 truncate" style={{ color: "#9CA3AF" }}>{step.hint}</p>
-                  )}
-                </div>
-                {!step.done && (
-                  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: "rgba(245,158,11,0.5)" }}>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                )}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">

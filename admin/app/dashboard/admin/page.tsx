@@ -333,6 +333,8 @@ export default function AdminBusinessesPage() {
             />
           </div>
 
+          <ProviderStatsPanel he={he} />
+
           {attentionCount > 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4 animate-fade-up text-sm">
               <div className="font-semibold text-amber-800 mb-1.5">
@@ -741,6 +743,127 @@ export default function AdminBusinessesPage() {
               </table>
             )}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface ProviderStatRow {
+  provider: string;
+  model: string;
+  calls: number;
+  businesses: number;
+  inputTokens: number;
+  outputTokens: number;
+  costAgorot: number;
+  unpricedCalls: number;
+  avgCostAgorotPerCall: number;
+  avgOutputTokensPerCall: number;
+  cacheHitRate: number | null;
+}
+
+/**
+ * Head-to-head AI provider comparison from real production usage — the basis for deciding whether
+ * a provider switch is actually worth it, instead of relying on vendor list prices.
+ *
+ * Two columns carry most of the signal: cost-per-call is the directly comparable commercial
+ * number, and cache-hit rate is the health check on prompt caching (a large system prompt with a
+ * low hit rate means caching silently isn't engaging, which makes every call full-price).
+ */
+function ProviderStatsPanel({ he }: { he: boolean }) {
+  const [rows, setRows] = useState<ProviderStatRow[] | null>(null);
+  const [days, setDays] = useState(30);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setRows(null);
+    apiFetch<{ rows: ProviderStatRow[] }>(`/api/business/admin/provider-stats?days=${days}`)
+      .then((r) => setRows(r.rows))
+      .catch((e) => setError(e instanceof Error ? e.message : "שגיאה"));
+  }, [days]);
+
+  const totalCost = rows?.reduce((s, r) => s + r.costAgorot, 0) ?? 0;
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-1">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-900">{he ? "השוואת ספקי AI" : "AI provider comparison"}</h2>
+          <p className="text-xs text-gray-600 mt-0.5">
+            {he
+              ? "נתוני שימוש אמיתיים — כל שורה היא קריאות API שבוצעו בפועל, לא הערכה."
+              : "Real usage — every row is API calls actually made, not an estimate."}
+          </p>
+        </div>
+        <select value={days} onChange={(e) => setDays(Number(e.target.value))} className="text-sm">
+          <option value={7}>{he ? "7 ימים" : "7 days"}</option>
+          <option value={30}>{he ? "30 ימים" : "30 days"}</option>
+          <option value={90}>{he ? "90 ימים" : "90 days"}</option>
+        </select>
+      </div>
+
+      {error && <div className="bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg px-3 py-2 mt-3">{error}</div>}
+
+      {rows === null ? (
+        <p className="text-xs text-gray-600 mt-4">…</p>
+      ) : rows.length === 0 ? (
+        <p className="text-xs text-gray-600 mt-4">
+          {he ? "אין עדיין נתוני שימוש בטווח הזה." : "No usage recorded in this range yet."}
+        </p>
+      ) : (
+        <div className="overflow-x-auto mt-4">
+          <table className="w-full text-sm min-w-[720px]">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="text-start px-2 py-2 text-gray-600 font-medium">{he ? "ספק / מודל" : "Provider / model"}</th>
+                <th className="text-end px-2 py-2 text-gray-600 font-medium">{he ? "קריאות" : "Calls"}</th>
+                <th className="text-end px-2 py-2 text-gray-600 font-medium">{he ? "עסקים" : "Businesses"}</th>
+                <th className="text-end px-2 py-2 text-gray-600 font-medium">{he ? "עלות" : "Cost"}</th>
+                <th className="text-end px-2 py-2 text-gray-600 font-medium">{he ? "לקריאה" : "Per call"}</th>
+                <th className="text-end px-2 py-2 text-gray-600 font-medium">{he ? "מטמון" : "Cache hit"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={`${r.provider}|${r.model}`} className="border-b border-gray-100 last:border-0">
+                  <td className="px-2 py-2.5">
+                    <div className="font-medium text-gray-800">{r.provider}</div>
+                    <div className="text-xs text-gray-600" dir="ltr">{r.model}</div>
+                  </td>
+                  <td className="px-2 py-2.5 text-end tabular-nums text-gray-700">{r.calls.toLocaleString()}</td>
+                  <td className="px-2 py-2.5 text-end tabular-nums text-gray-700">{r.businesses}</td>
+                  <td className="px-2 py-2.5 text-end tabular-nums text-gray-700">
+                    ₪{(r.costAgorot / 100).toFixed(2)}
+                    {r.unpricedCalls > 0 && (
+                      <div className="text-[11px] text-amber-700" title={he ? "אין מחירון למודל הזה — העלות בפועל גבוהה יותר" : "No price on file for this model — real cost is higher"}>
+                        {he ? `${r.unpricedCalls} ללא תמחור` : `${r.unpricedCalls} unpriced`}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-2 py-2.5 text-end tabular-nums font-medium text-gray-800">
+                    {(r.avgCostAgorotPerCall).toFixed(2)}{he ? " אג׳" : "ag"}
+                  </td>
+                  <td className="px-2 py-2.5 text-end tabular-nums">
+                    {r.cacheHitRate === null ? (
+                      <span className="text-gray-600">—</span>
+                    ) : (
+                      <span className={r.cacheHitRate < 0.3 ? "text-amber-700 font-medium" : "text-green-700"}>
+                        {Math.round(r.cacheHitRate * 100)}%
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="text-xs text-gray-600 mt-3">
+            {he ? `סה"כ ${(totalCost / 100).toFixed(2)} ₪ בטווח הנבחר.` : `₪${(totalCost / 100).toFixed(2)} total over the selected range.`}
+            {" "}
+            {he
+              ? "מטמון נמוך (מתחת ל-30%) על פרומפט גדול מרמז שהמטמון לא נתפס — כל קריאה משלמת מחיר מלא."
+              : "A low cache hit rate (under 30%) on a large prompt suggests caching isn't engaging — every call pays full price."}
+          </p>
         </div>
       )}
     </div>

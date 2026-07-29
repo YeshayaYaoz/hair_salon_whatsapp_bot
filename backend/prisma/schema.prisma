@@ -308,8 +308,17 @@ model ApiUsageEvent {
   businessId   String
   customerPhone String
   kind         String // "claude" | "whatsapp"
-  model        String? // Claude model id, e.g. "claude-haiku-4-5-20251001"
-  inputTokens  Int?
+  // Which LLM backend served this call — "anthropic" | "openai" | "deepseek". Recorded explicitly
+  // rather than derived from `model`, since a business may pin an arbitrary model id that no
+  // lookup table would recognise. Null on rows written before multi-provider support existed.
+  provider     String?
+  model        String? // model id, e.g. "claude-haiku-4-5-20251001" / "deepseek-chat"
+  inputTokens  Int? // total billed input, INCLUDING the two cache buckets below
+  // Broken out so prompt-cache effectiveness is measurable rather than assumed: a healthy
+  // conversation should show cacheReadTokens dominating inputTokens. Both are already counted
+  // inside inputTokens — do not add them on top of it.
+  cacheReadTokens  Int?
+  cacheWriteTokens Int?
   outputTokens Int?
   costAgorot   Int? // only set when computed from a known published rate (Claude); null for WhatsApp
   category     String? // WhatsApp billing category Meta reports: marketing | utility | authentication | service
