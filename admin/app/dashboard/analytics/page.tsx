@@ -97,6 +97,9 @@ export default function AnalyticsPage() {
   const [todayAppts, setTodayAppts] = useState<Appt[]>([]);
   const [tz, setTz] = useState("Asia/Jerusalem");
   const [businessName, setBusinessName] = useState<string | null>(null);
+  // Without this the page renders its skeleton forever on any load failure — an expired session,
+  // a network blip, a 500 — with nothing telling the owner why the dashboard never appears.
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -116,8 +119,28 @@ export default function AnalyticsPage() {
           .filter((a) => a.status === "confirmed" && dayKeyInTz(a.startTime, businessTz) === todayKey)
           .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
       );
-    });
+    }).catch((err) => setLoadError(err instanceof Error ? err.message : "שגיאה בטעינה"));
   }, []);
+
+  if (loadError) {
+    return (
+      <div className="animate-fade-in">
+        <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center max-w-md mx-auto mt-8">
+          <div className="text-3xl mb-3" aria-hidden>⚠️</div>
+          <h1 className="text-base font-bold text-gray-900 mb-1">
+            {lang === "he" ? "לא הצלחנו לטעון את הנתונים" : "Couldn't load your data"}
+          </h1>
+          <p className="text-sm text-gray-600 mb-5">{loadError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-[#1B7FA0] hover:bg-[#2A9BBF] text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition"
+          >
+            {lang === "he" ? "נסה שוב" : "Try again"}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!data) {
     return (

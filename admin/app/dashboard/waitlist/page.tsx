@@ -18,18 +18,27 @@ export default function WaitlistPage() {
   const { t, lang } = useLanguage();
   const [entries, setEntries] = useState<WaitlistEntry[]>([]);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  // The mutations below previously used try/finally with no catch, so a failed notify/remove
+  // cleared the spinner and did nothing else — the owner clicked and the row simply didn't change,
+  // with no indication anything had gone wrong.
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
     setEntries(await apiFetch<WaitlistEntry[]>("/api/business/waitlist"));
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load().catch((e) => setError(e instanceof Error ? e.message : "שגיאה בטעינה"));
+  }, []);
 
   async function markNotified(id: string) {
     setLoadingId(id);
+    setError(null);
     try {
       await apiFetch(`/api/business/waitlist/${id}/notify`, { method: "PATCH" });
       await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "הפעולה נכשלה");
     } finally {
       setLoadingId(null);
     }
@@ -37,9 +46,12 @@ export default function WaitlistPage() {
 
   async function remove(id: string) {
     setLoadingId(id);
+    setError(null);
     try {
       await apiFetch(`/api/business/waitlist/${id}`, { method: "DELETE" });
       await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "הפעולה נכשלה");
     } finally {
       setLoadingId(null);
     }
@@ -54,6 +66,12 @@ export default function WaitlistPage() {
         <h1 className="text-2xl font-bold text-gray-900">{t.waitlistTitle}</h1>
         <p className="text-gray-600 text-sm mt-1">{t.waitlistSubtitle}</p>
       </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3 mb-4" role="alert">
+          {error}
+        </div>
+      )}
 
       {entries.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">

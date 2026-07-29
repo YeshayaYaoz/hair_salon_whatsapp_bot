@@ -315,6 +315,9 @@ export default function PaymentsPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [paymentProvider, setPaymentProvider] = useState<PaymentProviderName>("payplus");
   const [invoiceProvider, setInvoiceProvider] = useState<InvoiceProviderName>("greeninvoice");
+  // load() was previously fired without a catch, so a failed /me left every section stuck showing
+  // "not connected" rather than reporting that the page never loaded — which reads as real state.
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   async function load() {
     const data = await apiFetch<Me>("/api/business/me");
@@ -328,7 +331,7 @@ export default function PaymentsPage() {
   }
 
   useEffect(() => {
-    load();
+    load().catch((e) => setLoadError(e instanceof Error ? e.message : "שגיאה בטעינה"));
   }, []);
 
   const canUsePayplusInvoice = me?.paymentProvider === "payplus" && me?.paymentConnected;
@@ -343,6 +346,12 @@ export default function PaymentsPage() {
             : "Connect the payment and invoicing accounts you already have — money goes straight to you, we just orchestrate between them and issue receipts automatically."}
         </p>
       </div>
+
+      {loadError && (
+        <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-4 py-3 mb-4" role="alert">
+          {loadError}
+        </div>
+      )}
 
       {!me && (
         <div className="grid gap-5 lg:grid-cols-2 items-start">
