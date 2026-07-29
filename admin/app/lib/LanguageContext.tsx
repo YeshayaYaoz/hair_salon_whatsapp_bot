@@ -25,6 +25,12 @@ const LanguageContext = createContext<LanguageContextValue>({
 const VOCAB_OVERRIDES: Record<string, Record<Lang, [string, string][]>> = {
   bnb: {
     he: [
+      // Phrase-level fixes must run before the single-word "תור"→"הזמנה" swap below — "תור" is
+      // masculine and "הזמנה" is feminine, so a bare word swap leaves the adjective מisagreeing
+      // ("תור חדש" → "הזמנה חדש" instead of "הזמנה חדשה"). List every adjective/phrase that
+      // appears next to "תור" in the base dict here.
+      ["תור חדש", "הזמנה חדשה"],
+      ["תור רגיל", "הזמנה רגילה"],
       ["לקוחות", "אורחים"],
       ["לקוחה", "אורחת"],
       ["לקוח", "אורח"],
