@@ -495,6 +495,9 @@ async function runTool(
       `📞 בקשת הזמנה חדשה — יש לחזור ללקוח!\nלקוח: ${label}\nטלפון לחזרה: ${customerPhone}\nוואטסאפ: https://wa.me/${customerPhone.replace(/\D/g, "")}\nפרטים: ${input.details}`
     );
     if (!notified) {
+      // Kept in English deliberately: this is a control-flow instruction the model reasons about
+      // ("don't promise a callback"), not text meant to reach the customer verbatim — unlike
+      // tellCustomer below, there's no live-translation step to worry about here.
       return JSON.stringify({
         notified: false,
         error:
@@ -505,12 +508,19 @@ async function runTool(
     // for the callback — the inquiry vertical's whole model is "bot informs, humans close".
     const biz = await prisma.business.findUnique({ where: { id: businessId }, select: { notificationPhone: true } });
     const ownerWaLink = biz?.notificationPhone ? `https://wa.me/${biz.notificationPhone.replace(/\D/g, "")}` : null;
+    // tellCustomer is meant to reach the customer close to verbatim, so it's handed over already
+    // in Hebrew (this business's default language) instead of English — asking the model to
+    // compose or paraphrase a live translation on a short customer-facing sentence is exactly what
+    // produced garbled Hebrew before ("בחצי דרך" out of "message them right away"). If the customer
+    // is writing in English, the model still translates this cleanly on its own (Hebrew→English is
+    // far more reliable for it than the reverse) per the "answer in the customer's language" rule
+    // in the system prompt.
     return JSON.stringify({
       notified: true,
       ownerWhatsappLink: ownerWaLink,
       tellCustomer:
-        "The owner will call the customer back shortly to confirm the booking." +
-        (ownerWaLink ? ` Also share this direct WhatsApp link to the owner so the customer can message them right away: ${ownerWaLink}` : ""),
+        "בעל העסק יחזור אליך בהקדם לאישור סופי." +
+        (ownerWaLink ? ` אפשר גם לכתוב לו ישירות בוואטסאפ: ${ownerWaLink}` : ""),
     });
   }
 
@@ -525,7 +535,7 @@ async function runTool(
         businessName: biz?.name,
       });
     }
-    return JSON.stringify({ notified: true });
+    return JSON.stringify({ notified: true, tellCustomer: "העברתי את זה לבעל העסק — הוא יחזור אליך בהקדם." });
   }
 
   return JSON.stringify({ error: "Unknown tool" });
