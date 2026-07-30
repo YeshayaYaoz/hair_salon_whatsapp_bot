@@ -116,7 +116,7 @@ function BlockedTimesSection() {
                   <div className="text-sm font-medium text-gray-800">{fmt(b.startTime)} — {fmt(b.endTime)}</div>
                   {b.reason && <div className="text-xs text-gray-600 mt-0.5">{b.reason}</div>}
                 </div>
-                <button onClick={() => remove(b.id)} className="text-xs text-gray-600 hover:text-red-600 transition px-2 py-1 rounded">
+                <button onClick={() => remove(b.id)} className="row-action text-xs text-gray-600 hover:text-red-600 transition px-2 py-1 rounded hover:bg-red-50">
                   {he ? "הסר" : "Remove"}
                 </button>
               </li>
