@@ -367,5 +367,9 @@ Deliberately not fixed, with reasons:
   shared row-action pattern rather than page-by-page patches.
 - **`billing: "תשלום"` vs `payments: "סליקה וחשבוניות"`** — genuinely ambiguous in Hebrew, but
   renaming a nav item owners already know is a call for whoever owns the product vocabulary.
+- **The Lead Finder page body is Hebrew-only** (`0 קמפיינים`, `צור קמפיין חדש`, …). Its chrome —
+  the nav entry, the section heading, the page `h1` — is localised now, but the page itself is
+  hundreds of Hebrew strings. It's an internal sales tool gated behind `SUPER_ADMIN_EMAIL`, never
+  seen by a salon owner or their customers, so translating it wasn't worth the churn in this pass.
 - **Login form invisible with JS off**, and `/api/business/me` 401ing on every public page.
 - **The missing init migration** (see above) — outside UI scope, but it still blocks a fresh clone.

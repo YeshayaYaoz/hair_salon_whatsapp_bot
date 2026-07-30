@@ -188,7 +188,7 @@ function SidebarContent({ pathname, isSuperAdmin }: { pathname: string; isSuperA
           />
           <div>
             <div className="font-bold text-base text-white leading-tight tracking-tight">תורי</div>
-            <div className="text-[10px] leading-none mt-0.5 font-medium" style={{ color: "rgba(255,255,255,0.25)", letterSpacing: "0.03em" }}>הזמנת תורים בוואטסאפ</div>
+            <div className="text-[10px] leading-none mt-0.5 font-medium" style={{ color: "rgba(255,255,255,0.25)", letterSpacing: "0.03em" }}>{t.brandTagline}</div>
           </div>
         </div>
       </div>
@@ -225,11 +225,11 @@ function SidebarContent({ pathname, isSuperAdmin }: { pathname: string; isSuperA
         {isSuperAdmin && (
           <div className="flex flex-col gap-0.5">
             <div className="px-3 mb-1">
-              <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: "0.1em", color: "rgba(232,184,75,0.6)", textTransform: "uppercase" }}>Admin</span>
+              <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: "0.1em", color: "rgba(232,184,75,0.6)", textTransform: "uppercase" }}>{t.adminSection}</span>
             </div>
             {[
-              { href: "/dashboard/admin", label: "Admin", icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" },
-              { href: "/dashboard/admin/leads", label: "מציאת לידים", icon: "M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" },
+              { href: "/dashboard/admin", label: t.adminSection, icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" },
+              { href: "/dashboard/admin/leads", label: t.leadFinder, icon: "M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" },
             ].map((item) => (
               <Link
                 key={item.href}
@@ -463,7 +463,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
                   </svg>
-                  מציאת לידים
+                  {t.leadFinder}
                 </Link>
               </>
             )}

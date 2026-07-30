@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { apiFetch } from "../../../lib/api";
 import { SkeletonRow } from "../../../lib/Skeleton";
 import { useDialog } from "../../../lib/useDialog";
+import { useLanguage } from "../../../lib/LanguageContext";
 
 // --- Types ---
 
@@ -164,6 +165,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function LeadFinderPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean | null>(null);
 
   const [view, setView] = useState<{ kind: "list" } | { kind: "campaign"; id: string } | { kind: "lead"; id: string; campaignId: string }>({
@@ -275,6 +277,7 @@ function SuggestedMatchesPanel() {
 }
 
 function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => void }) {
+  const { t } = useLanguage();
   const [campaigns, setCampaigns] = useState<Campaign[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -368,7 +371,7 @@ function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => 
     <>
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3 animate-fade-up">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">מציאת לידים</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t.leadFinder}</h1>
           <p className="text-gray-600 text-sm mt-1">
             {campaigns ? `${campaigns.length} קמפיינים` : "…"}
           </p>

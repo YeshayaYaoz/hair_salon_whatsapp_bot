@@ -15,6 +15,7 @@ const translations = {
     awaitingDeposit: "Awaiting deposit",
     loadFailed: "Couldn't load this list", retry: "Try again",
     skipToContent: "Skip to content",
+    brandTagline: "WhatsApp appointment booking", leadFinder: "Lead Finder", adminSection: "Admin",
 
     // Analytics
     analyticsTitle: "Analytics", analyticsSubtitle: "Overview of your salon's performance",
@@ -158,6 +159,7 @@ const translations = {
     awaitingDeposit: "ממתין למקדמה",
     loadFailed: "לא הצלחנו לטעון את הרשימה", retry: "נסו שוב",
     skipToContent: "דילוג לתוכן",
+    brandTagline: "הזמנת תורים בוואטסאפ", leadFinder: "מציאת לידים", adminSection: "ניהול",
 
     // Analytics
     analyticsTitle: "סטטיסטיקות", analyticsSubtitle: "מה קורה בעסק — במבט אחד",
