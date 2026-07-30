@@ -112,7 +112,7 @@ export default function WaitlistPage() {
                       <button
                         onClick={() => remove(e.id)}
                         disabled={loadingId === e.id}
-                        className="text-xs text-gray-600 hover:text-red-600 disabled:opacity-50 px-2 py-1.5 rounded-lg hover:bg-red-950/30 transition"
+                        className="row-action text-xs text-gray-600 hover:text-red-600 disabled:opacity-50 px-2 py-1.5 rounded-lg hover:bg-red-50 transition"
                       >
                         {t.remove}
                       </button>
@@ -141,7 +141,7 @@ export default function WaitlistPage() {
                     <button
                       onClick={() => remove(e.id)}
                       disabled={loadingId === e.id}
-                      className="text-xs text-zinc-600 hover:text-red-600 disabled:opacity-50 px-2 py-1.5 rounded-lg hover:bg-red-950/30 transition"
+                      className="row-action text-xs text-gray-600 hover:text-red-600 disabled:opacity-50 px-2 py-1.5 rounded-lg hover:bg-red-50 transition"
                     >
                       {t.remove}
                     </button>

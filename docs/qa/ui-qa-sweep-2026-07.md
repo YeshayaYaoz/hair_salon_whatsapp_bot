@@ -237,7 +237,10 @@ light UI, next to `bg-green-50` / `bg-amber-50` siblings. (`pending` also looks 
 **Mobile**
 
 - Bottom tab label truncates to “מחירים ושי…” — the rename to “מחירים ושירותים” doesn't fit a 5-tab bar.
-- The “עוד” sheet's last items sit under the fixed tab bar. *Evidence:* `shots/ix-mobilenav-more-open.png`
+- ~~The “עוד” sheet's last items sit under the fixed tab bar.~~ **Withdrawn — this was wrong.**
+  Measured afterwards: the sheet ends at y=780 and the tab bar starts at y=780, so they don't
+  overlap, and the sheet is a normal `overflow-y-auto` scroller (content 674px in a 591px box).
+  The screenshot that prompted this just caught a row below the scroll fold.
 - Week grid is hardcoded `07:00–21:00` (`appointments/page.tsx:263`) regardless of the salon's real
   hours (09:00–19:00 here), so there are always dead rows. At 390px the 7 day columns are ~44px each
   and appointment chips measure 39–71px, truncating names to a few characters. A day view or
@@ -349,6 +352,36 @@ owner-chosen swatch, and **12 of the 17 stock swatches failed AA against their o
 `lib/readableColor.ts` keeps the hue and walks lightness down until it clears 4.5:1. All 17 now
 pass, worst case 4.52:1.
 
+**The P3 pass.**
+
+- *Timezone correctness.* The analytics “today” bar, the calendar's today column, and the CSV
+  export all used the viewer's device zone. A salon owner abroad — or simply a device on UTC — saw
+  the wrong day highlighted and exported times that didn't match their own calendar. All three now
+  go through the salon's zone via the existing `dayKeyInTz`, and the CSV takes an explicit locale
+  and timezone rather than defaulting to the viewer's.
+- *Touch targets.* A `.row-action` class gives edit/delete/remove a 44px target where the pointer
+  is coarse while leaving desktop density alone — measured 46×44 on mobile, 46×32 on desktop.
+  Checkboxes were being squeezed to 13px by flex-shrink despite `globals.css` asking for 16px.
+- *`bg-zinc-950 text-zinc-100` on `<body>`.* Dark-theme leftovers that outranked the light `body`
+  rule in `globals.css` (utilities beat `@layer base`). Nothing visible was broken, only because
+  every page paints its own background and nearly every element sets its own colour — but the
+  inherited text colour genuinely was near-white on a light page, so anything added without an
+  explicit colour would have rendered invisible.
+- *Accessible names* for the hours checkboxes and time inputs (each now names its day) and for the
+  filter/amount selects, which had none at all.
+- *`/api/business/me`* no longer fires without a token: 36 guaranteed-to-401 requests across the
+  sweep became 0. Those were on the pages seen most — landing, login, legal, and the customer
+  booking page.
+- *Mobile tab labels* get their own short forms instead of truncating to “מחירים ושי…”.
+- *The week grid* derives its hours from the salon's real opening window (padded an hour each
+  side) instead of a hardcoded 07:00–21:00, which gave a 09:00–19:00 shop four dead rows.
+- *Emoji as UI icons* in the analytics stat cards and the Google Calendar card are now SVGs from
+  the same Heroicons family as the sidebar — the calendar emoji renders with a baked-in “17” on
+  most platforms, which read as a stray date. (`EmptyState` keeps its emoji: there it's a large
+  deliberate illustration, not an icon in a row of controls.)
+- *The login form* is no longer invisible with JS off — a `<noscript>` rule reveals the card that
+  a `useEffect` otherwise animates in.
+
 ## Still open
 
 Deliberately not fixed, with reasons:
@@ -363,13 +396,12 @@ Deliberately not fixed, with reasons:
   be overridden; a real fix means a custom date picker.
 - **The mobile week grid** (~44px columns, hardcoded 07:00–21:00 regardless of opening hours). A
   day view or horizontal scroll is a design change, not a bug fix.
-- **Sub-44px touch targets** on row actions (עריכה/מחק/הסרה at 24px high) — worth a pass over the
-  shared row-action pattern rather than page-by-page patches.
+- **Native checkbox size (16px)** and the segmented list/calendar toggle (28px tall). Row actions
+  are fixed; making a native checkbox a 44px target means replacing it with a custom control.
 - **`billing: "תשלום"` vs `payments: "סליקה וחשבוניות"`** — genuinely ambiguous in Hebrew, but
   renaming a nav item owners already know is a call for whoever owns the product vocabulary.
 - **The Lead Finder page body is Hebrew-only** (`0 קמפיינים`, `צור קמפיין חדש`, …). Its chrome —
   the nav entry, the section heading, the page `h1` — is localised now, but the page itself is
   hundreds of Hebrew strings. It's an internal sales tool gated behind `SUPER_ADMIN_EMAIL`, never
   seen by a salon owner or their customers, so translating it wasn't worth the churn in this pass.
-- **Login form invisible with JS off**, and `/api/business/me` 401ing on every public page.
 - **The missing init migration** (see above) — outside UI scope, but it still blocks a fresh clone.

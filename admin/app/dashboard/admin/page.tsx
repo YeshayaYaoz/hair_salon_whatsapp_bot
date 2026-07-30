@@ -263,7 +263,7 @@ export default function AdminBusinessesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusFilter)} className="text-sm">
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusFilter)} className="text-sm" aria-label="סינון לפי סטטוס מנוי">
             <option value="all">{he ? "כל הסטטוסים" : "All statuses"}</option>
             <option value="trial">{he ? "בניסיון" : "Trial"}</option>
             <option value="active">{he ? "פעיל" : "Active"}</option>
@@ -880,7 +880,7 @@ function ProviderStatsPanel({ he }: { he: boolean }) {
               : "Real usage — every row is API calls actually made, not an estimate."}
           </p>
         </div>
-        <select value={days} onChange={(e) => setDays(Number(e.target.value))} className="text-sm">
+        <select value={days} onChange={(e) => setDays(Number(e.target.value))} className="text-sm" aria-label="טווח ימים">
           <option value={7}>{he ? "7 ימים" : "7 days"}</option>
           <option value={30}>{he ? "30 ימים" : "30 days"}</option>
           <option value={90}>{he ? "90 ימים" : "90 days"}</option>

@@ -9,6 +9,10 @@ const translations = {
       whatsapp: "WhatsApp", bot: "Bot", payments: "Payments", faq: "FAQ", settings: "Settings", billing: "Billing", logout: "Log out",
     },
     navGroups: { setup: "Get started", overview: "Home", operations: "Day-to-day", business: "My business", account: "Setup & account" },
+    // Bottom-tab labels. The full nav names are written for the sidebar and overflow a ~56px tab
+    // ("Pricing & Services" / "מחירים ושירותים" truncated to an ellipsis), so the four tabs get
+    // their own short forms rather than being cut off.
+    navShort: { analytics: "Home", appointments: "Bookings", customers: "Customers", services: "Services" },
     days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
     daysShort: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
     today: "Today", previousWeek: "Previous week", nextWeek: "Next week",
@@ -153,6 +157,7 @@ const translations = {
       whatsapp: "וואטסאפ", bot: "בוט", payments: "סליקה וחשבוניות", faq: "שאלות נפוצות", settings: "הגדרות", billing: "תשלום", logout: "התנתקות",
     },
     navGroups: { setup: "הפעלה ראשונית", overview: "ראשי", operations: "ניהול יומי", business: "העסק שלי", account: "הגדרות וחשבון" },
+    navShort: { analytics: "ראשי", appointments: "תורים", customers: "לקוחות", services: "מחירים" },
     days: ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"],
     daysShort: ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"],
     today: "היום", previousWeek: "השבוע הקודם", nextWeek: "השבוע הבא",

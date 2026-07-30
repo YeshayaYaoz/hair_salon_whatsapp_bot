@@ -528,7 +528,7 @@ export default function BillingPage() {
               {lang === "he" ? "יתרה לשימוש עתידי בהודעות/SMS נוספים מעבר למכסת המנוי." : "Prepaid balance for future extra WhatsApp/SMS sends beyond your plan quota."}
             </p>
             <div className="flex items-center gap-2">
-              <select value={topupAmount} onChange={(e) => setTopupAmount(+e.target.value)} className="text-sm">
+              <select value={topupAmount} onChange={(e) => setTopupAmount(+e.target.value)} className="text-sm" aria-label={lang === "he" ? "סכום טעינה" : "Top-up amount"}>
                 {[20, 50, 100, 200].map((v) => <option key={v} value={v}>₪{v}</option>)}
               </select>
               <button

@@ -25,10 +25,21 @@ interface Me {
   whatsappConnected: boolean;
 }
 
+// Heroicons outline paths, the same family the sidebar uses. These replace emoji: 📅 👤 🏆 sat
+// next to a typographic ₪, so half the row was full-colour glyphs at the OS's mercy and half was
+// text — and the calendar emoji renders with a baked-in "17" on most platforms, which reads as a
+// stray date on a card about this month's totals.
+const STAT_ICONS = {
+  calendar: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
+  shekel: "M6 4h7a4 4 0 014 4v12M18 20h-7a4 4 0 01-4-4V4",
+  user: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
+  trophy: "M8 21h8m-4-4v4M6 4h12v4a6 6 0 11-12 0V4zM6 6H4a2 2 0 002 4M18 6h2a2 2 0 01-2 4",
+} as const;
+
 function StatCard({
   label, value, sub, icon, delay = 0, accent = false,
 }: {
-  label: string; value: string; sub?: string; icon: string; delay?: number; accent?: boolean;
+  label: string; value: string; sub?: string; icon: keyof typeof STAT_ICONS; delay?: number; accent?: boolean;
 }) {
   return (
     <div
@@ -48,15 +59,23 @@ function StatCard({
         </span>
         <span
           aria-hidden="true"
-          className="text-lg"
+          className="inline-flex items-center justify-center shrink-0"
           style={{
             background: accent ? "rgba(27,127,160,0.12)" : "#E5E5F0",
             borderRadius: 10,
-            padding: "6px 10px",
-            lineHeight: 1,
+            width: 30,
+            height: 30,
           }}
         >
-          {icon}
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke={accent ? "#145F78" : "#4B5563"}
+            strokeWidth={1.8}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d={STAT_ICONS[icon]} />
+          </svg>
         </span>
       </div>
       <div>
@@ -162,6 +181,10 @@ export default function AnalyticsPage() {
     );
   }
 
+  // "Today" per the SALON's clock, not the viewer's device. A device in a western timezone is
+  // still on yesterday while the salon is on today, which highlighted the wrong bar. dayKeyInTz
+  // is already how this page picks today's appointments (see the loader above).
+  const todayKey = dayKeyInTz(new Date(), tz);
   const maxDaily = Math.max(...data.dailyThisWeek.map((d) => d.count), 1);
   const maxService = Math.max(...data.topServices.map((s) => s.count), 1);
   const dayNames = lang === "he" ? t.daysShort : ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -224,14 +247,14 @@ export default function AnalyticsPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <StatCard
           delay={60}
-          icon="📅"
+          icon="calendar"
           label={t.thisMonth}
           value={String(data.confirmedThisMonth)}
           sub={`${data.cancelledThisMonth} ${t.subCancelled}`}
         />
         <StatCard
           delay={120}
-          icon="₪"
+          icon="shekel"
           label={t.revenue}
           value={`₪${(data.revenueThisMonth / 100).toLocaleString()}`}
           sub={t.subRevenue}
@@ -239,14 +262,14 @@ export default function AnalyticsPage() {
         />
         <StatCard
           delay={180}
-          icon="👤"
+          icon="user"
           label={t.newCustomers}
           value={String(data.newCustomersThisMonth)}
           sub={t.subNewCustomers}
         />
         <StatCard
           delay={240}
-          icon="🏆"
+          icon="trophy"
           label={t.allTime}
           value={String(data.allTimeConfirmed)}
           sub={t.subAllTime}
@@ -284,8 +307,10 @@ export default function AnalyticsPage() {
           <div className="flex items-end gap-2" style={{ height: 128 }}>
             {data.dailyThisWeek.map(({ date, count }, i) => {
               const heightPct = maxDaily > 0 ? (count / maxDaily) * 100 : 0;
-              const d = new Date(date + "T00:00:00");
-              const isToday = new Date().toDateString() === d.toDateString();
+              // Noon-anchored so the weekday label can't slip a day on a DST boundary; `date` is
+              // already a plain calendar key from the API, so no timeZone belongs on the parse.
+              const d = new Date(date + "T12:00:00");
+              const isToday = date === todayKey;
               return (
                 <div key={date} className="flex flex-col items-center flex-1 gap-1">
                   <span className="text-xs font-semibold" style={{ color: count > 0 ? "#1B7FA0" : "transparent" }}>{count > 0 ? count : "·"}</span>

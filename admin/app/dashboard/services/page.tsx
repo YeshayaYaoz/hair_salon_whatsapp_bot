@@ -287,8 +287,8 @@ export default function ServicesPage() {
                     {overnight ? `${toDurationInput(s.durationMin)} ${t.nightsAbbrev}` : `${s.durationMin}′`}
                   </span>
                   <div className="flex gap-1 shrink-0">
-                    <button onClick={() => startEdit(s)} className="text-xs text-gray-600 hover:text-[#1B7FA0] transition px-2 py-1 rounded hover:bg-[#E0F5FB]">{t.edit}</button>
-                    <button onClick={() => remove(s.id)} className="text-xs text-gray-600 hover:text-red-600 transition px-2 py-1 rounded hover:bg-red-50">{t.delete}</button>
+                    <button onClick={() => startEdit(s)} className="row-action text-xs text-gray-600 hover:text-[#1B7FA0] transition px-2 py-1 rounded hover:bg-[#E0F5FB]">{t.edit}</button>
+                    <button onClick={() => remove(s.id)} className="row-action text-xs text-gray-600 hover:text-red-600 transition px-2 py-1 rounded hover:bg-red-50">{t.delete}</button>
                   </div>
                 </div>
               )

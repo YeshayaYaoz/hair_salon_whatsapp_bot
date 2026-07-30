@@ -389,8 +389,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.5 : 1.75} d={item.icon} />
               </svg>
-              <span className="truncate max-w-[56px] text-center leading-tight">
-                {t.nav[item.key]}
+              <span className="truncate max-w-[64px] text-center leading-tight">
+                {(t.navShort as Record<string, string>)[item.key] ?? t.nav[item.key]}
               </span>
             </Link>
           );

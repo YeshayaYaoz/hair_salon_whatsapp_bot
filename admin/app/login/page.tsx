@@ -96,6 +96,11 @@ export default function LoginPage() {
 
   return (
     <>
+      {/* .login-card starts at opacity 0 and is revealed by a `show` class set from a useEffect, so
+          with JavaScript disabled the sign-in form stayed invisible forever — a blank half-page
+          rather than a graceful degradation. This restores it without costing JS users the
+          entrance animation. */}
+      <noscript><style dangerouslySetInnerHTML={{ __html: `.login-card { opacity: 1 !important; transform: none !important; }` }} /></noscript>
       {/* dangerouslySetInnerHTML, not a text child: React escapes text children, so an apostrophe
           becomes &#x27; in the server HTML — but <style> is a raw-text element, so the browser never
           decodes it. `content: ''` then parses as invalid and the declaration is dropped entirely

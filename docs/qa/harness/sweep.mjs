@@ -150,6 +150,8 @@ async function visit(browser, token, viewport, lang, route, slug) {
     for (const el of document.querySelectorAll("button,a,[role=switch],input[type=checkbox],select")) {
       const r = el.getBoundingClientRect();
       if (r.width === 0 || r.height === 0) continue;
+      // Screen-reader-only controls (the skip link) are clipped to 1px and only sized when focused.
+      if (el.closest(".sr-only") || (r.width <= 1 && r.height <= 1)) continue;
       if (r.height < 32 || r.width < 24) {
         smallTargets.push({
           tag: el.tagName.toLowerCase(),
