@@ -24,7 +24,10 @@ const ICONS = {
   analytics: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z",
   appointments: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
   customers: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z",
-  waitlist: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+  // Distinct from `hours`, which is the clock: these two sat next to each other in the nav with
+  // byte-identical paths, so "waitlist" and "schedule" were indistinguishable at a glance.
+  // This one is a queue of people waiting.
+  waitlist: "M17 20h5v-2a3 3 0 00-5.36-1.86M17 20H7m10 0v-2c0-.66-.13-1.29-.36-1.86m0 0a5 5 0 00-9.28 0M7 20H2v-2a3 3 0 015.36-1.86M7 20v-2c0-.66.13-1.29.36-1.86m0 0a5 5 0 019.28 0M15 7a3 3 0 11-6 0 3 3 0 016 0z",
   services: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2",
   staff: "M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 100-8 4 4 0 000 8zm6 3c0-1.1-.9-2-2-2h-1m-3-1a4 4 0 11-8 0",
   hours: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
@@ -69,7 +72,10 @@ const NAV_GROUPS: { titleKey: keyof ReturnType<typeof useLanguage>["t"]["navGrou
 
 const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 
-export function isVisibleFor(item: NavItem, businessType: string | null): boolean {
+// Not exported: Next.js allows a layout module to export only its own known names (default,
+// metadata, revalidate, …), and any extra export fails `tsc` against the generated .next/types —
+// which broke `npm run typecheck` and `next build`. Nothing outside this file uses it.
+function isVisibleFor(item: NavItem, businessType: string | null): boolean {
   return !item.hideFor || !businessType || !item.hideFor.includes(businessType);
 }
 
@@ -315,6 +321,17 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <AuthGuard>
     <div className="flex min-h-screen" style={{ background: "#F4F6F8" }}>
+      {/* The sidebar is 17 links deep and comes first in the DOM, so without this a keyboard user
+          tabbed through all of it before reaching page content — on every single navigation.
+          Visually hidden until focused, which is the point: only keyboard users need it. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:start-3 focus:z-50
+          focus:px-4 focus:py-2 focus:rounded-lg focus:bg-white focus:text-[#145F78]
+          focus:font-semibold focus:text-sm focus:shadow-lg"
+      >
+        {t.skipToContent}
+      </a>
       {/* Desktop sidebar */}
       <aside
         className="hidden md:flex w-64 flex-col py-7 px-3 shrink-0 fixed top-0 bottom-0 start-0 z-20"
@@ -341,7 +358,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       </div>
 
       {/* Main content */}
-      <main className="flex-1 md:ms-64 p-4 pt-[4.5rem] pb-24 md:p-8 md:pt-8 md:pb-8 overflow-auto">
+      <main id="main-content" tabIndex={-1} className="flex-1 md:ms-64 p-4 pt-[4.5rem] pb-24 md:p-8 md:pt-8 md:pb-8 overflow-auto">
         <ImpersonationBanner />
         <TrialBanner status={trial?.status ?? null} createdAt={trial?.createdAt ?? null} />
         {children}

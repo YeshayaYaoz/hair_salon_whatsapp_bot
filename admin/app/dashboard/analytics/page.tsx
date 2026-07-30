@@ -47,6 +47,7 @@ function StatCard({
           {label}
         </span>
         <span
+          aria-hidden="true"
           className="text-lg"
           style={{
             background: accent ? "rgba(27,127,160,0.12)" : "#E5E5F0",
@@ -293,9 +294,11 @@ export default function AnalyticsPage() {
                       className="w-full rounded-t-lg transition-all duration-700"
                       style={{
                         height: `${Math.max(heightPct, count > 0 ? 8 : 2)}%`,
-                        background: isToday
-                          ? "linear-gradient(to top, #D97706, #F59E0B)"
-                          : "rgba(27,127,160,0.2)",
+                        // Today is the brand teal at full strength; other days are the same hue
+                        // at 20%. It used to be an amber gradient — but the top-services chart
+                        // beside it painted *every* bar that same amber, so the one colour meant
+                        // "today" in one chart and nothing at all in the other.
+                        background: isToday ? "#1B7FA0" : "rgba(27,127,160,0.2)",
                         animationDelay: `${i * 60 + 300}ms`,
                       }}
                     />
@@ -330,7 +333,7 @@ export default function AnalyticsPage() {
                     <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "#E5E5F0" }}>
                       <div
                         className="h-full rounded-full transition-all duration-700"
-                        style={{ width: `${pct}%`, background: "linear-gradient(to right, #D97706, #F59E0B)" }}
+                        style={{ width: `${pct}%`, background: "#1B7FA0" }}
                       />
                     </div>
                   </div>

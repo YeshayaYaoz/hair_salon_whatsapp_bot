@@ -12,6 +12,7 @@ interface TemplateCard {
   labelHe: string;
   labelEn: string;
   descriptionHe: string;
+  descriptionEn: string;
   depositEnabled: boolean;
   depositAmountIls: number;
   reviewsEnabled: boolean;
@@ -23,6 +24,7 @@ export default function OnboardingPage() {
   const he = lang === "he";
   const router = useRouter();
   const [templates, setTemplates] = useState<TemplateCard[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +32,9 @@ export default function OnboardingPage() {
   useEffect(() => {
     apiFetch<{ templates: TemplateCard[] }>("/api/business/me/templates")
       .then((d) => setTemplates(d.templates))
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"));
+      // Reported separately from `error` (which carries apply failures) and rendered in place of
+      // the cards — otherwise a failed load leaves the skeletons spinning forever.
+      .catch((e) => setLoadError(e instanceof Error ? e.message : "Failed to load"));
   }, []);
 
   async function confirm() {
@@ -63,7 +67,18 @@ export default function OnboardingPage() {
         </p>
       </div>
 
-      {!templates ? (
+      {loadError ? (
+        <div className="bg-white border border-red-200 rounded-2xl p-8 text-center">
+          <p className="text-gray-700 text-sm font-medium">{he ? "לא הצלחנו לטעון את הקטגוריות" : "Couldn't load the categories"}</p>
+          <p className="text-gray-500 text-xs mt-1">{loadError}</p>
+          <button
+            onClick={() => { setLoadError(null); location.reload(); }}
+            className="mt-4 text-sm font-medium text-[#1B7FA0] hover:text-[#145F78] px-3 py-1.5 rounded-lg hover:bg-[#E0F5FB] transition"
+          >
+            {he ? "נסו שוב" : "Try again"}
+          </button>
+        </div>
+      ) : !templates ? (
         <div className="grid gap-4 sm:grid-cols-2">
           <SkeletonCard lines={4} />
           <SkeletonCard lines={4} />
@@ -83,7 +98,7 @@ export default function OnboardingPage() {
                 }`}
               >
                 <div className="flex items-center gap-3 mb-2">
-                  <span className="text-3xl">{tpl.emoji}</span>
+                  <span aria-hidden="true" className="text-3xl w-9 shrink-0 text-center leading-none">{tpl.emoji}</span>
                   <span className="text-lg font-bold text-gray-900">{he ? tpl.labelHe : tpl.labelEn}</span>
                   {isSel && (
                     <span className="ms-auto w-6 h-6 rounded-full bg-[#1B7FA0] text-white flex items-center justify-center text-sm">
@@ -91,10 +106,10 @@ export default function OnboardingPage() {
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-gray-600 leading-relaxed mb-3">{tpl.descriptionHe}</p>
+                <p className="text-sm text-gray-600 leading-relaxed mb-3">{he ? tpl.descriptionHe : tpl.descriptionEn}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {tpl.sampleServices.map((s) => (
-                    <span key={s} className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">
+                    <span key={s} dir="auto" className="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">
                       {s}
                     </span>
                   ))}

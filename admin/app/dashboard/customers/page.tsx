@@ -6,6 +6,7 @@ import { useLanguage } from "../../lib/LanguageContext";
 import { SkeletonBlock, SkeletonRow } from "../../lib/Skeleton";
 import { EmptyState } from "../../lib/EmptyState";
 import { formatPhone } from "../../lib/formatPhone";
+import { useDialog } from "../../lib/useDialog";
 
 // Short, stable, human-recognizable reference for a customer (there's no business-facing
 // numeric id in the system) — derived from the DB id so it never changes.
@@ -36,6 +37,7 @@ function ConversationPanel({
 }) {
   const { t, lang } = useLanguage();
   const he = lang === "he";
+  const dialogRef = useDialog<HTMLDivElement>(onClose);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState("");
@@ -136,6 +138,10 @@ function ConversationPanel({
     <div className="fixed inset-0 z-50 flex items-stretch justify-end" onClick={onClose}>
       <div className="absolute inset-0 bg-black/30" />
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={customer.name ?? customer.phone}
         onClick={(e) => e.stopPropagation()}
         className="relative bg-white w-full max-w-md h-full flex flex-col shadow-2xl animate-fade-in"
       >
@@ -256,6 +262,7 @@ function ConversationPanel({
 function BulkMessageModal({ customers, onClose, onSent }: { customers: Customer[]; onClose: () => void; onSent: () => void }) {
   const { t, lang } = useLanguage();
   const he = lang === "he";
+  const dialogRef = useDialog<HTMLDivElement>(onClose);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -284,10 +291,17 @@ function BulkMessageModal({ customers, onClose, onSent }: { customers: Customer[
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)" }} onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bulk-msg-title"
+        className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">{he ? "הודעה קבוצתית" : "Bulk message"}</h2>
+            <h2 id="bulk-msg-title" className="text-sm font-semibold text-gray-900">{he ? "הודעה קבוצתית" : "Bulk message"}</h2>
             <p className="text-xs text-gray-600">{he ? `אל ${customers.length} לקוחות` : `To ${customers.length} customers`}</p>
           </div>
           <button onClick={onClose} aria-label={he ? "סגירה" : "Close"} className="text-gray-600 hover:text-gray-900 transition">

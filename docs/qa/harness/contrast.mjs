@@ -66,6 +66,9 @@ const AUDIT = () => {
     if (rect.width === 0 || rect.height === 0) continue;
     const st = getComputedStyle(el);
     if (st.visibility === "hidden" || st.display === "none") continue;
+    // Screen-reader-only text is clipped to 1px and never painted; its contrast is meaningless
+    // (skip links reveal themselves on focus with their own colours).
+    if (el.closest(".sr-only") || (rect.width <= 1 && rect.height <= 1)) continue;
     // Cumulative opacity through ancestors — a half-faded ancestor lowers effective contrast too.
     let cumOpacity = 1;
     for (let p = el; p && p.nodeType === 1; p = p.parentElement) cumOpacity *= parseFloat(getComputedStyle(p).opacity);
@@ -111,7 +114,6 @@ async function getToken() {
   return (await r.json()).token;
 }
 
-fs.mkdirSync(process.env.QA_OUT ?? "./qa-out", { recursive: true });
 const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
 const token = await getToken();
 const all = {};

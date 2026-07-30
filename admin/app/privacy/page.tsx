@@ -44,20 +44,20 @@ export default function PrivacyPolicy() {
       <div className="max-w-5xl mx-auto px-6 py-10 grid md:grid-cols-[220px_1fr] gap-10">
         {/* Table of contents */}
         <nav className="hidden md:block sticky top-10 self-start">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-3">On this page</p>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-gray-600 mb-3">On this page</p>
           <ul className="flex flex-col gap-1">
             {SECTIONS.map((s) => (
               <li key={s.id}>
                 <a
                   href={`#${s.id}`}
-                  className="block text-xs text-gray-500 hover:text-[#1B7FA0] py-1.5 transition leading-snug"
+                  className="block text-xs text-gray-600 hover:text-[#145F78] py-1.5 transition leading-snug"
                 >
                   {s.title}
                 </a>
               </li>
             ))}
           </ul>
-          <Link href="/terms" className="block text-xs text-[#1B7FA0] hover:underline mt-4 pt-4 border-t border-gray-100">
+          <Link href="/terms" className="block text-xs text-[#145F78] hover:underline mt-4 pt-4 border-t border-gray-100">
             View Terms of Service →
           </Link>
         </nav>

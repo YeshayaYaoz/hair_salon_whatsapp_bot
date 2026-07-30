@@ -2,8 +2,13 @@
 
 **Date:** 2026-07-30 · **Branch:** `claude/torionline-ui-design-qa-9r2mbq` · **Scope:** `admin/` (dashboard, landing, auth, public booking)
 
-Findings only — no product code was changed in this pass. Every item below was reproduced against
-a locally running stack, and each one names the file and line it comes from.
+Every item below was reproduced against a locally running stack, and each one names the file and
+line it came from.
+
+> **Status:** all four P1s and most P2s are **fixed** on this branch — see
+> [What was fixed](#what-was-fixed) at the end for the verified before/after. Line numbers in the
+> findings refer to the code *as it was when the defect was found*. Items still marked open are
+> listed in [Still open](#still-open).
 
 ---
 
@@ -286,12 +291,81 @@ doesn't reproduce a working local DB. `db push` is the working path today.
 
 ---
 
-## Suggested order of work
+## What was fixed
 
-1. #3 `<style>` escaping and #2 the hydration mismatch — both are one-line-ish fixes that restore SSR.
-2. #1 booking page i18n — highest external visibility.
-3. #4 the invisible cancel button — destructive action with no affordance.
-4. #8 / #10 — decide the colour system: promote `#1B7FA0` to a real token, delete the dead amber and
-   slate tokens, pick an accessible WhatsApp green for text and buttons. Most of the P3 contrast list
-   falls out of that one decision.
-5. #5, #6, #7, #9, then the P3 list.
+Re-measured with the same harness after the fixes, on the same seed data:
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Hydration failures (108 page visits) | 10 | **0** |
+| Pages with uncaught JS errors | 10 | **0** |
+| WCAG AA contrast failures | 126 | **50** |
+| Distinct failing colour+size combinations | 66 | **27** |
+| Horizontal overflow / navigation errors | 0 | 0 (no regression) |
+
+Backend suite: 125 tests passing. `tsc --noEmit` clean in both packages — it previously failed,
+because `app/dashboard/layout.tsx` exported `isVisibleFor` and Next.js permits only its own known
+exports from a layout module. That broke `npm run typecheck` and `next build`; the export is now
+module-private (nothing imported it).
+
+**All four P1s.** Booking-page i18n (plus RTL logical properties, mirrored chevrons, salon-timezone
+slot times, and an `isoDate` that no longer returns yesterday for evening visitors in Israel);
+the `toLocaleDateString(undefined)` hydration mismatch, via `formatDateIn`/`localeFor` in `lib/tz.ts`
+which *require* an explicit locale; the `<style>` escaping, via `dangerouslySetInnerHTML`; and the
+invisible cancel button, now 20×20, hidden only on hover-capable devices, `pointer-events-none`
+while hidden, revealed on `focus-visible`, and labelled with the customer's name.
+
+**P2 #5 — modal semantics.** New `lib/useDialog.ts` gives all seven dialogs `role="dialog"`,
+`aria-modal`, Escape-to-close, focus moved in on open and restored on close, a focus trap, and a
+body scroll lock. Verified: focus now lands on the first control and every Tab stays inside.
+
+**P2 #6 — failed loads.** Services and onboarding set `loaded` on the error path too, so a dead API
+no longer renders skeletons forever; the message moved next to the list that actually failed and
+gained a retry.
+
+**P2 #7 — onboarding i18n.** `descriptionEn` added to all five templates in
+`businessTemplates.ts` and served by the API; sample-service chips keep their Hebrew names (they
+become the real seeded services) but carry `dir="auto"` so they stop being bidi-mangled in the
+English UI. Emoji are now fixed-width, which also un-skews the card titles.
+
+**P2 #8/#10 — the colour system.** `tailwind.config.js` now defines real `brand` and `wa` scales;
+the dead `brand: #F59E0B` / `brand-dim` / `slate950-700` tokens (zero usages) are gone. `wa.DEFAULT`
+is Meta's `#25D366` for fills only, `wa.ink` (`#0F8043`, 5.0:1) for anything carrying text — the
+landing CTAs and the dashboard's WhatsApp connect button now pass. Amber that carried text moved to
+`#B45309` (5.0:1). Both analytics charts are teal, so the colour no longer means "today" in one
+chart and nothing in the one beside it.
+
+**P2 #9 — validation copy.** New `lib/validation.ts` replaces Chromium's English
+"Please fill out this field." with localised text on the appointment modal's required fields.
+
+**Several P3s**, where they sat in code already being touched: `"Today"` and the awaiting-deposit
+chip localised, week-nav chevrons mirrored for RTL, dark-theme status pills replaced, the duplicate
+waitlist/schedule clock icon replaced, `aria-hidden` on decorative stat emoji, and a
+skip-to-content link (previously 17 sidebar links stood between a keyboard user and page content).
+
+One systemic fix worth calling out: service price chips derive their text colour from the
+owner-chosen swatch, and **12 of the 17 stock swatches failed AA against their own tint** (amber
+2.04:1, teal 2.33:1). Rather than hand-tune swatches a user can change anyway,
+`lib/readableColor.ts` keeps the hue and walks lightness down until it clears 4.5:1. All 17 now
+pass, worst case 4.52:1.
+
+## Still open
+
+Deliberately not fixed, with reasons:
+
+- **Phone-mockup internals** on the landing pages (`21:03`, `✓✓`, `מקליד`, `Message`) — a faithful
+  reproduction of WhatsApp's own UI. Changing them makes the mockup less convincing; they carry no
+  information the page doesn't state elsewhere. This is most of the remaining 50.
+- **Payments provider chips** (GI / iC / PP / חשבונית ירוקה) — white on third-party brand colours
+  at 2.0–3.3:1. Fixing properly means not using each provider's brand colour as a fill, which is a
+  product decision.
+- **`datetime-local` rendering `mm/dd/yyyy`** — the native control follows browser locale and can't
+  be overridden; a real fix means a custom date picker.
+- **The mobile week grid** (~44px columns, hardcoded 07:00–21:00 regardless of opening hours). A
+  day view or horizontal scroll is a design change, not a bug fix.
+- **Sub-44px touch targets** on row actions (עריכה/מחק/הסרה at 24px high) — worth a pass over the
+  shared row-action pattern rather than page-by-page patches.
+- **`billing: "תשלום"` vs `payments: "סליקה וחשבוניות"`** — genuinely ambiguous in Hebrew, but
+  renaming a nav item owners already know is a call for whoever owns the product vocabulary.
+- **Login form invisible with JS off**, and `/api/business/me` 401ing on every public page.
+- **The missing init migration** (see above) — outside UI scope, but it still blocks a fresh clone.

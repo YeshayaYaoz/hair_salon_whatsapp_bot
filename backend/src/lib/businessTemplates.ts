@@ -56,6 +56,7 @@ export interface BusinessTemplate {
   labelHe: string;
   labelEn: string;
   descriptionHe: string;
+  descriptionEn: string;
   presets: TemplatePresets;
   seedServices: SeedService[];
   vocabulary: Vocabulary;
@@ -68,6 +69,7 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
     labelHe: "מכון יופי / מספרה",
     labelEn: "Salon & Barber",
     descriptionHe: "תספורות, צבע, פן וטיפולי שיער. תזכורות יום לפני ובקשת ביקורת אחרי הביקור.",
+    descriptionEn: "Haircuts, colour, blow-dry and hair treatments. Day-before reminders, and a review request after the visit.",
     presets: {
       botPersonality:
         "דבר בטון חברותי, חם ועדכני. השתמש באימוג'ים במידה. הלקוחות מגיעים לפינוק — תעביר תחושה נעימה ומזמינה.",
@@ -97,6 +99,7 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
     labelHe: "ברברשופ",
     labelEn: "Barbershop",
     descriptionHe: "תספורות גברים, זקן וגילוח. מהיר, ישיר, עם תזכורות יום לפני.",
+    descriptionEn: "Men's cuts, beard trims and shaves. Fast and direct, with day-before reminders.",
     presets: {
       botPersonality:
         "דבר בטון ישיר, קליל וחברי. תכל'ס ולעניין, בלי יותר מדי מילים. הלקוחות רוצים לקבוע מהר ולזוז.",
@@ -125,6 +128,7 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
     labelHe: "קליניקה רפואית",
     labelEn: "Health Clinic",
     descriptionHe: "בדיקות, ייעוצים וטיפולים. טון מקצועי ודיסקרטי, תזכורות עם הנחיות הכנה, ותשלום על אי-הגעה.",
+    descriptionEn: "Check-ups, consultations and treatments. A professional, discreet tone, reminders with preparation instructions, and a no-show charge.",
     presets: {
       botPersonality:
         "דבר בטון רגוע, מקצועי ודיסקרטי. שמור על פרטיות המטופל, הימנע משאלות רפואיות מפורטות, והפנה לצוות בכל מקרה שאינו קביעה או שינוי של תור.",
@@ -154,6 +158,7 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
     labelHe: "קוסמטיקה ואסתטיקה",
     labelEn: "Aesthetics",
     descriptionHe: "טיפולי פנים, לייזר וקוסמטיקה. טון מלוטש ואכפתי, תזכורות עם הנחיות הכנה ומקדמה קטנה.",
+    descriptionEn: "Facials, laser and cosmetics. A polished, attentive tone, reminders with preparation instructions, and a small deposit.",
     presets: {
       botPersonality:
         "דבר בטון מלוטש, אכפתי ומרגיע. הדגש תוצאה ופינוק, והקפד על מקצועיות. במידת הצורך ציין הנחיות הכנה לטיפול.",
@@ -182,6 +187,7 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
     labelHe: "צימרים / אירוח",
     labelEn: "B&B / Vacation Rental",
     descriptionHe: "אירוח ולינה. הבוט מוסר מחירים וזמינות כללית, וכשאורח רוצה להזמין — שולח לך התראה עם המספר לחזור אליו (ללא קביעת הזמנה אוטומטית).",
+    descriptionEn: "Lodging and hospitality. The bot quotes prices and general availability; when a guest wants to book it alerts you with their number to call back, rather than booking automatically.",
     presets: {
       botPersonality:
         "דבר בטון חם, מסביר פנים ואירוחי. גרום לאורח להרגיש רצוי. מסור מידע על היחידות והמחירים, וכשמבקשים להזמין — אסוף פרטים והעבר למארח.",

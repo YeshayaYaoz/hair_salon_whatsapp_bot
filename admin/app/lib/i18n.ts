@@ -13,6 +13,8 @@ const translations = {
     daysShort: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
     today: "Today", previousWeek: "Previous week", nextWeek: "Next week",
     awaitingDeposit: "Awaiting deposit",
+    loadFailed: "Couldn't load this list", retry: "Try again",
+    skipToContent: "Skip to content",
 
     // Analytics
     analyticsTitle: "Analytics", analyticsSubtitle: "Overview of your salon's performance",
@@ -154,6 +156,8 @@ const translations = {
     daysShort: ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"],
     today: "היום", previousWeek: "השבוע הקודם", nextWeek: "השבוע הבא",
     awaitingDeposit: "ממתין למקדמה",
+    loadFailed: "לא הצלחנו לטעון את הרשימה", retry: "נסו שוב",
+    skipToContent: "דילוג לתוכן",
 
     // Analytics
     analyticsTitle: "סטטיסטיקות", analyticsSubtitle: "מה קורה בעסק — במבט אחד",

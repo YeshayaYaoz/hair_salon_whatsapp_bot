@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SkeletonRow } from "../../lib/Skeleton";
+import { readableOnTint } from "../../lib/readableColor";
 
 // A curated, muted palette instead of raw saturated primaries — tones picked to sit together
 // (similar chroma/lightness) so any combination of service tags looks intentional, not like a
@@ -63,6 +64,9 @@ export default function ServicesPage() {
   const [newImageUrl, setNewImageUrl] = useState("");
   const [newLinkUrl, setNewLinkUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // Tracked separately from `error` (which also carries add/save failures) so a failed *list* load
+  // is reported where the list is, instead of in the add-service card at the bottom of the page.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -71,7 +75,14 @@ export default function ServicesPage() {
     setLoaded(true);
   }
 
-  useEffect(() => { load().catch((e) => setError(e.message)); }, []);
+  // `setLoaded(true)` on failure too: without it the skeleton rows below render forever, so a
+  // dead API looks like a page that is still loading rather than one that failed.
+  useEffect(() => {
+    load().catch((e) => {
+      setLoadError(e instanceof Error ? e.message : String(e));
+      setLoaded(true);
+    });
+  }, []);
 
   function startEdit(s: Service) {
     setEditingId(s.id);
@@ -188,6 +199,22 @@ export default function ServicesPage() {
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-6 animate-fade-up stagger-2">
         {!loaded ? (
           <div><SkeletonRow cols={2} /><SkeletonRow cols={2} /><SkeletonRow cols={2} /></div>
+        ) : loadError ? (
+          <div className="px-6 py-12 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-50 border border-red-200 flex items-center justify-center mx-auto mb-3">
+              <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <p className="text-gray-700 text-sm font-medium">{t.loadFailed}</p>
+            <p className="text-gray-500 text-xs mt-1">{loadError}</p>
+            <button
+              onClick={() => { setLoadError(null); setLoaded(false); load().catch((e) => { setLoadError(e instanceof Error ? e.message : String(e)); setLoaded(true); }); }}
+              className="mt-4 text-sm font-medium text-[#1B7FA0] hover:text-[#145F78] px-3 py-1.5 rounded-lg hover:bg-[#E0F5FB] transition"
+            >
+              {t.retry}
+            </button>
+          </div>
         ) : services.length === 0 ? (
           <div className="px-6 py-12 text-center">
             <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
@@ -244,7 +271,12 @@ export default function ServicesPage() {
                   </div>
                   <span
                     className="text-xs font-bold shrink-0 tabular-nums px-2.5 py-1 rounded-full"
-                    style={{ background: `${s.color ?? "#1B7FA0"}12`, color: s.color ?? "#1B7FA0" }}
+                    style={{
+                      background: `${s.color ?? "#1B7FA0"}12`,
+                      // The raw swatch is the chip's fill; the text is a darkened form of it, or
+                      // several stock colours land at 2-4:1 against their own tint.
+                      color: readableOnTint(s.color ?? "#1B7FA0"),
+                    }}
                   >
                     ₪{(s.priceCents / 100).toFixed(0)}
                   </span>

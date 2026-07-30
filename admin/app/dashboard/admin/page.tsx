@@ -5,6 +5,7 @@ import { apiFetch, startImpersonation } from "../../lib/api";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SkeletonRow } from "../../lib/Skeleton";
+import { useDialog } from "../../lib/useDialog";
 
 interface AdminBusiness {
   id: string;
@@ -94,6 +95,7 @@ export default function AdminBusinessesPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [drilldown, setDrilldown] = useState<AdminBusiness | null>(null);
+  const drilldownRef = useDialog<HTMLDivElement>(() => setDrilldown(null), drilldown !== null);
   const [phoneRows, setPhoneRows] = useState<PhoneUsageRow[] | null>(null);
   const [bizAuditLog, setBizAuditLog] = useState<AuditLogEntry[] | null>(null);
   const [blockReason, setBlockReason] = useState("");
@@ -525,12 +527,16 @@ export default function AdminBusinessesPage() {
           onClick={() => setDrilldown(null)}
         >
           <div
+            ref={drilldownRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="drilldown-title"
             className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-1">
               <div className="min-w-0">
-                <h2 className="text-lg font-bold text-gray-900">{drilldown.name}</h2>
+                <h2 id="drilldown-title" className="text-lg font-bold text-gray-900">{drilldown.name}</h2>
                 {/* Reachability up top: the whole point of this panel is diagnosing a business and
                     then actually contacting the owner about it. hover:text-gray-900 because the
                     Close button's hover previously matched its base colour. */}

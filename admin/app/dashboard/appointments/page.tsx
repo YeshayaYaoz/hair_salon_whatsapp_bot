@@ -7,6 +7,8 @@ import { formatTimeInTz, formatDateTimeInTz, partsInTz, dayKeyInTz, formatDateIn
 import { SkeletonBlock, SkeletonRow } from "../../lib/Skeleton";
 import { EmptyState } from "../../lib/EmptyState";
 import { formatPhone } from "../../lib/formatPhone";
+import { useDialog } from "../../lib/useDialog";
+import { requiredField } from "../../lib/validation";
 
 function localDayKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -127,6 +129,8 @@ function GoogleCalendarSection() {
 function NewAppointmentModal({ tz, onClose, onCreated }: { tz: string; onClose: () => void; onCreated: () => void }) {
   const { lang } = useLanguage();
   const he = lang === "he";
+  const dialogRef = useDialog<HTMLFormElement>(onClose);
+  const req = requiredField(he ? "יש למלא שדה זה" : "Please fill out this field");
   const [services, setServices] = useState<{ id: string; name: string }[]>([]);
   const [serviceId, setServiceId] = useState("");
   const [customerName, setCustomerName] = useState("");
@@ -162,30 +166,34 @@ function NewAppointmentModal({ tz, onClose, onCreated }: { tz: string; onClose: 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <form
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-appt-title"
         onClick={(e) => e.stopPropagation()}
         onSubmit={submit}
         className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl flex flex-col gap-4 animate-fade-up"
         dir={he ? "rtl" : "ltr"}
       >
-        <h2 className="text-lg font-bold text-gray-900">{he ? "תור חדש (ידני)" : "New appointment (manual)"}</h2>
+        <h2 id="new-appt-title" className="text-lg font-bold text-gray-900">{he ? "תור חדש (ידני)" : "New appointment (manual)"}</h2>
 
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "שירות" : "Service"}</label>
-          <select value={serviceId} onChange={(e) => setServiceId(e.target.value)} required className="w-full">
+          <select value={serviceId} onChange={(e) => setServiceId(e.target.value)} {...req} className="w-full">
             {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "שם הלקוח" : "Customer name"}</label>
-          <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} required className="w-full" />
+          <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} {...req} className="w-full" />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "טלפון" : "Phone"}</label>
-          <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} required placeholder="972501234567" className="w-full" dir="ltr" />
+          <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} {...req} placeholder="972501234567" className="w-full" dir="ltr" />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "מועד" : "Date & time"}</label>
-          <input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} required className="w-full" dir="ltr" />
+          <input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} {...req} className="w-full" dir="ltr" />
           <p className="text-[11px] text-gray-600 mt-1">{he ? `לפי אזור הזמן ${tz}` : `In timezone ${tz}`}</p>
         </div>
 
@@ -531,7 +539,7 @@ export default function AppointmentsPage() {
             </button>
             <button
               onClick={() => setWeekStart(startOfWeek(new Date()))}
-              className="text-xs text-[#1B7FA0] hover:text-[#145F78] font-medium px-2 py-1 rounded-lg hover:bg-[#E0F5FB] transition"
+              className="text-xs text-[#145F78] hover:text-[#0F4A5E] font-medium px-2 py-1 rounded-lg hover:bg-[#E0F5FB] transition"
             >
               {t.today}
             </button>
