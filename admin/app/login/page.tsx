@@ -96,7 +96,12 @@ export default function LoginPage() {
 
   return (
     <>
-      <style>{`
+      {/* dangerouslySetInnerHTML, not a text child: React escapes text children, so an apostrophe
+          becomes &#x27; in the server HTML — but <style> is a raw-text element, so the browser never
+          decodes it. `content: ''` then parses as invalid and the declaration is dropped entirely
+          (the aurora glows below simply never render in the server paint), and the text mismatch
+          fails hydration, making React throw away the whole document and re-render client-side. */}
+      <style dangerouslySetInnerHTML={{ __html: `
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         .login-root {
@@ -582,7 +587,7 @@ export default function LoginPage() {
         @media (prefers-reduced-motion: reduce) {
           .login-card, .login-card.show > * { animation: none; transition: none; opacity: 1; transform: none; }
         }
-      `}</style>
+      ` }} />
 
       <main className="login-root" dir={he ? "rtl" : "ltr"}>
         {/* Left / dark showcase panel */}

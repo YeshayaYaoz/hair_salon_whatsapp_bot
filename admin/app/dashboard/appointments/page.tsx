@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
-import { formatTimeInTz, formatDateTimeInTz, partsInTz, dayKeyInTz } from "../../lib/tz";
+import { formatTimeInTz, formatDateTimeInTz, partsInTz, dayKeyInTz, formatDateIn, localeFor } from "../../lib/tz";
 import { SkeletonBlock, SkeletonRow } from "../../lib/Skeleton";
 import { EmptyState } from "../../lib/EmptyState";
 import { formatPhone } from "../../lib/formatPhone";
@@ -24,10 +24,13 @@ interface Appointment {
   staff?: { name: string } | null;
 }
 
+// All four are light-theme tints. `cancelled` and `pending` previously carried bg-red-950/bg-yellow-950
+// with light text — leftovers from the old dark theme that rendered as a near-black chip in the
+// middle of a light table, next to their bg-*-50 siblings.
 const STATUS_STYLES: Record<string, string> = {
   confirmed: "bg-green-50 text-green-700 border-green-200",
-  cancelled: "bg-red-950/50 text-red-600 border-red-200",
-  pending: "bg-yellow-950/50 text-yellow-400 border-yellow-800",
+  cancelled: "bg-red-50 text-red-700 border-red-200",
+  pending: "bg-yellow-50 text-yellow-800 border-yellow-300",
   pending_payment: "bg-amber-50 text-amber-700 border-amber-200",
 };
 
@@ -301,17 +304,28 @@ function WeekCalendar({
                       className={`rounded px-1.5 py-1 text-[10px] leading-tight cursor-default transition group relative text-white ${
                         a.status === "pending_payment" ? "bg-amber-500 hover:bg-amber-600" : "bg-[#1B7FA0] hover:bg-[#2A9BBF]"
                       }`}
-                      title={`${a.customer.name ?? formatPhone(a.customer.phone)} · ${a.service.name}${a.status === "pending_payment" ? " · ⏳ ממתין למקדמה" : ""}`}
+                      title={`${a.customer.name ?? formatPhone(a.customer.phone)} · ${a.service.name}${a.status === "pending_payment" ? ` · ⏳ ${t.awaitingDeposit}` : ""}`}
                     >
                       <div className="font-semibold truncate">{formatTimeInTz(a.startTime, tz)}</div>
                       <div className="truncate opacity-80">{a.customer.name ?? <span dir="ltr">{formatPhone(a.customer.phone)}</span>}</div>
-                      <div className="truncate opacity-70">{a.status === "pending_payment" ? "⏳ ממתין למקדמה" : a.service.name}</div>
+                      <div className="truncate opacity-70">{a.status === "pending_payment" ? `⏳ ${t.awaitingDeposit}` : a.service.name}</div>
                       {new Date(a.startTime) >= new Date() && (
+                        // Cancelling is destructive, so this must never be invisible-but-clickable.
+                        // It stays visible by default (touch devices have no hover, and previously
+                        // this was unreachable there while still being tappable); only pointer
+                        // devices get the reveal-on-hover treatment, and then `pointer-events-none`
+                        // while hidden means a click can't land on something nobody can see.
+                        // focus-visible brings it back for keyboard users, who could otherwise
+                        // trigger a cancel they had no way to perceive.
                         <button
                           onClick={() => onCancel(a.id)}
                           disabled={cancellingId === a.id}
-                          className="absolute top-0.5 end-0.5 opacity-0 group-hover:opacity-100 text-white/70 hover:text-white transition text-xs leading-none"
-                          title={t.cancel}
+                          className="absolute top-0 end-0 grid place-items-center w-5 h-5 rounded text-white/80
+                            hover:text-white hover:bg-black/25 transition leading-none
+                            [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:pointer-events-none
+                            [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-hover:pointer-events-auto
+                            focus-visible:opacity-100 focus-visible:pointer-events-auto"
+                          aria-label={`${t.cancel} — ${a.customer.name ?? formatPhone(a.customer.phone)}`}
                         >×</button>
                       )}
                     </div>
@@ -492,22 +506,26 @@ export default function AppointmentsPage() {
       {view === "calendar" ? (
         <>
           <div className="flex items-center gap-3 mb-4 animate-fade-up stagger-2">
+            {/* rtl:-scale-x-100 mirrors the chevron: in RTL the flex row reverses, so this button
+                sits on the right, where "previous" has to point right to read as going back. */}
             <button
               onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d); }}
               className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition"
+              aria-label={t.previousWeek}
             >
-              <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-gray-600 rtl:-scale-x-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
             <span className="text-sm font-medium text-gray-700">
-              {weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} — {weekEnd.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+              {formatDateIn(weekStart, localeFor(lang), { month: "short", day: "numeric" })} — {formatDateIn(weekEnd, localeFor(lang), { month: "short", day: "numeric", year: "numeric" })}
             </span>
             <button
               onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d); }}
               className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition"
+              aria-label={t.nextWeek}
             >
-              <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-gray-600 rtl:-scale-x-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
@@ -515,7 +533,7 @@ export default function AppointmentsPage() {
               onClick={() => setWeekStart(startOfWeek(new Date()))}
               className="text-xs text-[#1B7FA0] hover:text-[#145F78] font-medium px-2 py-1 rounded-lg hover:bg-[#E0F5FB] transition"
             >
-              Today
+              {t.today}
             </button>
           </div>
           {loaded ? (
@@ -648,7 +666,7 @@ export default function AppointmentsPage() {
                         <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLES[a.status] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
                           {a.status === "confirmed" ? (lang === "he" ? "מאושר" : "Confirmed")
                             : a.status === "cancelled" ? (lang === "he" ? "בוטל" : "Cancelled")
-                            : a.status === "pending_payment" ? `⏳ ${lang === "he" ? "ממתין למקדמה" : "Awaiting deposit"}${a.depositAmountIls ? ` ₪${a.depositAmountIls}` : ""}`
+                            : a.status === "pending_payment" ? `⏳ ${t.awaitingDeposit}${a.depositAmountIls ? ` ₪${a.depositAmountIls}` : ""}`
                             : a.status}
                         </span>
                       </td>

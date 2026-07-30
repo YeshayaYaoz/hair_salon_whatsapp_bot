@@ -232,7 +232,12 @@ export default function LandingPageEN() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <style>{`
+      {/* dangerouslySetInnerHTML, not a text child: React escapes text children, so an apostrophe
+          becomes &#x27; in the server HTML — but <style> is a raw-text element, so the browser never
+          decodes it. `content: ''` then parses as invalid and the declaration is dropped entirely
+          (every ::before/::after decoration below vanishes from the server paint), and the text
+          mismatch fails hydration, costing this page — the one that most needs SSR — its server render. */}
+      <style dangerouslySetInnerHTML={{ __html: `
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         .lp {
           background: #fff; color: #111;
@@ -649,7 +654,7 @@ export default function LandingPageEN() {
         .mobile-nav-link:hover { background: #F5F5F5; }
         .mobile-nav-divider { height: 1px; background: #F0F0F0; margin: 6px 0; }
         .mobile-nav-cta { display: block; background: #111; color: #fff; font-size: 14px; font-weight: 700; text-decoration: none; padding: 12px 16px; border-radius: 10px; text-align: center; margin-top: 4px; }
-      `}</style>
+      ` }} />
 
       <div id="scroll-bar" />
 

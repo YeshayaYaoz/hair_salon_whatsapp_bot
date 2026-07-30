@@ -241,8 +241,13 @@ export default function LandingPage() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <noscript><style>{`.phone-chat > * { display: flex !important; }`}</style></noscript>
-      <style>{`
+      <noscript><style dangerouslySetInnerHTML={{ __html: `.phone-chat > * { display: flex !important; }` }} /></noscript>
+      {/* dangerouslySetInnerHTML, not a text child: React escapes text children, so an apostrophe
+          becomes &#x27; in the server HTML — but <style> is a raw-text element, so the browser never
+          decodes it. `content: ''` then parses as invalid and the declaration is dropped entirely
+          (every ::before/::after decoration below vanishes from the server paint), and the text
+          mismatch fails hydration, costing this page — the one that most needs SSR — its server render. */}
+      <style dangerouslySetInnerHTML={{ __html: `
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         /* Offset in-page anchor scrolling for the 62px fixed nav, so section headings aren't
            hidden behind it when clicking links like #pricing / #faq. */
@@ -918,7 +923,7 @@ export default function LandingPage() {
         .lp-roi-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 8px 0 32px; }
         .lp-roi-source { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.06); }
         .lp-roi-source svg { flex-shrink: 0; opacity: 0.6; }
-      `}</style>
+      ` }} />
 
 
       <div id="scroll-bar" />

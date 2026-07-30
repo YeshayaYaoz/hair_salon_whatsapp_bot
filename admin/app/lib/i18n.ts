@@ -11,6 +11,8 @@ const translations = {
     navGroups: { setup: "Get started", overview: "Home", operations: "Day-to-day", business: "My business", account: "Setup & account" },
     days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
     daysShort: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+    today: "Today", previousWeek: "Previous week", nextWeek: "Next week",
+    awaitingDeposit: "Awaiting deposit",
 
     // Analytics
     analyticsTitle: "Analytics", analyticsSubtitle: "Overview of your salon's performance",
@@ -150,6 +152,8 @@ const translations = {
     navGroups: { setup: "הפעלה ראשונית", overview: "ראשי", operations: "ניהול יומי", business: "העסק שלי", account: "הגדרות וחשבון" },
     days: ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"],
     daysShort: ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"],
+    today: "היום", previousWeek: "השבוע הקודם", nextWeek: "השבוע הבא",
+    awaitingDeposit: "ממתין למקדמה",
 
     // Analytics
     analyticsTitle: "סטטיסטיקות", analyticsSubtitle: "מה קורה בעסק — במבט אחד",
