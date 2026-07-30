@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SkeletonRow } from "../../lib/Skeleton";
+import { AutoTextarea } from "../../lib/AutoTextarea";
 
 // A curated, muted palette instead of raw saturated primaries — tones picked to sit together
 // (similar chroma/lightness) so any combination of service tags looks intentional, not like a
@@ -208,7 +209,16 @@ export default function ServicesPage() {
                     <input value={editState.duration} onChange={(e) => setEditState((p) => ({ ...p, duration: e.target.value }))} placeholder={durationLabel} type="number" min="1" className="w-28 text-sm" />
                     <input value={editState.capacity} onChange={(e) => setEditState((p) => ({ ...p, capacity: e.target.value }))} placeholder={t.capacity} title={t.capacityHint} type="number" min="1" className="w-24 text-sm" />
                   </div>
-                  <input value={editState.description} onChange={(e) => setEditState((p) => ({ ...p, description: e.target.value }))} placeholder={t.descriptionOptional} className="w-full text-sm mb-2" />
+                  {/* The bot reads this out to customers, so it can run to several lines — a
+                      single-line input hid everything past the first few words while writing it. */}
+                  <div className="mb-2">
+                    <AutoTextarea
+                      value={editState.description}
+                      onChange={(v) => setEditState((p) => ({ ...p, description: v }))}
+                      placeholder={t.descriptionOptional}
+                      className="w-full text-sm"
+                    />
+                  </div>
                   <div className="flex gap-2 mb-2">
                     <input value={editState.imageUrl} onChange={(e) => setEditState((p) => ({ ...p, imageUrl: e.target.value }))} placeholder={t.imageUrlOptional} dir="ltr" className="flex-1 min-w-32 text-sm" />
                     <input value={editState.linkUrl} onChange={(e) => setEditState((p) => ({ ...p, linkUrl: e.target.value }))} placeholder={t.linkUrlOptional} dir="ltr" className="flex-1 min-w-32 text-sm" />
@@ -240,7 +250,7 @@ export default function ServicesPage() {
                         </a>
                       )}
                     </div>
-                    {s.description && <div className="text-gray-600 text-xs truncate mt-0.5">{s.description}</div>}
+                    {s.description && <div className="text-gray-600 text-xs mt-0.5 line-clamp-2 whitespace-pre-line">{s.description}</div>}
                   </div>
                   <span
                     className="text-xs font-bold shrink-0 tabular-nums px-2.5 py-1 rounded-full"
@@ -275,7 +285,12 @@ export default function ServicesPage() {
             <input placeholder={durationLabel} type="number" min="1" value={newDuration} onChange={(e) => setNewDuration(e.target.value)} required className="w-32" />
             <input placeholder={t.capacity} title={t.capacityHint} type="number" min="1" value={newCapacity} onChange={(e) => setNewCapacity(e.target.value)} className="w-28" />
           </div>
-          <input placeholder={t.descriptionOptional} value={newDescription} onChange={(e) => setNewDescription(e.target.value)} className="w-full" />
+          <AutoTextarea
+            value={newDescription}
+            onChange={setNewDescription}
+            placeholder={t.descriptionOptional}
+            className="w-full"
+          />
           <div className="flex gap-2">
             <input placeholder={t.imageUrlOptional} value={newImageUrl} onChange={(e) => setNewImageUrl(e.target.value)} dir="ltr" className="flex-1 min-w-32" />
             <input placeholder={t.linkUrlOptional} value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} dir="ltr" className="flex-1 min-w-32" />

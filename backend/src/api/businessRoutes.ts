@@ -1708,6 +1708,19 @@ businessRouter.post("/faq", async (req: AuthedRequest, res) => {
   res.status(201).json(entry);
 });
 
+// updateMany rather than update-by-id: the businessId in the WHERE clause is what stops one
+// account editing another's entry, and update() would ignore it and throw only on a missing row.
+businessRouter.put("/faq/:id", async (req: AuthedRequest, res) => {
+  const parsed = faqSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const { count } = await prisma.faqEntry.updateMany({
+    where: { id: req.params.id, businessId: req.businessId! },
+    data: parsed.data,
+  });
+  if (count === 0) return res.status(404).json({ error: "Not found" });
+  res.json({ ok: true });
+});
+
 businessRouter.delete("/faq/:id", async (req: AuthedRequest, res) => {
   await prisma.faqEntry.deleteMany({ where: { id: req.params.id, businessId: req.businessId! } });
   res.json({ ok: true });
