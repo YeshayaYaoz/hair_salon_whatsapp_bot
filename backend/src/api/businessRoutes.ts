@@ -1269,7 +1269,10 @@ const serviceSchema = z.object({
   durationMin: z.number().int().positive(),
   color: z.string().optional(),
   capacity: z.number().int().min(1).max(500).optional(), // >1 = group class; omitted keeps default 1
-  imageUrl: z.string().optional(),
+  // WhatsApp fetches these URLs itself, so they must be publicly reachable http(s) links —
+  // rejecting anything else here beats the bot silently failing to deliver a photo later.
+  // Capped at 10: WhatsApp sends one image per message, and a longer burst reads as spam.
+  imageUrls: z.array(z.string().url().startsWith("http")).max(10).optional(),
   linkUrl: z.string().optional(),
 });
 

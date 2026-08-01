@@ -42,6 +42,11 @@ const translations = {
     descriptionOptional: "Description (optional)",
     imageUrlOptional: "Photo link (optional)",
     linkUrlOptional: "More info link (optional)",
+    photos: "Photos",
+    photosHint: "The bot sends these on WhatsApp when a customer asks to see photos. Paste a public image link (https://…) — one per photo.",
+    addPhoto: "Add photo",
+    removePhoto: "Remove photo",
+    photoCount: (n: number) => `${n} photo${n === 1 ? "" : "s"}`,
     noServices: "No services yet. Add one below.",
     servicesSubtitle: "Add the services your salon offers.",
 
@@ -181,6 +186,11 @@ const translations = {
     descriptionOptional: "תיאור (לא חובה)",
     imageUrlOptional: "קישור לתמונה (לא חובה)",
     linkUrlOptional: "קישור למידע נוסף (לא חובה)",
+    photos: "תמונות",
+    photosHint: "הבוט שולח את התמונות האלה בוואטסאפ כשלקוח מבקש לראות. הדביקו קישור ציבורי לתמונה (https://…) — קישור אחד לכל תמונה.",
+    addPhoto: "הוספת תמונה",
+    removePhoto: "הסרת תמונה",
+    photoCount: (n: number) => (n === 1 ? "תמונה אחת" : `${n} תמונות`),
     noServices: "עוד לא הוספתם שירותים — זה השלב הראשון, יאללה 👇",
     servicesSubtitle: "מה אתם מציעים? תספורת, צבע, טיפול פנים — הכל נכנס לפה.",
 

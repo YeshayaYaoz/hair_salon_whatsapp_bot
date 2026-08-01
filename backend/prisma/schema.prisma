@@ -189,7 +189,9 @@ model Service {
   // Plain URLs (an image link, or a page with more photos/details) rather than hosted uploads —
   // no object storage exists in this app yet, and a URL field matches the existing googleMapsUrl
   // pattern rather than introducing new upload infrastructure for this alone.
-  imageUrl        String?
+  // Photos the bot can send when a customer asks to see the unit. Plain URLs rather than uploaded
+  // files: there is no object storage in this app, and a URL list needs no new infrastructure.
+  imageUrls       String[]
   linkUrl         String?
   appointments    Appointment[]
   waitlistEntries WaitlistEntry[]

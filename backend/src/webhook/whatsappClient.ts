@@ -62,6 +62,18 @@ export async function sendWhatsAppMessage(params: SendCommon & { text: string })
   });
 }
 
+/**
+ * Sends a photo by URL. Meta fetches the URL itself, so it has to be publicly reachable — a link
+ * behind auth, or one that 404s, fails at Meta's end rather than ours and surfaces as a send error.
+ * Caption is optional and shown under the image.
+ */
+export async function sendWhatsAppImage(params: SendCommon & { imageUrl: string; caption?: string }) {
+  await send(params, {
+    type: "image",
+    image: { link: params.imageUrl, ...(params.caption ? { caption: params.caption } : {}) },
+  });
+}
+
 export interface ListRow {
   id: string;
   title: string; // max 24 chars per WhatsApp's limit

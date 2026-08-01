@@ -2,7 +2,7 @@ import { Router } from "express";
 import express from "express";
 import crypto from "crypto";
 import { resolveBusinessByPhoneNumberId } from "../tenants/resolve.js";
-import { sendWhatsAppMessage, sendWhatsAppList, WhatsAppAuthError, type ListRow } from "./whatsappClient.js";
+import { sendWhatsAppMessage, sendWhatsAppList, sendWhatsAppImage, WhatsAppAuthError, type ListRow } from "./whatsappClient.js";
 import { sendWhatsAppTokenExpiredEmail } from "../lib/email.js";
 import { handleIncomingMessage } from "../bot/claudeBot.js";
 import { clearHistory, appendTurn } from "../bot/conversationStore.js";
@@ -321,7 +321,7 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
     // canned replies and interactive UI pieces.
     const lang: "he" | "en" = detectLang(textToProcess);
 
-    const { text: reply, offeredSlots } = await handleIncomingMessage(business.id, customerPhone, textToProcess);
+    const { text: reply, offeredSlots, photos } = await handleIncomingMessage(business.id, customerPhone, textToProcess);
 
     if (offeredSlots && offeredSlots.length > 0) {
       await sendWhatsAppList({
@@ -335,6 +335,19 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
       });
     } else {
       await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: reply });
+    }
+
+    // Photos go out after the text so the customer reads the lead-in first. Sent one at a time
+    // (WhatsApp has no multi-image message) and in order. A single bad URL — a link the owner
+    // pasted wrong, or an image host that's down — must not swallow the rest or the whole reply,
+    // which the customer has already received at this point.
+    for (const photo of photos ?? []) {
+      try {
+        await sendWhatsAppImage({ phoneNumberId, accessToken, to: customerPhone, imageUrl: photo.url, caption: photo.caption });
+      } catch (photoErr) {
+        console.error("Failed to send photo:", photo.url, photoErr);
+        captureError(photoErr, { businessId: business.id, customerPhone, kind: "sendPhoto" });
+      }
     }
   } catch (err) {
     // A bad/expired access token: alert the owner by email (we can't WhatsApp them — same token).

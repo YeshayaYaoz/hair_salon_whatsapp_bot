@@ -26,7 +26,7 @@ interface Service {
   durationMin: number;
   color?: string;
   capacity?: number;
-  imageUrl?: string;
+  imageUrls?: string[];
   linkUrl?: string;
 }
 
@@ -37,7 +37,7 @@ interface EditState {
   duration: string;
   color: string;
   capacity: string;
-  imageUrl: string;
+  imageUrls: string[];
   linkUrl: string;
 }
 
@@ -54,14 +54,14 @@ export default function ServicesPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editState, setEditState] = useState<EditState>({ name: "", description: "", price: "", duration: "", color: COLORS[0].hex, capacity: "1", imageUrl: "", linkUrl: "" });
+  const [editState, setEditState] = useState<EditState>({ name: "", description: "", price: "", duration: "", color: COLORS[0].hex, capacity: "1", imageUrls: [], linkUrl: "" });
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [newDuration, setNewDuration] = useState("");
   const [newCapacity, setNewCapacity] = useState("1");
   const [newColor, setNewColor] = useState(COLORS[0].hex);
-  const [newImageUrl, setNewImageUrl] = useState("");
+  const [newImageUrls, setNewImageUrls] = useState<string[]>([]);
   const [newLinkUrl, setNewLinkUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -83,7 +83,7 @@ export default function ServicesPage() {
       duration: toDurationInput(s.durationMin),
       color: s.color ?? COLORS[0].hex,
       capacity: String(s.capacity ?? 1),
-      imageUrl: s.imageUrl ?? "",
+      imageUrls: s.imageUrls ?? [],
       linkUrl: s.linkUrl ?? "",
     });
   }
@@ -100,7 +100,7 @@ export default function ServicesPage() {
           durationMin: fromDurationInput(editState.duration),
           color: editState.color,
           capacity: Math.max(1, Number(editState.capacity) || 1),
-          imageUrl: editState.imageUrl || undefined,
+          imageUrls: editState.imageUrls.map((u) => u.trim()).filter(Boolean),
           linkUrl: editState.linkUrl || undefined,
         }),
       });
@@ -127,11 +127,11 @@ export default function ServicesPage() {
           durationMin: fromDurationInput(newDuration),
           color: newColor,
           capacity: Math.max(1, Number(newCapacity) || 1),
-          imageUrl: newImageUrl || undefined,
+          imageUrls: newImageUrls.map((u) => u.trim()).filter(Boolean),
           linkUrl: newLinkUrl || undefined,
         }),
       });
-      setNewName(""); setNewDescription(""); setNewPrice(""); setNewDuration(""); setNewCapacity("1"); setNewColor(COLORS[0].hex); setNewImageUrl(""); setNewLinkUrl("");
+      setNewName(""); setNewDescription(""); setNewPrice(""); setNewDuration(""); setNewCapacity("1"); setNewColor(COLORS[0].hex); setNewImageUrls([]); setNewLinkUrl("");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add service");
@@ -143,6 +143,60 @@ export default function ServicesPage() {
   async function remove(id: string) {
     await apiFetch(`/api/business/services/${id}`, { method: "DELETE" });
     await load();
+  }
+
+  /**
+   * Editor for the list of photo links the bot sends over WhatsApp.
+   *
+   * These are pasted public URLs rather than uploads: the app has no object storage, and WhatsApp
+   * fetches the image from the link itself, so whatever is stored here must stay reachable. Each
+   * row previews the link so a typo or a dead host is visible here instead of surfacing as a
+   * missing photo in a customer's chat.
+   */
+  function PhotoList({ urls, onChange }: { urls: string[]; onChange: (next: string[]) => void }) {
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="text-xs font-semibold text-gray-600">{t.photos}</div>
+        {urls.map((url, i) => (
+          <div key={i} className="flex items-center gap-2">
+            {url.trim() ? (
+              /* eslint-disable-next-line @next/next/no-img-element -- arbitrary owner-pasted URL, not a local/optimizable asset */
+              <img src={url} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0 bg-gray-100" onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+            ) : (
+              <div className="w-9 h-9 rounded-lg shrink-0 bg-gray-100" />
+            )}
+            <input
+              value={url}
+              onChange={(e) => onChange(urls.map((u, j) => (j === i ? e.target.value : u)))}
+              placeholder="https://…"
+              dir="ltr"
+              className="flex-1 min-w-32 text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => onChange(urls.filter((_, j) => j !== i))}
+              aria-label={t.removePhoto}
+              title={t.removePhoto}
+              className="text-gray-600 hover:text-red-600 transition p-1.5 rounded hover:bg-red-50"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        ))}
+        {urls.length < 10 && (
+          <button
+            type="button"
+            onClick={() => onChange([...urls, ""])}
+            className="self-start text-xs text-[#1B7FA0] hover:text-[#145F78] font-semibold px-2 py-1 rounded hover:bg-[#E0F5FB] transition"
+          >
+            + {t.addPhoto}
+          </button>
+        )}
+        <p className="text-xs text-gray-600">{t.photosHint}</p>
+      </div>
+    );
   }
 
   function ColorPicker({ value, onChange }: { value: string; onChange: (hex: string) => void }) {
@@ -219,8 +273,10 @@ export default function ServicesPage() {
                       className="w-full text-sm"
                     />
                   </div>
+                  <div className="mb-3">
+                    <PhotoList urls={editState.imageUrls} onChange={(next) => setEditState((p) => ({ ...p, imageUrls: next }))} />
+                  </div>
                   <div className="flex gap-2 mb-2">
-                    <input value={editState.imageUrl} onChange={(e) => setEditState((p) => ({ ...p, imageUrl: e.target.value }))} placeholder={t.imageUrlOptional} dir="ltr" className="flex-1 min-w-32 text-sm" />
                     <input value={editState.linkUrl} onChange={(e) => setEditState((p) => ({ ...p, linkUrl: e.target.value }))} placeholder={t.linkUrlOptional} dir="ltr" className="flex-1 min-w-32 text-sm" />
                   </div>
                   <div className="flex items-center justify-between">
@@ -233,9 +289,16 @@ export default function ServicesPage() {
                 </div>
               ) : (
                 <div key={s.id} className="flex items-center gap-3 px-4 py-3.5 group">
-                  {s.imageUrl ? (
-                    /* eslint-disable-next-line @next/next/no-img-element -- arbitrary owner-pasted URL, not a local/optimizable asset */
-                    <img src={s.imageUrl} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                  {s.imageUrls && s.imageUrls.length > 0 ? (
+                    <div className="relative shrink-0" title={t.photoCount(s.imageUrls.length)}>
+                      {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary owner-pasted URL, not a local/optimizable asset */}
+                      <img src={s.imageUrls[0]} alt="" className="w-9 h-9 rounded-lg object-cover bg-gray-100" onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+                      {s.imageUrls.length > 1 && (
+                        <span className="absolute -bottom-1 -end-1 bg-[#1B7FA0] text-white text-[10px] font-bold leading-none px-1.5 py-0.5 rounded-full tabular-nums">
+                          {s.imageUrls.length}
+                        </span>
+                      )}
+                    </div>
                   ) : (
                     <div className="w-2 h-9 rounded-full shrink-0" style={{ backgroundColor: s.color ?? "#1B7FA0" }} />
                   )}
@@ -291,8 +354,8 @@ export default function ServicesPage() {
             placeholder={t.descriptionOptional}
             className="w-full"
           />
+          <PhotoList urls={newImageUrls} onChange={setNewImageUrls} />
           <div className="flex gap-2">
-            <input placeholder={t.imageUrlOptional} value={newImageUrl} onChange={(e) => setNewImageUrl(e.target.value)} dir="ltr" className="flex-1 min-w-32" />
             <input placeholder={t.linkUrlOptional} value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} dir="ltr" className="flex-1 min-w-32" />
           </div>
           <div className="flex items-center justify-between mt-1">

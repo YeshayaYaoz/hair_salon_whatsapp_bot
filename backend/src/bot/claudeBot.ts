@@ -111,6 +111,18 @@ const tools: GenericTool[] = [
     },
   },
   {
+    name: "send_photos",
+    description:
+      "Send the customer photos of a specific service/unit as real WhatsApp images. Use when they ask to see photos, or ask what a unit looks like. Only works for services that actually have photos configured.",
+    input_schema: {
+      type: "object",
+      properties: {
+        serviceName: { type: "string", description: "Name of the service/unit whose photos to send, matching a known service name" },
+      },
+      required: ["serviceName"],
+    },
+  },
+  {
     name: "request_human_followup",
     description: "Alert the salon owner to follow up with this customer. Use for complaints, complex requests, or anything the bot cannot handle.",
     input_schema: {
@@ -144,12 +156,16 @@ const requestBookingCallbackTool: GenericTool = {
 // since there is no live booking engine for these verticals.
 const inquiryTools: GenericTool[] = [
   requestBookingCallbackTool,
+  // A guest asking to see the unit is the single most common request in this mode.
+  tools.find((t) => t.name === "send_photos")!,
   tools.find((t) => t.name === "request_human_followup")!,
 ];
 
 export interface BotResult {
   text: string;
   offeredSlots?: AvailableSlot[];
+  /** Photos to send as separate WhatsApp image messages after the text reply. */
+  photos?: { url: string; caption?: string }[];
 }
 
 /**
@@ -173,7 +189,8 @@ async function runTool(
   customerPhone: string,
   name: string,
   input: Record<string, unknown>,
-  lastOfferedSlots: { value?: AvailableSlot[] }
+  lastOfferedSlots: { value?: AvailableSlot[] },
+  lastPhotos: { value?: { url: string; caption?: string }[] }
 ): Promise<string> {
   if (name === "check_availability") {
     const service = await prisma.service.findFirst({
@@ -518,6 +535,32 @@ async function runTool(
     });
   }
 
+  if (name === "send_photos") {
+    const service = await prisma.service.findFirst({
+      where: { businessId, name: { equals: input.serviceName as string, mode: "insensitive" } },
+      select: { name: true, imageUrls: true },
+    });
+    if (!service) {
+      const all = await prisma.service.findMany({ where: { businessId }, select: { name: true } });
+      return JSON.stringify({ error: "Unknown service", availableServices: all.map((s) => s.name) });
+    }
+    if (service.imageUrls.length === 0) {
+      // Told plainly so the model apologizes instead of inventing a link or claiming it sent something.
+      return JSON.stringify({
+        sent: false,
+        error: `No photos are configured for "${service.name}". Tell the customer there are no photos available for it and offer to describe it instead. Do NOT invent or paste any image link.`,
+      });
+    }
+    // The images themselves are sent by the webhook layer after the text reply — the model only
+    // needs to know they're on the way so it can write a one-line lead-in.
+    lastPhotos.value = service.imageUrls.map((url, i) => ({ url, caption: i === 0 ? service.name : undefined }));
+    return JSON.stringify({
+      sent: true,
+      count: service.imageUrls.length,
+      tellCustomer: "התמונות נשלחות עכשיו — כתוב משפט קצר שמלווה אותן, בלי לצרף קישורים.",
+    });
+  }
+
   if (name === "request_human_followup") {
     const label = (input.customerName as string | undefined) ?? customerPhone;
     const notified = await notifyOwner(businessId, `🙋 לקוח ${label} ביקש המשך טיפול אנושי:\n${input.reason}`);
@@ -602,6 +645,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   ];
 
   const lastOfferedSlots: { value?: AvailableSlot[] } = {};
+  const lastPhotos: { value?: { url: string; caption?: string }[] } = {};
   let hadToolError = false;
   // Tracks whether the most recent book/reschedule attempt actually failed and hasn't since
   // been followed by a success — guards against the model claiming "booked!" in its final
@@ -656,7 +700,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
       console.log(`[bot] tool=${tc.name} input=${JSON.stringify(tc.input)}`);
       let result: string;
       try {
-        result = await runTool(businessId, customerPhone, tc.name, tc.input, lastOfferedSlots);
+        result = await runTool(businessId, customerPhone, tc.name, tc.input, lastOfferedSlots, lastPhotos);
       } catch (toolErr) {
         console.error(`[bot] tool ${tc.name} threw:`, toolErr);
         result = JSON.stringify({ error: String(toolErr) });
@@ -742,5 +786,5 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     console.log(`[bot] escalated to ${model} for this turn (tool error recovery)`);
   }
 
-  return { text: replyText, offeredSlots: lastOfferedSlots.value };
+  return { text: replyText, offeredSlots: lastOfferedSlots.value, photos: lastPhotos.value };
 }
