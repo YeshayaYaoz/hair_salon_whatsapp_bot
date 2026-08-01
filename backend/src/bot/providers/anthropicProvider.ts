@@ -19,8 +19,27 @@ const MODEL_SMART = "claude-sonnet-5";
  * is simply wrong, and nothing this bot does benefits from linguistic invention: it quotes prices,
  * offers times, and confirms bookings. Not 0, so identical repeated questions don't produce
  * word-for-word identical replies, which reads robotic in a chat thread.
+ *
+ * Note this no longer applies on models that reject the parameter (see below) — there the Hebrew
+ * guardrails are only the prompt's "no invented wording" rules.
  */
 const TEMPERATURE = 0.2;
+
+/**
+ * Newer Anthropic models reject `temperature` outright — the API answers
+ * `400 invalid_request_error: "temperature is deprecated for this model"`. That took the bot down
+ * completely on claude-sonnet-5: every call 400'd, including the Haiku fallback path's own retry,
+ * so customers got "the bot is unavailable" for every message.
+ *
+ * Rather than hardcode a model list that goes stale the next time a model ships, the parameter is
+ * sent optimistically and dropped on the one specific error that says it isn't accepted. The
+ * result is cached per model id so it costs one failed call per model per process, not per message.
+ */
+const temperatureRejected = new Set<string>();
+
+function isTemperatureRejection(err: unknown): boolean {
+  return err instanceof APIError && err.status === 400 && /temperature/i.test(err.message);
+}
 
 /** Keeps the HTTP status and model id in the message: a 404 (model not enabled for this account)
  * and a 529 (overloaded) look identical once flattened to a bare string, but need opposite fixes. */
@@ -106,11 +125,29 @@ export const anthropicProvider: AiProvider = {
     const anthropicTools = toAnthropicTools(tools);
     const messages = toAnthropicMessages(turns);
 
-    const call = () => anthropic.messages.create({ model, max_tokens: 1024, temperature: TEMPERATURE, system: cachedSystem, tools: anthropicTools, messages });
+    const call = () =>
+      anthropic.messages.create({
+        model,
+        max_tokens: 1024,
+        ...(temperatureRejected.has(model) ? {} : { temperature: TEMPERATURE }),
+        system: cachedSystem,
+        tools: anthropicTools,
+        messages,
+      });
 
     try {
       return fromAnthropicResponse(await call());
     } catch (err) {
+      // Retry immediately without temperature, and remember for every later call on this model.
+      if (isTemperatureRejection(err) && !temperatureRejected.has(model)) {
+        console.warn(`[anthropicProvider] ${model} rejects temperature — retrying without it and dropping it from now on`);
+        temperatureRejected.add(model);
+        try {
+          return fromAnthropicResponse(await call());
+        } catch (err2) {
+          throw providerError(err2, model);
+        }
+      }
       const retryable = err instanceof APIError ? RETRYABLE_STATUSES.has(err.status ?? 0) : true;
       if (!retryable) throw providerError(err, model);
       console.warn(`[anthropicProvider] call failed (${err instanceof APIError ? err.status : "network"}), retrying once...`);

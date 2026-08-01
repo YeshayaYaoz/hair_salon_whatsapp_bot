@@ -174,6 +174,46 @@ export interface BotResult {
  * - { staffId } if resolved
  * - { error } if the name doesn't match anyone, listing real staff names so the model can retry
  */
+/** Strips quotes, punctuation and vertical-type prefixes so `צימר "תאנה"` and `תאנה` compare equal. */
+export function normalizeServiceName(name: string): string {
+  return name
+    // The literal hyphen stays first in the class — anywhere else it would form a character range
+    // with its neighbours and silently strip most of the alphabet.
+    .replace(/[-"'״׳`()[\]–—]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Resolves a customer/model-supplied service name to a real Service.
+ *
+ * Exact matching was too strict in practice. Owners name their units things like `צימר "תאנה"` or
+ * `"תמר" - יחידה משפחתית`, while both the customer and the model refer to them by the bare name
+ * ("תאנה"). That mismatch made every tool call on those services fail with "Unknown service" even
+ * though the name was perfectly recognizable — so this falls back to a containment match on
+ * punctuation-stripped names, and only accepts it when exactly one service matches (an ambiguous
+ * abbreviation must stay an error rather than silently picking the wrong unit).
+ */
+async function findServiceByName(businessId: string, rawName: string | undefined) {
+  const services = await prisma.service.findMany({ where: { businessId } });
+  const query = normalizeServiceName(rawName ?? "");
+  if (!query) return { services };
+  const exact = services.find((s) => normalizeServiceName(s.name) === query);
+  if (exact) return { service: exact, services };
+  const partial = services.filter((s) => {
+    const n = normalizeServiceName(s.name);
+    return n.includes(query) || query.includes(n);
+  });
+  if (partial.length === 1) return { service: partial[0], services };
+  return { services };
+}
+
+/** The standard "couldn't resolve that name" payload, listing the real names so the model can retry. */
+function unknownServiceError(services: { name: string }[]): string {
+  return JSON.stringify({ error: "Unknown service", availableServices: services.map((s) => s.name) });
+}
+
 async function resolveStaffId(businessId: string, staffName: string | undefined): Promise<{ staffId?: string; error?: string }> {
   if (!staffName) return {};
   const match = await prisma.staffMember.findFirst({
@@ -193,13 +233,8 @@ async function runTool(
   lastPhotos: { value?: { url: string; caption?: string }[] }
 ): Promise<string> {
   if (name === "check_availability") {
-    const service = await prisma.service.findFirst({
-      where: { businessId, name: { equals: input.serviceName as string, mode: "insensitive" } },
-    });
-    if (!service) {
-      const all = await prisma.service.findMany({ where: { businessId }, select: { name: true } });
-      return JSON.stringify({ error: "Unknown service", availableServices: all.map((s) => s.name) });
-    }
+    const { service, services } = await findServiceByName(businessId, input.serviceName as string);
+    if (!service) return unknownServiceError(services);
     const staffResolution = await resolveStaffId(businessId, input.staffName as string | undefined);
     if (staffResolution.error) return staffResolution.error;
 
@@ -233,13 +268,8 @@ async function runTool(
   }
 
   if (name === "book_appointment") {
-    const service = await prisma.service.findFirst({
-      where: { businessId, name: { equals: input.serviceName as string, mode: "insensitive" } },
-    });
-    if (!service) {
-      const all = await prisma.service.findMany({ where: { businessId }, select: { name: true } });
-      return JSON.stringify({ error: "Unknown service", availableServices: all.map((s) => s.name) });
-    }
+    const { service, services } = await findServiceByName(businessId, input.serviceName as string);
+    if (!service) return unknownServiceError(services);
     const biz = await prisma.business.findUniqueOrThrow({
       where: { id: businessId },
       select: {
@@ -424,10 +454,8 @@ async function runTool(
     if (!existing) return JSON.stringify({ error: "No matching appointment found to reschedule" });
 
     const serviceName = (input.serviceName as string | undefined) ?? existing.service.name;
-    const service = await prisma.service.findFirst({
-      where: { businessId, name: { equals: serviceName, mode: "insensitive" } },
-    });
-    if (!service) return JSON.stringify({ error: "Unknown service" });
+    const { service, services } = await findServiceByName(businessId, serviceName);
+    if (!service) return unknownServiceError(services);
 
     // Carry over the original staff assignment unless the customer explicitly asked for someone
     // else — otherwise a reschedule would silently drop who they booked with.
@@ -485,10 +513,8 @@ async function runTool(
   }
 
   if (name === "add_to_waitlist") {
-    const service = await prisma.service.findFirst({
-      where: { businessId, name: { equals: input.serviceName as string, mode: "insensitive" } },
-    });
-    if (!service) return JSON.stringify({ error: "Unknown service" });
+    const { service, services } = await findServiceByName(businessId, input.serviceName as string);
+    if (!service) return unknownServiceError(services);
 
     const customer = await prisma.customer.upsert({
       where: { businessId_phone: { businessId, phone: customerPhone } },
@@ -536,14 +562,8 @@ async function runTool(
   }
 
   if (name === "send_photos") {
-    const service = await prisma.service.findFirst({
-      where: { businessId, name: { equals: input.serviceName as string, mode: "insensitive" } },
-      select: { name: true, imageUrls: true },
-    });
-    if (!service) {
-      const all = await prisma.service.findMany({ where: { businessId }, select: { name: true } });
-      return JSON.stringify({ error: "Unknown service", availableServices: all.map((s) => s.name) });
-    }
+    const { service, services } = await findServiceByName(businessId, input.serviceName as string);
+    if (!service) return unknownServiceError(services);
     if (service.imageUrls.length === 0) {
       // Told plainly so the model apologizes instead of inventing a link or claiming it sent something.
       return JSON.stringify({
