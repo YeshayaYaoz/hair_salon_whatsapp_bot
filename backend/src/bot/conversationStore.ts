@@ -3,6 +3,10 @@ import { prisma } from "../lib/prisma.js";
 export interface Turn {
   role: "user" | "assistant";
   content: string;
+  /** When the turn was written. Conversations routinely span days, and without this the model
+   * reads a message from last week as if it were said just now — "מחר" in an old turn silently
+   * means a date that has already passed. See claudeBot's date-stamping of stale turns. */
+  at?: Date;
 }
 
 // Only the last MAX_TURNS are fed to the model; the full history stays in the DB
@@ -36,7 +40,7 @@ export async function getHistory(businessId: string, customerPhone: string): Pro
   // model returned no text). The Anthropic API rejects empty text content blocks outright, so a
   // single stale blank turn here would break every future call for this conversation.
   const turns: Turn[] = rows
-    .map((r) => ({ role: r.role as Turn["role"], content: r.content }))
+    .map((r) => ({ role: r.role as Turn["role"], content: r.content, at: r.createdAt }))
     .filter((t) => t.content.trim().length > 0);
   cache.set(k, turns);
   return turns;
@@ -46,7 +50,7 @@ export async function appendTurn(businessId: string, customerPhone: string, turn
   if (!turn.content.trim()) return; // never persist empty content — see getHistory for why
   const k = cacheKey(businessId, customerPhone);
   const history = cache.get(k) ?? [];
-  history.push(turn);
+  history.push({ ...turn, at: turn.at ?? new Date() });
   if (history.length > MAX_TURNS) history.splice(0, history.length - MAX_TURNS);
   cache.set(k, history);
 

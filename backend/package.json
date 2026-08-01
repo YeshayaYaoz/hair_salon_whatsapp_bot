@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",
+    "@hebcal/core": "^6.9.1",
     "@prisma/client": "^5.20.0",
     "@sentry/node": "^10.63.0",
     "bcryptjs": "^2.4.3",

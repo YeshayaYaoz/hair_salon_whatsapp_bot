@@ -12,11 +12,31 @@ export interface SystemPrompt {
   volatile: string;
 }
 
+/** Midnight UTC today, for filtering date-only columns. */
+function startOfToday(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
+
+/** "12.4" for a single day, "12.4-15.4" for a range — how dates are read aloud in Hebrew. */
+function formatDateRange(start: Date, end: Date): string {
+  const fmt = (d: Date) => `${d.getUTCDate()}.${d.getUTCMonth() + 1}.${d.getUTCFullYear()}`;
+  return fmt(start) === fmt(end) ? fmt(start) : `${fmt(start)} עד ${fmt(end)}`;
+}
+
 export async function buildSystemPrompt(businessId: string, customerPhone?: string): Promise<SystemPrompt> {
   const [business, customer] = await Promise.all([
     prisma.business.findUniqueOrThrow({
       where: { id: businessId },
-      include: { services: true, hours: true, staff: true, faqEntries: true },
+      include: {
+        services: true,
+        hours: true,
+        staff: true,
+        faqEntries: true,
+        // Only periods that haven't ended yet: a rule about last Pesach is pure noise in the
+        // prompt, and these accumulate year over year.
+        specialPeriods: { where: { endDate: { gte: startOfToday() } }, orderBy: { startDate: "asc" }, take: 40 },
+      },
     }),
     customerPhone
       ? prisma.customer.findUnique({
@@ -54,6 +74,16 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
 
   const faqText = business.faqEntries.length
     ? business.faqEntries.map((f: FaqEntry) => `ש: ${f.question}\nת: ${f.answer}`).join("\n\n")
+    : "";
+
+  // Dates on which the business operates differently (holiday pricing, minimum stays, seasonal
+  // rules). This does NOT close the calendar — the business is open, the terms differ — so the
+  // rule below is about disclosure: say it before quoting, and never work out the new price.
+  const specialPeriodsText = business.specialPeriods.length
+    ? `\nתאריכים מיוחדים שבהם התנאים שונים מהרגיל:\n${business.specialPeriods
+        .map((p) => `• ${p.label}: ${formatDateRange(p.startDate, p.endDate)} — ${p.description}`)
+        .join("\n")}
+כשלקוח שואל על תאריך שנופל באחת התקופות האלה — אמור לו מראש, לפני כל מחיר, שבתאריך הזה התנאים שונים, וציין מה בדיוק שונה כפי שכתוב כאן. אל תחשב את המחיר החדש בעצמך גם אם כתוב "פי 2" או "תוספת" — מסור את הכלל כפי שהוא, ואמור שהסכום המדויק ייסגר מול בעל העסק.\n`
     : "";
 
   const personalityNote = business.botPersonality ? `\nסגנון תקשורת: ${business.botPersonality}\n` : "";
@@ -233,8 +263,9 @@ ${dateTable}
 כלל חשוב: השתמש רק במילים עבריות אמיתיות וקיימות. אל תמציא הטיות. אם אתה לא בטוח איך נוטה מילה — בחר ניסוח פשוט יותר במקום לנחש. דוגמאות לשגיאות אמיתיות שקרו ואסור לחזור עליהן: "יתאשר" (הנכון: "יאשר"), "משתניים" (הנכון: "מהשתיים" או "משתיהן"), "מבורך הבא" (הנכון: "ברוך הבא"). עדיף משפט פשוט ונכון על פני משפט מתוחכם ושגוי.
 אפס יצירתיות בשפה. אתה לא כותב טקסט מקורי — אתה מוסר מידע. השתמש במילים היומיומיות והנפוצות ביותר, ובמשפטים קצרים ופשוטים. אל תחפש ניסוח מקורי, ציורי או ספרותי.
 ביטויים קבועים בעברית נכתבים תמיד בדיוק כמו שהם, ואסור לשנות בהם אפילו אות: "ברוך הבא" / "ברוכים הבאים", "בשעה טובה", "בכל שמחה", "תודה רבה", "בבקשה", "נעים להכיר", "יום טוב". אל תמציא גרסה משלך לביטוי קבוע ואל תנסה לגוון בו — וריאציה על ביטוי קבוע היא תמיד שגיאה, גם אם היא נשמעת לך תקנית.
+שיחות בוואטסאפ נמשכות לאורך ימים. הודעה שמתחילה ב-"[נכתב ב-YYYY-MM-DD]" נכתבה בתאריך ההוא ולא היום — "מחר" או "יום שלישי" בתוכה מתייחסים לאותו תאריך, שכנראה כבר עבר. התאריך התקף היחיד לחישוב הוא התאריך של היום שמופיע למטה. אם לקוח חוזר לשיחה ישנה ומבקש "כמו שדיברנו" — ודא מחדש את התאריך איתו לפני שאתה קובע משהו.
 כשלקוח מבקש לראות תמונות של שירות/יחידה מסוימת — קרא ל-send_photos עם שם השירות, והתמונות יישלחו אליו כתמונות אמיתיות בוואטסאפ. אל תדביק כתובות של תמונות בטקסט. אם לשירות יש "מידע נוסף" — שלח את הקישור הזה כשזה רלוונטי.
-${cancellationNote}${pricingNote}${vocabNote}${personalityNote}${greeting}${crmNote}
+${cancellationNote}${pricingNote}${specialPeriodsText}${vocabNote}${personalityNote}${greeting}${crmNote}
 שירותים ומחירים:
 ${servicesText}
 

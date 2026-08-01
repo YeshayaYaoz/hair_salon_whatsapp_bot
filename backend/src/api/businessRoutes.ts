@@ -19,6 +19,8 @@ import { getJobStatuses } from "../lib/jobStatus.js";
 import { listTemplates, BUSINESS_TYPES } from "../lib/businessTemplates.js";
 import { AI_PROVIDER_KEYS } from "../bot/providers/index.js";
 import { applyTemplate } from "../lib/applyTemplate.js";
+import { matchPeriodKinds, resolvePeriod } from "../lib/hebrewPeriods.js";
+import { classifyPeriodText } from "../lib/classifyPeriodText.js";
 import { getPaymentProvider, PAYMENT_PROVIDERS, UnknownPaymentProviderError } from "../lib/payments/index.js";
 import { getInvoiceProvider, INVOICE_PROVIDERS, UnknownInvoiceProviderError, resolveInvoiceCredentials } from "../lib/invoices/index.js";
 
@@ -1443,6 +1445,139 @@ businessRouter.post("/blocked-times", async (req: AuthedRequest, res) => {
 businessRouter.delete("/blocked-times/:id", async (req: AuthedRequest, res) => {
   await prisma.blockedTime.deleteMany({ where: { id: req.params.id, businessId: req.businessId! } });
   res.json({ ok: true });
+});
+
+// --- Special periods (dates on which the terms change: pricing, minimum stay, hours) ---
+
+/** Parses "YYYY-MM-DD" as a plain calendar day. Uses UTC midnight because the column is a DATE:
+ * building it from local time would shift the stored day for anything east of Greenwich. */
+function parseCalendarDate(iso: string): Date {
+  return new Date(`${iso}T00:00:00Z`);
+}
+
+function toCalendarIso(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+businessRouter.get("/special-periods", async (req: AuthedRequest, res) => {
+  const periods = await prisma.specialPeriod.findMany({
+    where: { businessId: req.businessId! },
+    orderBy: { startDate: "asc" },
+  });
+  res.json(
+    periods.map((p) => ({
+      id: p.id,
+      label: p.label,
+      description: p.description,
+      startDate: toCalendarIso(p.startDate),
+      endDate: toCalendarIso(p.endDate),
+    }))
+  );
+});
+
+/**
+ * Turns free Hebrew text ("כל ערב חג יקר פי 2") into concrete dates for a year, WITHOUT saving
+ * anything — the owner reviews the list and confirms. Keyword matching answers the common phrasings
+ * outright; anything it doesn't recognise is handed to the LLM, which may only pick from the fixed
+ * catalogue of period names. The dates themselves always come from the Hebrew calendar, never from
+ * the model.
+ */
+businessRouter.post("/special-periods/suggest", async (req: AuthedRequest, res) => {
+  const parsed = z.object({
+    text: z.string().min(1).max(300),
+    year: z.number().int().min(2020).max(2100).optional(),
+  }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const year = parsed.data.year ?? new Date().getFullYear();
+  let kinds = matchPeriodKinds(parsed.data.text);
+
+  if (kinds.length === 0) {
+    try {
+      kinds = await classifyPeriodText(parsed.data.text);
+    } catch (err) {
+      console.error("[special-periods] LLM classification failed:", err);
+      // Not fatal: the owner can still add dates by hand, and saying so beats a 500.
+      return res.json({ kinds: [], periods: [], unmatched: true });
+    }
+  }
+
+  const periods = kinds.flatMap((kind) =>
+    resolvePeriod(kind, year).map((p) => ({ ...p, kind }))
+  );
+  // Two kinds can produce the same span (e.g. "סוכות" and "חול המועד"), which would otherwise be
+  // saved twice and shown to the bot twice.
+  const seen = new Set<string>();
+  const unique = periods.filter((p) => {
+    const key = `${p.startDate}|${p.endDate}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  res.json({
+    kinds,
+    periods: unique.sort((a, b) => a.startDate.localeCompare(b.startDate)),
+    unmatched: kinds.length === 0,
+  });
+});
+
+const specialPeriodSchema = z.object({
+  label: z.string().min(1).max(80),
+  description: z.string().min(1).max(500),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+/** Accepts one period or a whole batch, since confirming a suggestion saves many rows at once. */
+businessRouter.post("/special-periods", async (req: AuthedRequest, res) => {
+  const parsed = z.object({ periods: z.array(specialPeriodSchema).min(1).max(200) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const invalid = parsed.data.periods.find((p) => p.endDate < p.startDate);
+  if (invalid) return res.status(400).json({ error: "תאריך הסיום חייב להיות אחרי תאריך ההתחלה" });
+
+  await prisma.specialPeriod.createMany({
+    data: parsed.data.periods.map((p) => ({
+      businessId: req.businessId!,
+      label: p.label,
+      description: p.description,
+      startDate: parseCalendarDate(p.startDate),
+      endDate: parseCalendarDate(p.endDate),
+    })),
+  });
+  res.status(201).json({ ok: true, created: parsed.data.periods.length });
+});
+
+businessRouter.put("/special-periods/:id", async (req: AuthedRequest, res) => {
+  const parsed = specialPeriodSchema.partial().safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const { count } = await prisma.specialPeriod.updateMany({
+    where: { id: req.params.id, businessId: req.businessId! },
+    data: {
+      ...(parsed.data.label !== undefined ? { label: parsed.data.label } : {}),
+      ...(parsed.data.description !== undefined ? { description: parsed.data.description } : {}),
+      ...(parsed.data.startDate ? { startDate: parseCalendarDate(parsed.data.startDate) } : {}),
+      ...(parsed.data.endDate ? { endDate: parseCalendarDate(parsed.data.endDate) } : {}),
+    },
+  });
+  if (count === 0) return res.status(404).json({ error: "Not found" });
+  res.json({ ok: true });
+});
+
+businessRouter.delete("/special-periods/:id", async (req: AuthedRequest, res) => {
+  await prisma.specialPeriod.deleteMany({ where: { id: req.params.id, businessId: req.businessId! } });
+  res.json({ ok: true });
+});
+
+/** Deletes every row a single suggestion created, so an owner can undo "ערב חג" in one click
+ * instead of removing five dates individually. */
+businessRouter.delete("/special-periods/group/:label", async (req: AuthedRequest, res) => {
+  const { count } = await prisma.specialPeriod.deleteMany({
+    where: { businessId: req.businessId!, description: String(req.query.description ?? ""), label: req.params.label },
+  });
+  res.json({ ok: true, deleted: count });
 });
 
 // --- Bot conversations (read-only transcripts) ---

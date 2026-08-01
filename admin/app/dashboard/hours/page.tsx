@@ -5,6 +5,7 @@ import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SkeletonBlock } from "../../lib/Skeleton";
 import { SavedBadge } from "../../lib/SavedBadge";
+import { SpecialPeriods } from "../../lib/SpecialPeriods";
 
 interface DayHours {
   dayOfWeek: number;
@@ -241,6 +242,7 @@ export default function HoursPage() {
       </div>
 
       <BlockedTimesSection />
+      <SpecialPeriods />
     </div>
   );
 }

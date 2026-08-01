@@ -3,7 +3,7 @@ import { buildSystemPrompt } from "./prompt.js";
 import { appendTurn, getHistory, type Turn } from "./conversationStore.js";
 import { findAvailableSlots, createAppointment, attachDepositPaymentLink, SlotUnavailableError, OutsideBusinessHoursError, type AvailableSlot } from "../booking/availability.js";
 import { getPaymentProvider } from "../lib/payments/index.js";
-import { parseBookingTime, parseDateString, dayOfWeekForDate, instantPartsInTz } from "../lib/timezone.js";
+import { parseBookingTime, parseDateString, dayOfWeekForDate, instantPartsInTz, zonedDateParts } from "../lib/timezone.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { syncAppointmentToCalendar, deleteCalendarEvent } from "../lib/googleCalendar.js";
@@ -644,6 +644,28 @@ export function toWhatsAppFormatting(text: string): string {
   );
 }
 
+/** Calendar day in the business's timezone, as YYYY-MM-DD. */
+function dayIsoInTz(date: Date, timezone: string | null): string {
+  const p = zonedDateParts(date, timezone || "Asia/Jerusalem");
+  return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+}
+
+/**
+ * Marks history turns that were written on an earlier day with the date they were written.
+ *
+ * The system prompt states today's date, but a WhatsApp thread is never reset — a customer who
+ * wrote "אפשר מחר ב-5?" last Tuesday leaves that sentence in the history forever, and the model
+ * reads it as a message from today. That produces bookings on the wrong date and answers that
+ * contradict the calendar. Stamping only the stale turns keeps today's turns untouched, so the
+ * common case (a conversation inside one day) is byte-identical to before and stays cacheable.
+ */
+function stampIfStale(turn: Turn, timezone: string | null): string {
+  if (!turn.at) return turn.content;
+  const turnDay = dayIsoInTz(turn.at, timezone);
+  if (turnDay === dayIsoInTz(new Date(), timezone)) return turn.content;
+  return `[נכתב ב-${turnDay}] ${turn.content}`;
+}
+
 const AI_UNAVAILABLE_HE = "מצטער, הבוט אינו זמין כרגע. נסה שוב בעוד כמה דקות, או צור קשר ישיר עם העסק.";
 
 export async function handleIncomingMessage(businessId: string, customerPhone: string, messageText: string): Promise<BotResult> {
@@ -654,13 +676,13 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   // booking intent to the owner, so it gets a reduced tool set with no slot/booking tools.
   const biz = await prisma.business.findUniqueOrThrow({
     where: { id: businessId },
-    select: { bookingModel: true, aiProvider: true, aiModel: true },
+    select: { bookingModel: true, aiProvider: true, aiModel: true, timezone: true },
   });
   const activeTools = biz.bookingModel === "inquiry" ? inquiryTools : tools;
   const provider = getAiProvider(biz.aiProvider);
 
   const turns: GenericTurn[] = [
-    ...history.map((t: Turn) => ({ role: t.role, text: t.content }) as GenericTurn),
+    ...history.map((t: Turn) => ({ role: t.role, text: stampIfStale(t, biz.timezone) }) as GenericTurn),
     { role: "user", text: messageText },
   ];
 

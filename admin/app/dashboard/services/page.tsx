@@ -6,6 +6,7 @@ import { useLanguage } from "../../lib/LanguageContext";
 import { SkeletonRow } from "../../lib/Skeleton";
 import { readableOnTint } from "../../lib/readableColor";
 import { AutoTextarea } from "../../lib/AutoTextarea";
+import { SpecialPeriods } from "../../lib/SpecialPeriods";
 
 // A curated, muted palette instead of raw saturated primaries — tones picked to sit together
 // (similar chroma/lightness) so any combination of service tags looks intentional, not like a
@@ -399,6 +400,12 @@ export default function ServicesPage() {
         </form>
         {error && <p className="text-red-600 text-sm mt-3">{error}</p>}
       </div>
+
+      {/* Holiday/season pricing rules live on the Schedule page for every other vertical — but
+          overnight businesses have that page hidden (no per-day opening hours to keep), and they
+          are precisely the businesses whose prices move with the calendar. So it's mounted here,
+          next to the prices it modifies, rather than being unreachable for them. */}
+      {overnight && <SpecialPeriods />}
     </div>
   );
 }

@@ -145,6 +145,7 @@ model Business {
   emailVerificationTokens EmailVerificationToken[]
   googleCalendar      GoogleCalendarToken?
   blockedTimes        BlockedTime[]
+  specialPeriods      SpecialPeriod[]
   linkedLeads         Lead[] // Lead Finder prospects that turned into this real, paying account
 }
 
@@ -156,6 +157,30 @@ model SystemJobRun {
   lastStatus     String // "ok" | "error"
   lastError      String?
   lastDurationMs Int?
+}
+
+/// A date range on which the business operates differently — different pricing, a minimum stay, a
+/// special menu, reduced hours. Unlike BlockedTime this does NOT close the calendar: the business
+/// is open, the terms are just different, and the bot's job is to say so before quoting anything.
+///
+/// Stored one row per continuous range rather than as a recurrence rule. Most of these follow the
+/// Hebrew calendar (ערב חג, חול המועד, בין הזמנים), which has no expressible recurrence in
+/// Gregorian terms — the dates are resolved from a real Hebrew calendar when the owner adds the
+/// rule, so what's stored is always concrete dates the owner reviewed and can edit.
+///
+/// label groups the rows a single rule generated ("ערב חג"), so the dashboard can show one entry
+/// with its N dates instead of N unrelated rows.
+model SpecialPeriod {
+  id          String   @id @default(cuid())
+  business    Business @relation(fields: [businessId], references: [id])
+  businessId  String
+  label       String // what the period is: "ערב חג", "בין הזמנים - ניסן"
+  description String // what changes, in the owner's words: "מחיר כפול", "מינימום 3 לילות"
+  startDate   DateTime @db.Date // date-only: these are whole days, never times
+  endDate     DateTime @db.Date // inclusive
+  createdAt   DateTime @default(now())
+
+  @@index([businessId, startDate])
 }
 
 /// Owner-defined closures (vacations, lunch breaks, holidays) during which no bookings are allowed.
