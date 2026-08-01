@@ -140,7 +140,7 @@ function toHHMM(min: number): string {
 }
 
 export default function HoursPage() {
-  const { t, lang } = useLanguage();
+  const { t, lang, businessType } = useLanguage();
   const [hours, setHours] = useState<DayHours[]>(
     t.days.map((_, i) => ({ dayOfWeek: i, open: "09:00", close: "18:00", enabled: i !== 6 }))
   );
@@ -187,7 +187,10 @@ export default function HoursPage() {
         <p className="text-gray-600 text-sm mt-1">{t.hoursSubtitle}</p>
       </div>
 
-      <GoogleHoursSync onApplied={loadHours} />
+      {/* An overnight rental has no daily opening hours to keep in sync — a guest checks in and
+          stays the night — so importing a Google "open 09:00-18:00" week would be meaningless
+          there. Same reasoning that hides this whole page from the B&B nav. */}
+      {businessType !== "bnb" && <GoogleHoursSync onApplied={loadHours} />}
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-4">
         {!loaded ? (
