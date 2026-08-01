@@ -554,6 +554,7 @@ businessRouter.get("/me/templates", async (_req: AuthedRequest, res) => {
       labelHe: t.labelHe,
       labelEn: t.labelEn,
       descriptionHe: t.descriptionHe,
+      descriptionEn: t.descriptionEn,
       depositEnabled: t.presets.depositEnabled,
       depositAmountIls: t.presets.depositAmountIls,
       reviewsEnabled: t.presets.reviewsEnabled,

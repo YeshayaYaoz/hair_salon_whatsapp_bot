@@ -97,7 +97,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           }}
         />
       </head>
-      <body className="bg-zinc-950 text-zinc-100 min-h-screen font-[family-name:var(--font-heebo)]">
+      {/* No bg-zinc-950/text-zinc-100 here: those were dark-theme leftovers that outranked the
+          light `body` rule in globals.css (utilities beat @layer base). Nothing visible broke only
+          because every page paints its own background and nearly every element sets its own text
+          colour — but the inherited colour really was near-white on a light page, so anything added
+          without an explicit colour would have rendered invisible. The pages that are still dark
+          (password reset, OAuth callbacks) set their own background and text colours. */}
+      <body className="min-h-screen font-[family-name:var(--font-heebo)]">
         <LanguageProvider>{children}</LanguageProvider>
       </body>
     </html>

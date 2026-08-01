@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "../../../lib/api";
 import { SkeletonRow } from "../../../lib/Skeleton";
+import { useDialog } from "../../../lib/useDialog";
+import { useLanguage } from "../../../lib/LanguageContext";
 
 // --- Types ---
 
@@ -163,6 +165,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function LeadFinderPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [isSuperAdmin, setIsSuperAdmin] = useState<boolean | null>(null);
 
   const [view, setView] = useState<{ kind: "list" } | { kind: "campaign"; id: string } | { kind: "lead"; id: string; campaignId: string }>({
@@ -274,6 +277,7 @@ function SuggestedMatchesPanel() {
 }
 
 function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => void }) {
+  const { t } = useLanguage();
   const [campaigns, setCampaigns] = useState<Campaign[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -282,6 +286,7 @@ function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => 
   const [locationQuery, setLocationQuery] = useState("");
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Campaign | null>(null);
+  const editRef = useDialog<HTMLDivElement>(() => setEditing(null), editing !== null);
   const [editName, setEditName] = useState("");
   const [editCategory, setEditCategory] = useState("");
   const [editLocation, setEditLocation] = useState("");
@@ -366,7 +371,7 @@ function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => 
     <>
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3 animate-fade-up">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">מציאת לידים</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t.leadFinder}</h1>
           <p className="text-gray-600 text-sm mt-1">
             {campaigns ? `${campaigns.length} קמפיינים` : "…"}
           </p>
@@ -402,8 +407,8 @@ function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => 
 
       {editing && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setEditing(null)}>
-          <div className="bg-white rounded-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-bold text-gray-900 mb-4">עריכת קמפיין</h2>
+          <div ref={editRef} role="dialog" aria-modal="true" aria-labelledby="edit-campaign-title" className="bg-white rounded-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
+            <h2 id="edit-campaign-title" className="text-lg font-bold text-gray-900 mb-4">עריכת קמפיין</h2>
             <div className="flex flex-col gap-3">
               <input placeholder="שם הקמפיין" value={editName} onChange={(e) => setEditName(e.target.value)} />
               <input placeholder="קטגוריה" value={editCategory} onChange={(e) => setEditCategory(e.target.value)} />
@@ -493,6 +498,7 @@ function AddLeadModal({
   onClose: () => void;
   onAdded: () => void;
 }) {
+  const dialogRef = useDialog<HTMLDivElement>(onClose);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -521,8 +527,8 @@ function AddLeadModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl max-w-md w-full p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-bold text-gray-900 mb-1">הוספת ליד ידנית</h2>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="manual-lead-title" className="bg-white rounded-xl max-w-md w-full p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <h2 id="manual-lead-title" className="text-lg font-bold text-gray-900 mb-1">הוספת ליד ידנית</h2>
         <p className="text-gray-600 text-sm mb-3">לידים שלא הגיעו מסריקה — הפניה, שיחה, או עסק שאיתרת בעצמך.</p>
 
         {err && <div className="bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg px-3 py-2 mb-3">{err}</div>}
@@ -587,6 +593,7 @@ function BroadcastModal({
   onClose: () => void;
   onSent: () => void;
 }) {
+  const dialogRef = useDialog<HTMLDivElement>(onClose);
   const [channel, setChannel] = useState<"email" | "whatsapp">("email");
   const [subject, setSubject] = useState(DEFAULT_BROADCAST_SUBJECT);
   const [body, setBody] = useState(DEFAULT_BROADCAST_BODY);
@@ -617,8 +624,8 @@ function BroadcastModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl max-w-lg w-full p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-bold text-gray-900 mb-1">שליחת הודעת תפוצה</h2>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="broadcast-title" className="bg-white rounded-xl max-w-lg w-full p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <h2 id="broadcast-title" className="text-lg font-bold text-gray-900 mb-1">שליחת הודעת תפוצה</h2>
 
         {result ? (
           <div className="mt-3">

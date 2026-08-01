@@ -99,10 +99,15 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     setLangState(stored);
     applyLang(stored);
     initClientMonitoring();
-    // Outside the dashboard (login/signup) this 401s — fine, base terminology applies there.
-    apiFetch<{ businessType?: string | null }>("/api/business/me")
-      .then((me) => setBusinessType(me.businessType ?? null))
-      .catch(() => {});
+    // Only ask when there's a token to ask with. This used to fire unconditionally and 401 on
+    // every landing/login/legal/booking view — a guaranteed-failing request and a console error on
+    // the pages seen most often, including by salon customers. No token means no business, which
+    // is exactly the base-terminology case anyway.
+    if (localStorage.getItem("token")) {
+      apiFetch<{ businessType?: string | null }>("/api/business/me")
+        .then((me) => setBusinessType(me.businessType ?? null))
+        .catch(() => {});
+    }
   }, []);
 
   function setLang(l: Lang) {

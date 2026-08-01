@@ -20,6 +20,10 @@
     accent-color: #1B7FA0;
     width: 1rem;
     height: 1rem;
+    /* Every checkbox here sits in a flex row. Without this, flex-shrink squeezes them below the
+       1rem set above — measured at 13px wide on the hours page at phone width, which is both hard
+       to hit and visibly lopsided next to its own label. */
+    flex-shrink: 0;
   }
 
   input[type="time"] {
@@ -114,5 +118,24 @@
   }
   .sidebar-scroll::-webkit-scrollbar-thumb:hover {
     background-color: rgba(255,255,255,0.28);
+  }
+}
+
+@layer components {
+  /* Row-level actions (edit / delete / remove) measured 24px tall — comfortable with a mouse, well
+     under the ~44px a fingertip needs, and these sit next to each other so a mis-tap deletes the
+     wrong row. The mouse appearance is unchanged; the target only grows where the pointer is
+     coarse, so dense tables don't get taller on desktop. */
+  .row-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
+  }
+  @media (pointer: coarse) {
+    .row-action {
+      min-height: 44px;
+      padding-inline: 0.625rem;
+    }
   }
 }

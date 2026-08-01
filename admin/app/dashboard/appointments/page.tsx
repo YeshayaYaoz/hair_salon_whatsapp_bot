@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
-import { formatTimeInTz, formatDateTimeInTz, partsInTz, dayKeyInTz } from "../../lib/tz";
+import { formatTimeInTz, formatDateTimeInTz, partsInTz, dayKeyInTz, formatDateIn, localeFor } from "../../lib/tz";
 import { SkeletonBlock, SkeletonRow } from "../../lib/Skeleton";
 import { EmptyState } from "../../lib/EmptyState";
 import { formatPhone } from "../../lib/formatPhone";
+import { useDialog } from "../../lib/useDialog";
+import { requiredField } from "../../lib/validation";
 
 function localDayKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -24,10 +26,13 @@ interface Appointment {
   staff?: { name: string } | null;
 }
 
+// All four are light-theme tints. `cancelled` and `pending` previously carried bg-red-950/bg-yellow-950
+// with light text — leftovers from the old dark theme that rendered as a near-black chip in the
+// middle of a light table, next to their bg-*-50 siblings.
 const STATUS_STYLES: Record<string, string> = {
   confirmed: "bg-green-50 text-green-700 border-green-200",
-  cancelled: "bg-red-950/50 text-red-600 border-red-200",
-  pending: "bg-yellow-950/50 text-yellow-400 border-yellow-800",
+  cancelled: "bg-red-50 text-red-700 border-red-200",
+  pending: "bg-yellow-50 text-yellow-800 border-yellow-300",
   pending_payment: "bg-amber-50 text-amber-700 border-amber-200",
 };
 
@@ -81,7 +86,12 @@ function GoogleCalendarSection() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-sm font-semibold text-gray-900 mb-0.5 flex items-center gap-2">
-            <span className="text-base">📅</span> Google Calendar
+            {/* SVG rather than 📅: the emoji renders with a baked-in "17" on most platforms, which
+                on a Google Calendar connect card reads as a date the salon didn't choose. */}
+            <svg className="w-4 h-4 text-gray-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Google Calendar
           </h2>
           <p className="text-xs text-gray-600">
             {connected
@@ -124,6 +134,8 @@ function GoogleCalendarSection() {
 function NewAppointmentModal({ tz, onClose, onCreated }: { tz: string; onClose: () => void; onCreated: () => void }) {
   const { lang } = useLanguage();
   const he = lang === "he";
+  const dialogRef = useDialog<HTMLFormElement>(onClose);
+  const req = requiredField(he ? "יש למלא שדה זה" : "Please fill out this field");
   const [services, setServices] = useState<{ id: string; name: string }[]>([]);
   const [serviceId, setServiceId] = useState("");
   const [customerName, setCustomerName] = useState("");
@@ -159,30 +171,34 @@ function NewAppointmentModal({ tz, onClose, onCreated }: { tz: string; onClose: 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <form
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-appt-title"
         onClick={(e) => e.stopPropagation()}
         onSubmit={submit}
         className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl flex flex-col gap-4 animate-fade-up"
         dir={he ? "rtl" : "ltr"}
       >
-        <h2 className="text-lg font-bold text-gray-900">{he ? "תור חדש (ידני)" : "New appointment (manual)"}</h2>
+        <h2 id="new-appt-title" className="text-lg font-bold text-gray-900">{he ? "תור חדש (ידני)" : "New appointment (manual)"}</h2>
 
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "שירות" : "Service"}</label>
-          <select value={serviceId} onChange={(e) => setServiceId(e.target.value)} required className="w-full">
+          <select value={serviceId} onChange={(e) => setServiceId(e.target.value)} {...req} className="w-full">
             {services.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "שם הלקוח" : "Customer name"}</label>
-          <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} required className="w-full" />
+          <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} {...req} className="w-full" />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "טלפון" : "Phone"}</label>
-          <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} required placeholder="972501234567" className="w-full" dir="ltr" />
+          <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} {...req} placeholder="972501234567" className="w-full" dir="ltr" />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "מועד" : "Date & time"}</label>
-          <input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} required className="w-full" dir="ltr" />
+          <input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} {...req} className="w-full" dir="ltr" />
           <p className="text-[11px] text-gray-600 mt-1">{he ? `לפי אזור הזמן ${tz}` : `In timezone ${tz}`}</p>
         </div>
 
@@ -212,12 +228,15 @@ function googleCalendarUrl(a: Appointment) {
   return `https://calendar.google.com/calendar/render?${params}`;
 }
 
-function exportCsv(appointments: Appointment[]) {
+// tz and locale are passed in rather than defaulted: toLocaleDateString()/toLocaleTimeString([])
+// use the VIEWER's zone and locale, so an owner travelling — or a server-rendered export — got
+// appointment times that don't match their own calendar.
+function exportCsv(appointments: Appointment[], tz: string, locale: string) {
   const rows = [
     ["Date", "Time", "Customer Name", "Phone", "Service", "Staff", "Status"],
     ...appointments.map((a) => [
-      new Date(a.startTime).toLocaleDateString(),
-      new Date(a.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      formatDateIn(new Date(a.startTime), locale, { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }),
+      formatTimeInTz(a.startTime, tz, locale),
       a.customer.name ?? "",
       a.customer.phone,
       a.service.name,
@@ -246,12 +265,16 @@ function WeekCalendar({
   onCancel,
   cancellingId,
   tz,
+  openHour,
+  closeHour,
 }: {
   appointments: Appointment[];
   weekStart: Date;
   onCancel: (id: string) => void;
   cancellingId: string | null;
   tz: string;
+  openHour: number;
+  closeHour: number;
 }) {
   const { t } = useLanguage();
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -260,7 +283,14 @@ function WeekCalendar({
     return d;
   });
 
-  const hours = Array.from({ length: 15 }, (_, i) => i + 7); // 7am-9pm
+  // Was a hardcoded 07:00-21:00 for every salon. A 09:00-19:00 shop got four permanently empty
+  // rows, which on a phone is a lot of dead scrolling before the first bookable hour. One hour of
+  // padding either side keeps an early or late booking from being clipped out of view.
+  const hours = Array.from({ length: Math.max(closeHour - openHour + 1, 1) }, (_, i) => i + openHour);
+
+  // The salon's today, so the highlighted column matches the salon's clock rather than a viewer
+  // device that may still be on yesterday.
+  const todayKey = dayKeyInTz(new Date(), tz);
 
   function apptsByDay(day: Date) {
     const key = localDayKey(day);
@@ -275,7 +305,7 @@ function WeekCalendar({
       <div className="grid border-b border-gray-200" style={{ gridTemplateColumns: "3.5rem repeat(7, 1fr)" }}>
         <div className="px-2 py-2 border-e border-gray-100" />
         {days.map((d) => {
-          const today = d.toDateString() === new Date().toDateString();
+          const today = localDayKey(d) === todayKey;
           return (
             <div key={d.toISOString()} className={`px-1 py-2 text-center border-e border-gray-100 last:border-e-0 ${today ? "bg-[#E0F5FB]" : ""}`}>
               <div className="text-xs text-gray-600">{t.daysShort[d.getDay()]}</div>
@@ -292,7 +322,7 @@ function WeekCalendar({
             <div className="px-2 pt-1 text-xs text-gray-600 border-e border-gray-100 leading-none">{h}:00</div>
             {days.map((d) => {
               const appts = apptsByDay(d).filter((a) => partsInTz(a.startTime, tz).hour === h);
-              const today = d.toDateString() === new Date().toDateString();
+              const today = localDayKey(d) === todayKey;
               return (
                 <div key={d.toISOString()} className={`border-e border-gray-100 last:border-e-0 p-0.5 flex flex-col gap-0.5 ${today ? "bg-[#E0F5FB]/40" : ""}`}>
                   {appts.map((a) => (
@@ -301,17 +331,28 @@ function WeekCalendar({
                       className={`rounded px-1.5 py-1 text-[10px] leading-tight cursor-default transition group relative text-white ${
                         a.status === "pending_payment" ? "bg-amber-500 hover:bg-amber-600" : "bg-[#1B7FA0] hover:bg-[#2A9BBF]"
                       }`}
-                      title={`${a.customer.name ?? formatPhone(a.customer.phone)} · ${a.service.name}${a.status === "pending_payment" ? " · ⏳ ממתין למקדמה" : ""}`}
+                      title={`${a.customer.name ?? formatPhone(a.customer.phone)} · ${a.service.name}${a.status === "pending_payment" ? ` · ⏳ ${t.awaitingDeposit}` : ""}`}
                     >
                       <div className="font-semibold truncate">{formatTimeInTz(a.startTime, tz)}</div>
                       <div className="truncate opacity-80">{a.customer.name ?? <span dir="ltr">{formatPhone(a.customer.phone)}</span>}</div>
-                      <div className="truncate opacity-70">{a.status === "pending_payment" ? "⏳ ממתין למקדמה" : a.service.name}</div>
+                      <div className="truncate opacity-70">{a.status === "pending_payment" ? `⏳ ${t.awaitingDeposit}` : a.service.name}</div>
                       {new Date(a.startTime) >= new Date() && (
+                        // Cancelling is destructive, so this must never be invisible-but-clickable.
+                        // It stays visible by default (touch devices have no hover, and previously
+                        // this was unreachable there while still being tappable); only pointer
+                        // devices get the reveal-on-hover treatment, and then `pointer-events-none`
+                        // while hidden means a click can't land on something nobody can see.
+                        // focus-visible brings it back for keyboard users, who could otherwise
+                        // trigger a cancel they had no way to perceive.
                         <button
                           onClick={() => onCancel(a.id)}
                           disabled={cancellingId === a.id}
-                          className="absolute top-0.5 end-0.5 opacity-0 group-hover:opacity-100 text-white/70 hover:text-white transition text-xs leading-none"
-                          title={t.cancel}
+                          className="absolute top-0 end-0 grid place-items-center w-5 h-5 rounded text-white/80
+                            hover:text-white hover:bg-black/25 transition leading-none
+                            [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:pointer-events-none
+                            [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-hover:pointer-events-auto
+                            focus-visible:opacity-100 focus-visible:pointer-events-auto"
+                          aria-label={`${t.cancel} — ${a.customer.name ?? formatPhone(a.customer.phone)}`}
                         >×</button>
                       )}
                     </div>
@@ -335,6 +376,10 @@ export default function AppointmentsPage() {
   const [view, setView] = useState<ViewMode>("calendar");
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [tz, setTz] = useState("Asia/Jerusalem");
+  // Opening window for the calendar grid, padded an hour each side. Defaults to 07:00-21:00 so
+  // the grid looks the same as before until hours load (or if the salon hasn't set any yet).
+  const [openHour, setOpenHour] = useState(7);
+  const [closeHour, setCloseHour] = useState(21);
   const [showNew, setShowNew] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -351,6 +396,15 @@ export default function AppointmentsPage() {
   useEffect(() => {
     apiFetch<{ timezone?: string }>("/api/business/me")
       .then((me) => { if (me.timezone) setTz(me.timezone); })
+      .catch(() => {});
+    apiFetch<{ dayOfWeek: number; openMin: number; closeMin: number }[]>("/api/business/hours")
+      .then((rows) => {
+        if (!rows.length) return;
+        const earliest = Math.min(...rows.map((r) => Math.floor(r.openMin / 60)));
+        const latest = Math.max(...rows.map((r) => Math.ceil(r.closeMin / 60)));
+        setOpenHour(Math.max(0, earliest - 1));
+        setCloseHour(Math.min(23, latest + 1));
+      })
       .catch(() => {});
     load();
     // Auto-refresh so new bookings made via WhatsApp appear without a manual reload.
@@ -459,7 +513,7 @@ export default function AppointmentsPage() {
             ))}
           </div>
           <button
-            onClick={() => exportCsv(filtered)}
+            onClick={() => exportCsv(filtered, tz, localeFor(lang))}
             className="flex items-center gap-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium px-3 py-2 rounded-lg transition"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -492,30 +546,34 @@ export default function AppointmentsPage() {
       {view === "calendar" ? (
         <>
           <div className="flex items-center gap-3 mb-4 animate-fade-up stagger-2">
+            {/* rtl:-scale-x-100 mirrors the chevron: in RTL the flex row reverses, so this button
+                sits on the right, where "previous" has to point right to read as going back. */}
             <button
               onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d); }}
-              className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition"
+              className="row-action p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition"
+              aria-label={t.previousWeek}
             >
-              <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-gray-600 rtl:-scale-x-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
             <span className="text-sm font-medium text-gray-700">
-              {weekStart.toLocaleDateString(undefined, { month: "short", day: "numeric" })} — {weekEnd.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+              {formatDateIn(weekStart, localeFor(lang), { month: "short", day: "numeric" })} — {formatDateIn(weekEnd, localeFor(lang), { month: "short", day: "numeric", year: "numeric" })}
             </span>
             <button
               onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d); }}
-              className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition"
+              className="row-action p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition"
+              aria-label={t.nextWeek}
             >
-              <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-gray-600 rtl:-scale-x-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
             <button
               onClick={() => setWeekStart(startOfWeek(new Date()))}
-              className="text-xs text-[#1B7FA0] hover:text-[#145F78] font-medium px-2 py-1 rounded-lg hover:bg-[#E0F5FB] transition"
+              className="row-action text-xs text-[#145F78] hover:text-[#0F4A5E] font-medium px-2 py-1 rounded-lg hover:bg-[#E0F5FB] transition"
             >
-              Today
+              {t.today}
             </button>
           </div>
           {loaded ? (
@@ -525,6 +583,8 @@ export default function AppointmentsPage() {
               onCancel={cancel}
               cancellingId={cancellingId}
               tz={tz}
+              openHour={openHour}
+              closeHour={closeHour}
             />
           ) : (
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -648,7 +708,7 @@ export default function AppointmentsPage() {
                         <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${STATUS_STYLES[a.status] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
                           {a.status === "confirmed" ? (lang === "he" ? "מאושר" : "Confirmed")
                             : a.status === "cancelled" ? (lang === "he" ? "בוטל" : "Cancelled")
-                            : a.status === "pending_payment" ? `⏳ ${lang === "he" ? "ממתין למקדמה" : "Awaiting deposit"}${a.depositAmountIls ? ` ₪${a.depositAmountIls}` : ""}`
+                            : a.status === "pending_payment" ? `⏳ ${t.awaitingDeposit}${a.depositAmountIls ? ` ₪${a.depositAmountIls}` : ""}`
                             : a.status}
                         </span>
                       </td>
@@ -664,7 +724,7 @@ export default function AppointmentsPage() {
                           )}
                           {a.status === "confirmed" && new Date(a.startTime) >= new Date() && (
                             <button onClick={() => cancel(a.id)} disabled={cancellingId === a.id}
-                              className="text-xs text-gray-600 hover:text-red-600 disabled:opacity-50 transition px-2 py-1 rounded hover:bg-red-950/30">
+                              className="row-action text-xs text-gray-600 hover:text-red-600 disabled:opacity-50 transition px-2 py-1 rounded hover:bg-red-50">
                               {cancellingId === a.id ? "…" : t.cancel}
                             </button>
                           )}

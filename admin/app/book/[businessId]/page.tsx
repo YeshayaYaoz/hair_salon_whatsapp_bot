@@ -2,33 +2,77 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { useLanguage } from "../../lib/LanguageContext";
+import { formatDateTimeInTz, localeFor } from "../../lib/tz";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 interface Service { id: string; name: string; description?: string; priceCents: number; durationMin: number }
-interface BusinessInfo { id: string; name: string; address?: string; services: Service[] }
+interface BusinessInfo { id: string; name: string; address?: string; timezone?: string; services: Service[] }
 interface Slot { startTime: string; endTime: string }
 
 type Step = "service" | "date" | "slot" | "details" | "done";
 
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+/** This page is the only one a salon's own customers ever see, and it had no i18n at all — every
+ *  string was hardcoded English while the document renders RTL, so even "30 min" came out reordered
+ *  as "min 30". Copy lives here rather than in lib/i18n.ts because none of it is shared with the
+ *  owner-facing dashboard. */
+const COPY = {
+  he: {
+    steps: ["שירות", "תאריך", "שעה", "פרטים"],
+    loading: "טוען…",
+    loadFailed: "לא הצלחנו לטעון את פרטי העסק.",
+    chooseService: "בחרו שירות",
+    chooseDateFor: "בחרו תאריך ל",
+    back: "חזרה",
+    noAvailability: "אין זמינות ביום הזה.",
+    tryAnotherDate: "נסו תאריך אחר",
+    yourName: "השם שלכם",
+    phonePlaceholder: "טלפון (לדוגמה 0501234567)",
+    booking: "קובעים…",
+    confirmBooking: "אישור הזמנה",
+    bookingFailed: "ההזמנה נכשלה",
+    somethingWrong: "משהו השתבש. נסו שוב.",
+    confirmed: "התור נקבע!",
+    seeYouThen: "נתראה! אפשר גם לנהל את התורים דרך וואטסאפ.",
+    poweredBy: "מופעל על ידי",
+    minutesShort: "דק׳",
+  },
+  en: {
+    steps: ["Service", "Date", "Time", "Details"],
+    loading: "Loading…",
+    loadFailed: "Could not load salon information.",
+    chooseService: "Choose a service",
+    chooseDateFor: "Choose a date for ",
+    back: "Back",
+    noAvailability: "No availability on this day.",
+    tryAnotherDate: "Try another date",
+    yourName: "Your name",
+    phonePlaceholder: "Phone (e.g. 0501234567)",
+    booking: "Booking…",
+    confirmBooking: "Confirm booking",
+    bookingFailed: "Booking failed",
+    somethingWrong: "Something went wrong",
+    confirmed: "Booking confirmed!",
+    seeYouThen: "We'll see you then. You can also manage bookings via WhatsApp.",
+    poweredBy: "Powered by",
+    minutesShort: "min",
+  },
+} as const;
 
-function fmt(iso: string) {
-  return new Date(iso).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-}
-
+/** Local calendar date `offset` days from today. Built from local date parts rather than
+ *  `toISOString().slice(0, 10)`, which converts to UTC first and so returns the wrong day for
+ *  anyone east of Greenwich during the evening — including the whole of Israel. */
 function isoDate(offset: number) {
   const d = new Date();
   d.setDate(d.getDate() + offset);
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-const STEP_LABELS = ["Service", "Date", "Time", "Details"];
-
-function StepIndicator({ current }: { current: number }) {
+function StepIndicator({ current, labels }: { current: number; labels: readonly string[] }) {
   return (
     <div className="flex items-center gap-0 mb-8">
-      {STEP_LABELS.map((label, i) => {
+      {labels.map((label, i) => {
         const done = i < current;
         const active = i === current;
         return (
@@ -43,7 +87,7 @@ function StepIndicator({ current }: { current: number }) {
               </div>
               <span className={`text-[10px] font-medium ${active ? "text-[#1B7FA0]" : done ? "text-[#5BB8D4]" : "text-gray-400"}`}>{label}</span>
             </div>
-            {i < STEP_LABELS.length - 1 && (
+            {i < labels.length - 1 && (
               <div className={`flex-1 h-0.5 mx-1 mb-4 ${done ? "bg-[#5BB8D4]" : "bg-gray-200"}`} />
             )}
           </div>
@@ -57,7 +101,13 @@ const STEP_INDEX: Record<Step, number> = { service: 0, date: 1, slot: 2, details
 
 export default function BookPage() {
   const { businessId } = useParams<{ businessId: string }>();
+  const { lang } = useLanguage();
+  const c = COPY[lang === "he" ? "he" : "en"];
+  const locale = localeFor(lang);
   const [info, setInfo] = useState<BusinessInfo | null>(null);
+  // Slot times are absolute instants; render them in the salon's zone, not the visitor's device
+  // zone, or someone browsing from abroad books a time that isn't the one they were shown.
+  const tz = info?.timezone ?? "Asia/Jerusalem";
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [step, setStep] = useState<Step>("service");
@@ -76,7 +126,7 @@ export default function BookPage() {
     fetch(`${API}/api/public/${businessId}`)
       .then((r) => r.json())
       .then((d) => { if (d.error) setLoadError(d.error); else setInfo(d); })
-      .catch(() => setLoadError("Could not load salon information."));
+      .catch(() => setLoadError(c.loadFailed));
   }, [businessId]);
 
   async function loadSlots(svc: Service, offset: number) {
@@ -119,11 +169,11 @@ export default function BookPage() {
         body: JSON.stringify({ serviceId: service.id, startTime: slot.startTime, customerName: name, customerPhone: phone }),
       });
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error ?? "Booking failed");
+      if (!r.ok) throw new Error(data.error ?? c.bookingFailed);
       setBooked({ startTime: data.startTime, service: data.service });
       setStep("done");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(err instanceof Error ? err.message : c.somethingWrong);
     } finally {
       setSubmitting(false);
     }
@@ -149,7 +199,7 @@ export default function BookPage() {
       <main className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-[#1B7FA0] border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-400 text-sm">Loading…</p>
+          <p className="text-gray-400 text-sm">{c.loading}</p>
         </div>
       </main>
     );
@@ -169,7 +219,7 @@ export default function BookPage() {
           {info.address && <p className="text-gray-400 text-xs mt-1">{info.address}</p>}
         </div>
 
-        {step !== "done" && <StepIndicator current={STEP_INDEX[step]} />}
+        {step !== "done" && <StepIndicator current={STEP_INDEX[step]} labels={c.steps} />}
 
         {/* Done */}
         {step === "done" && booked && (
@@ -179,31 +229,31 @@ export default function BookPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h2 className="text-gray-900 font-semibold text-lg mb-1">Booking confirmed!</h2>
+            <h2 className="text-gray-900 font-semibold text-lg mb-1">{c.confirmed}</h2>
             <p className="text-gray-500 text-sm">{booked.service}</p>
-            <p className="text-[#1B7FA0] font-semibold text-sm mt-1">{fmt(booked.startTime)}</p>
-            <p className="text-gray-400 text-xs mt-5">We'll see you then. You can also manage bookings via WhatsApp.</p>
+            <p className="text-[#1B7FA0] font-semibold text-sm mt-1">{formatDateTimeInTz(booked.startTime, tz, locale)}</p>
+            <p className="text-gray-400 text-xs mt-5">{c.seeYouThen}</p>
           </div>
         )}
 
         {/* Service */}
         {step === "service" && (
           <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-            <h2 className="text-sm font-semibold text-gray-900 mb-4">Choose a service</h2>
+            <h2 className="text-sm font-semibold text-gray-900 mb-4">{c.chooseService}</h2>
             <div className="flex flex-col gap-2">
               {info.services.map((svc) => (
                 <button
                   key={svc.id}
                   onClick={() => pickService(svc)}
-                  className="flex items-center justify-between w-full text-left px-4 py-3 rounded-xl border border-gray-200 hover:border-[#5BB8D4] hover:bg-[#E0F5FB] transition group"
+                  className="flex items-center justify-between w-full text-start px-4 py-3 rounded-xl border border-gray-200 hover:border-[#5BB8D4] hover:bg-[#E0F5FB] transition group"
                 >
                   <div>
                     <div className="text-gray-800 text-sm font-medium group-hover:text-[#145F78] transition">{svc.name}</div>
                     {svc.description && <div className="text-gray-400 text-xs mt-0.5">{svc.description}</div>}
                   </div>
-                  <div className="text-right shrink-0 ms-3">
+                  <div className="text-end shrink-0 ms-3">
                     <div className="text-[#1B7FA0] text-sm font-semibold">₪{(svc.priceCents / 100).toFixed(0)}</div>
-                    <div className="text-gray-400 text-xs">{svc.durationMin} min</div>
+                    <div className="text-gray-400 text-xs">{svc.durationMin} {c.minutesShort}</div>
                   </div>
                 </button>
               ))}
@@ -215,21 +265,23 @@ export default function BookPage() {
         {step === "date" && service && (
           <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
             <button onClick={() => setStep("service")} className="text-xs text-gray-400 hover:text-gray-600 mb-4 flex items-center gap-1 transition">
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-              Back
+              <svg className="w-3 h-3 rtl:-scale-x-100" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              {c.back}
             </button>
-            <h2 className="text-sm font-semibold text-gray-900 mb-4">Choose a date for <span className="text-[#1B7FA0]">{service.name}</span></h2>
+            <h2 className="text-sm font-semibold text-gray-900 mb-4">{c.chooseDateFor}<span className="text-[#1B7FA0]">{service.name}</span></h2>
             <div className="grid grid-cols-4 gap-2">
               {Array.from({ length: 14 }, (_, i) => i + 1).map((offset) => {
-                const d = new Date();
-                d.setDate(d.getDate() + offset);
+                // Anchored at noon on the same calendar date `isoDate` sends to the API, so the
+                // label can never name a different day than the one being requested. No timeZone
+                // here on purpose: this is a plain calendar date, not an instant.
+                const d = new Date(isoDate(offset) + "T12:00:00");
                 return (
                   <button
                     key={offset}
                     onClick={() => pickDate(offset)}
                     className="flex flex-col items-center py-2.5 rounded-xl border border-gray-200 hover:border-[#5BB8D4] hover:bg-[#E0F5FB] transition"
                   >
-                    <span className="text-gray-400 text-xs">{DAYS[d.getDay()]}</span>
+                    <span className="text-gray-400 text-xs">{d.toLocaleDateString(locale, { weekday: "short" })}</span>
                     <span className="text-gray-800 font-semibold text-sm">{d.getDate()}</span>
                   </button>
                 );
@@ -242,11 +294,11 @@ export default function BookPage() {
         {step === "slot" && service && (
           <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
             <button onClick={() => setStep("date")} className="text-xs text-gray-400 hover:text-gray-600 mb-4 flex items-center gap-1 transition">
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-              Back
+              <svg className="w-3 h-3 rtl:-scale-x-100" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              {c.back}
             </button>
             <h2 className="text-sm font-semibold text-gray-900 mb-4">
-              {new Date(isoDate(dateOffset) + "T12:00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
+              {new Date(isoDate(dateOffset) + "T12:00:00").toLocaleDateString(locale, { weekday: "long", month: "long", day: "numeric" })}
             </h2>
             {slotsLoading ? (
               <div className="flex justify-center py-8">
@@ -254,8 +306,8 @@ export default function BookPage() {
               </div>
             ) : slots.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-gray-400 text-sm">No availability on this day.</p>
-                <button onClick={() => setStep("date")} className="text-[#1B7FA0] text-xs mt-2 hover:underline">Try another date</button>
+                <p className="text-gray-400 text-sm">{c.noAvailability}</p>
+                <button onClick={() => setStep("date")} className="text-[#1B7FA0] text-xs mt-2 hover:underline">{c.tryAnotherDate}</button>
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-2">
@@ -265,7 +317,7 @@ export default function BookPage() {
                     onClick={() => pickSlot(s)}
                     className="py-2.5 rounded-xl border border-gray-200 hover:border-[#5BB8D4] hover:bg-[#E0F5FB] text-gray-700 text-sm font-medium transition"
                   >
-                    {new Date(s.startTime).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                    {new Date(s.startTime).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", timeZone: tz })}
                   </button>
                 ))}
               </div>
@@ -277,23 +329,23 @@ export default function BookPage() {
         {step === "details" && slot && (
           <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
             <button onClick={() => setStep("slot")} className="text-xs text-gray-400 hover:text-gray-600 mb-4 flex items-center gap-1 transition">
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-              Back
+              <svg className="w-3 h-3 rtl:-scale-x-100" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              {c.back}
             </button>
             <div className="bg-[#E0F5FB] border border-[#D6F0F8] rounded-xl px-4 py-3 mb-4">
               <div className="text-xs font-semibold text-[#145F78]">{service?.name}</div>
-              <div className="text-xs text-[#2A9BBF] mt-0.5">{fmt(slot.startTime)}</div>
+              <div className="text-xs text-[#2A9BBF] mt-0.5">{formatDateTimeInTz(slot.startTime, tz, locale)}</div>
             </div>
             <form onSubmit={submit} className="flex flex-col gap-3">
               <input
-                placeholder="Your name"
+                placeholder={c.yourName}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#5BB8D4] focus:border-transparent"
               />
               <input
-                placeholder="Phone (e.g. 0501234567)"
+                placeholder={c.phonePlaceholder}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 required
@@ -305,13 +357,13 @@ export default function BookPage() {
                 disabled={submitting}
                 className="mt-1 w-full bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white font-semibold rounded-xl py-3 text-sm transition shadow-sm shadow-[#1B7FA0]-200"
               >
-                {submitting ? "Booking…" : "Confirm booking"}
+                {submitting ? c.booking : c.confirmBooking}
               </button>
             </form>
           </div>
         )}
 
-        <p className="text-center text-gray-400 text-[11px] mt-8">Powered by <span className="font-semibold text-gray-500">תורי</span></p>
+        <p className="text-center text-gray-400 text-[11px] mt-8">{c.poweredBy} <span className="font-semibold text-gray-500">תורי</span></p>
       </div>
     </main>
   );

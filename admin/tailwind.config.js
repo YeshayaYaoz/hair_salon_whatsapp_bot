@@ -5,12 +5,25 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        brand: "#F59E0B",
-        "brand-dim": "#D97706",
-        slate950: "#0B0F1A",
-        slate900: "#0F1420",
-        slate800: "#161C2D",
-        slate700: "#1E2640",
+        // The product's accent. Previously `brand` was #F59E0B (amber) alongside four slate-*
+        // shades — all leftovers from an earlier dark/amber theme with zero usages anywhere in
+        // app/, while the real accent lived as a bare #1B7FA0 hex repeated across files. These are
+        // the single source of truth; prefer them over literal hexes in new code.
+        brand: {
+          DEFAULT: "#1B7FA0", // 4.58:1 on white — passes AA for text and for white-on-brand buttons
+          dark: "#145F78", // hover/pressed
+          light: "#2A9BBF",
+          tint: "#E0F5FB", // hover/selected surface
+          ring: "#D6F0F8",
+        },
+        // WhatsApp brand green. `DEFAULT` is Meta's exact green and is for FILLS ONLY — chat
+        // mockups, the phone illustration. It is 1.98:1 against white, so it must never carry text
+        // or sit under white text. Use `ink` (5.0:1 on white) for anything with a label on it.
+        wa: {
+          DEFAULT: "#25D366",
+          ink: "#0F8043",
+          "ink-dark": "#0B6634",
+        },
       },
       keyframes: {
         "fade-up": {

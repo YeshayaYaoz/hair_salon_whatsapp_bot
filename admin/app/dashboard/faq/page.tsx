@@ -136,13 +136,13 @@ export default function FaqPage() {
                   <div className="flex gap-1 shrink-0">
                     <button
                       onClick={() => startEdit(entry)}
-                      className="text-xs text-gray-600 hover:text-[#1B7FA0] transition px-2 py-1 rounded hover:bg-[#E0F5FB]"
+                      className="row-action text-xs text-gray-600 hover:text-[#1B7FA0] transition px-2 py-1 rounded hover:bg-[#E0F5FB]"
                     >
                       {t.edit}
                     </button>
                     <button
                       onClick={() => remove(entry.id)}
-                      className="text-xs text-gray-600 hover:text-red-600 transition px-2 py-1 rounded hover:bg-red-50"
+                      className="row-action text-xs text-gray-600 hover:text-red-600 transition px-2 py-1 rounded hover:bg-red-50"
                     >
                       {t.delete}
                     </button>

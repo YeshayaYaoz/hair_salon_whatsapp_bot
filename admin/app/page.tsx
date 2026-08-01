@@ -241,8 +241,13 @@ export default function LandingPage() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <noscript><style>{`.phone-chat > * { display: flex !important; }`}</style></noscript>
-      <style>{`
+      <noscript><style dangerouslySetInnerHTML={{ __html: `.phone-chat > * { display: flex !important; }` }} /></noscript>
+      {/* dangerouslySetInnerHTML, not a text child: React escapes text children, so an apostrophe
+          becomes &#x27; in the server HTML — but <style> is a raw-text element, so the browser never
+          decodes it. `content: ''` then parses as invalid and the declaration is dropped entirely
+          (every ::before/::after decoration below vanishes from the server paint), and the text
+          mismatch fails hydration, costing this page — the one that most needs SSR — its server render. */}
+      <style dangerouslySetInnerHTML={{ __html: `
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         /* Offset in-page anchor scrolling for the 62px fixed nav, so section headings aren't
            hidden behind it when clicking links like #pricing / #faq. */
@@ -296,7 +301,7 @@ export default function LandingPage() {
         .lp-kicker-dot { width: 6px; height: 6px; border-radius: 50%; background: #25D366; animation: pulse-green 2s infinite; }
         @keyframes pulse-green { 0%,100% { box-shadow: 0 0 0 0 rgba(37,211,102,0.4); } 50% { box-shadow: 0 0 0 5px rgba(37,211,102,0); } }
         .lp-h1 { font-size: clamp(36px, 4.5vw, 62px); font-weight: 800; line-height: 1.06; letter-spacing: -2.5px; color: #0A0A0A; max-width: 520px; margin-bottom: 20px; animation: fadeUp 0.7s ease 0.3s both; }
-        .lp-h1 .green { color: #25D366; }
+        .lp-h1 .green { color: #0F8043; }
         .lp-hero-sub { font-size: clamp(16px, 1.5vw, 18px); color: #666; line-height: 1.75; max-width: 420px; margin-bottom: 36px; animation: fadeUp 0.7s ease 0.4s both; }
         .lp-hero-ctas { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 40px; animation: fadeUp 0.7s ease 0.5s both; }
         .lp-hero-types { display: flex; flex-wrap: wrap; gap: 7px; animation: fadeUp 0.6s ease 0.65s both; }
@@ -363,7 +368,7 @@ export default function LandingPage() {
         .phone-chat { scrollbar-width: none; }
 
         /* Chat date divider */
-        .chat-date { align-self: center; background: rgba(255,255,255,0.85); color: #888; font-size: 9.5px; font-weight: 600; padding: 3px 10px; border-radius: 10px; margin: 4px 0 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.08); letter-spacing: 0.02em; }
+        .chat-date { align-self: center; background: rgba(255,255,255,0.85); color: #767676; font-size: 9.5px; font-weight: 600; padding: 3px 10px; border-radius: 10px; margin: 4px 0 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.08); letter-spacing: 0.02em; }
 
         /* Bubbles */
         .chat-bubble { max-width: 78%; padding: 6px 9px 4px; font-size: 12px; line-height: 1.5; position: relative; word-break: break-word; }
@@ -432,7 +437,10 @@ export default function LandingPage() {
         @keyframes typingDotHeader { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
 
         /* BUTTONS */
-        .btn-green { background: #25D366; color: #fff; font-size: 15px; font-weight: 700; padding: 13px 28px; border-radius: 10px; text-decoration: none; transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s; box-shadow: 0 4px 14px rgba(37,211,102,0.35); display: inline-block; }
+        /* #25D366 is Meta's green and stays on fills (mockups, dots, sliders). Anything carrying
+           text uses #0F8043 instead: white on #25D366 is 1.98:1 and green-on-white is the same,
+           both far below the 4.5:1 AA needs — and these are the primary conversion CTAs. */
+        .btn-green { background: #0F8043; color: #fff; font-size: 15px; font-weight: 700; padding: 13px 28px; border-radius: 10px; text-decoration: none; transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s; box-shadow: 0 4px 14px rgba(15,128,67,0.3); display: inline-block; }
         .btn-green:hover { opacity: 0.9; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37,211,102,0.4); }
         .btn-outline { background: transparent; color: #444; font-size: 15px; font-weight: 500; padding: 13px 22px; border-radius: 10px; border: 1px solid #DDD; text-decoration: none; transition: border-color 0.15s, background 0.15s, transform 0.15s; display: inline-block; }
         .btn-outline:hover { border-color: #aaa; background: #FAFAFA; transform: translateY(-1px); }
@@ -460,7 +468,7 @@ export default function LandingPage() {
         .mock-url { margin: 0 auto; background: #1E1E1E; border: 1px solid rgba(255,255,255,0.07); border-radius: 6px; padding: 5px 20px; font-size: 11px; color: #666; font-family: 'Courier New', monospace; }
         .mock-body { display: grid; grid-template-columns: 220px 1fr; direction: ltr; }
         .mock-sidebar { background: #111; border-right: 1px solid rgba(255,255,255,0.06); padding: 24px 14px; display: flex; flex-direction: column; gap: 3px; }
-        .mock-sidebar-header { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.25); letter-spacing: 0.12em; text-transform: uppercase; padding: 0 10px; margin-bottom: 12px; }
+        .mock-sidebar-header { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.55); letter-spacing: 0.12em; text-transform: uppercase; padding: 0 10px; margin-bottom: 12px; }
         .mock-nav-item { padding: 9px 14px; border-radius: 8px; font-size: 12.5px; color: #666; cursor: default; display: flex; align-items: center; gap: 10px; transition: background 0.12s; }
         .mock-nav-item.active { background: rgba(245,158,11,0.12); color: #F59E0B; font-weight: 600; }
         .mock-nav-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
@@ -477,7 +485,7 @@ export default function LandingPage() {
         .mock-stat-n { font-size: 26px; font-weight: 800; color: #fff; letter-spacing: -1px; margin-bottom: 4px; line-height: 1; }
         .mock-stat-n .g { color: #F59E0B; }
         .mock-stat-l { font-size: 11.5px; color: rgba(255,255,255,0.45); }
-        .mock-section-title { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.35); margin-bottom: 12px; letter-spacing: 0.1em; text-transform: uppercase; }
+        .mock-section-title { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.6); margin-bottom: 12px; letter-spacing: 0.1em; text-transform: uppercase; }
         .mock-appt-list { display: flex; flex-direction: column; gap: 8px; }
         .mock-appt { background: #1E1E1E; border-radius: 10px; padding: 13px 18px; display: flex; align-items: center; gap: 14px; border: 1px solid rgba(255,255,255,0.06); }
         .mock-appt-time { font-size: 12px; color: rgba(255,255,255,0.5); font-family: 'Courier New', monospace; flex-shrink: 0; font-weight: 600; min-width: 38px; }
@@ -495,7 +503,7 @@ export default function LandingPage() {
         .lp-trust-item:hover { border-color: #D0D0D0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
 
         /* SECTION LABELS */
-        .lp-label { font-size: 13px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #25D366; margin-bottom: 12px; }
+        .lp-label { font-size: 13px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #0F8043; margin-bottom: 12px; }
         .lp-title { font-size: clamp(28px, 3.5vw, 44px); font-weight: 800; letter-spacing: -1.5px; color: #0A0A0A; margin-bottom: 56px; line-height: 1.1; }
 
         /* STATS BAND */
@@ -503,7 +511,7 @@ export default function LandingPage() {
         .lp-stats-band-inner { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
         .lp-stat-cell { padding: 48px 36px; background: #141414; border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; }
         .lp-stat-n { font-size: 52px; font-weight: 800; letter-spacing: -3px; line-height: 1; color: #fff; margin-bottom: 6px; font-variant-numeric: tabular-nums; display: flex; align-items: flex-end; gap: 2px; }
-        .lp-stat-n .accent { color: #F59E0B; font-size: 32px; padding-bottom: 6px; }
+        .lp-stat-n .accent { color: #B45309; font-size: 32px; padding-bottom: 6px; }
         .lp-stat-n .count-up { display: inline-block; }
         .lp-stat-l { font-size: 14px; color: rgba(255,255,255,0.72); line-height: 1.5; }
 
@@ -520,7 +528,7 @@ export default function LandingPage() {
         .lp-flow-icon.phone { background: linear-gradient(135deg, #FFF0F0, #FEE2E2); border: 2px solid #FCA5A5; }
         .lp-flow-label { font-size: 14px; font-weight: 700; color: #111; text-align: center; }
         .lp-flow-sub { font-size: 12px; color: #666; text-align: center; max-width: 110px; line-height: 1.45; }
-        .lp-flow-arrow { flex-shrink: 0; width: 40px; color: #BBB; font-size: 24px; text-align: center; padding-bottom: 40px; }
+        .lp-flow-arrow { flex-shrink: 0; width: 40px; color: #767676; font-size: 24px; text-align: center; padding-bottom: 40px; }
         .lp-flow-ping { position: absolute; top: -4px; right: -4px; width: 12px; height: 12px; border-radius: 50%; }
         .lp-flow-ping.green { background: #25D366; animation: ping 2s ease infinite; }
         .lp-flow-ping.blue { background: #6366F1; animation: ping 2s ease 0.5s infinite; }
@@ -534,7 +542,7 @@ export default function LandingPage() {
         .lp-step { padding: 40px 34px; background: #fff; border-left: 1px solid #EBEBEB; transition: background 0.2s; }
         .lp-step:hover { background: #FAFAFA; }
         .lp-step:last-child { border-left: none; }
-        .lp-step-num { font-size: 12px; font-weight: 700; color: #25D366; margin-bottom: 20px; letter-spacing: 0.06em; }
+        .lp-step-num { font-size: 12px; font-weight: 700; color: #0F8043; margin-bottom: 20px; letter-spacing: 0.06em; }
         .lp-step-title { font-size: 16px; font-weight: 700; color: #111; margin-bottom: 10px; letter-spacing: -0.3px; line-height: 1.35; }
         .lp-step-desc { font-size: 16px; color: #666; line-height: 1.7; }
 
@@ -560,12 +568,12 @@ export default function LandingPage() {
         .lp-testi-footer { display: flex; align-items: center; gap: 12px; padding-top: 16px; border-top: 1px solid #E8E8E8; }
         .lp-testi-avatar { width: 38px; height: 38px; border-radius: 50%; font-size: 15px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .lp-testi-name { font-size: 13px; font-weight: 700; color: #111; }
-        .lp-testi-role { font-size: 12px; color: #888; }
+        .lp-testi-role { font-size: 12px; color: #767676; }
 
         /* BEFORE/AFTER */
         .lp-ba { background: #0A0A0A; padding: 100px 40px; }
         .lp-ba-inner { max-width: 1080px; margin: 0 auto; }
-        .lp-ba .lp-label { color: #F59E0B; }
+        .lp-ba .lp-label { color: #B45309; }
         .lp-ba .lp-title { color: #fff; }
         .lp-ba-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 52px; }
         .lp-ba-card { border-radius: 16px; padding: 36px; border: 1px solid transparent; }
@@ -590,10 +598,10 @@ export default function LandingPage() {
         .lp-premium-inner { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
         .lp-premium-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.25); color: #F59E0B; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 20px; margin-bottom: 18px; letter-spacing: 0.08em; text-transform: uppercase; }
         .lp-premium-title { font-size: clamp(28px, 3vw, 42px); font-weight: 800; color: #fff; letter-spacing: -1.5px; line-height: 1.1; margin-bottom: 16px; }
-        .lp-premium-title .amber { color: #F59E0B; }
+        .lp-premium-title .amber { color: #B45309; }
         .lp-premium-desc { font-size: 16px; color: rgba(255,255,255,0.72); line-height: 1.75; margin-bottom: 28px; }
         .lp-premium-note { display: inline-flex; align-items: center; gap: 8px; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); border-radius: 8px; padding: 10px 16px; font-size: 13px; color: rgba(255,255,255,0.72); margin-bottom: 32px; }
-        .lp-premium-note strong { color: #F59E0B; }
+        .lp-premium-note strong { color: #B45309; }
         .btn-amber { display: inline-flex; align-items: center; gap: 8px; background: #F59E0B; color: #000; font-size: 14px; font-weight: 700; padding: 12px 24px; border-radius: 9px; text-decoration: none; transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s; box-shadow: 0 4px 16px rgba(245,158,11,0.3); }
         .btn-amber:hover { opacity: 0.88; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(245,158,11,0.4); }
         .voice-card { background: #141414; border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; overflow: hidden; }
@@ -628,21 +636,21 @@ export default function LandingPage() {
         .lp-plan { border-radius: 16px; padding: 36px; border: 1px solid #E8E8E8; position: relative; transition: box-shadow 0.2s; }
         .lp-plan:hover { box-shadow: 0 16px 48px rgba(0,0,0,0.08); }
         .lp-plan.featured { border-color: #111; background: #0A0A0A; }
-        .lp-plan-tag { position: absolute; top: -12px; right: 28px; background: #25D366; color: #fff; font-size: 11px; font-weight: 700; padding: 3px 12px; border-radius: 20px; letter-spacing: 0.05em; }
+        .lp-plan-tag { position: absolute; top: -12px; right: 28px; background: #0F8043; color: #fff; font-size: 11px; font-weight: 700; padding: 3px 12px; border-radius: 20px; letter-spacing: 0.05em; }
         .lp-plan.featured .lp-plan-tag { background: #F59E0B; color: #000; }
         .lp-plan-name { font-size: 14px; font-weight: 700; color: #111; margin-bottom: 8px; letter-spacing: -0.2px; }
         .lp-plan.featured .lp-plan-name { color: #fff; }
         .lp-plan-price { font-size: 52px; font-weight: 800; letter-spacing: -2.5px; color: #111; line-height: 1; margin-bottom: 4px; }
         .lp-plan.featured .lp-plan-price { color: #fff; }
-        .lp-plan-per { font-size: 13px; color: #888; margin-bottom: 28px; }
+        .lp-plan-per { font-size: 13px; color: #767676; margin-bottom: 28px; }
         .lp-plan.featured .lp-plan-per { color: rgba(255,255,255,0.6); }
         .lp-plan-divider { height: 1px; background: #EBEBEB; margin-bottom: 24px; }
         .lp-plan.featured .lp-plan-divider { background: rgba(255,255,255,0.08); }
         .lp-plan-features { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
         .lp-plan-feat { display: flex; align-items: flex-start; gap: 10px; font-size: 16px; color: #444; line-height: 1.5; }
         .lp-plan.featured .lp-plan-feat { color: rgba(255,255,255,0.82); }
-        .lp-plan-feat .check { color: #25D366; font-size: 13px; flex-shrink: 0; margin-top: 1px; }
-        .lp-plan.featured .lp-plan-feat .check { color: #F59E0B; }
+        .lp-plan-feat .check { color: #0F8043; font-size: 13px; flex-shrink: 0; margin-top: 1px; }
+        .lp-plan.featured .lp-plan-feat .check { color: #B45309; }
         .lp-plan-btn { display: block; text-align: center; padding: 13px; border-radius: 10px; font-size: 14px; font-weight: 700; text-decoration: none; transition: opacity 0.15s, transform 0.15s; }
         .lp-plan-btn.dark { background: #111; color: #fff; }
         .lp-plan-btn.dark:hover { opacity: 0.8; transform: translateY(-1px); }
@@ -734,7 +742,7 @@ export default function LandingPage() {
         /* CTA */
         .lp-cta { background: #fff; padding: 120px 40px; text-align: center; }
         .lp-cta-title { font-size: clamp(28px, 4.5vw, 56px); font-weight: 800; letter-spacing: -2.5px; color: #0A0A0A; margin-bottom: 12px; line-height: 1.05; }
-        .lp-cta-sub { font-size: 17px; color: #888; margin-bottom: 36px; }
+        .lp-cta-sub { font-size: 17px; color: #767676; margin-bottom: 36px; }
         .lp-cta-row { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
         .lp-cta-trust { display: flex; align-items: center; justify-content: center; gap: 20px; margin-top: 28px; flex-wrap: wrap; }
         .lp-cta-trust-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #AAA; }
@@ -747,7 +755,7 @@ export default function LandingPage() {
         .lp-footer-logo-row img { width: 52px; height: 52px; border-radius: 12px; opacity: 0.95; }
         .lp-footer-brand { font-size: 16px; font-weight: 700; color: #fff; }
         .lp-footer-tagline { font-size: 14px; color: rgba(255,255,255,0.62); line-height: 1.7; }
-        .lp-footer-col h4 { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.4); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 16px; }
+        .lp-footer-col h4 { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.6); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 16px; }
         .lp-footer-col a { display: block; font-size: 14px; color: rgba(255,255,255,0.65); text-decoration: none; margin-bottom: 11px; transition: color 0.15s; }
         .lp-footer-col a:hover { color: #25D366; }
         /* "Suitable for" uses a compact 2-column list so the many business types stay tidy.
@@ -756,7 +764,7 @@ export default function LandingPage() {
         .lp-footer-suitable { display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; }
         .lp-footer-suitable span { display: block; font-size: 14px; color: rgba(255,255,255,0.65); margin-bottom: 11px; }
         .lp-footer-bottom { display: flex; align-items: center; justify-content: space-between; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08); flex-wrap: wrap; gap: 12px; }
-        .lp-footer-copy { font-size: 12.5px; color: rgba(255,255,255,0.45); }
+        .lp-footer-copy { font-size: 12.5px; color: rgba(255,255,255,0.6); }
         .lp-footer-copy-link { color: rgba(255,255,255,0.65); text-decoration: underline; text-underline-offset: 2px; }
         .lp-footer-copy-link:hover { color: #25D366; }
 
@@ -916,9 +924,9 @@ export default function LandingPage() {
         .roi-slider::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: #25D366; border: 3px solid #0F0F0F; cursor: pointer; }
         .roi-slider:focus-visible::-webkit-slider-thumb { outline: 2px solid #25D366; outline-offset: 3px; }
         .lp-roi-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 8px 0 32px; }
-        .lp-roi-source { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.06); }
+        .lp-roi-source { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 18px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.06); }
         .lp-roi-source svg { flex-shrink: 0; opacity: 0.6; }
-      `}</style>
+      ` }} />
 
 
       <div id="scroll-bar" />

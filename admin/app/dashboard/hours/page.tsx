@@ -116,7 +116,7 @@ function BlockedTimesSection() {
                   <div className="text-sm font-medium text-gray-800">{fmt(b.startTime)} — {fmt(b.endTime)}</div>
                   {b.reason && <div className="text-xs text-gray-600 mt-0.5">{b.reason}</div>}
                 </div>
-                <button onClick={() => remove(b.id)} className="text-xs text-gray-600 hover:text-red-600 transition px-2 py-1 rounded">
+                <button onClick={() => remove(b.id)} className="row-action text-xs text-gray-600 hover:text-red-600 transition px-2 py-1 rounded hover:bg-red-50">
                   {he ? "הסר" : "Remove"}
                 </button>
               </li>
@@ -201,6 +201,7 @@ export default function HoursPage() {
               type="checkbox"
               checked={h.enabled}
               onChange={(e) => update(i, { enabled: e.target.checked })}
+              aria-label={lang === "he" ? `פתוח ביום ${t.days[h.dayOfWeek]}` : `Open on ${t.days[h.dayOfWeek]}`}
             />
             <span className="w-24 text-sm font-medium text-gray-700">{t.days[h.dayOfWeek]}</span>
             <div className="flex items-center gap-2 ms-auto" dir={lang === "he" ? "rtl" : "ltr"}>
@@ -212,6 +213,7 @@ export default function HoursPage() {
                 disabled={!h.enabled}
                 className="text-sm py-1.5 px-2"
                 dir="ltr"
+                aria-label={lang === "he" ? `שעת פתיחה ביום ${t.days[h.dayOfWeek]}` : `Opening time on ${t.days[h.dayOfWeek]}`}
               />
               <span className="text-gray-600 text-sm">{t.to}</span>
               <input
@@ -221,6 +223,7 @@ export default function HoursPage() {
                 disabled={!h.enabled}
                 className="text-sm py-1.5 px-2"
                 dir="ltr"
+                aria-label={lang === "he" ? `שעת סגירה ביום ${t.days[h.dayOfWeek]}` : `Closing time on ${t.days[h.dayOfWeek]}`}
               />
             </div>
           </div>

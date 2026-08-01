@@ -96,7 +96,17 @@ export default function LoginPage() {
 
   return (
     <>
-      <style>{`
+      {/* .login-card starts at opacity 0 and is revealed by a `show` class set from a useEffect, so
+          with JavaScript disabled the sign-in form stayed invisible forever — a blank half-page
+          rather than a graceful degradation. This restores it without costing JS users the
+          entrance animation. */}
+      <noscript><style dangerouslySetInnerHTML={{ __html: `.login-card { opacity: 1 !important; transform: none !important; }` }} /></noscript>
+      {/* dangerouslySetInnerHTML, not a text child: React escapes text children, so an apostrophe
+          becomes &#x27; in the server HTML — but <style> is a raw-text element, so the browser never
+          decodes it. `content: ''` then parses as invalid and the declaration is dropped entirely
+          (the aurora glows below simply never render in the server paint), and the text mismatch
+          fails hydration, making React throw away the whole document and re-render client-side. */}
+      <style dangerouslySetInnerHTML={{ __html: `
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         .login-root {
@@ -401,10 +411,10 @@ export default function LoginPage() {
           font-size: 29px; font-weight: 850; color: #0F1D2A;
           letter-spacing: -0.8px; margin-bottom: 6px; text-align: center;
         }
-        /* #6B7A88 rather than the lighter #8A97A5 used elsewhere as a border/icon tint — at this
+        /* #5C6B7A rather than the lighter #8A97A5 used elsewhere as a border/icon tint — at this
            font weight/size, #8A97A5-on-white sits under the 4.5:1 contrast ratio normal text
            needs for WCAG AA. */
-        .login-form-sub { font-size: 15.5px; color: #6B7A88; margin-bottom: 26px; text-align: center; }
+        .login-form-sub { font-size: 15.5px; color: #5C6B7A; margin-bottom: 26px; text-align: center; }
 
         /* Signup step indicator */
         .login-steps { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
@@ -473,7 +483,7 @@ export default function LoginPage() {
         .login-field-hint { font-size: 12.5px; color: #9CA3AF; margin-top: 2px; }
 
         .login-forgot {
-          display: block; text-align: start; font-size: 14px; color: #6B7A88;
+          display: block; text-align: start; font-size: 14px; color: #5C6B7A;
           text-decoration: none; margin-top: -4px; margin-bottom: 10px; transition: color 0.15s;
         }
         .login-forgot:hover { color: #1B7FA0; }
@@ -546,9 +556,9 @@ export default function LoginPage() {
 
         .login-divider { display: flex; align-items: center; gap: 12px; margin: 20px 0; }
         .login-divider-line { flex: 1; height: 1px; background: #EAEFF4; }
-        .login-divider-text { font-size: 13.5px; color: #A8B4C0; white-space: nowrap; }
+        .login-divider-text { font-size: 13.5px; color: #5C6B7A; white-space: nowrap; }
 
-        .login-switch { text-align: center; font-size: 15.5px; color: #6B7A88; }
+        .login-switch { text-align: center; font-size: 15.5px; color: #5C6B7A; }
         .login-switch button {
           background: none; border: none; color: #1B7FA0;
           font-size: 15.5px; font-weight: 700; cursor: pointer;
@@ -562,7 +572,7 @@ export default function LoginPage() {
         }
         .login-trust-item {
           display: flex; align-items: center; gap: 6px;
-          font-size: 12.5px; font-weight: 600; color: #6B7A88;
+          font-size: 12.5px; font-weight: 600; color: #5C6B7A;
           background: #F3F7FA; border: 1px solid #E8EEF3;
           border-radius: 20px; padding: 5px 12px;
         }
@@ -582,7 +592,7 @@ export default function LoginPage() {
         @media (prefers-reduced-motion: reduce) {
           .login-card, .login-card.show > * { animation: none; transition: none; opacity: 1; transform: none; }
         }
-      `}</style>
+      ` }} />
 
       <main className="login-root" dir={he ? "rtl" : "ltr"}>
         {/* Left / dark showcase panel */}

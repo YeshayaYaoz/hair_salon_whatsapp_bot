@@ -53,6 +53,9 @@ publicRouter.get("/:businessId", async (req, res) => {
     id: business.id,
     name: business.name,
     address: business.address,
+    // The booking page renders slot times, and a customer browsing from another timezone would
+    // otherwise see them shifted by the offset — same reasoning as admin/app/lib/tz.ts.
+    timezone: business.timezone,
     services: business.services.map((s) => ({
       id: s.id,
       name: s.name,

@@ -368,7 +368,7 @@ export default function BillingPage() {
                   }`}
                 >
                   {p === "premium" && (
-                    <span className="absolute -top-2.5 right-5 bg-[#F59E0B] text-white text-[10px] font-bold px-2.5 py-1 rounded-full tracking-wide">
+                    <span className="absolute -top-2.5 right-5 bg-[#B45309] text-white text-[10px] font-bold px-2.5 py-1 rounded-full tracking-wide">
                       {lang === "he" ? "הכי פופולרי" : "MOST POPULAR"}
                     </span>
                   )}
@@ -476,7 +476,7 @@ export default function BillingPage() {
               worth it" at a glance. */}
           <div className={`relative rounded-xl p-5 overflow-hidden ${billingCycle === "annual" ? "bg-white border border-gray-200" : "bg-gradient-to-br from-[#1B7FA0] to-[#155F79] border border-[#1B7FA0]"}`}>
             {billingCycle !== "annual" && (
-              <span className="absolute top-3 left-3 bg-[#F59E0B] text-white text-[10px] font-bold px-2.5 py-1 rounded-full tracking-wide">
+              <span className="absolute top-3 left-3 bg-[#B45309] text-white text-[10px] font-bold px-2.5 py-1 rounded-full tracking-wide">
                 {lang === "he" ? "חודשיים מתנה" : "2 MONTHS FREE"}
               </span>
             )}
@@ -528,7 +528,7 @@ export default function BillingPage() {
               {lang === "he" ? "יתרה לשימוש עתידי בהודעות/SMS נוספים מעבר למכסת המנוי." : "Prepaid balance for future extra WhatsApp/SMS sends beyond your plan quota."}
             </p>
             <div className="flex items-center gap-2">
-              <select value={topupAmount} onChange={(e) => setTopupAmount(+e.target.value)} className="text-sm">
+              <select value={topupAmount} onChange={(e) => setTopupAmount(+e.target.value)} className="text-sm" aria-label={lang === "he" ? "סכום טעינה" : "Top-up amount"}>
                 {[20, 50, 100, 200].map((v) => <option key={v} value={v}>₪{v}</option>)}
               </select>
               <button

@@ -73,7 +73,7 @@ export default function StaffPage() {
                 </div>
                 <button
                   onClick={() => remove(s.id)}
-                  className="text-xs text-gray-600 hover:text-red-600 transition px-2 py-1 rounded hover:bg-red-950/30"
+                  className="row-action text-xs text-gray-600 hover:text-red-600 transition px-2 py-1 rounded hover:bg-red-50"
                 >
                   {t.remove}
                 </button>
