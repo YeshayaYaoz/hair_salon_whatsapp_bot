@@ -9,6 +9,13 @@ import { captureError } from "../lib/errorMonitoring.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import { requireActiveSubscription } from "../lib/subscriptionGate.js";
 import { getAuthUrl, saveGoogleTokens, disconnectGoogleCalendar, deleteCalendarEvent, GoogleCalendarNotConfiguredError } from "../lib/googleCalendar.js";
+import {
+  fetchGoogleLocations,
+  mapGoogleHours,
+  GOOGLE_BUSINESS_SCOPE,
+  GoogleBusinessAuthError,
+  GoogleBusinessAccessError,
+} from "../lib/googleBusinessProfile.js";
 import { sendWhatsAppMessage, getWabaId, subscribeAppToWaba, registerPhoneNumber, getPhoneNumberStatus, getSubscribedApps, createMessageTemplate, setWhatsAppProfilePicture, type CreateTemplateResult } from "../webhook/whatsappClient.js";
 import { reminderTemplate, reviewTemplate, REMINDER_TEMPLATE_BODY, REVIEW_TEMPLATE_BODY } from "../lib/whatsappTemplates.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
@@ -1830,6 +1837,77 @@ businessRouter.post("/google-calendar/callback", async (req: AuthedRequest, res)
 businessRouter.delete("/google-calendar", async (req: AuthedRequest, res) => {
   await disconnectGoogleCalendar(req.businessId!);
   res.json({ ok: true });
+});
+
+// --- Google Business Profile: import the opening hours already published on Google ---
+
+/** Consent URL that asks for the Business Profile scope on top of the calendar one, so an owner
+ * who connected before this feature existed upgrades the same stored token instead of holding two
+ * separate Google connections. */
+businessRouter.get("/google-business/auth-url", async (req: AuthedRequest, res) => {
+  try {
+    const url = getAuthUrl(req.businessId!, {
+      scope: `https://www.googleapis.com/auth/calendar.events ${GOOGLE_BUSINESS_SCOPE}`,
+    });
+    res.json({ url });
+  } catch (err) {
+    if (err instanceof GoogleCalendarNotConfiguredError) {
+      return res.status(503).json({ error: "החיבור ל-Google אינו מוגדר בשרת. פנה לתמיכה." });
+    }
+    throw err;
+  }
+});
+
+/** Reads the hours from Google WITHOUT saving them — the owner sees what would change first. */
+businessRouter.get("/google-business/hours", async (req: AuthedRequest, res) => {
+  try {
+    const locations = await fetchGoogleLocations(req.businessId!);
+    res.json({
+      locations: locations.map((loc) => ({
+        name: loc.name,
+        title: loc.title,
+        ...mapGoogleHours(loc.periods),
+      })),
+    });
+  } catch (err) {
+    if (err instanceof GoogleBusinessAuthError) {
+      return res.status(401).json({ error: "צריך לחבר מחדש את חשבון Google ולאשר גישה לפרופיל העסק.", needsReconnect: true });
+    }
+    if (err instanceof GoogleBusinessAccessError) {
+      console.error("[google-business] access denied:", err.message);
+      return res.status(403).json({
+        error: "Google לא מאפשר גישה לשעות הפעילות של פרופיל העסק בחשבון הזה. ודא שהעסק שלך מאומת ב-Google Business Profile ושאתה מחובר עם אותו חשבון.",
+      });
+    }
+    throw err;
+  }
+});
+
+/** Writes the reviewed hours into BusinessHours, replacing what's there. */
+businessRouter.post("/google-business/hours/apply", async (req: AuthedRequest, res) => {
+  const parsed = z.object({
+    hours: z.array(
+      z.object({
+        dayOfWeek: z.number().int().min(0).max(6),
+        openMin: z.number().int().min(0).max(1440),
+        closeMin: z.number().int().min(0).max(1440),
+      })
+    ).max(7),
+  }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const invalid = parsed.data.hours.find((h) => h.closeMin <= h.openMin);
+  if (invalid) return res.status(400).json({ error: "שעת הסגירה חייבת להיות אחרי שעת הפתיחה" });
+
+  // Replace rather than merge: a day missing from Google means "closed", and merging would leave
+  // the old hours in place for exactly the days the owner wanted removed.
+  await prisma.$transaction([
+    prisma.businessHours.deleteMany({ where: { businessId: req.businessId! } }),
+    prisma.businessHours.createMany({
+      data: parsed.data.hours.map((h) => ({ businessId: req.businessId!, ...h })),
+    }),
+  ]);
+  res.json({ ok: true, days: parsed.data.hours.length });
 });
 
 // --- FAQ entries ---

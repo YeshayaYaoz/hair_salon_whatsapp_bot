@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SkeletonBlock } from "../../lib/Skeleton";
 import { SavedBadge } from "../../lib/SavedBadge";
 import { SpecialPeriods } from "../../lib/SpecialPeriods";
+import { GoogleHoursSync } from "../../lib/GoogleHoursSync";
 
 interface DayHours {
   dayOfWeek: number;
@@ -146,7 +147,7 @@ export default function HoursPage() {
   const [loaded, setLoaded] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
+  const loadHours = useCallback(() => {
     apiFetch<{ dayOfWeek: number; openMin: number; closeMin: number }[]>("/api/business/hours").then((existing) => {
       if (existing.length > 0) {
         setHours(
@@ -160,7 +161,11 @@ export default function HoursPage() {
       }
       setLoaded(true);
     }).catch(() => setLoaded(true));
-  }, []);
+    // t.days is only read for its length (7), which never changes, so this is stable across
+    // language switches — re-running it on every render would refetch the hours on each keystroke.
+  }, [t.days]);
+
+  useEffect(() => { loadHours(); }, [loadHours]);
 
   async function save() {
     const payload = hours
@@ -181,6 +186,8 @@ export default function HoursPage() {
         <h1 className="text-2xl font-bold text-gray-900">{t.hoursTitle}</h1>
         <p className="text-gray-600 text-sm mt-1">{t.hoursSubtitle}</p>
       </div>
+
+      <GoogleHoursSync onApplied={loadHours} />
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-4">
         {!loaded ? (

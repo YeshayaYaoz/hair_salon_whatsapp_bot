@@ -138,7 +138,7 @@ export async function saveGoogleTokens(businessId: string, code: string) {
   });
 }
 
-async function getValidAccessToken(businessId: string): Promise<string | null> {
+export async function getValidAccessToken(businessId: string): Promise<string | null> {
   const record = await prisma.googleCalendarToken.findUnique({ where: { businessId } });
   if (!record) return null;
 
