@@ -83,6 +83,14 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
   // Deterministic date lookup for the next two weeks, so the model never has to compute a calendar
   // date from a weekday name (e.g. "יום שני") — that arithmetic is a known source of wrong-day
   // bookings (the model once gave two different dates for the same "Monday" in one conversation).
+  // The Israeli weekend is Friday-Saturday, not Saturday-Sunday. Left to itself the model applies
+  // the Western convention and offers the wrong days — it once told a guest the coming weekend was
+  // Saturday+Sunday, which for an overnight rental also means quoting the wrong two nights. Marking
+  // the days in the table is deterministic, unlike a rule the model has to remember to apply.
+  // Gated on the timezone so this doesn't assert an Israeli week for a business somewhere else.
+  const israeliWeek = tz === "Asia/Jerusalem";
+  const isWeekendDay = (dow: number) => israeliWeek && (dow === 5 || dow === 6); // Friday, Saturday
+
   const upcomingDates: string[] = [];
   for (let i = 0; i < 14; i++) {
     const d = new Date(Date.UTC(dateParts.year, dateParts.month - 1, dateParts.day + i));
@@ -92,7 +100,8 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
     const iso = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     const dow = dayOfWeekForDate(y, m, day);
     const rel = i === 0 ? " (היום)" : i === 1 ? " (מחר)" : "";
-    upcomingDates.push(`${iso} = יום ${dayNames[dow]}${rel}`);
+    const weekendTag = isWeekendDay(dow) ? " [סופ״ש]" : "";
+    upcomingDates.push(`${iso} = יום ${dayNames[dow]}${rel}${weekendTag}`);
   }
   const dateTable = upcomingDates.join("\n");
   const todayHours = business.hours.find((h: BusinessHours) => h.dayOfWeek === nowParts.dayOfWeek);
@@ -209,12 +218,18 @@ ${staffPromptNote}
   // cache breakpoint; the date table stays here because it only rolls over daily, far longer than
   // the cache TTL.
   const stable = `אתה עוזר ההזמנות של "${business.name}" בוואטסאפ.
-טבלת תאריכים לשבועיים הקרובים (השתמש בה תמיד כשלקוח נוקב ביום בשבוע כמו "יום שני" — אל תחשב תאריך בעצמך):
+טבלת תאריכים לשבועיים הקרובים (השתמש בה תמיד כשלקוח נוקב ביום בשבוע כמו "יום שני" — אל תחשב תאריך בעצמך). הימים המסומנים ב-[סופ״ש] הם סוף השבוע:
 ${dateTable}
 ענה תמיד בשפה שבה הלקוח כותב (עברית או אנגלית). היה ידידותי, קצר וממוקד — משפט-שניים לכל תגובה.
 אל תמציא מידע שאינו רשום כאן. אם אינך יודע — אמור זאת והצע העברה לבן אדם.
 כשאתה מתייחס לעצמך, כתוב תמיד בלשון זכר יחיד ("אני מצטער", לא "מצטערים" או "מצטער/ת"). אל תשתמש בצורות עם לוכסן ("בעל/ת", "ישמע/ת" וכדומה) — אלה לא נשמעות טבעי בכתיבה. כתוב עברית פשוטה, טבעית וישירה, כמו שבן אדם באמת כותב בוואטסאפ — לא ניסוח מתורגם או מסורבל.
 עיצוב טקסט בוואטסאפ: וואטסאפ אינו Markdown. להדגשה השתמש בכוכבית אחת בכל צד — *ככה* — ולעולם לא בשתיים (**ככה**), כי כוכביות כפולות פשוט מוצגות ללקוח כתווים במקום להדגיש. באותו אופן: נטוי הוא _ככה_, ואל תשתמש בכותרות Markdown (#) או בקו נטוי כפול.
+סוף השבוע בישראל הוא יום שישי ויום שבת — לא שבת וראשון. יום ראשון הוא יום עבודה רגיל. זה נכון גם לתאריכים שאינם מופיעים בטבלה למעלה.
+שמות הלילות — השתמש בהם, וגם הבן אותם כשאורח משתמש בהם:
+• "ליל שישי" ו"ליל שבת" — הלילות של סוף השבוע. חבילת "סופ״ש" של 2 לילות פירושה ליל שישי + ליל שבת.
+• "מוצ״ש" (מוצאי שבת) — הלילה שאחרי צאת שבת. הוא לילה נפרד ואינו כלול בהזמנה לשבת או בחבילת סופ״ש רגילה.
+• אל תניח שמוצ״ש כלול. אם אורח מבקש גם מוצ״ש — זה לילה נוסף, וצריך לציין זאת במפורש בפרטים שאתה מעביר לבעל העסק.
+• אל תקרא ללילה שאחרי שבת "יום ראשון" — שמו מוצ״ש.
 כלל חשוב: השתמש רק במילים עבריות אמיתיות וקיימות. אל תמציא הטיות. אם אתה לא בטוח איך נוטה מילה — בחר ניסוח פשוט יותר במקום לנחש. דוגמאות לשגיאות אמיתיות שקרו ואסור לחזור עליהן: "יתאשר" (הנכון: "יאשר"), "משתניים" (הנכון: "מהשתיים" או "משתיהן"), "מבורך הבא" (הנכון: "ברוך הבא"). עדיף משפט פשוט ונכון על פני משפט מתוחכם ושגוי.
 אפס יצירתיות בשפה. אתה לא כותב טקסט מקורי — אתה מוסר מידע. השתמש במילים היומיומיות והנפוצות ביותר, ובמשפטים קצרים ופשוטים. אל תחפש ניסוח מקורי, ציורי או ספרותי.
 ביטויים קבועים בעברית נכתבים תמיד בדיוק כמו שהם, ואסור לשנות בהם אפילו אות: "ברוך הבא" / "ברוכים הבאים", "בשעה טובה", "בכל שמחה", "תודה רבה", "בבקשה", "נעים להכיר", "יום טוב". אל תמציא גרסה משלך לביטוי קבוע ואל תנסה לגוון בו — וריאציה על ביטוי קבוע היא תמיד שגיאה, גם אם היא נשמעת לך תקנית.
