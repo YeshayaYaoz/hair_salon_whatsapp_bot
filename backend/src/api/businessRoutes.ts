@@ -25,6 +25,8 @@ import { parseBookingTime } from "../lib/timezone.js";
 import { getJobStatuses } from "../lib/jobStatus.js";
 import { listTemplates, BUSINESS_TYPES } from "../lib/businessTemplates.js";
 import { AI_PROVIDER_KEYS } from "../bot/providers/index.js";
+import { DEFAULT_TEMPERATURE, TEMPERATURE_MIN, TEMPERATURE_MAX } from "../bot/providers/types.js";
+import { anthropicRejectsTemperature } from "../bot/providers/anthropicProvider.js";
 import { applyTemplate } from "../lib/applyTemplate.js";
 import { matchPeriodKinds, resolvePeriod } from "../lib/hebrewPeriods.js";
 import { classifyPeriodText } from "../lib/classifyPeriodText.js";
@@ -528,6 +530,9 @@ const profileSchema = z.object({
   availabilitySuggestionsEnabled: z.boolean().optional(),
   aiProvider: z.enum(AI_PROVIDER_KEYS).optional(),
   aiModel: z.string().max(100).nullable().optional(),
+  // null resets to the app default rather than pinning 0 — the two are different intentions and
+  // the slider needs to be able to express "back to normal".
+  aiTemperature: z.number().min(TEMPERATURE_MIN).max(TEMPERATURE_MAX).nullable().optional(),
 });
 
 // Display metadata for the Bot page's provider/model picker — which providers are actually
@@ -542,6 +547,12 @@ businessRouter.get("/me/ai-providers", async (_req: AuthedRequest, res) => {
       // which this bot depends on entirely. See bot/providers/index.ts.
       { key: "deepseek", label: "DeepSeek", configured: Boolean(process.env.DEEPSEEK_API_KEY), defaultModels: ["deepseek-chat"] },
     ],
+    temperature: { default: DEFAULT_TEMPERATURE, min: TEMPERATURE_MIN, max: TEMPERATURE_MAX },
+    // Models known to reject the parameter outright (Anthropic answers 400 "temperature is
+    // deprecated for this model"). Detected at runtime on the first rejection, so this is empty
+    // until a model has actually refused once in this process — the dashboard uses it to say the
+    // slider has no effect rather than letting the owner move a control that does nothing.
+    temperatureIgnoredBy: ["claude-sonnet-5", "claude-opus-5"].filter(anthropicRejectsTemperature),
   });
 });
 

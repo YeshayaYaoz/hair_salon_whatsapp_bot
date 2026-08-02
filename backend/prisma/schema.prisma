@@ -97,6 +97,12 @@ model Business {
   // means "use that provider's built-in cheap/smart pair" (see bot/providers/index.ts).
   aiProvider                String    @default("anthropic")
   aiModel                   String?
+  // Sampling temperature for the bot's replies. Null = use the app default (0.2), which is low on
+  // purpose: high temperature is what produced invented Hebrew ("מבורך הבא" for "ברוך הבא"), since
+  // Hebrew is full of fixed collocations where any variation is simply wrong. Exposed per-business
+  // because some owners want a little more variety in small talk. Note that newer Anthropic models
+  // reject the parameter entirely — see anthropicProvider.
+  aiTemperature             Float?
   botGreeting               String? // custom greeting override
   botPersonality            String? // tone/personality instructions for the bot
   googleMapsUrl             String? // linked in post-visit review requests

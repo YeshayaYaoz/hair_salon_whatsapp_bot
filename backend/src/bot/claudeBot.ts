@@ -676,7 +676,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   // booking intent to the owner, so it gets a reduced tool set with no slot/booking tools.
   const biz = await prisma.business.findUniqueOrThrow({
     where: { id: businessId },
-    select: { bookingModel: true, aiProvider: true, aiModel: true, timezone: true },
+    select: { bookingModel: true, aiProvider: true, aiModel: true, timezone: true, aiTemperature: true },
   });
   const activeTools = biz.bookingModel === "inquiry" ? inquiryTools : tools;
   const provider = getAiProvider(biz.aiProvider);
@@ -699,7 +699,14 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   console.log(`[bot] provider=${provider.key} model=${model} business=${businessId} phone=${customerPhone} msg="${messageText.slice(0, 80)}"`);
 
   async function call(currentModel: string) {
-    const res = await provider.send({ model: currentModel, system, tools: activeTools, turns });
+    const res = await provider.send({
+      model: currentModel,
+      system,
+      tools: activeTools,
+      turns,
+      // null (the default) means "use the app default" — see DEFAULT_TEMPERATURE.
+      temperature: biz.aiTemperature ?? undefined,
+    });
     await recordUsage(businessId, customerPhone, provider.key, currentModel, res.usage);
     return res;
   }
