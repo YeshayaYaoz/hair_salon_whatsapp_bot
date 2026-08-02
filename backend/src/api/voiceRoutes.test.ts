@@ -10,6 +10,7 @@ const mockPrisma = {
   service: { findFirst: vi.fn(), findMany: vi.fn() },
   staffMember: { findFirst: vi.fn(), findMany: vi.fn() },
   faqEntry: { findMany: vi.fn() },
+  specialPeriod: { findMany: vi.fn() },
 };
 
 const mockFindAvailableSlots = vi.fn();
@@ -73,6 +74,7 @@ describe("POST /api/voice/context", () => {
     mockPrisma.customer.findMany.mockResolvedValue([]);
     mockPrisma.service.findMany.mockResolvedValue([]);
     mockPrisma.faqEntry.findMany.mockResolvedValue([]);
+    mockPrisma.specialPeriod.findMany.mockResolvedValue([]);
 
     const res = await request(app)
       .post("/api/voice/context")
@@ -91,6 +93,7 @@ describe("POST /api/voice/context", () => {
     mockPrisma.customer.findMany.mockResolvedValue([{ id: "cust1", phone: "972502222222", name: "Yael" }]);
     mockPrisma.service.findMany.mockResolvedValue([]);
     mockPrisma.faqEntry.findMany.mockResolvedValue([]);
+    mockPrisma.specialPeriod.findMany.mockResolvedValue([]);
     mockPrisma.appointment.findFirst.mockResolvedValue({
       id: "appt1",
       startTime: new Date("2026-08-01T10:00:00Z"),
@@ -109,6 +112,38 @@ describe("POST /api/voice/context", () => {
       name: "Yael",
       upcomingAppointment: { id: "appt1", serviceName: "Haircut", startTime: "2026-08-01T10:00:00.000Z", staffName: "Dana" },
     });
+  });
+
+  it("returns upcoming special periods as plain calendar dates", async () => {
+    mockPrisma.business.findMany.mockResolvedValue([{ id: "biz1", voicePhoneNumber: "972501111111" }]);
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ name: "Tzimmer", timezone: "Asia/Jerusalem", address: null, botGreeting: null });
+    mockPrisma.businessHours.findMany.mockResolvedValue([]);
+    mockPrisma.customer.findMany.mockResolvedValue([]);
+    mockPrisma.service.findMany.mockResolvedValue([]);
+    mockPrisma.faqEntry.findMany.mockResolvedValue([]);
+    mockPrisma.specialPeriod.findMany.mockResolvedValue([
+      {
+        label: "ערב פסח",
+        description: "מחיר כפול",
+        startDate: new Date("2027-04-21T00:00:00Z"),
+        endDate: new Date("2027-04-21T00:00:00Z"),
+      },
+    ]);
+
+    const res = await request(app)
+      .post("/api/voice/context")
+      .set("Authorization", "Bearer test-secret")
+      .send({ calledNumber: "972501111111", callerNumber: "972509999999" });
+
+    expect(res.status).toBe(200);
+    // Dates the agent reads aloud must be plain days, not timestamps.
+    expect(res.body.specialPeriods).toEqual([
+      { label: "ערב פסח", description: "מחיר כפול", startDate: "2027-04-21", endDate: "2027-04-21" },
+    ]);
+    // Periods that already ended must not be fetched at all — the filter is the query's job.
+    const where = mockPrisma.specialPeriod.findMany.mock.calls[0][0].where;
+    expect(where.businessId).toBe("biz1");
+    expect(where.endDate.gte).toBeInstanceOf(Date);
   });
 });
 

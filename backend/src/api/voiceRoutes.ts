@@ -65,7 +65,12 @@ voiceRouter.post("/context", async (req, res) => {
   if (!business) return res.status(404).json({ error: "No salon configured for this number" });
 
   const callerDigits = normalizePhone(parsed.data.callerNumber);
-  const [full, hours, customers, services, faqEntries] = await Promise.all([
+  // Midnight UTC today: SpecialPeriod.startDate/endDate are DATE columns, so comparing against a
+  // timestamp with a time component would drop a period on the day it ends.
+  const now = new Date();
+  const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+
+  const [full, hours, customers, services, faqEntries, specialPeriods] = await Promise.all([
     prisma.business.findUniqueOrThrow({
       where: { id: business.id },
       select: {
@@ -77,6 +82,16 @@ voiceRouter.post("/context", async (req, res) => {
     prisma.customer.findMany({ where: { businessId: business.id }, select: { id: true, phone: true, name: true } }),
     prisma.service.findMany({ where: { businessId: business.id }, select: { name: true, description: true, priceCents: true, durationMin: true } }),
     prisma.faqEntry.findMany({ where: { businessId: business.id }, select: { question: true, answer: true } }),
+    // Dates on which the terms differ (holiday pricing, minimum stays). Without these the voice
+    // agent quotes the ordinary rate on erev Pesach while the WhatsApp bot says it's different —
+    // the two channels answer the same caller, so they must not disagree. Only periods that
+    // haven't ended yet; past ones are noise that accumulates year over year.
+    prisma.specialPeriod.findMany({
+      where: { businessId: business.id, endDate: { gte: todayUtc } },
+      orderBy: { startDate: "asc" },
+      take: 40,
+      select: { label: true, description: true, startDate: true, endDate: true },
+    }),
   ]);
   const caller = customers.find((c) => normalizePhone(c.phone) === callerDigits);
 
@@ -110,6 +125,14 @@ voiceRouter.post("/context", async (req, res) => {
     greeting: full.botGreeting,
     personality: full.botPersonality,
     cancellationPolicy: full.cancellationPolicy,
+    // Date-only strings: the agent reads these out loud and compares them to what the caller asks
+    // for, so a timezone-bearing timestamp would be both wrong to speak and easy to misread.
+    specialPeriods: specialPeriods.map((p) => ({
+      label: p.label,
+      description: p.description,
+      startDate: p.startDate.toISOString().slice(0, 10),
+      endDate: p.endDate.toISOString().slice(0, 10),
+    })),
     hours: hours.map((h) => ({ dayOfWeek: h.dayOfWeek, openMin: h.openMin, closeMin: h.closeMin })),
     services: services.map((s) => ({ name: s.name, description: s.description, priceIls: s.priceCents / 100, durationMin: s.durationMin })),
     faq: faqEntries,
