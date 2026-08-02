@@ -4,7 +4,7 @@
  * to a different timezone (or UTC) would otherwise see times shifted by the offset.
  */
 
-const DEFAULT_TZ = "Asia/Jerusalem";
+export const DEFAULT_TZ = "Asia/Jerusalem";
 
 export function formatTimeInTz(iso: string, timeZone = DEFAULT_TZ, locale?: string): string {
   return new Date(iso).toLocaleTimeString(locale, { timeZone, hour: "2-digit", minute: "2-digit" });

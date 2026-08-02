@@ -5,6 +5,7 @@ import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { EmptyState } from "../../lib/EmptyState";
 import { formatPhone } from "../../lib/formatPhone";
+import { formatDateIn, localeFor, DEFAULT_TZ } from "../../lib/tz";
 
 interface WaitlistEntry {
   id: string;
@@ -101,7 +102,7 @@ export default function WaitlistPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-zinc-600 text-xs">{new Date(e.createdAt).toLocaleDateString()}</span>
+                      <span className="text-zinc-600 text-xs">{formatDateIn(new Date(e.createdAt), localeFor(lang), { timeZone: DEFAULT_TZ, year: "numeric", month: "2-digit", day: "2-digit" })}</span>
                       <button
                         onClick={() => markNotified(e.id)}
                         disabled={loadingId === e.id}
