@@ -9,8 +9,11 @@
 -- Idempotent: the NOT EXISTS guard means re-running changes nothing.
 INSERT INTO "Customer" ("id", "businessId", "phone")
 SELECT
-  -- No pgcrypto dependency: a random hex string in the same shape as the cuids Prisma generates.
-  'bkfl' || encode(gen_random_bytes(10), 'hex'),
+  -- Id shaped like the cuids Prisma generates. md5() is core Postgres — gen_random_bytes() lives
+  -- in the pgcrypto extension, which isn't installed here, and assuming otherwise is what made
+  -- the first version of this migration fail on deploy. Seeded with the row's own values plus a
+  -- random component so it stays unique without an extension.
+  'bkfl' || substr(md5(m."businessId" || m."phone" || random()::text), 1, 20),
   m."businessId",
   m."phone"
 FROM (SELECT DISTINCT "businessId", "phone" FROM "ConversationMessage") m
