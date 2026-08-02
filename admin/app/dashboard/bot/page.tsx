@@ -264,9 +264,9 @@ export default function BotPage() {
 
       <form onSubmit={save}>
         <Section title={t.botPersonalityTitle} description={t.botPersonalityDesc}>
-          <Field label={t.greeting}>
+          <Field label={t.greeting} hint={t.greetingHint}>
             <textarea
-              rows={2}
+              rows={4}
               placeholder={t.greetingPlaceholder}
               value={fields.botGreeting}
               onChange={(e) => set("botGreeting", e.target.value)}

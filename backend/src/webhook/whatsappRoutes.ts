@@ -226,6 +226,23 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
     accessToken = decryptSecret(business.whatsappAccessToken);
     businessRef = { id: business.id, name: business.name, email: business.email };
 
+    // Register anyone who writes in as a customer, before doing anything else with the message.
+    //
+    // Customer rows used to be created only by booking (availability.ts) and the waitlist, which
+    // silently excluded every inquiry-mode business: a B&B never books through the bot, so its
+    // Customers page stayed empty however many people had messaged, and the Conversations list
+    // showed phone numbers with no names attached. The dashboard's own empty state promises that
+    // "every customer who writes to the bot is saved here automatically" — this makes that true.
+    //
+    // Non-fatal: a failure here must not cost the customer their reply.
+    await prisma.customer
+      .upsert({
+        where: { businessId_phone: { businessId: business.id, phone: customerPhone } },
+        create: { businessId: business.id, phone: customerPhone },
+        update: {},
+      })
+      .catch((err) => console.error("[webhook] Failed to register customer:", err));
+
     // The owner's own number replying to a pending yield-management campaign proposal
     // (see yieldCampaignJob.ts) is handled here, before any of this routes to the customer bot.
     if (business.pendingYieldCampaign && business.notificationPhone && customerPhone === business.notificationPhone && extracted.kind === "text") {
