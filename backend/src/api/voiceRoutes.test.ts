@@ -114,6 +114,36 @@ describe("POST /api/voice/context", () => {
     });
   });
 
+  it("includes the fields the agent is asked about: capacity, directions and pricing rules", async () => {
+    mockPrisma.business.findMany.mockResolvedValue([{ id: "biz1", voicePhoneNumber: "972501111111" }]);
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue({
+      name: "Tzimmer",
+      timezone: "Asia/Jerusalem",
+      address: "מושב כלשהו",
+      botGreeting: null,
+      googleMapsUrl: "https://maps.app.goo.gl/abc",
+      pricingNotes: "סופ״ש מינימום שני לילות",
+    });
+    mockPrisma.businessHours.findMany.mockResolvedValue([]);
+    mockPrisma.customer.findMany.mockResolvedValue([]);
+    mockPrisma.service.findMany.mockResolvedValue([
+      { name: 'צימר "תאנה"', description: null, priceCents: 90000, durationMin: 1440, capacity: 4 },
+    ]);
+    mockPrisma.faqEntry.findMany.mockResolvedValue([]);
+    mockPrisma.specialPeriod.findMany.mockResolvedValue([]);
+
+    const res = await request(app)
+      .post("/api/voice/context")
+      .set("Authorization", "Bearer test-secret")
+      .send({ calledNumber: "972501111111", callerNumber: "972509999999" });
+
+    expect(res.status).toBe(200);
+    // How many guests a unit sleeps is the most common question on a booking call.
+    expect(res.body.services[0].capacity).toBe(4);
+    expect(res.body.googleMapsUrl).toBe("https://maps.app.goo.gl/abc");
+    expect(res.body.pricingNotes).toBe("סופ״ש מינימום שני לילות");
+  });
+
   it("returns upcoming special periods as plain calendar dates", async () => {
     mockPrisma.business.findMany.mockResolvedValue([{ id: "biz1", voicePhoneNumber: "972501111111" }]);
     mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ name: "Tzimmer", timezone: "Asia/Jerusalem", address: null, botGreeting: null });

@@ -76,11 +76,15 @@ voiceRouter.post("/context", async (req, res) => {
       select: {
         name: true, timezone: true, address: true, botGreeting: true, botPersonality: true,
         cancellationPolicy: true, businessType: true, bookingModel: true, availabilityInfo: true, notificationPhone: true,
+        // Same three the WhatsApp prompt already has. Without them the agent is asked questions it
+        // structurally cannot answer — "how many people fit", "how do I get there", "what about a
+        // 3-night stay" — and an agent with no data and a caller waiting tends to invent one.
+        pricingNotes: true, googleMapsUrl: true,
       },
     }),
     prisma.businessHours.findMany({ where: { businessId: business.id }, orderBy: { dayOfWeek: "asc" } }),
     prisma.customer.findMany({ where: { businessId: business.id }, select: { id: true, phone: true, name: true } }),
-    prisma.service.findMany({ where: { businessId: business.id }, select: { name: true, description: true, priceCents: true, durationMin: true } }),
+    prisma.service.findMany({ where: { businessId: business.id }, select: { name: true, description: true, priceCents: true, durationMin: true, capacity: true } }),
     prisma.faqEntry.findMany({ where: { businessId: business.id }, select: { question: true, answer: true } }),
     // Dates on which the terms differ (holiday pricing, minimum stays). Without these the voice
     // agent quotes the ordinary rate on erev Pesach while the WhatsApp bot says it's different —
@@ -122,6 +126,10 @@ voiceRouter.post("/context", async (req, res) => {
     ownerTransferNumber: full.bookingModel === "inquiry" ? full.notificationPhone : null,
     timezone: full.timezone,
     address: full.address,
+    googleMapsUrl: full.googleMapsUrl,
+    /** Free-text pricing rules the owner wrote (non-linear packages, surcharges, exclusions). The
+     * agent states these as written and still never computes a total from them. */
+    pricingNotes: full.pricingNotes,
     greeting: full.botGreeting,
     personality: full.botPersonality,
     cancellationPolicy: full.cancellationPolicy,
@@ -134,7 +142,15 @@ voiceRouter.post("/context", async (req, res) => {
       endDate: p.endDate.toISOString().slice(0, 10),
     })),
     hours: hours.map((h) => ({ dayOfWeek: h.dayOfWeek, openMin: h.openMin, closeMin: h.closeMin })),
-    services: services.map((s) => ({ name: s.name, description: s.description, priceIls: s.priceCents / 100, durationMin: s.durationMin })),
+    services: services.map((s) => ({
+      name: s.name,
+      description: s.description,
+      priceIls: s.priceCents / 100,
+      durationMin: s.durationMin,
+      // For an overnight rental this is how many guests the unit sleeps — the single most common
+      // question on a booking call.
+      capacity: s.capacity,
+    })),
     faq: faqEntries,
     caller: caller
       ? { isKnownCustomer: true, name: caller.name, upcomingAppointment }
