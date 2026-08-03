@@ -19,6 +19,7 @@ import { runMetricSnapshotJob } from "./billing/metricSnapshotJob.js";
 import { runWhatsAppHealthJob } from "./lib/whatsappHealthJob.js";
 import { runTrackedJob } from "./lib/jobStatus.js";
 import { runHealthDigestJob } from "./lib/healthDigest.js";
+import { runAiCostAlertJob } from "./lib/aiCostAlerts.js";
 import { leadFinderRouter } from "./leadfinder/routes.js";
 import { voiceRouter } from "./api/voiceRoutes.js";
 import { UPLOADS_ROUTE, UPLOADS_ROOT, UnsupportedImageError, MAX_UPLOAD_BYTES, checkUploadsDir } from "./lib/storage.js";
@@ -145,6 +146,7 @@ setInterval(() => {
   runTrackedJob("roiReport", runRoiReportJob);
   runTrackedJob("billingReminder", runBillingReminderJob);
   runTrackedJob("healthDigest", runHealthDigestJob);
+  runTrackedJob("aiCostAlert", runAiCostAlertJob);
 }, ONE_HOUR);
 // Also run immediately on startup to catch any missed windows
 runTrackedJob("reminders", runReminderJob);
@@ -153,6 +155,7 @@ runTrackedJob("digest", runDigestJob);
 runTrackedJob("roiReport", runRoiReportJob);
 runTrackedJob("billingReminder", runBillingReminderJob);
 runTrackedJob("healthDigest", runHealthDigestJob);
+runTrackedJob("aiCostAlert", runAiCostAlertJob);
 
 // Yield-management (empty-slot) campaign scan — runs once daily at 18:00 local business time;
 // like the digest job, the underlying function itself gates on each business's local clock, so

@@ -6,6 +6,7 @@ import { requireAuth, type AuthedRequest } from "../lib/auth.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import {
   createSubscriptionCheckoutLink,
+  createWalletTopupLink,
   chargeSubscriptionToken,
   PLAN_PRICES_ILS,
   BILLING_PERIOD_DAYS,
@@ -14,6 +15,9 @@ import {
 } from "./payplusSubscription.js";
 import { captureError } from "../lib/errorMonitoring.js";
 import { explainPayPlusError } from "../lib/payplusErrors.js";
+
+/** Fallback return URL when the caller sends none — the dashboard page these actions start from. */
+const APP_URL = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
 export const payplusBillingRouter = Router();
 export const payplusBillingWebhookRouter = Router();
@@ -51,16 +55,33 @@ payplusBillingRouter.post("/payplus/checkout", requireAuth, async (req: AuthedRe
 /** Switches an active monthly subscriber to the annual plan — charges 10 months upfront (2 free)
  * immediately via the saved token and pushes nextBillingDate a full year out. */
 payplusBillingRouter.post("/payplus/switch-to-annual", requireAuth, async (req: AuthedRequest, res) => {
+  const parsedBody = z.object({ returnUrl: z.string().url().optional() }).safeParse(req.body ?? {});
   const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! } });
-  if (!business.subscriptionToken || !business.subscriptionPlan) {
-    return res.status(400).json({ error: "No active PayPlus subscription to switch" });
+  if (!business.subscriptionPlan) {
+    return res.status(400).json({ error: "אין מנוי פעיל להחלפה." });
   }
   if (business.billingCycle === "annual") return res.json({ ok: true });
+
+  // No saved card: send the owner to a hosted page for the annual amount instead of refusing.
+  // A business can be active with no token (activated by hand, or before tokenisation was on), and
+  // "No active PayPlus subscription to switch" is both wrong from where they sit and unactionable.
+  if (!business.subscriptionToken) {
+    const returnUrl = parsedBody.success && parsedBody.data.returnUrl ? parsedBody.data.returnUrl : `${APP_URL}/dashboard/billing`;
+    try {
+      const url = await createSubscriptionCheckoutLink(business.id, business.subscriptionPlan, returnUrl, "annual");
+      return res.json({ url });
+    } catch (err) {
+      console.error("PayPlus annual checkout failed:", err);
+      captureError(err, { businessId: business.id, kind: "payplusAnnualCheckout" });
+      const detail = explainPayPlusError(err instanceof Error ? err.message : String(err));
+      return res.status(502).json({ error: `יצירת קישור התשלום נכשלה. ${detail}` });
+    }
+  }
 
   const amountIls = planPriceForCycle(business.subscriptionPlan, "annual");
   const token = decryptSecret(business.subscriptionToken);
   const result = await chargeSubscriptionToken(token, amountIls, "תורי — מעבר למנוי שנתי");
-  if (!result.success) return res.status(502).json({ error: `Annual charge failed: ${result.error}` });
+  if (!result.success) return res.status(502).json({ error: `החיוב למנוי השנתי נכשל. ${explainPayPlusError(result.error ?? "")}` });
 
   await prisma.business.update({
     where: { id: business.id },
@@ -75,15 +96,31 @@ payplusBillingRouter.post("/payplus/switch-to-annual", requireAuth, async (req: 
 
 /** Tops up the prepaid wallet used for metered add-ons (extra WhatsApp/SMS sends beyond the plan). */
 payplusBillingRouter.post("/payplus/wallet/topup", requireAuth, async (req: AuthedRequest, res) => {
-  const parsed = z.object({ amountIls: z.number().int().positive().max(1000) }).safeParse(req.body);
+  const parsed = z
+    .object({ amountIls: z.number().int().positive().max(1000), returnUrl: z.string().url().optional() })
+    .safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! } });
-  if (!business.subscriptionToken) return res.status(400).json({ error: "No active PayPlus subscription to charge" });
+
+  // Same fallback as the annual switch: no saved card is a reason to show a payment page, not a
+  // reason to tell a paying customer they have no subscription.
+  if (!business.subscriptionToken) {
+    const returnUrl = parsed.data.returnUrl ?? `${APP_URL}/dashboard/billing`;
+    try {
+      const url = await createWalletTopupLink(business.id, parsed.data.amountIls, returnUrl);
+      return res.json({ url });
+    } catch (err) {
+      console.error("PayPlus wallet checkout failed:", err);
+      captureError(err, { businessId: business.id, kind: "payplusWalletCheckout" });
+      const detail = explainPayPlusError(err instanceof Error ? err.message : String(err));
+      return res.status(502).json({ error: `יצירת קישור התשלום נכשלה. ${detail}` });
+    }
+  }
 
   const token = decryptSecret(business.subscriptionToken);
   const result = await chargeSubscriptionToken(token, parsed.data.amountIls, "תורי — טעינת ארנק להודעות");
-  if (!result.success) return res.status(502).json({ error: `Wallet top-up charge failed: ${result.error}` });
+  if (!result.success) return res.status(502).json({ error: `טעינת הארנק נכשלה. ${explainPayPlusError(result.error ?? "")}` });
 
   const updated = await prisma.business.update({
     where: { id: business.id },
@@ -99,10 +136,22 @@ payplusBillingRouter.put("/payplus/plan", requireAuth, async (req: AuthedRequest
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! } });
-  if (!business.subscriptionToken || !business.subscriptionPlan || !business.nextBillingDate) {
-    return res.status(400).json({ error: "No active PayPlus subscription to change" });
-  }
   if (business.subscriptionPlan === parsed.data.plan) return res.json({ ok: true });
+
+  // Proration needs both a saved card and a known cycle end. Without either, the honest move is a
+  // hosted page for a fresh period on the new plan rather than an English dead end.
+  if (!business.subscriptionToken || !business.subscriptionPlan || !business.nextBillingDate) {
+    const cycle = business.billingCycle === "annual" ? "annual" : "monthly";
+    try {
+      const url = await createSubscriptionCheckoutLink(business.id, parsed.data.plan, `${APP_URL}/dashboard/billing`, cycle);
+      return res.json({ url });
+    } catch (err) {
+      console.error("PayPlus plan-change checkout failed:", err);
+      captureError(err, { businessId: business.id, kind: "payplusPlanChangeCheckout" });
+      const detail = explainPayPlusError(err instanceof Error ? err.message : String(err));
+      return res.status(502).json({ error: `יצירת קישור התשלום נכשלה. ${detail}` });
+    }
+  }
 
   const oldDaily = PLAN_PRICES_ILS[business.subscriptionPlan] / 30;
   const newDaily = PLAN_PRICES_ILS[parsed.data.plan] / 30;
@@ -112,7 +161,7 @@ payplusBillingRouter.put("/payplus/plan", requireAuth, async (req: AuthedRequest
   if (proratedDiff > 0) {
     const token = decryptSecret(business.subscriptionToken);
     const result = await chargeSubscriptionToken(token, proratedDiff, `תורי — שדרוג תוכנית (${parsed.data.plan})`);
-    if (!result.success) return res.status(502).json({ error: `Proration charge failed: ${result.error}` });
+    if (!result.success) return res.status(502).json({ error: `חיוב ההפרש נכשל. ${explainPayPlusError(result.error ?? "")}` });
   }
 
   await prisma.business.update({ where: { id: business.id }, data: { subscriptionPlan: parsed.data.plan } });
@@ -159,10 +208,45 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
 
     const business = await prisma.business.findUnique({
       where: { checkoutRef },
-      select: { id: true, checkoutPlan: true, checkoutCycle: true },
+      select: { id: true, checkoutPlan: true, checkoutCycle: true, checkoutPurpose: true, checkoutAmountIls: true },
     });
-    if (!business?.checkoutPlan || !PLAN_PRICES_ILS[business.checkoutPlan]) {
+    if (!business) {
       console.warn(`[payplus subscription webhook] No pending checkout for ref ${checkoutRef}`);
+      return;
+    }
+
+    // Null purpose means a row written before wallet checkouts existed, and those were all
+    // subscriptions — an in-flight checkout must not be dropped by this deploy.
+    if ((business.checkoutPurpose ?? "subscription") === "wallet") {
+      // Credited from the amount WE generated the page for, never from one echoed back in the
+      // callback body — that field is attacker-controllable and this one is not.
+      if (!business.checkoutAmountIls) {
+        console.warn(`[payplus wallet webhook] Pending wallet checkout ${checkoutRef} has no amount — ignoring`);
+        return;
+      }
+      const updated = await prisma.business.update({
+        where: { id: business.id },
+        data: {
+          walletBalanceAgorot: { increment: business.checkoutAmountIls * 100 },
+          // Saved so the next top-up is a one-click token charge rather than another hosted page.
+          // Only ever set, never cleared: a top-up must not be able to drop a working subscription
+          // token just because PayPlus returned none for this transaction.
+          ...(tokenUid ? { subscriptionToken: encryptSecret(tokenUid) } : {}),
+          // Consumed — leaving it set would let a replayed callback credit the wallet twice.
+          checkoutRef: null,
+          checkoutPurpose: null,
+          checkoutAmountIls: null,
+        },
+      });
+      console.log(
+        `[payplus wallet webhook] Credited ₪${business.checkoutAmountIls} to business ${business.id} ` +
+          `(balance now ₪${(updated.walletBalanceAgorot / 100).toFixed(2)})`
+      );
+      return;
+    }
+
+    if (!business.checkoutPlan || !PLAN_PRICES_ILS[business.checkoutPlan]) {
+      console.warn(`[payplus subscription webhook] No pending plan for ref ${checkoutRef}`);
       return;
     }
 
@@ -190,6 +274,8 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
         checkoutRef: null,
         checkoutPlan: null,
         checkoutCycle: null,
+        checkoutPurpose: null,
+        checkoutAmountIls: null,
       },
     });
     console.log(`[payplus subscription webhook] Activated ${plan}/${billingCycle} subscription for business ${business.id}`);

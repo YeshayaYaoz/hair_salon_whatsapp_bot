@@ -38,6 +38,13 @@ model Business {
   checkoutRef               String?   @unique
   checkoutPlan              String?
   checkoutCycle             String?
+  // What the pending hosted-payment page is for: "subscription" (activate a plan) or "wallet"
+  // (credit the prepaid balance). Null on rows predating wallet checkouts, which were all
+  // subscriptions — the webhook treats null as "subscription" for exactly that reason.
+  checkoutPurpose           String?
+  // Amount the pending page was generated for, in whole shekels. Needed for wallet top-ups: the
+  // credit must come from what we asked for, never from an amount echoed back in the callback.
+  checkoutAmountIls         Int?
   nextBillingDate           DateTime?
   lastBillingAttemptAt      DateTime?
   billingCycle              String    @default("monthly") // "monthly" | "annual"
@@ -46,6 +53,10 @@ model Business {
   lastBillingReminderSentAt DateTime? // last "charge in 2 days" heads-up, to avoid duplicates
   walletBalanceAgorot       Int       @default(0) // prepaid balance in agorot (1/100 ILS) — funds metered add-ons once the plan's monthly message quota is exceeded
   messagesUsedThisCycle     Int       @default(0) // proactive WhatsApp sends (reminders/reviews/digests/etc.) counted against the plan quota this billing cycle; reset on each successful charge
+  // Highest AI-spend alert step (percent of the plan's inference budget) already emailed to the
+  // super admin, so a business parked above the threshold produces one mail and not one an hour.
+  // Cleared automatically when 30-day spend falls back under the step — see aiCostAlerts.ts.
+  aiCostAlertStepSent       Int       @default(0)
   pendingYieldCampaign      Json? // set when the empty-slot campaign is awaiting the owner's WhatsApp confirmation
   address                   String?
   whatsappPhoneNumberId     String?   @unique

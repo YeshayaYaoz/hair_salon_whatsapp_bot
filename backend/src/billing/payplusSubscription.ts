@@ -76,16 +76,70 @@ function creds() {
  */
 export async function createSubscriptionCheckoutLink(businessId: string, plan: string, returnUrl: string, cycle: "monthly" | "annual" = "monthly"): Promise<string> {
   const amountIls = planPriceForCycle(plan, cycle);
-  const { apiKey, secretKey, pageUid } = creds();
-
   const planLabel = plan === "premium" ? "Premium" : "Standard";
   const cycleLabel = cycle === "annual" ? "שנתי" : "חודשי";
+
+  return generateCheckoutPage({
+    businessId,
+    amountIls,
+    itemName: `תורי — מנוי ${planLabel} (${cycleLabel})`,
+    returnUrl,
+    pending: { checkoutPurpose: "subscription", checkoutPlan: plan, checkoutCycle: cycle },
+  });
+}
+
+/**
+ * Hosted page for a one-off wallet top-up.
+ *
+ * Exists because the wallet's charge-the-saved-token path only works for a business that HAS a
+ * saved token, and plenty don't: anyone activated before tokenisation was switched on, anyone
+ * activated by hand from the admin panel, and anyone whose checkout returned no token (the webhook
+ * activates them anyway — see its comment). For those owners "טען יתרה" simply answered "no active
+ * subscription", which is both untrue from where they sit and not something they can act on.
+ *
+ * The page stores a token too, so the *next* top-up is a one-click token charge.
+ */
+export async function createWalletTopupLink(businessId: string, amountIls: number, returnUrl: string): Promise<string> {
+  return generateCheckoutPage({
+    businessId,
+    amountIls,
+    itemName: `תורי — טעינת ארנק הודעות (₪${amountIls})`,
+    returnUrl,
+    pending: { checkoutPurpose: "wallet", checkoutAmountIls: amountIls },
+  });
+}
+
+/** Fields parked on the Business row for the webhook to read back — see the more_info note above. */
+interface PendingCheckout {
+  checkoutPurpose: "subscription" | "wallet";
+  checkoutPlan?: string;
+  checkoutCycle?: string;
+  checkoutAmountIls?: number;
+}
+
+async function generateCheckoutPage(params: {
+  businessId: string;
+  amountIls: number;
+  itemName: string;
+  returnUrl: string;
+  pending: PendingCheckout;
+}): Promise<string> {
+  const { businessId, amountIls, itemName, returnUrl } = params;
+  const { apiKey, secretKey, pageUid } = creds();
 
   // 16 hex chars, comfortably inside the 19-character limit.
   const checkoutRef = randomBytes(8).toString("hex");
   const business = await prisma.business.update({
     where: { id: businessId },
-    data: { checkoutRef, checkoutPlan: plan, checkoutCycle: cycle },
+    data: {
+      checkoutRef,
+      // Cleared explicitly so a stale field from an abandoned checkout of the other kind can't be
+      // picked up by the webhook alongside this one's ref.
+      checkoutPlan: null,
+      checkoutCycle: null,
+      checkoutAmountIls: null,
+      ...params.pending,
+    },
     select: { name: true, email: true },
   });
 
@@ -116,7 +170,7 @@ export async function createSubscriptionCheckoutLink(businessId: string, plan: s
       customer: { customer_name: business.name, email: business.email },
       more_info: checkoutRef,
       refURL_success: returnUrl,
-      items: [{ name: `תורי — מנוי ${planLabel} (${cycleLabel})`, quantity: 1, price: amountIls }],
+      items: [{ name: itemName, quantity: 1, price: amountIls }],
     }),
   });
 

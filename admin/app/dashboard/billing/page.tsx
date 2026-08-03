@@ -176,7 +176,16 @@ export default function BillingPage() {
     setError(null);
     setAnnualLoading(true);
     try {
-      await apiFetch("/api/billing/payplus/switch-to-annual", { method: "POST" });
+      // A business with a saved card is charged on the spot; one without gets a hosted PayPlus
+      // page back instead, and has to go pay before anything changes here.
+      const result = await apiFetch<{ ok?: boolean; url?: string }>("/api/billing/payplus/switch-to-annual", {
+        method: "POST",
+        body: JSON.stringify({ returnUrl: window.location.href }),
+      });
+      if (result.url) {
+        window.location.href = result.url;
+        return;
+      }
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not switch to annual");
@@ -189,11 +198,16 @@ export default function BillingPage() {
     setError(null);
     setTopupLoading(true);
     try {
-      const result = await apiFetch<{ walletBalanceAgorot: number }>("/api/billing/payplus/wallet/topup", {
+      const result = await apiFetch<{ walletBalanceAgorot?: number; url?: string }>("/api/billing/payplus/wallet/topup", {
         method: "POST",
-        body: JSON.stringify({ amountIls: topupAmount }),
+        body: JSON.stringify({ amountIls: topupAmount, returnUrl: window.location.href }),
       });
-      setWalletBalanceAgorot(result.walletBalanceAgorot);
+      // No saved card — pay on a hosted page; the webhook credits the balance on the way back.
+      if (result.url) {
+        window.location.href = result.url;
+        return;
+      }
+      if (result.walletBalanceAgorot !== undefined) setWalletBalanceAgorot(result.walletBalanceAgorot);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not top up wallet");
     } finally {
@@ -293,7 +307,11 @@ export default function BillingPage() {
         </div>
       ) : (
         <>
-          {/* Current status strip */}
+          {/* Status strip — only when there is something to say. On an active subscription it read
+              "הכל טוב — המנוי פעיל והבוט עובד", which is a whole row spent restating what the plan
+              card below already shows. Trial (days left), past-due and canceled all carry a real
+              instruction, so those keep it. */}
+          {status !== "active" && (
           <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-5 py-3.5 mb-4">
             <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-200 flex items-center justify-center flex-shrink-0 text-sm">
               {status === "active" ? "✅" : status === "trial" ? "🎁" : status === "past_due" ? "⚠️" : "⏸️"}
@@ -310,6 +328,7 @@ export default function BillingPage() {
               <p className="text-xs text-gray-600 mt-0.5">{info?.description}</p>
             </div>
           </div>
+          )}
 
           {/* Once a subscription is live, the full marketing comparison (ribbons, repeated feature
               checklists) is just noise — a business that already subscribed doesn't need to be
