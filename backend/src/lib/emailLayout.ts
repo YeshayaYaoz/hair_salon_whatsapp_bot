@@ -50,9 +50,10 @@ const FONT = "'Segoe UI', Arial, Helvetica, sans-serif";
  * inbox. Emails always reference the production asset. EMAIL_LOGO_URL can override it if the
  * asset ever moves to a CDN.
  *
- * email-logo.png is a trimmed 192px copy of the source logo (26KB rather than 1.2MB) — inbox
+ * email-logo.png is a trimmed 192px copy of the source mark (13KB rather than 1.2MB) — inbox
  * images load over whatever connection the reader is on, and a slow logo is a header that pops
- * into place after the text.
+ * into place after the text. Transparent, so it sits on the page background rather than on a white
+ * tile — which is also why the wordmark is set in text below it instead of being baked in.
  */
 const LOGO_URL = process.env.EMAIL_LOGO_URL ?? "https://torionline.com/email-logo.png";
 
@@ -167,10 +168,13 @@ export function emailLayout({ eyebrow, heading, headingAccent, body, footerNote 
 
           <tr>
             <td align="center" style="padding:0 0 22px;">
-              <!-- alt text carries the brand when images are blocked, which is the default in
-                   Outlook and for many Gmail users on first contact with a sender. -->
-              <img src="${LOGO_URL}" width="56" height="56" alt="תורי-אונליין"
-                   style="display:block;width:56px;height:56px;border:0;border-radius:12px;font-family:${FONT};font-size:15px;font-weight:800;color:${BRAND.primary};" />
+              <!-- The mark is transparent, so no border-radius and no tile: it sits directly on
+                   the page background. alt is empty because the wordmark below already carries the
+                   brand — images are blocked by default in Outlook and for Gmail users on first
+                   contact with a sender, and a stray "logo" label there would read as clutter. -->
+              <img src="${LOGO_URL}" width="52" height="52" alt=""
+                   style="display:block;width:52px;height:52px;border:0;margin:0 auto 8px;" />
+              <div style="font-family:${FONT};font-size:19px;font-weight:800;color:${BRAND.text};letter-spacing:-0.2px;">תורי<span style="color:${BRAND.primary};">-אונליין</span></div>
             </td>
           </tr>
 
