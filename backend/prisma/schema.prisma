@@ -115,6 +115,10 @@ model Business {
   // text exactly as before.
   greetingButtonText        String? // max 20 chars — WhatsApp rejects longer
   greetingButtonUrl         String?
+  // Up to 3 tappable replies on the opening message. Takes precedence over the URL button when
+  // both are set: WhatsApp allows one interactive type per message, and keeping the customer
+  // answering inside the chat beats sending them to a website.
+  quickReplies              String[]
   botPersonality            String? // tone/personality instructions for the bot
   googleMapsUrl             String? // linked in post-visit review requests
   remindersEnabled          Boolean   @default(true)

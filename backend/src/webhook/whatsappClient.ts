@@ -100,6 +100,36 @@ export async function sendWhatsAppCtaUrl(
   });
 }
 
+/**
+ * A message followed by up to three tappable reply buttons.
+ *
+ * Tapping one sends the button's title back as an ordinary message (see extractMessage's
+ * button_reply branch), so the bot needs no special handling — the customer simply didn't have to
+ * type. That is the whole value on a phone keyboard, and it also keeps the conversation inside
+ * WhatsApp rather than sending them to a website.
+ *
+ * WhatsApp's limits, all enforced by rejecting the send: three buttons maximum, 20 characters per
+ * title, and titles must be unique within a message. Trimmed here rather than risking a rejection.
+ */
+export async function sendWhatsAppButtons(
+  params: SendCommon & { body: string; buttons: string[]; footer?: string }
+) {
+  const titles = params.buttons.map((b) => b.trim().slice(0, 20)).filter(Boolean).slice(0, 3);
+  await send(params, {
+    type: "interactive",
+    interactive: {
+      type: "button",
+      body: { text: params.body.slice(0, 1024) },
+      ...(params.footer ? { footer: { text: params.footer.slice(0, 60) } } : {}),
+      action: {
+        // The id comes back on the reply; the title is what the customer sees and what we treat as
+        // their message, so using the title as the id keeps the two from drifting apart.
+        buttons: titles.map((title, i) => ({ type: "reply", reply: { id: `qr_${i}`, title } })),
+      },
+    },
+  });
+}
+
 export interface ListRow {
   id: string;
   title: string; // max 24 chars per WhatsApp's limit

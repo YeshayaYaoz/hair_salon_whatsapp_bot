@@ -2,7 +2,7 @@ import { Router } from "express";
 import express from "express";
 import crypto from "crypto";
 import { resolveBusinessByPhoneNumberId } from "../tenants/resolve.js";
-import { sendWhatsAppMessage, sendWhatsAppList, sendWhatsAppImage, sendWhatsAppCtaUrl, WhatsAppAuthError, type ListRow } from "./whatsappClient.js";
+import { sendWhatsAppMessage, sendWhatsAppList, sendWhatsAppImage, sendWhatsAppCtaUrl, sendWhatsAppButtons, WhatsAppAuthError, type ListRow } from "./whatsappClient.js";
 import { sendWhatsAppTokenExpiredEmail } from "../lib/email.js";
 import { handleIncomingMessage } from "../bot/claudeBot.js";
 import { clearHistory, appendTurn } from "../bot/conversationStore.js";
@@ -79,6 +79,11 @@ function extractMessage(message: any): ExtractedMessage {
     const body = (message.text?.body as string ?? "").trim();
     if (RESET_KEYWORDS.some((k) => body.toLowerCase() === k.toLowerCase())) return { kind: "reset" };
     return { kind: "text", text: body };
+  }
+  // A quick-reply tap. The title is exactly what the customer would have typed, so it enters the
+  // conversation as an ordinary message and the bot needs no special case for it.
+  if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+    return { kind: "text", text: (message.interactive.button_reply?.title as string ?? "").trim() };
   }
   if (message.type === "interactive" && message.interactive?.type === "list_reply") {
     // The row id is the slot's ISO start time (see buildSlotRows); phrase it as a natural reply
@@ -347,6 +352,10 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
       isFirstReply && business.greetingButtonText && business.greetingButtonUrl
         ? { text: business.greetingButtonText, url: business.greetingButtonUrl }
         : null;
+    // WhatsApp allows one interactive type per message, so these two can't both be attached.
+    // Quick replies win: keeping the customer answering inside the chat is worth more than sending
+    // them to a website, and the website link is usually also in the greeting text.
+    const quickReplies = isFirstReply && business.quickReplies.length > 0 ? business.quickReplies : null;
 
     if (offeredSlots && offeredSlots.length > 0) {
       await sendWhatsAppList({
@@ -358,6 +367,14 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
         sectionTitle: lang === "he" ? "מועדים פנויים" : "Available times",
         rows: buildSlotRows(offeredSlots, lang),
       });
+    } else if (quickReplies) {
+      try {
+        await sendWhatsAppButtons({ phoneNumberId, accessToken, to: customerPhone, body: reply, buttons: quickReplies });
+      } catch (btnErr) {
+        console.error("[whatsapp] Quick replies failed, sending plain text instead:", btnErr);
+        captureError(btnErr, { businessId: business.id, customerPhone, kind: "quickReplies" });
+        await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: reply });
+      }
     } else if (greetingButton) {
       try {
         await sendWhatsAppCtaUrl({

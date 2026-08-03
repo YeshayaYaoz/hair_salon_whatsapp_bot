@@ -522,6 +522,9 @@ const profileSchema = z.object({
   // button would silently fall back to plain text with no hint as to why.
   greetingButtonText: z.string().max(20).optional(),
   greetingButtonUrl: z.string().optional(),
+  // WhatsApp allows at most 3, each at most 20 characters, and rejects the send if either is
+  // exceeded — so the limits are enforced here rather than surfacing as a failed first message.
+  quickReplies: z.array(z.string().min(1).max(20)).max(3).optional(),
   botPersonality: z.string().optional(),
   googleMapsUrl: z.string().optional(),
   remindersEnabled: z.boolean().optional(),

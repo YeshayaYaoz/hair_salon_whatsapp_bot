@@ -24,6 +24,7 @@ interface BotProfile {
   aiTemperature?: number | null;
   greetingButtonText?: string;
   greetingButtonUrl?: string;
+  quickReplies?: string[];
 }
 
 interface AiProviderMeta {
@@ -153,7 +154,7 @@ export default function BotPage() {
     remindersEnabled: true, reviewsEnabled: true,
     cancellationPolicy: "", referralText: "", digestEnabled: true, availabilityInfo: "",
     pricingNotes: "", availabilitySuggestionsEnabled: true, aiProvider: "anthropic", aiModel: null, aiTemperature: null,
-    greetingButtonText: "", greetingButtonUrl: "",
+    greetingButtonText: "", greetingButtonUrl: "", quickReplies: [],
   });
   const [bookingModel, setBookingModel] = useState<string>("slot");
   const [botEnabled, setBotEnabled] = useState(true);
@@ -184,6 +185,7 @@ export default function BotPage() {
         aiTemperature: me.aiTemperature ?? null,
         greetingButtonText: me.greetingButtonText ?? "",
         greetingButtonUrl: me.greetingButtonUrl ?? "",
+        quickReplies: me.quickReplies ?? [],
       });
       setBookingModel(me.bookingModel ?? "slot");
       setBotEnabled(me.botEnabled ?? true);
@@ -212,7 +214,7 @@ export default function BotPage() {
     }
   }
 
-  function set(key: keyof BotProfile, value: string | number | boolean | null) {
+  function set(key: keyof BotProfile, value: string | number | boolean | string[] | null) {
     setFields((f) => ({ ...f, [key]: value }));
   }
 
@@ -295,6 +297,31 @@ export default function BotPage() {
               className="w-full"
             />
           </Field>
+          <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 flex flex-col gap-3">
+            <div>
+              <p className="text-xs font-semibold text-gray-800">{t.quickRepliesTitle}</p>
+              <p className="text-xs text-gray-600 mt-1">{t.quickRepliesHint}</p>
+            </div>
+            <div className="grid sm:grid-cols-3 gap-2">
+              {[0, 1, 2].map((i) => (
+                <input
+                  key={i}
+                  value={(fields.quickReplies ?? [])[i] ?? ""}
+                  onChange={(e) => {
+                    const next = [...(fields.quickReplies ?? [])];
+                    next[i] = e.target.value;
+                    // Trailing blanks are dropped so leaving the middle box empty doesn't send an
+                    // empty button, which WhatsApp rejects.
+                    set("quickReplies", next.map((v) => (v ?? "").trim()).filter(Boolean));
+                  }}
+                  placeholder={t.quickReplyPlaceholders[i]}
+                  maxLength={20}
+                  className="w-full text-sm"
+                />
+              ))}
+            </div>
+          </div>
+
           <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 flex flex-col gap-3">
             <div>
               <p className="text-xs font-semibold text-gray-800">{t.greetingButtonTitle}</p>
