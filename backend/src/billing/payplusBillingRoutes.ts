@@ -148,32 +148,51 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
     const success = status === "000" || status === 0 || status === "success";
     if (!success) return;
 
-    const moreInfo = data.more_info as string | undefined;
-    const tokenUid = data.token_uid as string | undefined;
-    if (!moreInfo || !tokenUid) {
-      console.warn("[payplus subscription webhook] Missing more_info/token_uid — cannot activate subscription");
-      return;
-    }
-    const [businessId, plan, cycle] = moreInfo.split(":");
-    const billingCycle = cycle === "annual" ? "annual" : "monthly";
-    if (!businessId || !plan || !PLAN_PRICES_ILS[plan]) {
-      console.warn(`[payplus subscription webhook] Unrecognized more_info: ${moreInfo}`);
+    // more_info is a short reference, not the businessId — PayPlus caps the field at 19 characters
+    // and a cuid alone is longer. The plan and cycle were parked on the row when the link was made.
+    const checkoutRef = data.more_info as string | undefined;
+    const tokenUid = (data.token_uid ?? data.token) as string | undefined;
+    if (!checkoutRef) {
+      console.warn("[payplus subscription webhook] No more_info on the callback — cannot attribute the payment");
       return;
     }
 
+    const business = await prisma.business.findUnique({
+      where: { checkoutRef },
+      select: { id: true, checkoutPlan: true, checkoutCycle: true },
+    });
+    if (!business?.checkoutPlan || !PLAN_PRICES_ILS[business.checkoutPlan]) {
+      console.warn(`[payplus subscription webhook] No pending checkout for ref ${checkoutRef}`);
+      return;
+    }
+
+    const plan = business.checkoutPlan;
+    const billingCycle = business.checkoutCycle === "annual" ? "annual" : "monthly";
+
+    // No token means the charge went through but the card wasn't stored — the subscription is paid
+    // for this period and will need a fresh link next time. Activating anyway is right: the customer
+    // paid. The nightly job skips businesses with no token, so this can't silently fail to bill.
+    if (!tokenUid) {
+      console.warn(`[payplus subscription webhook] No token returned for business ${business.id} — activating without one`);
+    }
+
     await prisma.business.update({
-      where: { id: businessId },
+      where: { id: business.id },
       data: {
         subscriptionStatus: "active",
         subscriptionPlan: plan,
-        subscriptionToken: encryptSecret(tokenUid),
+        subscriptionToken: tokenUid ? encryptSecret(tokenUid) : null,
         billingCycle,
         nextBillingDate: new Date(Date.now() + BILLING_PERIOD_DAYS[billingCycle] * 24 * 60 * 60 * 1000),
         lastBillingAttemptAt: new Date(),
         billingCyclesCompleted: 0,
+        // Consumed — leaving it set would let a replayed callback re-activate the subscription.
+        checkoutRef: null,
+        checkoutPlan: null,
+        checkoutCycle: null,
       },
     });
-    console.log(`[payplus subscription webhook] Activated ${plan}/${billingCycle} subscription for business ${businessId}`);
+    console.log(`[payplus subscription webhook] Activated ${plan}/${billingCycle} subscription for business ${business.id}`);
   } catch (err) {
     console.error("[payplus subscription webhook] Failed to process event:", err);
     captureError(err, { phase: "payplus subscription webhook" });

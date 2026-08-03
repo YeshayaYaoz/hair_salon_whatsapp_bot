@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import request from "supertest";
 import express from "express";
 
-const mockPrisma = { business: { update: vi.fn(), findUniqueOrThrow: vi.fn() } };
+const mockPrisma = {
+  business: { update: vi.fn(), findUnique: vi.fn(), findUniqueOrThrow: vi.fn() },
+};
 vi.mock("../lib/prisma.js", () => ({ prisma: mockPrisma }));
 vi.mock("../lib/crypto.js", () => ({ encryptSecret: (v: string) => v, decryptSecret: (v: string) => v }));
 vi.mock("../lib/errorMonitoring.js", () => ({ captureError: vi.fn() }));
@@ -19,6 +21,7 @@ describe("subscription webhook authentication", () => {
     vi.clearAllMocks();
     vi.resetModules();
     process.env.PAYPLUS_BILLING_WEBHOOK_SECRET = "correct-horse-battery-staple";
+    mockPrisma.business.findUnique.mockResolvedValue({ id: "biz1", checkoutPlan: "premium", checkoutCycle: "annual" });
     const { payplusBillingWebhookRouter } = await import("./payplusBillingRoutes.js");
     app = express();
     app.use(express.json());
@@ -26,7 +29,8 @@ describe("subscription webhook authentication", () => {
   });
 
   const validPayload = {
-    data: { status_code: "000", more_info: "biz1:premium:annual", token_uid: "tok_123" },
+    // A short checkout reference, not a businessId — PayPlus caps more_info at 19 characters.
+    data: { status_code: "000", more_info: "a1b2c3d4e5f60718", token_uid: "tok_123" },
   };
 
   it("activates the subscription when the secret matches", async () => {
@@ -45,6 +49,21 @@ describe("subscription webhook authentication", () => {
   it("rejects a secret of a different length without leaking that via timing", async () => {
     const res = await request(app).post("/webhook/billing/payplus/short").send(validPayload);
     expect(res.status).toBe(404);
+    expect(mockPrisma.business.update).not.toHaveBeenCalled();
+  });
+
+  it("clears the pending checkout so a replayed callback can't re-activate", async () => {
+    await request(app).post("/webhook/billing/payplus/correct-horse-battery-staple").send(validPayload);
+    await new Promise((r) => setImmediate(r));
+    expect(mockPrisma.business.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ checkoutRef: null, checkoutPlan: null }) })
+    );
+  });
+
+  it("ignores a callback whose reference has no pending checkout", async () => {
+    mockPrisma.business.findUnique.mockResolvedValue(null);
+    await request(app).post("/webhook/billing/payplus/correct-horse-battery-staple").send(validPayload);
+    await new Promise((r) => setImmediate(r));
     expect(mockPrisma.business.update).not.toHaveBeenCalled();
   });
 

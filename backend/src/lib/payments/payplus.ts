@@ -2,7 +2,10 @@ import type { PaymentProvider, PaymentCredentials, CreatePaymentLinkParams, Paym
 
 // PayPlus "Generate Payment Link" API. apiKey = PayPlus API Key, apiSecret = PayPlus Secret Key.
 // Docs: https://restapidoc.payplus.co.il (PaymentPages/generateLink)
-const BASE_URL = "https://restapi.payplus.co.il/api/v1.0";
+const BASE_URL =
+  process.env.PAYPLUS_ENV === "sandbox"
+    ? "https://restapidev.payplus.co.il/api/v1.0"
+    : "https://restapi.payplus.co.il/api/v1.0";
 
 export const payplusProvider: PaymentProvider = {
   async createPaymentLink(creds: PaymentCredentials, params: CreatePaymentLinkParams): Promise<PaymentLinkResult> {

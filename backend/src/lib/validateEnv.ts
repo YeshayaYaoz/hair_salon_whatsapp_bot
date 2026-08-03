@@ -41,6 +41,7 @@ const RECOMMENDED: RequiredVar[] = [
   { name: "UPLOADS_DIR", description: "mount path of the Railway volume holding owner-uploaded unit photos — without it uploads land on the container's ephemeral disk and vanish on the next deploy" },
   { name: "PAYPLUS_API_KEY", description: "Tori's own PayPlus account — recurring subscription billing" },
   { name: "PAYPLUS_SECRET_KEY", description: "Tori's own PayPlus account — recurring subscription billing" },
+  { name: "API_PUBLIC_URL", description: "public URL of THIS backend — sent to PayPlus as refURL_callback so a payment is confirmed server-to-server, not only when the customer's browser returns. Falls back to APP_URL, which points at the dashboard and is usually a different host" },
   { name: "PAYPLUS_BILLING_WEBHOOK_SECRET", description: "shared secret in the subscription webhook URL (/webhook/billing/payplus/<secret>) — without it the endpoint rejects every call, and subscriptions never activate after payment" },
   { name: "PAYPLUS_PAGE_UID", description: "uid of the PayPlus payment page to render for subscription checkout — PayPlus rejects every generateLink call without it (405 not-authorize-missing-payment-page-uid), so subscriptions cannot be bought until it's set" },
   // NOTE: managed *payment clearing* is disabled at the API layer (see businessRoutes.ts) — third-

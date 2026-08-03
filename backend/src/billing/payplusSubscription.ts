@@ -8,8 +8,17 @@
  * salon charging *their* customers, not for Tori charging the salon.
  */
 
+import { randomBytes } from "crypto";
+import { prisma } from "../lib/prisma.js";
+
 const GRAPH_VERSION = "v1.0";
-const BASE_URL = `https://restapi.payplus.co.il/api/${GRAPH_VERSION}`;
+// Sandbox and production are different hosts. PayPlus issues separate keys for each, so pointing
+// PAYPLUS_ENV at "sandbox" and pasting the staging keys exercises the whole flow — including a real
+// callback — without charging a card.
+const BASE_URL =
+  process.env.PAYPLUS_ENV === "sandbox"
+    ? `https://restapidev.payplus.co.il/api/${GRAPH_VERSION}`
+    : `https://restapi.payplus.co.il/api/${GRAPH_VERSION}`;
 
 export const PLAN_PRICES_ILS: Record<string, number> = { standard: 149, premium: 299 };
 // Annual plan: 10 months' worth charged upfront (2 months free) — a common SaaS annual incentive.
@@ -52,14 +61,36 @@ function creds() {
 }
 
 /** Generates a hosted payment page that both charges the first period and stores a reusable
- * token for future recurring charges. more_info carries "<businessId>:<plan>:<cycle>" so the
- * webhook can attribute the resulting token to the right business/plan/billing cycle. */
+ * token for future charges.
+ *
+ * charge_method is 1 (a normal charge) with create_token — NOT 3.
+ *
+ * PayPlus's charge_method 3 is their own standing-order product: they hold the schedule and decide
+ * when to charge, and it needs the "recurring payment" permission enabled on the account. We don't
+ * want that. We want the card stored and a token handed back, so our own billing job decides when
+ * and how much — which is what makes loyalty discounts, plan switches and mid-cycle proration
+ * possible. `create_token` is a separate flag from charge_method and does exactly that.
+ *
+ * more_info is capped at 19 characters by PayPlus, which a cuid alone exceeds — so it carries a
+ * short random reference and the plan/cycle are parked on the business row for the webhook to read.
+ */
 export async function createSubscriptionCheckoutLink(businessId: string, plan: string, returnUrl: string, cycle: "monthly" | "annual" = "monthly"): Promise<string> {
   const amountIls = planPriceForCycle(plan, cycle);
   const { apiKey, secretKey, pageUid } = creds();
 
   const planLabel = plan === "premium" ? "Premium" : "Standard";
   const cycleLabel = cycle === "annual" ? "שנתי" : "חודשי";
+
+  // 16 hex chars, comfortably inside the 19-character limit.
+  const checkoutRef = randomBytes(8).toString("hex");
+  const business = await prisma.business.update({
+    where: { id: businessId },
+    data: { checkoutRef, checkoutPlan: plan, checkoutCycle: cycle },
+    select: { name: true, email: true },
+  });
+
+  const webhookSecret = process.env.PAYPLUS_BILLING_WEBHOOK_SECRET;
+  const appUrl = (process.env.API_PUBLIC_URL ?? process.env.APP_URL ?? "").replace(/\/$/, "");
 
   const res = await fetch(`${BASE_URL}/PaymentPages/generateLink`, {
     method: "POST",
@@ -69,11 +100,21 @@ export async function createSubscriptionCheckoutLink(businessId: string, plan: s
     },
     body: JSON.stringify({
       payment_page_uid: pageUid,
-      charge_method: 3, // charge now AND create a reusable token
+      charge_method: 1,
+      create_token: true,
       amount: amountIls,
       currency_code: "ILS",
       sendEmailApproval: true,
-      more_info: `${businessId}:${plan}:${cycle}`,
+      sendEmailFailure: false,
+      // Server-to-server notification. Without it the only signal a payment succeeded is the
+      // customer's browser landing on refURL_success — so anyone who closes the tab after paying
+      // is charged and never activated.
+      ...(appUrl && webhookSecret ? { refURL_callback: `${appUrl}/webhook/billing/payplus/${webhookSecret}` } : {}),
+      // PayPlus issues the receipt itself once "חשבונית+" is enabled on the account, which is why
+      // the customer object below is mandatory rather than nice-to-have.
+      initial_invoice: true,
+      customer: { customer_name: business.name, email: business.email },
+      more_info: checkoutRef,
       refURL_success: returnUrl,
       items: [{ name: `תורי — מנוי ${planLabel} (${cycleLabel})`, quantity: 1, price: amountIls }],
     }),
