@@ -1,4 +1,5 @@
 import { Router } from "express";
+import crypto from "crypto";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, type AuthedRequest } from "../lib/auth.js";
@@ -120,7 +121,25 @@ payplusBillingRouter.put("/payplus/plan", requireAuth, async (req: AuthedRequest
 
 /** PayPlus webhook for the initial checkout — captures the recurring token and activates the
  * subscription. more_info carries "<businessId>:<plan>" set when the link was generated. */
-payplusBillingWebhookRouter.post("/", async (req, res) => {
+payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
+  // Authenticate BEFORE acknowledging. Without this the endpoint activates a subscription for any
+  // businessId a caller puts in more_info: POST {status_code:"000", more_info:"<id>:premium:annual"}
+  // and that business is on a paid plan for free, forever. The deposit webhook has always verified
+  // a per-business secret (webhook/paymentWebhooks.ts); this one was the odd one out.
+  //
+  // A single shared secret rather than per-business: this webhook is Tori's own PayPlus account,
+  // configured once in their dashboard, not something each business sets up.
+  const expected = process.env.PAYPLUS_BILLING_WEBHOOK_SECRET;
+  if (!expected) {
+    console.error("[payplus subscription webhook] PAYPLUS_BILLING_WEBHOOK_SECRET is not set — rejecting");
+    return res.status(503).json({ error: "not configured" });
+  }
+  const given = req.params.secret;
+  if (given.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(expected))) {
+    console.warn("[payplus subscription webhook] Rejected call with a bad secret");
+    return res.status(404).json({ error: "not found" });
+  }
+
   res.status(200).json({ ok: true }); // acknowledge fast, PayPlus retries aggressively on non-2xx
 
   try {
