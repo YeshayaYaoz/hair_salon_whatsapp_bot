@@ -42,6 +42,20 @@ export const BRAND = {
 
 const FONT = "'Segoe UI', Arial, Helvetica, sans-serif";
 
+/**
+ * The same logo the dashboard sidebar shows, so the email and the app read as one product.
+ *
+ * Served from the admin app's public/ folder. Deliberately NOT APP_URL: that can point at
+ * localhost in development, and a localhost image in an email is a broken image in someone's
+ * inbox. Emails always reference the production asset. EMAIL_LOGO_URL can override it if the
+ * asset ever moves to a CDN.
+ *
+ * email-logo.png is a trimmed 192px copy of the source logo (26KB rather than 1.2MB) — inbox
+ * images load over whatever connection the reader is on, and a slow logo is a header that pops
+ * into place after the text.
+ */
+const LOGO_URL = process.env.EMAIL_LOGO_URL ?? "https://torionline.com/email-logo.png";
+
 /** Escapes text that will be interpolated into HTML. Business names and customer-supplied strings
  * reach these templates, and an unescaped `<` silently breaks the whole layout. */
 export function esc(value: string): string {
@@ -152,8 +166,11 @@ export function emailLayout({ eyebrow, heading, headingAccent, body, footerNote 
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:600px;max-width:100%;">
 
           <tr>
-            <td align="center" style="padding:0 0 24px;">
-              <span style="font-family:${FONT};font-size:22px;font-weight:800;color:${BRAND.text};letter-spacing:-0.3px;">תורי<span style="color:${BRAND.primary};">-אונליין</span></span>
+            <td align="center" style="padding:0 0 22px;">
+              <!-- alt text carries the brand when images are blocked, which is the default in
+                   Outlook and for many Gmail users on first contact with a sender. -->
+              <img src="${LOGO_URL}" width="56" height="56" alt="תורי-אונליין"
+                   style="display:block;width:56px;height:56px;border:0;border-radius:12px;font-family:${FONT};font-size:15px;font-weight:800;color:${BRAND.primary};" />
             </td>
           </tr>
 
