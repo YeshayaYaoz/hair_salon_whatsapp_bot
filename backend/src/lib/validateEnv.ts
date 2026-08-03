@@ -94,10 +94,52 @@ export function validateEnv(): void {
 
   reportLikelyTypos();
 
+  reportBillingWebhookProblems();
+
   const missingRecommended = RECOMMENDED.filter((v) => !process.env[v.name]);
   if (missingRecommended.length > 0) {
     console.warn("\n⚠ Missing recommended environment variables (features will degrade silently):\n");
     for (const v of missingRecommended) console.warn(`  - ${v.name}  (${v.description})`);
     console.warn("");
   }
+}
+
+/**
+ * Checks the shape of the billing webhook secret, and prints the exact callback URL to register.
+ *
+ * Presence alone is not enough here, because every way this goes wrong is silent. The secret is a
+ * URL path segment: put a "/", "?", "#" or a space in it and the route simply never matches, so
+ * PayPlus's callback 404s and the payment is taken while nothing is activated or credited. A
+ * pasted trailing newline does the same the moment the URL is typed into PayPlus by hand.
+ *
+ * And the URL itself has to be assembled from two variables and a literal path, which is exactly
+ * the kind of thing that gets one character wrong. Printing it means it can be copied, not derived.
+ */
+function reportBillingWebhookProblems(): void {
+  const raw = process.env.PAYPLUS_BILLING_WEBHOOK_SECRET;
+  if (!raw) return; // already covered by the RECOMMENDED list above
+
+  const problems: string[] = [];
+  if (raw !== raw.trim()) {
+    problems.push("it has leading or trailing whitespace — almost certainly a paste artefact, and it silently becomes part of the URL");
+  }
+  const secret = raw.trim();
+  if (!/^[A-Za-z0-9._~-]+$/.test(secret)) {
+    problems.push('it contains characters that are not safe in a URL path (use only letters, digits, and " - _ . ~ ")');
+  }
+  if (secret.length < 16) {
+    problems.push(`it is only ${secret.length} characters — this is the sole thing standing between the public internet and free subscriptions; use 32+`);
+  }
+
+  if (problems.length > 0) {
+    console.error("\n✖ PAYPLUS_BILLING_WEBHOOK_SECRET is set but unusable as a URL path segment:\n");
+    for (const p of problems) console.error(`  - ${p}`);
+    console.error("\n  PayPlus's callback will 404, so payments will be taken and nothing activated.\n");
+    return;
+  }
+
+  const base = (process.env.PUBLIC_BACKEND_URL ?? process.env.APP_URL ?? "").trim().replace(/\/+$/, "");
+  if (!base) return; // the storage check already complains loudly about a missing public base
+  const withScheme = /^https?:\/\//i.test(base) ? base : `https://${base}`;
+  console.log(`[billing] PayPlus callback URL (set this on the payment page in PayPlus):\n          ${withScheme}/webhook/billing/payplus/${secret}`);
 }

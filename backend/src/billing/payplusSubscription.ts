@@ -143,7 +143,7 @@ async function generateCheckoutPage(params: {
     select: { name: true, email: true },
   });
 
-  const webhookSecret = process.env.PAYPLUS_BILLING_WEBHOOK_SECRET;
+  const webhookSecret = process.env.PAYPLUS_BILLING_WEBHOOK_SECRET?.trim();
   const appUrl = (process.env.PUBLIC_BACKEND_URL ?? process.env.APP_URL ?? "").replace(/\/$/, "");
 
   const res = await fetch(`${BASE_URL}/PaymentPages/generateLink`, {

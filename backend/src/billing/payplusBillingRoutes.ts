@@ -178,7 +178,9 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
   //
   // A single shared secret rather than per-business: this webhook is Tori's own PayPlus account,
   // configured once in their dashboard, not something each business sets up.
-  const expected = process.env.PAYPLUS_BILLING_WEBHOOK_SECRET;
+  // Trimmed: a pasted trailing newline would otherwise make the configured URL and the compared
+  // value disagree, and the only symptom is a 404 on PayPlus's side. See validateEnv.
+  const expected = process.env.PAYPLUS_BILLING_WEBHOOK_SECRET?.trim();
   if (!expected) {
     console.error("[payplus subscription webhook] PAYPLUS_BILLING_WEBHOOK_SECRET is not set — rejecting");
     return res.status(503).json({ error: "not configured" });
