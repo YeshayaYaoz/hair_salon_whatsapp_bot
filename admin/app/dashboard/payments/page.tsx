@@ -5,6 +5,7 @@ import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SavedBadge } from "../../lib/SavedBadge";
 import { SkeletonCard } from "../../lib/Skeleton";
+import { readableWithWhiteText } from "../../lib/readableColor";
 
 const PAYMENT_PROVIDERS = ["payplus", "tranzila", "cardcom", "grow"] as const;
 type PaymentProviderName = (typeof PAYMENT_PROVIDERS)[number];
@@ -103,12 +104,15 @@ interface Me {
   invoiceProvider?: string | null;
 }
 
+// readableWithWhiteText, not the raw brand colour: several provider brands are light enough that
+// a white monogram on them sat near 2:1. Darkening keeps the hue so the badge still reads as that
+// company, while making the monogram legible.
 function ProviderIcon({ color, monogram, size = "md" }: { color: string; monogram: string; size?: "sm" | "md" }) {
   const dims = size === "sm" ? "w-6 h-6 text-[9px]" : "w-9 h-9 text-xs";
   return (
     <span
       className={`${dims} rounded-lg flex items-center justify-center shrink-0 text-white font-bold tracking-tight shadow-sm`}
-      style={{ backgroundColor: color }}
+      style={{ backgroundColor: readableWithWhiteText(color) }}
       dir="ltr"
     >
       {monogram}
@@ -205,7 +209,7 @@ function ProviderCard<T extends string>({
                   ? "text-white border-transparent"
                   : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
               }`}
-              style={selected === p ? { backgroundColor: meta[p].color } : undefined}
+              style={selected === p ? { backgroundColor: readableWithWhiteText(meta[p].color) } : undefined}
             >
               <ProviderIcon color={selected === p ? "rgba(255,255,255,0.25)" : meta[p].color} monogram={meta[p].monogram} size="sm" />
               {meta[p].label}
@@ -253,7 +257,7 @@ function ProviderCard<T extends string>({
                 type="submit"
                 disabled={saving}
                 className="text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition disabled:opacity-50"
-                style={{ backgroundColor: info.color }}
+                style={{ backgroundColor: readableWithWhiteText(info.color) }}
               >
                 {saving ? (he ? "מתחבר..." : "Connecting...") : (he ? "חבר" : "Connect")}
               </button>
@@ -280,7 +284,7 @@ function ProviderCard<T extends string>({
               disabled={saving}
               onClick={() => submit({ preventDefault: () => {} } as React.FormEvent)}
               className="text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition disabled:opacity-50"
-              style={{ backgroundColor: info.color }}
+              style={{ backgroundColor: readableWithWhiteText(info.color) }}
             >
               {saving ? (he ? "מתחבר..." : "Connecting...") : (he ? "חבר" : "Connect")}
             </button>

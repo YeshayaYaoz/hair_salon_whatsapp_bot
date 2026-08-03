@@ -6,7 +6,7 @@ const translations = {
       analytics: "Analytics", appointments: "Appointments", customers: "Customers",
       waitlist: "Waitlist", services: "Pricing & Services", staff: "Staff", hours: "Schedule",
       blocked: "Time off", conversations: "Conversations",
-      whatsapp: "WhatsApp", bot: "Bot", payments: "Payments", faq: "FAQ", settings: "Settings", billing: "Billing", logout: "Log out",
+      whatsapp: "WhatsApp", bot: "Bot", payments: "Payments", faq: "FAQ", settings: "Settings", billing: "My subscription", logout: "Log out",
     },
     navGroups: { setup: "Get started", overview: "Home", operations: "Day-to-day", business: "My business", account: "Setup & account" },
     // Bottom-tab labels. The full nav names are written for the sidebar and overflow a ~56px tab
@@ -135,7 +135,7 @@ const translations = {
     templateWarning: "WhatsApp only allows proactive messages to customers who have messaged you in the last 24 hours. Reminders and review requests may be silently blocked for other customers.",
 
     // Billing
-    billingTitle: "Billing", billingSubtitle: "Manage your subscription",
+    billingTitle: "My subscription", billingSubtitle: "Your Tori subscription, payments and wallet",
     subscriptionStatus: "Subscription status",
     subscribeNow: "Subscribe now", reactivate: "Reactivate subscription",
     manageBilling: "Manage billing & invoices",
@@ -159,7 +159,7 @@ const translations = {
       analytics: "סטטיסטיקות", appointments: "תורים", customers: "לקוחות",
       waitlist: "רשימת המתנה", services: "מחירים ושירותים", staff: "צוות", hours: "לוח זמנים",
       blocked: "חופשות", conversations: "שיחות",
-      whatsapp: "וואטסאפ", bot: "בוט", payments: "סליקה וחשבוניות", faq: "שאלות נפוצות", settings: "הגדרות", billing: "תשלום", logout: "התנתקות",
+      whatsapp: "וואטסאפ", bot: "בוט", payments: "סליקה וחשבוניות", faq: "שאלות נפוצות", settings: "הגדרות", billing: "המנוי שלי", logout: "התנתקות",
     },
     navGroups: { setup: "הפעלה ראשונית", overview: "ראשי", operations: "ניהול יומי", business: "העסק שלי", account: "הגדרות וחשבון" },
     navShort: { analytics: "ראשי", appointments: "תורים", customers: "לקוחות", services: "מחירים" },
@@ -285,7 +285,7 @@ const translations = {
     templateWarning: "וואטסאפ מאפשר הודעות יזומות רק ללקוחות שכתבו לכם ב-24 השעות האחרונות. תזכורות ובקשות ביקורת עלולות להיחסם בשקט עבור לקוחות אחרים.",
 
     // Billing
-    billingTitle: "תשלום", billingSubtitle: "המנוי, התשלומים והארנק — הכל פה",
+    billingTitle: "המנוי שלי", billingSubtitle: "המנוי שלכם בתורי, התשלומים והארנק — הכל פה",
     subscriptionStatus: "סטטוס מנוי",
     subscribeNow: "להרשמה עכשיו", reactivate: "הפעלת המנוי מחדש",
     manageBilling: "ניהול חיוב וחשבוניות",

@@ -38,6 +38,27 @@ function tintOverWhite(rgb: { r: number; g: number; b: number }, alpha: number) 
 }
 
 /**
+ * Darkens a brand colour until WHITE text on it is readable.
+ *
+ * Third-party payment/invoice providers are shown as a filled badge in their own brand colour with
+ * a white monogram, and the same colour fills the "Connect" button. Several of those brands are
+ * light — Grow's green is 2.26:1 against white, iCount's amber 2.03:1 — so the label on them was
+ * barely visible. Darkening keeps the hue (the badge still reads as that company) while making the
+ * text legible; the alternative, switching to dark text, loses the brand association entirely.
+ */
+export function readableWithWhiteText(hex: string, target = 4.5): string {
+  const rgb = toRgb(hex);
+  if (!rgb) return hex;
+  const white = { r: 255, g: 255, b: 255 };
+  let cur = rgb;
+  for (let i = 0; i < 20; i++) {
+    if (contrast(white, cur) >= target) break;
+    cur = { r: Math.round(cur.r * 0.92), g: Math.round(cur.g * 0.92), b: Math.round(cur.b * 0.92) };
+  }
+  return `#${[cur.r, cur.g, cur.b].map((c) => c.toString(16).padStart(2, "0")).join("")}`;
+}
+
+/**
  * Returns `hex` darkened just enough to hit `target` contrast against its own `alpha` tint.
  * Returns the input unchanged when it already passes, and falls back to it if unparseable.
  */

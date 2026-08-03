@@ -86,6 +86,163 @@ const STATUS_COLORS: Record<string, string> = {
   canceled: "bg-gray-100 text-gray-600 border-gray-200",
 };
 
+// The table used to print raw database values — "past_due" with the underscore showing, and
+// lowercase provider ids like "greeninvoice". The filter dropdown right above it already had
+// proper Hebrew for the same statuses, so the page disagreed with itself.
+const STATUS_LABELS: Record<string, { he: string; en: string }> = {
+  trial: { he: "בניסיון", en: "Trial" },
+  active: { he: "פעיל", en: "Active" },
+  past_due: { he: "בפיגור", en: "Past due" },
+  canceled: { he: "בוטל", en: "Canceled" },
+};
+
+const PLAN_LABELS: Record<string, { he: string; en: string }> = {
+  standard: { he: "סטנדרט", en: "Standard" },
+  premium: { he: "פרימיום", en: "Premium" },
+};
+
+const PROVIDER_LABELS: Record<string, string> = {
+  payplus: "PayPlus",
+  tranzila: "Tranzila",
+  cardcom: "Cardcom",
+  grow: "Grow",
+  greeninvoice: "חשבונית ירוקה",
+  icount: "iCount",
+  "payplus-invoice": "PayPlus חשבונית+",
+};
+
+function statusLabel(status: string, he: boolean): string {
+  const l = STATUS_LABELS[status];
+  return l ? (he ? l.he : l.en) : status;
+}
+
+function planLabel(plan: string, he: boolean): string {
+  const l = PLAN_LABELS[plan];
+  return l ? (he ? l.he : l.en) : plan;
+}
+
+/** Status pill, shared by the desktop table and the mobile cards so they can't drift apart. */
+function StatusPill({ status, he }: { status: string; he: boolean }) {
+  return (
+    <span className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_COLORS[status] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
+      {statusLabel(status, he)}
+    </span>
+  );
+}
+
+/** WhatsApp connection state, shared for the same reason. */
+function WhatsappPill({ connected, valid, he }: { connected: boolean; valid: boolean; he: boolean }) {
+  if (!connected) return <span className="text-xs text-gray-600">{he ? "לא מחובר" : "Not connected"}</span>;
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full border ${valid ? "bg-green-50 text-green-700 border-green-200" : "bg-amber-50 text-amber-700 border-amber-300"}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${valid ? "bg-green-400" : "bg-amber-400"}`} />
+      {valid ? (he ? "מחובר" : "Connected") : (he ? "נותק" : "Broken")}
+    </span>
+  );
+}
+
+/**
+ * One business as a card, for phones.
+ *
+ * The desktop view is an 11-column table with a 1020px minimum width. On a 390px screen that meant
+ * three visible columns and a horizontal scrollbar with no hint that eight more existed — the
+ * operator couldn't see subscription state, WhatsApp health or spend without discovering the
+ * sideways scroll. Same data, stacked.
+ */
+function BusinessCard({ b, he, onOpen, fmtDate }: {
+  b: AdminBusiness; he: boolean; onOpen: () => void; fmtDate: (iso: string) => string;
+}) {
+  const quota = MESSAGE_QUOTA_BY_PLAN[b.subscriptionPlan ?? ""] ?? MESSAGE_QUOTA_BY_PLAN.standard;
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } }}
+      className={`w-full text-start p-4 border-b border-gray-200/70 last:border-b-0 cursor-pointer transition hover:bg-gray-50 ${b.blockedAt ? "bg-red-50/40" : ""}`}
+    >
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="min-w-0">
+          <div className="text-gray-900 font-semibold text-sm flex items-center gap-1.5 flex-wrap">
+            {b.name}
+            {b.blockedAt && (
+              <span className="inline-flex text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200">
+                {he ? "חסום" : "blocked"}
+              </span>
+            )}
+          </div>
+          <div className="text-gray-600 text-xs flex items-center gap-1 mt-0.5 truncate" dir="ltr">
+            {b.email}
+            {!b.emailVerifiedAt && (
+              <span title={he ? "האימייל לא אומת" : "Email unverified"} className="text-amber-600 shrink-0">⚠</span>
+            )}
+          </div>
+        </div>
+        <StatusPill status={b.subscriptionStatus} he={he} />
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap mb-3">
+        <WhatsappPill connected={b.whatsappConnected} valid={b.whatsappTokenValid} he={he} />
+        {b.subscriptionPlan && (
+          <span className="text-xs text-gray-600">
+            {planLabel(b.subscriptionPlan, he)}{b.billingCycle === "annual" ? (he ? " · שנתי" : " · annual") : ""}
+          </span>
+        )}
+        <span className="text-xs text-gray-500">· {fmtDate(b.createdAt)}</span>
+      </div>
+
+      {/* The numbers an operator scans for: activity, spend, and whether the wallet has gone red. */}
+      <dl className="grid grid-cols-3 gap-2 mb-3">
+        {[
+          { k: he ? "תורים" : "Bookings", v: String(b._count.appointments) },
+          { k: he ? "לקוחות" : "Customers", v: String(b._count.customers) },
+          { k: he ? "עלות 30 יום" : "Cost 30d", v: `₪${(b.realClaudeCostAgorot30d / 100).toFixed(2)}` },
+        ].map((cell) => (
+          <div key={cell.k} className="bg-gray-50 rounded-lg px-2.5 py-2">
+            <dt className="text-[10px] text-gray-600 leading-tight">{cell.k}</dt>
+            <dd className="text-sm font-semibold text-gray-900 tabular-nums">{cell.v}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <div className="flex items-center justify-between gap-3 text-xs">
+        <span className="text-gray-600 truncate">
+          {b.paymentProvider ? (PROVIDER_LABELS[b.paymentProvider] ?? b.paymentProvider) : (he ? "אין סליקה" : "no payments")}
+          {b.invoiceProvider ? ` · ${PROVIDER_LABELS[b.invoiceProvider] ?? b.invoiceProvider}` : ""}
+        </span>
+        <span className="tabular-nums shrink-0">
+          <span className={b.walletBalanceAgorot < 0 ? "text-red-600 font-semibold" : "text-gray-700"}>
+            ₪{(b.walletBalanceAgorot / 100).toFixed(2)}
+          </span>
+          <span className="text-gray-500"> · {b.messagesUsedThisCycle}/{quota}</span>
+        </span>
+      </div>
+
+      {/* Tel/WhatsApp links stop propagation so tapping them dials instead of opening the panel. */}
+      <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+        {b.notificationPhone ? (
+          <div className="flex items-center gap-3" dir="ltr">
+            <a href={`tel:${b.notificationPhone}`} className="row-action text-[#145F78] hover:underline tabular-nums text-xs font-medium">
+              {b.notificationPhone}
+            </a>
+            <a
+              href={`https://wa.me/${b.notificationPhone.replace(/\D/g, "")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={he ? "פתיחת וואטסאפ" : "Open WhatsApp"}
+              className="row-action text-green-700 hover:text-green-800 text-xs font-medium px-1"
+            >
+              WhatsApp
+            </a>
+          </div>
+        ) : (
+          <span className="text-xs text-amber-700">{he ? "אין מספר" : "no phone"}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminBusinessesPage() {
   const { lang } = useLanguage();
   const he = lang === "he";
@@ -262,8 +419,8 @@ export default function AdminBusinessesPage() {
             {businesses ? (he ? `${businesses.length} עסקים רשומים` : `${businesses.length} registered businesses`) : "…"}
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusFilter)} className="text-sm" aria-label="סינון לפי סטטוס מנוי">
+        <div className="flex items-center gap-2 flex-wrap w-full md:w-auto [&>*]:min-w-0">
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusFilter)} className="text-sm flex-1 md:flex-none" aria-label={he ? "סינון לפי סטטוס מנוי" : "Filter by subscription status"}>
             <option value="all">{he ? "כל הסטטוסים" : "All statuses"}</option>
             <option value="trial">{he ? "בניסיון" : "Trial"}</option>
             <option value="active">{he ? "פעיל" : "Active"}</option>
@@ -277,14 +434,16 @@ export default function AdminBusinessesPage() {
             placeholder={he ? "חיפוש לפי שם, אימייל או טלפון" : "Search by name, email or phone"}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-56"
+            aria-label={he ? "חיפוש עסקים" : "Search businesses"}
+            className="w-full md:w-56 order-first md:order-none"
           />
-          <button onClick={exportCsv} className="text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-700">
+          <button onClick={exportCsv} className="row-action text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 flex-1 md:flex-none">
             {he ? "⬇ ייצוא CSV" : "⬇ Export CSV"}
           </button>
           <button
             onClick={() => setShowAuditLog((v) => !v)}
-            className="text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-700"
+            aria-expanded={showAuditLog}
+            className="row-action text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 flex-1 md:flex-none"
           >
             {he ? "📋 יומן פעולות" : "📋 Audit log"}
           </button>
@@ -392,7 +551,20 @@ export default function AdminBusinessesPage() {
         </>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
+      {/* Mobile: cards. The table below needs 1020px and is unreadable on a phone. */}
+      <div className="md:hidden bg-white border border-gray-200 rounded-xl overflow-hidden">
+        {businesses === null ? (
+          <div>{Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} cols={2} />)}</div>
+        ) : filtered.length === 0 ? (
+          <div className="px-6 py-12 text-center text-gray-600 text-sm">{he ? "לא נמצאו עסקים" : "No businesses found"}</div>
+        ) : (
+          filtered.map((b) => (
+            <BusinessCard key={b.id} b={b} he={he} fmtDate={fmtDate} onOpen={() => openDrilldown(b)} />
+          ))
+        )}
+      </div>
+
+      <div className="hidden md:block bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
         {businesses === null ? (
           <div>{Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} cols={10} />)}</div>
         ) : filtered.length === 0 ? (
@@ -472,34 +644,25 @@ export default function AdminBusinessesPage() {
                   </td>
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(b.createdAt)}</td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_COLORS[b.subscriptionStatus] ?? ""}`}>
-                      {b.subscriptionStatus}
-                    </span>
+                    <StatusPill status={b.subscriptionStatus} he={he} />
                     {b.subscriptionPlan && (
                       <span className="ms-1.5 text-xs text-gray-600">
-                        {b.subscriptionPlan}{b.billingCycle === "annual" ? " · annual" : ""}
+                        {planLabel(b.subscriptionPlan, he)}{b.billingCycle === "annual" ? (he ? " · שנתי" : " · annual") : ""}
                       </span>
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    {b.whatsappConnected ? (
-                      <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full border ${b.whatsappTokenValid ? "bg-green-50 text-green-700 border-green-200" : "bg-amber-50 text-amber-700 border-amber-300"}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${b.whatsappTokenValid ? "bg-green-400" : "bg-amber-400"}`} />
-                        {b.whatsappTokenValid ? (he ? "מחובר" : "Connected") : (he ? "נותק" : "Broken")}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-gray-600">{he ? "לא מחובר" : "Not connected"}</span>
-                    )}
+                    <WhatsappPill connected={b.whatsappConnected} valid={b.whatsappTokenValid} he={he} />
                   </td>
                   <td className="px-4 py-3 text-gray-600 text-xs">
-                    {b.paymentProvider ?? "—"}
+                    {b.paymentProvider ? (PROVIDER_LABELS[b.paymentProvider] ?? b.paymentProvider) : "—"}
                     {b.depositEnabled && (
                       <span className="ms-1.5 inline-flex text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
                         {he ? "מקדמות" : "deposits"}
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-gray-600 text-xs">{b.invoiceProvider ?? "—"}</td>
+                  <td className="px-4 py-3 text-gray-600 text-xs">{b.invoiceProvider ? (PROVIDER_LABELS[b.invoiceProvider] ?? b.invoiceProvider) : "—"}</td>
                   <td className="px-4 py-3 text-xs whitespace-nowrap">
                     <span className={`font-medium tabular-nums ${b.walletBalanceAgorot < 0 ? "text-red-600" : "text-gray-700"}`}>
                       ₪{(b.walletBalanceAgorot / 100).toFixed(2)}
@@ -896,7 +1059,15 @@ function ProviderStatsPanel({ he }: { he: boolean }) {
           {he ? "אין עדיין נתוני שימוש בטווח הזה." : "No usage recorded in this range yet."}
         </p>
       ) : (
-        <div className="overflow-x-auto mt-4">
+        // A 9-column analytical comparison genuinely wants to stay a table — stacking it into cards
+        // loses the column-to-column scan it exists for. So it keeps scrolling sideways, but says
+        // so on narrow screens, and the region is focusable so it can be scrolled by keyboard too
+        // (a scrollable box with no focusable child is otherwise unreachable without a mouse).
+        <div className="mt-4">
+          <p className="md:hidden text-[11px] text-gray-600 mb-1.5">
+            {he ? "↔ אפשר לגלול את הטבלה הצידה" : "↔ Scroll the table sideways"}
+          </p>
+          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label={he ? "השוואת ספקי AI" : "AI provider comparison"}>
           <table className="w-full text-sm min-w-[720px]">
             <thead>
               <tr className="border-b border-gray-200">
@@ -941,6 +1112,7 @@ function ProviderStatsPanel({ he }: { he: boolean }) {
               ))}
             </tbody>
           </table>
+          </div>
           <p className="text-xs text-gray-600 mt-3">
             {he ? `סה"כ ${(totalCost / 100).toFixed(2)} ₪ בטווח הנבחר.` : `₪${(totalCost / 100).toFixed(2)} total over the selected range.`}
             {" "}
