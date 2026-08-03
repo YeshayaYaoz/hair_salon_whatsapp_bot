@@ -15,6 +15,17 @@ export interface CreatePaymentLinkParams {
   customerPhone?: string;
   /** Business-generated id (e.g. appointment id) to correlate the webhook callback later. */
   referenceId: string;
+  /**
+   * Where the provider should POST the result, server-to-server.
+   *
+   * Sent per transaction rather than relying on the account-level callback field configured in the
+   * provider's dashboard. That field is single-valued, and our webhook URL carries the businessId
+   * in its path — so one merchant account could only ever route deposits to one business in Tori.
+   * A second business sharing the account would have its customers pay and never get a confirmed
+   * booking, silently. Sending it here also means the owner has nothing to paste and nothing to
+   * forget during onboarding.
+   */
+  callbackUrl?: string;
 }
 
 export interface PaymentLinkResult {

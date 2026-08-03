@@ -2,7 +2,7 @@ import { prisma } from "../lib/prisma.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { appendTurn, getHistory, type Turn } from "./conversationStore.js";
 import { findAvailableSlots, createAppointment, attachDepositPaymentLink, SlotUnavailableError, OutsideBusinessHoursError, type AvailableSlot } from "../booking/availability.js";
-import { getPaymentProvider } from "../lib/payments/index.js";
+import { depositCallbackUrl, getPaymentProvider } from "../lib/payments/index.js";
 import { parseBookingTime, parseDateString, dayOfWeekForDate, instantPartsInTz, zonedDateParts } from "../lib/timezone.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
 import { decryptSecret } from "../lib/crypto.js";
@@ -279,7 +279,7 @@ async function runTool(
       select: {
         timezone: true, name: true,
         depositEnabled: true, depositAmountIls: true, depositHoldMinutes: true,
-        paymentProvider: true, paymentApiKey: true, paymentApiSecret: true, paymentPageUid: true,
+        paymentProvider: true, paymentApiKey: true, paymentApiSecret: true, paymentPageUid: true, paymentWebhookSecret: true,
       },
     });
 
@@ -370,6 +370,7 @@ async function runTool(
           customerName,
           customerPhone,
           referenceId: appointment.id,
+          callbackUrl: depositCallbackUrl(businessId, biz.paymentProvider!, biz.paymentWebhookSecret) ?? undefined,
         });
         await attachDepositPaymentLink(appointment.id, {
           provider: biz.paymentProvider!,

@@ -26,6 +26,9 @@ export const payplusProvider: PaymentProvider = {
         sendEmailApproval: true,
         sendEmailFailure: false,
         more_info: params.referenceId,
+        // Overrides the account-level Callback field in PayPlus's dashboard, which is why several
+        // businesses can share one merchant account — see CreatePaymentLinkParams.callbackUrl.
+        ...(params.callbackUrl ? { refURL_callback: params.callbackUrl } : {}),
         refURL_success: undefined,
         customer: {
           customer_name: params.customerName,

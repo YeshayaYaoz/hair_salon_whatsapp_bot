@@ -27,3 +27,18 @@ export function getPaymentProvider(name: string): PaymentProvider {
   if (!provider) throw new UnknownPaymentProviderError(name);
   return provider;
 }
+
+/**
+ * The webhook URL a provider should call back for this business's deposits.
+ *
+ * Kept here so the two places that create payment links and the dashboard hint all describe the
+ * same address. Returns null when the business has no webhook secret yet — better to send no
+ * callback than one that will be rejected.
+ */
+export function depositCallbackUrl(businessId: string, provider: string, webhookSecret: string | null): string | null {
+  if (!webhookSecret) return null;
+  const base = (process.env.PUBLIC_BACKEND_URL ?? process.env.APP_URL ?? "").trim().replace(/\/+$/, "");
+  if (!base) return null;
+  const withScheme = /^https?:\/\//i.test(base) ? base : `https://${base}`;
+  return `${withScheme}/webhook/payments/${provider}/${businessId}/${webhookSecret}`;
+}

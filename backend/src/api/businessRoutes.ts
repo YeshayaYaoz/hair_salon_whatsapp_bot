@@ -33,7 +33,7 @@ import { classifyPeriodText } from "../lib/classifyPeriodText.js";
 import { explainPayPlusError } from "../lib/payplusErrors.js";
 import multer from "multer";
 import { saveImage, deleteImageByUrl, toPublicUploadUrl, MAX_UPLOAD_BYTES, ALLOWED_MIME, UnsupportedImageError } from "../lib/storage.js";
-import { getPaymentProvider, PAYMENT_PROVIDERS, UnknownPaymentProviderError } from "../lib/payments/index.js";
+import { depositCallbackUrl, getPaymentProvider, PAYMENT_PROVIDERS, UnknownPaymentProviderError } from "../lib/payments/index.js";
 import { getInvoiceProvider, INVOICE_PROVIDERS, UnknownInvoiceProviderError, resolveInvoiceCredentials } from "../lib/invoices/index.js";
 
 export const businessRouter = Router();
@@ -841,7 +841,17 @@ const paymentConnectSchema = z
     // PayPlus refuses every generateLink call without it (405
     // not-authorize-missing-payment-page-uid), so connecting without it produces a provider that
     // verifies fine and then fails on the first real charge.
-    pageUid: z.string().min(1).max(120).optional(),
+    // Rejecting an email here specifically: browsers autofill one into this box (it sits next to
+    // two credential fields), PayPlus then answers 405 on every charge, and the dashboard still
+    // says "connected" — so the owner has a payment provider that verifies and never works.
+    pageUid: z
+      .string()
+      .min(1)
+      .max(120)
+      .refine((v) => !v.includes("@"), {
+        message: "Payment Page UID looks like an email address — copy the page uid from PayPlus's \"payment pages\" screen.",
+      })
+      .optional(),
   })
   .refine((v) => v.apiKey && v.apiSecret, {
     message: "apiKey and apiSecret are required for this provider",
@@ -967,7 +977,7 @@ businessRouter.post("/payments/link", async (req: AuthedRequest, res) => {
 
   const business = await prisma.business.findUniqueOrThrow({
     where: { id: req.businessId! },
-    select: { paymentProvider: true, paymentApiKey: true, paymentApiSecret: true, paymentPageUid: true },
+    select: { id: true, paymentProvider: true, paymentApiKey: true, paymentApiSecret: true, paymentPageUid: true, paymentWebhookSecret: true },
   });
   if (!business.paymentProvider || !business.paymentApiKey || !business.paymentApiSecret) {
     return res.status(400).json({ error: "No payment provider connected" });
@@ -984,7 +994,10 @@ businessRouter.post("/payments/link", async (req: AuthedRequest, res) => {
             apiSecret: decryptSecret(business.paymentApiSecret),
             pageUid: business.paymentPageUid ?? undefined,
           };
-    const result = await provider.createPaymentLink(creds, parsed.data);
+    const result = await provider.createPaymentLink(creds, {
+      ...parsed.data,
+      callbackUrl: depositCallbackUrl(business.id, business.paymentProvider, business.paymentWebhookSecret) ?? undefined,
+    });
     res.json(result);
   } catch (err) {
     if (err instanceof UnknownPaymentProviderError) return res.status(400).json({ error: err.message });

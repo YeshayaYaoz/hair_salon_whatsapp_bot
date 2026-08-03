@@ -184,8 +184,13 @@ function ProviderCard<T extends string>({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
+  // Collapsed once connected. A finished setup is not something the owner needs to look at again,
+  // and leaving the credential form open invites re-entering keys that are already working — or
+  // worse, letting a password manager autofill over them.
+  const [expanded, setExpanded] = useState(false);
 
   const info = meta[selected];
+  const showBody = !connected || expanded;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -212,8 +217,41 @@ function ProviderCard<T extends string>({
         </div>
         <ConnectedPill connected={connected} he={he} />
         {saved && <SavedBadge text={he ? "נשמר" : "Saved"} />}
+        {connected && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="text-xs font-medium text-gray-500 hover:text-gray-700 transition shrink-0"
+            aria-expanded={expanded}
+          >
+            {expanded ? (he ? "סגירה" : "Close") : (he ? "שינוי" : "Change")}
+          </button>
+        )}
       </div>
 
+      {!showBody && (
+        <div className="px-5 py-3.5 flex items-center gap-3 flex-wrap">
+          <p className="text-xs text-gray-600 flex-1 min-w-0">
+            {he
+              ? `מחובר ל-${info.label}. אין צורך לעשות כלום — לחצו „שינוי” כדי להחליף ספק או מפתחות.`
+              : `Connected to ${info.label}. Nothing to do here — use "Change" to switch provider or keys.`}
+          </p>
+          <button
+            type="button"
+            disabled={disconnecting}
+            onClick={async () => {
+              if (!confirm(he ? "לנתק?" : "Disconnect?")) return;
+              setDisconnecting(true);
+              try { await onDisconnect(); setSaved(false); } finally { setDisconnecting(false); }
+            }}
+            className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50 transition shrink-0"
+          >
+            {he ? "נתק" : "Disconnect"}
+          </button>
+        </div>
+      )}
+
+      {showBody && (
       <div className="p-5">
         {/* Provider tabs */}
         <div className="flex flex-wrap gap-2 mb-4">
@@ -262,11 +300,11 @@ function ProviderCard<T extends string>({
             <div className="grid sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">API Key</label>
-                <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="API Key" required className="w-full" dir="ltr" />
+                <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="API Key" required className="w-full" dir="ltr" autoComplete="off" name="provider-api-key" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">API Secret</label>
-                <input value={apiSecret} onChange={(e) => setApiSecret(e.target.value)} placeholder="API Secret" required className="w-full" dir="ltr" type="password" />
+                <input value={apiSecret} onChange={(e) => setApiSecret(e.target.value)} placeholder="API Secret" required className="w-full" dir="ltr" type="password" autoComplete="new-password" name="provider-api-secret" />
               </div>
             </div>
             {selected === "payplus" && (
@@ -282,6 +320,10 @@ function ProviderCard<T extends string>({
                   required
                   className="w-full"
                   dir="ltr"
+                  // Browsers happily autofill an email address into this box, and PayPlus then
+                  // rejects every charge with a 405 while the dashboard shows "connected".
+                  autoComplete="off"
+                  name="payplus-page-uid"
                 />
                 <p className="text-xs text-gray-600 mt-1.5">
                   מזהה דף התשלום שלכם ב-PayPlus. נמצא בממשק PayPlus תחת „דפי תשלום”. בלעדיו PayPlus
@@ -344,6 +386,7 @@ function ProviderCard<T extends string>({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
