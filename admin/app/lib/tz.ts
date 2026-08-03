@@ -4,7 +4,7 @@
  * to a different timezone (or UTC) would otherwise see times shifted by the offset.
  */
 
-const DEFAULT_TZ = "Asia/Jerusalem";
+export const DEFAULT_TZ = "Asia/Jerusalem";
 
 export function formatTimeInTz(iso: string, timeZone = DEFAULT_TZ, locale?: string): string {
   return new Date(iso).toLocaleTimeString(locale, { timeZone, hour: "2-digit", minute: "2-digit" });
@@ -68,4 +68,27 @@ export function partsInTz(iso: string, timeZone = DEFAULT_TZ): { y: number; m: n
 export function dayKeyInTz(iso: string | Date, timeZone = DEFAULT_TZ): string {
   const p = partsInTz(typeof iso === "string" ? iso : iso.toISOString(), timeZone);
   return `${p.y}-${String(p.m).padStart(2, "0")}-${String(p.d).padStart(2, "0")}`;
+}
+
+/**
+ * Reads back a `datetime-local` / `date` value in the user's own language and conventions.
+ *
+ * The native pickers render in the BROWSER's locale, so an Israeli owner on an en-US browser is
+ * offered mm/dd/yyyy and a 12-hour clock. HTML gives no way to override that, and replacing them
+ * with custom pickers is a much larger change — so instead the app echoes the chosen value back in
+ * a format the owner actually reads, which is what makes a mis-entered date noticeable.
+ *
+ * Returns null for empty or unparseable input so callers can simply skip rendering the hint.
+ */
+export function describeLocalInput(value: string, locale: string, withTime: boolean): string | null {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString(locale, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    ...(withTime ? { hour: "2-digit", minute: "2-digit", hour12: false } : {}),
+  });
 }

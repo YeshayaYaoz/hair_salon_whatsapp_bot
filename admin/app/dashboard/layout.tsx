@@ -8,6 +8,7 @@ import { clearToken, apiFetch, decodeToken, exitImpersonation, reloadAs } from "
 import { useLanguage } from "../lib/LanguageContext";
 import { AuthGuard } from "../lib/AuthGuard";
 import { MobileSetupBar } from "../lib/MobileSetupBar";
+import { useDialog } from "../lib/useDialog";
 
 // One nav item. Icons are Heroicons outline path data.
 // hideFor: verticals where this destination is meaningless. An overnight rental has no staff
@@ -322,6 +323,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   const moreActive = MORE_ITEMS.some((i) => i.href === pathname) || pathname.startsWith("/dashboard/admin");
+  // Escape to close, focus moved in and restored, focus trapped, background scroll locked — the
+  // sheet is modal in every way except that it previously behaved like inert markup.
+  const moreRef = useDialog<HTMLDivElement>(() => setMoreOpen(false), moreOpen);
 
   return (
     <AuthGuard>
@@ -404,6 +408,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <button
           type="button"
           onClick={() => setMoreOpen((v) => !v)}
+          aria-expanded={moreOpen}
+          aria-haspopup="dialog"
           className="flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition"
           style={{ color: moreOpen || moreActive ? "#1B7FA0" : "#6B7280" }}
         >
@@ -419,10 +425,28 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <div className="md:hidden fixed inset-0 z-40" onClick={() => setMoreOpen(false)}>
           <div className="absolute inset-0 bg-black/30" />
           <div
+            ref={moreRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="more-sheet-title"
             onClick={(e) => e.stopPropagation()}
             className="absolute bottom-16 start-0 end-0 bg-white rounded-t-2xl shadow-2xl p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] max-h-[70vh] overflow-y-auto"
           >
-            <div className="w-9 h-1 rounded-full bg-gray-200 mx-auto mb-2" />
+            {/* Sticky header: the sheet scrolls, and without this the only way out (other than
+                tapping the dim backdrop, which isn't obvious) scrolled away with the content. */}
+            <div className="sticky top-0 -mx-3 -mt-3 mb-1 px-3 pt-3 pb-2 bg-white flex items-center justify-between gap-2 border-b border-gray-100">
+              <h2 id="more-sheet-title" className="text-sm font-bold text-gray-900">{he ? "כל הדפים" : "All pages"}</h2>
+              <button
+                type="button"
+                onClick={() => setMoreOpen(false)}
+                aria-label={he ? "סגירה" : "Close"}
+                className="row-action -me-1 px-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
             {/* Mirror the sidebar's grouping so the mobile sheet reads as sections, not a flat list */}
             {NAV_GROUPS.map((group) => {
               const items = group.items.filter((i) => MORE_ITEMS.includes(i) && isVisibleFor(i, businessType));
@@ -459,7 +483,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  Admin
+                  {t.adminSection}
                 </Link>
                 <Link
                   href="/dashboard/admin/leads"

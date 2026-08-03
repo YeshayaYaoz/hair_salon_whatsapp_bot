@@ -127,31 +127,40 @@ interface SuggestedMatch {
 
 const LEAD_STATUSES = ["new", "contacted", "replied", "meeting_scheduled", "trial_sent", "converted", "not_interested"] as const;
 
-const STATUS_LABELS_HE: Record<string, string> = {
-  new: "חדש",
-  contacted: "נוצר קשר",
-  replied: "השיב",
-  meeting_scheduled: "פגישה נקבעה",
-  trial_sent: "נשלח ניסיון",
-  converted: "הומר ללקוח",
-  not_interested: "לא מעוניין",
+// Bilingual, unlike the _HE-only maps these replace. Note what is deliberately NOT here: the
+// outreach subject/body below stay Hebrew in both languages. Those are the message *content* sent
+// to Israeli salon owners — they follow the recipient's language, not the operator's UI, and
+// translating them alongside the chrome would start emailing English to Hebrew-speaking prospects.
+const STATUS_LABELS: Record<string, { he: string; en: string }> = {
+  new: { he: "חדש", en: "New" },
+  contacted: { he: "נוצר קשר", en: "Contacted" },
+  replied: { he: "השיב", en: "Replied" },
+  meeting_scheduled: { he: "פגישה נקבעה", en: "Meeting booked" },
+  trial_sent: { he: "נשלח ניסיון", en: "Trial sent" },
+  converted: { he: "הומר ללקוח", en: "Converted" },
+  not_interested: { he: "לא מעוניין", en: "Not interested" },
 };
 
-const CAMPAIGN_STATUS_LABELS_HE: Record<string, string> = {
-  draft: "טיוטה",
-  running: "פעיל",
-  paused: "מושהה",
-  completed: "הושלם",
+const CAMPAIGN_STATUS_LABELS: Record<string, { he: string; en: string }> = {
+  draft: { he: "טיוטה", en: "Draft" },
+  running: { he: "פעיל", en: "Running" },
+  paused: { he: "מושהה", en: "Paused" },
+  completed: { he: "הושלם", en: "Completed" },
 };
 
-const RUN_STATUS_LABELS_HE: Record<string, string> = {
-  pending: "ממתין",
-  discovering: "מאתר עסקים",
-  enriching: "מעשיר נתונים",
-  scoring: "מדרג",
-  completed: "הושלם",
-  failed: "נכשל",
+const RUN_STATUS_LABELS: Record<string, { he: string; en: string }> = {
+  pending: { he: "ממתין", en: "Pending" },
+  discovering: { he: "מאתר עסקים", en: "Discovering" },
+  enriching: { he: "מעשיר נתונים", en: "Enriching" },
+  scoring: { he: "מדרג", en: "Scoring" },
+  completed: { he: "הושלם", en: "Completed" },
+  failed: { he: "נכשל", en: "Failed" },
 };
+
+function pick(map: Record<string, { he: string; en: string }>, key: string, he: boolean): string {
+  const e = map[key];
+  return e ? (he ? e.he : e.en) : key;
+}
 
 const STATUS_COLORS: Record<string, string> = {
   new: "bg-gray-100 text-gray-600 border-gray-200",
@@ -277,7 +286,8 @@ function SuggestedMatchesPanel() {
 }
 
 function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => void }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const he = lang === "he";
   const [campaigns, setCampaigns] = useState<Campaign[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -458,7 +468,7 @@ function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => 
                   <td className="px-4 py-3 text-gray-600 cursor-pointer" onClick={() => onOpenCampaign(c.id)}>{c.locationQuery}</td>
                   <td className="px-4 py-3 cursor-pointer" onClick={() => onOpenCampaign(c.id)}>
                     <span className="inline-flex text-xs font-medium px-2.5 py-1 rounded-full border bg-gray-50 text-gray-600 border-gray-200">
-                      {CAMPAIGN_STATUS_LABELS_HE[c.status] ?? c.status}
+                      {pick(CAMPAIGN_STATUS_LABELS, c.status, he)}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap cursor-pointer" onClick={() => onOpenCampaign(c.id)}>{fmtDate(c.createdAt)}</td>
@@ -742,6 +752,8 @@ function CampaignDetailView({
   onBack: () => void;
   onOpenLead: (leadId: string) => void;
 }) {
+  const { lang } = useLanguage();
+  const he = lang === "he";
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
   const [leads, setLeads] = useState<LeadListItem[] | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
@@ -860,7 +872,7 @@ function CampaignDetailView({
       {latestRun && (
         <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">סריקה אחרונה — {RUN_STATUS_LABELS_HE[latestRun.status] ?? latestRun.status}</span>
+            <span className="text-sm font-medium text-gray-700">סריקה אחרונה — {pick(RUN_STATUS_LABELS, latestRun.status, he)}</span>
             {latestRun.status === "failed" && latestRun.errorMessage && (
               <span className="text-xs text-red-500">{latestRun.errorMessage}</span>
             )}
@@ -878,7 +890,7 @@ function CampaignDetailView({
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="text-sm">
           <option value="">הכל</option>
           {LEAD_STATUSES.map((s) => (
-            <option key={s} value={s}>{STATUS_LABELS_HE[s]}</option>
+            <option key={s} value={s}>{pick(STATUS_LABELS, s, he)}</option>
           ))}
         </select>
       </div>
@@ -920,7 +932,7 @@ function CampaignDetailView({
                   <td className="px-4 py-3 text-gray-600 truncate max-w-[200px]" dir="ltr">{l.website ?? "—"}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_COLORS[l.status] ?? ""}`}>
-                      {STATUS_LABELS_HE[l.status] ?? l.status}
+                      {pick(STATUS_LABELS, l.status, he)}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-end tabular-nums text-gray-700 font-medium">{l.latestScore ?? "—"}</td>
@@ -1077,10 +1089,16 @@ function ConversionPanel({ lead, onChanged }: { lead: LeadDetail; onChanged: () 
   );
 }
 
-const APPROVAL_LABELS_HE: Record<string, string> = { draft: "טיוטה", approved: "מאושר", rejected: "נדחה" };
-const CHANNEL_LABELS_HE: Record<string, string> = { email: "מייל", manual_call: "שיחת טלפון" };
+const APPROVAL_LABELS: Record<string, { he: string; en: string }> = {
+  draft: { he: "טיוטה", en: "Draft" }, approved: { he: "מאושר", en: "Approved" }, rejected: { he: "נדחה", en: "Rejected" },
+};
+const CHANNEL_LABELS: Record<string, { he: string; en: string }> = {
+  email: { he: "מייל", en: "Email" }, manual_call: { he: "שיחת טלפון", en: "Phone call" },
+};
 
 function OutreachPanel({ leadId }: { leadId: string }) {
+  const { lang } = useLanguage();
+  const he = lang === "he";
   const [messages, setMessages] = useState<OutreachMessage[] | null>(null);
   const [generating, setGenerating] = useState(false);
   const [channel, setChannel] = useState<"email" | "manual_call">("email");
@@ -1197,7 +1215,7 @@ function OutreachPanel({ leadId }: { leadId: string }) {
             <div key={m.id} className="border border-gray-200 rounded-lg p-3">
               <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                 <div className="flex items-center gap-1.5 text-[11px]">
-                  <span className="font-medium text-gray-600">{CHANNEL_LABELS_HE[m.channel]}</span>
+                  <span className="font-medium text-gray-600">{pick(CHANNEL_LABELS, m.channel, he)}</span>
                   <span className="text-gray-600">· {m.angle === "follow_up_1" ? "מעקב" : "ראשונה"}</span>
                   <span
                     className={`inline-flex px-1.5 py-0.5 rounded-full border ${
@@ -1208,7 +1226,7 @@ function OutreachPanel({ leadId }: { leadId: string }) {
                           : "bg-gray-50 text-gray-600 border-gray-200"
                     }`}
                   >
-                    {APPROVAL_LABELS_HE[m.approvalStatus]}
+                    {pick(APPROVAL_LABELS, m.approvalStatus, he)}
                   </span>
                   {m.sentAt && <span className="text-green-600">✓ נשלח {new Date(m.sentAt).toLocaleDateString("he-IL")}</span>}
                 </div>
@@ -1292,6 +1310,8 @@ function OutreachPanel({ leadId }: { leadId: string }) {
 }
 
 function LeadDetailView({ leadId, onBack }: { leadId: string; onBack: () => void }) {
+  const { lang } = useLanguage();
+  const he = lang === "he";
   const [lead, setLead] = useState<LeadDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
@@ -1346,7 +1366,7 @@ function LeadDetailView({ leadId, onBack }: { leadId: string; onBack: () => void
           <span className="text-sm text-gray-600">סטטוס:</span>
           <select disabled={updating} value={lead.status} onChange={(e) => changeStatus(e.target.value)} className="text-sm">
             {LEAD_STATUSES.map((s) => (
-              <option key={s} value={s}>{STATUS_LABELS_HE[s]}</option>
+              <option key={s} value={s}>{pick(STATUS_LABELS, s, he)}</option>
             ))}
           </select>
         </div>
@@ -1415,7 +1435,7 @@ function LeadDetailView({ leadId, onBack }: { leadId: string; onBack: () => void
           <div className="flex flex-col gap-2 text-sm text-gray-600">
             {lead.statusEvents.map((e) => (
               <div key={e.id} className="flex justify-between">
-                <span>{e.fromStatus ? `${STATUS_LABELS_HE[e.fromStatus] ?? e.fromStatus} ← ` : ""}{STATUS_LABELS_HE[e.toStatus] ?? e.toStatus}</span>
+                <span>{e.fromStatus ? `${pick(STATUS_LABELS, e.fromStatus, he)} ← ` : ""}{pick(STATUS_LABELS, e.toStatus, he)}</span>
                 <span className="text-gray-600 text-xs">{new Date(e.createdAt).toLocaleString("he-IL")}</span>
               </div>
             ))}
