@@ -22,6 +22,24 @@ interface ProviderMeta {
   instructionsUrl?: string;
 }
 
+/**
+ * Where the Webhook/Notify field actually lives inside each provider's dashboard.
+ *
+ * Separate from `instructions` above, which covers getting API keys. Salons were being handed a
+ * URL and told to "paste it into your provider's Webhook settings" with no idea where that is —
+ * and skipping it fails silently: everything looks connected right up until a customer pays a
+ * deposit and the appointment is never confirmed.
+ *
+ * Only filled in for providers whose dashboard has actually been walked through. A guessed menu
+ * path is worse than none — it sends the owner hunting in the wrong place.
+ */
+const WEBHOOK_LOCATION: Partial<Record<PaymentProviderName, { he: string; en: string }>> = {
+  payplus: {
+    he: 'בחשבון PayPlus: הגדרות דף הסליקה ← "החזרת המידע לאחר ביצוע עסקה" ← פתחו את "הגדרות תשובה חזרה" ← הדביקו בשדה ה-CallBack ושמרו.',
+    en: 'In PayPlus: payment page settings → "Return info after transaction" → expand "Callback settings" → paste into the CallBack field and save.',
+  },
+};
+
 const PAYMENT_META: Record<PaymentProviderName, ProviderMeta> = {
   payplus: {
     label: "PayPlus",
@@ -462,9 +480,18 @@ export default function PaymentsPage() {
               : `So deposit-appointments get confirmed automatically and receipts get issued on a successful payment, paste this into ${PAYMENT_META[me.paymentProvider as PaymentProviderName].label}'s Webhook/Notify settings. The URL includes a secret key — don't share it.`}
           </p>
           {me.paymentWebhookSecret ? (
-            <code className="block text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-600 break-all" dir="ltr">
-              {`${API_URL}/webhook/payments/${me.paymentProvider}/${me.id}/${me.paymentWebhookSecret}`}
-            </code>
+            <>
+              <code className="block text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-600 break-all" dir="ltr">
+                {`${API_URL}/webhook/payments/${me.paymentProvider}/${me.id}/${me.paymentWebhookSecret}`}
+              </code>
+              {WEBHOOK_LOCATION[me.paymentProvider as PaymentProviderName] && (
+                <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                  {he
+                    ? WEBHOOK_LOCATION[me.paymentProvider as PaymentProviderName]!.he
+                    : WEBHOOK_LOCATION[me.paymentProvider as PaymentProviderName]!.en}
+                </p>
+              )}
+            </>
           ) : (
             <p className="text-xs text-amber-600">
               {he

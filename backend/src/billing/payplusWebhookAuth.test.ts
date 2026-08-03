@@ -79,4 +79,28 @@ describe("subscription webhook authentication", () => {
     expect(res.status).toBe(503);
     expect(mockPrisma.business.update).not.toHaveBeenCalled();
   });
+
+  /**
+   * A browser-openable version of the same check, so confirming the callback URL does not require
+   * hand-crafting a POST. It must reveal nothing a POST to the same path does not already reveal,
+   * and must never touch the database.
+   */
+  it("confirms a matching secret over GET, without writing anything", async () => {
+    const res = await request(app).get("/webhook/billing/payplus/correct-horse-battery-staple");
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(mockPrisma.business.update).not.toHaveBeenCalled();
+    expect(mockPrisma.business.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("404s a wrong secret over GET, same as the real endpoint", async () => {
+    const res = await request(app).get("/webhook/billing/payplus/wrong-secret-entirely");
+    expect(res.status).toBe(404);
+  });
+
+  it("does not report ok over GET when no secret is configured at all", async () => {
+    delete process.env.PAYPLUS_BILLING_WEBHOOK_SECRET;
+    const res = await request(app).get("/webhook/billing/payplus/anything");
+    expect(res.status).toBe(404);
+  });
 });

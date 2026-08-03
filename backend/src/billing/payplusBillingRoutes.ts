@@ -168,6 +168,38 @@ payplusBillingRouter.put("/payplus/plan", requireAuth, async (req: AuthedRequest
   res.json({ ok: true, proratedChargeIls: Math.max(0, proratedDiff) });
 });
 
+/**
+ * Browser-openable check that the callback URL is actually live and the secret matches.
+ *
+ * The failure it exists for is silent and expensive: a secret that does not match means PayPlus's
+ * POST 404s, so the card is charged and nothing is activated or credited, with no trace on our
+ * side. Confirming that previously meant crafting a POST by hand, which is not a reasonable thing
+ * to ask of the person who needs the answer.
+ *
+ * Safe to expose. It reveals exactly what a POST to the same URL already reveals — whether the
+ * path exists — and does strictly less: GET touches no database and changes no state. Anyone
+ * guessing the secret could learn the same thing from the real endpoint, so this adds no oracle
+ * that was not already there, and the comparison below is the same timing-safe one.
+ */
+payplusBillingWebhookRouter.get("/:secret", (req, res) => {
+  if (!secretMatches(req.params.secret)) return res.status(404).json({ error: "not found" });
+  res.json({
+    ok: true,
+    message: "Billing webhook is live and the secret matches. PayPlus callbacks will be accepted.",
+  });
+});
+
+/** Timing-safe compare against the configured secret. Returns false when none is configured, so a
+ * missing variable can never be mistaken for a match. */
+function secretMatches(given: string): boolean {
+  // Trimmed: a pasted trailing newline would otherwise make the configured URL and the compared
+  // value disagree, and the only symptom is a 404 on PayPlus's side. See validateEnv.
+  const expected = process.env.PAYPLUS_BILLING_WEBHOOK_SECRET?.trim();
+  if (!expected) return false;
+  if (given.length !== expected.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(given), Buffer.from(expected));
+}
+
 /** PayPlus webhook for the initial checkout — captures the recurring token and activates the
  * subscription. more_info carries "<businessId>:<plan>" set when the link was generated. */
 payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
@@ -178,15 +210,11 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
   //
   // A single shared secret rather than per-business: this webhook is Tori's own PayPlus account,
   // configured once in their dashboard, not something each business sets up.
-  // Trimmed: a pasted trailing newline would otherwise make the configured URL and the compared
-  // value disagree, and the only symptom is a 404 on PayPlus's side. See validateEnv.
-  const expected = process.env.PAYPLUS_BILLING_WEBHOOK_SECRET?.trim();
-  if (!expected) {
+  if (!process.env.PAYPLUS_BILLING_WEBHOOK_SECRET?.trim()) {
     console.error("[payplus subscription webhook] PAYPLUS_BILLING_WEBHOOK_SECRET is not set — rejecting");
     return res.status(503).json({ error: "not configured" });
   }
-  const given = req.params.secret;
-  if (given.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(given), Buffer.from(expected))) {
+  if (!secretMatches(req.params.secret)) {
     console.warn("[payplus subscription webhook] Rejected call with a bad secret");
     return res.status(404).json({ error: "not found" });
   }
