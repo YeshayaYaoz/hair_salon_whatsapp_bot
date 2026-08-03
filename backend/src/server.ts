@@ -28,7 +28,9 @@ validateEnv(); // exits the process before anything binds to a port if required 
 initErrorMonitoring();
 // Non-blocking: a misconfigured uploads dir breaks photos, not the whole app, so it reports and
 // lets everything else start rather than taking the bot down with it.
-void checkUploadsDir();
+// Deferred until the port is bound: the check calls this server's own /health from the outside, so
+// running it before listen() would always fail against itself.
+setTimeout(() => void checkUploadsDir(), 3000);
 
 // Surface crashes that slip past every try/catch instead of dying silently in a Railway log.
 process.on("uncaughtException", (err) => {

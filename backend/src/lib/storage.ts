@@ -207,6 +207,43 @@ export async function checkUploadsDir(): Promise<void> {
         ` dashboard. The dashboard does not serve /uploads, so photos will 404.`
     );
   }
+  await checkPublicBaseReachable();
+}
+
+/**
+ * Calls this server's own /health through PUBLIC_BASE, from the outside.
+ *
+ * Printing the URL wasn't enough: a base can look completely plausible and still be a domain whose
+ * DNS no longer points anywhere — which is exactly what happened, and it cost a deploy cycle to
+ * find. Photos are the only feature whose URLs leave the building, so nothing else notices, and
+ * WhatsApp's failure to fetch an image is invisible on our side.
+ *
+ * Deliberately not fatal, and deliberately not retried: the server is fine, one feature isn't, and
+ * a startup probe that can block a boot on someone else's DNS is worse than the bug it catches.
+ */
+async function checkPublicBaseReachable(): Promise<void> {
+  // Localhost bases in development have nothing listening yet at this point in startup.
+  if (PUBLIC_BASE.includes("localhost") || PUBLIC_BASE.includes("127.0.0.1")) return;
+  try {
+    const res = await fetch(`${PUBLIC_BASE}/health`, {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res.ok) {
+      console.log(`[storage] ${PUBLIC_BASE} is reachable — photo URLs will resolve.`);
+      return;
+    }
+    console.error(
+      `\n✖ ${PUBLIC_BASE}/health answered ${res.status}. That address does not appear to be this` +
+        `\n  backend, so every photo URL will be broken for owners and for WhatsApp.` +
+        `\n  Set PUBLIC_BACKEND_URL to this service's real public domain.\n`
+    );
+  } catch (err) {
+    console.error(
+      `\n✖ Could not reach ${PUBLIC_BASE}/health (${err instanceof Error ? err.message : String(err)}).` +
+        `\n  Photo URLs are built from this address, so every photo will be broken.` +
+        `\n  Set PUBLIC_BACKEND_URL to this service's real public domain.\n`
+    );
+  }
 }
 
 /** Mount path for serving uploads back out. Exported so server.ts and this file can't disagree. */
