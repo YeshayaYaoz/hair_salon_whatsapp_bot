@@ -9,6 +9,7 @@ import {
   PLAN_PRICES_ILS,
   BILLING_PERIOD_DAYS,
   planPriceForCycle,
+  PayPlusBillingNotConfiguredError,
 } from "./payplusSubscription.js";
 import { captureError } from "../lib/errorMonitoring.js";
 
@@ -27,7 +28,21 @@ payplusBillingRouter.post("/payplus/checkout", requireAuth, async (req: AuthedRe
     res.json({ url });
   } catch (err) {
     console.error("PayPlus subscription checkout failed:", err);
-    res.status(502).json({ error: "Failed to create checkout link" });
+    captureError(err, { businessId: req.businessId, kind: "payplusCheckout" });
+
+    // A blanket 502 here sent the owner to support with nothing to go on, and sent us to the logs
+    // for something PayPlus already explained. The two failures below are the ones that actually
+    // happen, and they need opposite fixes.
+    if (err instanceof PayPlusBillingNotConfiguredError) {
+      return res.status(503).json({ error: "חיוב מנויים אינו מוגדר בשרת. פנו לתמיכה." });
+    }
+    const detail = err instanceof Error ? err.message : String(err);
+    return res.status(502).json({
+      // PayPlus's own rejection reason ("invalid api key", "payment page not found"), passed
+      // through. This endpoint is owner-only (requireAuth), so it isn't leaking anything to the
+      // public — and without it the owner cannot tell a misconfiguration from an outage.
+      error: `יצירת קישור התשלום נכשלה. ${detail}`,
+    });
   }
 });
 
