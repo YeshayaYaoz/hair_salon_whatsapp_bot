@@ -37,7 +37,24 @@ const UPLOADS_DIR = resolve(process.env.UPLOADS_DIR ?? "./uploads");
  * that 404'd — broken thumbnails for the owner, and a failed image send for every customer who
  * asked to see a unit.
  */
-const PUBLIC_BASE = (process.env.PUBLIC_BACKEND_URL ?? process.env.APP_URL ?? "http://localhost:4000").replace(/\/$/, "");
+const PUBLIC_BASE = normalizeBase(process.env.PUBLIC_BACKEND_URL ?? process.env.APP_URL ?? "http://localhost:4000");
+
+/**
+ * Accepts a bare hostname as well as a full URL.
+ *
+ * Railway displays a service's domain without a scheme, so "hairsalonwhatsappbot.up.railway.app"
+ * is what gets pasted. Left alone that produces relative-looking photo URLs that WhatsApp cannot
+ * fetch and browsers resolve against the wrong origin — a broken image with no obvious cause.
+ * Prefixing https is safe: this value is only ever a public address, and there is no case where
+ * plain http is the right answer for one.
+ */
+export function normalizeBase(raw: string): string {
+  const trimmed = raw.trim().replace(/\/+$/, "");
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  // Keep localhost on http — nothing serves TLS there in development.
+  const scheme = /^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(trimmed) ? "http" : "https";
+  return `${scheme}://${trimmed}`;
+}
 
 /** WhatsApp rejects images over 5MB. Reject earlier, with a message the owner can act on. */
 export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;

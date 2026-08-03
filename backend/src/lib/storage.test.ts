@@ -90,6 +90,32 @@ describe("saveImage", () => {
   });
 });
 
+describe("normalizeBase", () => {
+  it("adds https to a bare domain, which is how Railway displays one", async () => {
+    const { normalizeBase } = await loadStorage();
+    // Pasted straight out of Railway's Networking tab. Without a scheme the resulting photo URL is
+    // relative-looking: WhatsApp can't fetch it and browsers resolve it against the wrong origin.
+    expect(normalizeBase("hairsalonwhatsappbot.up.railway.app")).toBe("https://hairsalonwhatsappbot.up.railway.app");
+  });
+
+  it("leaves a full URL alone", async () => {
+    const { normalizeBase } = await loadStorage();
+    expect(normalizeBase("https://api.example.com")).toBe("https://api.example.com");
+    expect(normalizeBase("http://api.example.com")).toBe("http://api.example.com");
+  });
+
+  it("strips trailing slashes and surrounding whitespace", async () => {
+    const { normalizeBase } = await loadStorage();
+    expect(normalizeBase("  https://api.example.com/  ")).toBe("https://api.example.com");
+    expect(normalizeBase("api.example.com//")).toBe("https://api.example.com");
+  });
+
+  it("keeps localhost on http, since nothing serves TLS there", async () => {
+    const { normalizeBase } = await loadStorage();
+    expect(normalizeBase("localhost:4000")).toBe("http://localhost:4000");
+  });
+});
+
 describe("toPublicUploadUrl", () => {
   it("re-points a URL written under a different host", async () => {
     const { toPublicUploadUrl } = await loadStorage();
