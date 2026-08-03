@@ -130,6 +130,43 @@ export async function deleteImageByUrl(businessId: string, url: string): Promise
   });
 }
 
+/**
+ * Startup check that the uploads directory is real, writable, and — most importantly — persistent.
+ *
+ * The failure this exists to catch is silent and slow: if the Railway volume isn't mounted, or is
+ * mounted somewhere other than UPLOADS_DIR points at, uploads still succeed. They land on the
+ * container's ephemeral disk and vanish on the next deploy. Nobody notices until an owner's photos
+ * disappear and the bot starts sending broken images to their customers.
+ *
+ * A directory that exists but sits outside a mount cannot be distinguished from a mounted one at
+ * this level, so this reports the resolved path and lets the log speak: if it doesn't look like
+ * the volume's mount path, it isn't the volume.
+ */
+export async function checkUploadsDir(): Promise<void> {
+  const probe = join(UPLOADS_DIR, ".write-probe");
+  try {
+    await mkdir(UPLOADS_DIR, { recursive: true });
+    await writeFile(probe, "ok");
+    await unlink(probe);
+  } catch (err) {
+    console.error(`\n✖ Uploads directory is not writable: ${UPLOADS_DIR}`);
+    console.error(`  Owner photo uploads will fail. Check the Railway volume mount and UPLOADS_DIR.`);
+    console.error(`  ${err instanceof Error ? err.message : String(err)}\n`);
+    return;
+  }
+
+  if (!process.env.UPLOADS_DIR) {
+    console.warn(
+      `\n⚠ UPLOADS_DIR is not set — photos are being written to ${UPLOADS_DIR}, on the container's` +
+        `\n  ephemeral disk. They WILL be deleted on the next deploy. Mount a Railway volume and set` +
+        `\n  UPLOADS_DIR to its path.\n`
+    );
+    return;
+  }
+
+  console.log(`[storage] Uploads directory ready and writable: ${UPLOADS_DIR}`);
+}
+
 /** Mount path for serving uploads back out. Exported so server.ts and this file can't disagree. */
 export const UPLOADS_ROUTE = "/uploads";
 export const UPLOADS_ROOT = UPLOADS_DIR;

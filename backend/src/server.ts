@@ -21,11 +21,14 @@ import { runTrackedJob } from "./lib/jobStatus.js";
 import { runHealthDigestJob } from "./lib/healthDigest.js";
 import { leadFinderRouter } from "./leadfinder/routes.js";
 import { voiceRouter } from "./api/voiceRoutes.js";
-import { UPLOADS_ROUTE, UPLOADS_ROOT, UnsupportedImageError, MAX_UPLOAD_BYTES } from "./lib/storage.js";
+import { UPLOADS_ROUTE, UPLOADS_ROOT, UnsupportedImageError, MAX_UPLOAD_BYTES, checkUploadsDir } from "./lib/storage.js";
 import multer from "multer";
 
 validateEnv(); // exits the process before anything binds to a port if required config is missing
 initErrorMonitoring();
+// Non-blocking: a misconfigured uploads dir breaks photos, not the whole app, so it reports and
+// lets everything else start rather than taking the bot down with it.
+void checkUploadsDir();
 
 // Surface crashes that slip past every try/catch instead of dying silently in a Railway log.
 process.on("uncaughtException", (err) => {
