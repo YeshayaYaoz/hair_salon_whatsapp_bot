@@ -806,6 +806,11 @@ const paymentConnectSchema = z
     }),
     apiKey: z.string().min(1).optional(),
     apiSecret: z.string().min(1).optional(),
+    // PayPlus only. Not a secret — it names one of the merchant's configured payment pages — but
+    // PayPlus refuses every generateLink call without it (405
+    // not-authorize-missing-payment-page-uid), so connecting without it produces a provider that
+    // verifies fine and then fails on the first real charge.
+    pageUid: z.string().min(1).max(120).optional(),
   })
   .refine((v) => v.apiKey && v.apiSecret, {
     message: "apiKey and apiSecret are required for this provider",
@@ -816,7 +821,15 @@ businessRouter.put("/me/payment-provider", async (req: AuthedRequest, res) => {
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const provider = getPaymentProvider(parsed.data.provider);
-  const creds = { apiKey: parsed.data.apiKey ?? "", apiSecret: parsed.data.apiSecret ?? "" };
+  if (parsed.data.provider === "payplus" && !parsed.data.pageUid) {
+    return res.status(400).json({ error: "PayPlus דורש מזהה דף תשלום (Payment Page UID). מצאו אותו בממשק PayPlus תחת דפי תשלום." });
+  }
+
+  const creds = {
+    apiKey: parsed.data.apiKey ?? "",
+    apiSecret: parsed.data.apiSecret ?? "",
+    pageUid: parsed.data.pageUid,
+  };
   const verification = await provider.verifyCredentials(creds);
   if (!verification.valid) return res.status(400).json({ error: verification.error ?? "Invalid credentials" });
 
@@ -832,6 +845,7 @@ businessRouter.put("/me/payment-provider", async (req: AuthedRequest, res) => {
       paymentProvider: parsed.data.provider,
       paymentApiKey: encryptSecret(parsed.data.apiKey!),
       paymentApiSecret: encryptSecret(parsed.data.apiSecret!),
+      paymentPageUid: parsed.data.pageUid ?? null,
       paymentWebhookSecret: webhookSecret,
     },
   });
@@ -841,7 +855,7 @@ businessRouter.put("/me/payment-provider", async (req: AuthedRequest, res) => {
 businessRouter.delete("/me/payment-provider", async (req: AuthedRequest, res) => {
   await prisma.business.update({
     where: { id: req.businessId! },
-    data: { paymentProvider: null, paymentApiKey: null, paymentApiSecret: null },
+    data: { paymentProvider: null, paymentApiKey: null, paymentApiSecret: null, paymentPageUid: null },
   });
   res.json({ ok: true });
 });
@@ -863,6 +877,11 @@ const invoiceConnectSchema = z
     }),
     apiKey: z.string().min(1).optional(),
     apiSecret: z.string().min(1).optional(),
+    // PayPlus only. Not a secret — it names one of the merchant's configured payment pages — but
+    // PayPlus refuses every generateLink call without it (405
+    // not-authorize-missing-payment-page-uid), so connecting without it produces a provider that
+    // verifies fine and then fails on the first real charge.
+    pageUid: z.string().min(1).max(120).optional(),
   })
   .refine((v) => NO_KEYS_NEEDED.has(v.provider) || (v.apiKey && v.apiSecret), {
     message: "apiKey and apiSecret are required for this provider",
@@ -917,7 +936,7 @@ businessRouter.post("/payments/link", async (req: AuthedRequest, res) => {
 
   const business = await prisma.business.findUniqueOrThrow({
     where: { id: req.businessId! },
-    select: { paymentProvider: true, paymentApiKey: true, paymentApiSecret: true },
+    select: { paymentProvider: true, paymentApiKey: true, paymentApiSecret: true, paymentPageUid: true },
   });
   if (!business.paymentProvider || !business.paymentApiKey || !business.paymentApiSecret) {
     return res.status(400).json({ error: "No payment provider connected" });
@@ -929,7 +948,11 @@ businessRouter.post("/payments/link", async (req: AuthedRequest, res) => {
     const creds =
       business.paymentProvider === "tori_managed"
         ? { apiKey: "", apiSecret: "" }
-        : { apiKey: decryptSecret(business.paymentApiKey), apiSecret: decryptSecret(business.paymentApiSecret) };
+        : {
+            apiKey: decryptSecret(business.paymentApiKey),
+            apiSecret: decryptSecret(business.paymentApiSecret),
+            pageUid: business.paymentPageUid ?? undefined,
+          };
     const result = await provider.createPaymentLink(creds, parsed.data);
     res.json(result);
   } catch (err) {
@@ -949,7 +972,7 @@ businessRouter.post("/invoices/receipt", async (req: AuthedRequest, res) => {
 
   const business = await prisma.business.findUniqueOrThrow({
     where: { id: req.businessId! },
-    select: { invoiceProvider: true, invoiceApiKey: true, invoiceApiSecret: true, paymentProvider: true, paymentApiKey: true, paymentApiSecret: true },
+    select: { invoiceProvider: true, invoiceApiKey: true, invoiceApiSecret: true, paymentProvider: true, paymentApiKey: true, paymentApiSecret: true, paymentPageUid: true },
   });
   const resolved = resolveInvoiceCredentials(business);
   if (!resolved) return res.status(400).json({ error: "No invoice provider connected" });

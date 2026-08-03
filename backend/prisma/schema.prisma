@@ -118,6 +118,11 @@ model Business {
   paymentProvider  String? // "payplus" | "tranzila" | "cardcom"
   paymentApiKey    String? // encrypted at rest — provider's key/terminal/username
   paymentApiSecret String? // encrypted at rest — provider's secret/password
+  // PayPlus only: the uid of the payment page to render. Not a secret (it identifies a page, not
+  // an account), and PayPlus rejects generateLink without it — 405
+  // not-authorize-missing-payment-page-uid — so a business enabling deposits cannot work until
+  // this is filled in. Other providers ignore it.
+  paymentPageUid   String?
   // Random per-business secret embedded in the payment webhook URL path (…/webhook/payments/
   // :provider/:businessId/:webhookSecret). Unlike businessId/appointmentId, this is never exposed
   // to the customer (only the payment LINK is; the webhook URL is configured once, server-side, in

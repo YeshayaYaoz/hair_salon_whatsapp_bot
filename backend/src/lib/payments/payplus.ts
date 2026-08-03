@@ -13,7 +13,10 @@ export const payplusProvider: PaymentProvider = {
         Authorization: JSON.stringify({ api_key: creds.apiKey, secret_key: creds.apiSecret }),
       },
       body: JSON.stringify({
-        payment_page_uid: undefined, // uses the merchant's default payment page
+        // Required, not optional: PayPlus answers 405 not-authorize-missing-payment-page-uid
+        // without it. There is no "merchant default page" fallback, which an earlier comment here
+        // assumed — the uid identifies which configured page to render.
+        payment_page_uid: creds.pageUid,
         charge_method: 1, // charge (not just token/auth)
         amount: params.amountIls,
         currency_code: "ILS",

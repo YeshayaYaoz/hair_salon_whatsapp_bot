@@ -34,7 +34,7 @@ export function planPriceForCycle(plan: string, cycle: string): number {
 
 export class PayPlusBillingNotConfiguredError extends Error {
   constructor() {
-    super("PAYPLUS_API_KEY/PAYPLUS_SECRET_KEY are not set — subscription billing is unavailable");
+    super("PAYPLUS_API_KEY / PAYPLUS_SECRET_KEY / PAYPLUS_PAGE_UID are not all set — subscription billing is unavailable");
     this.name = "PayPlusBillingNotConfiguredError";
   }
 }
@@ -42,8 +42,13 @@ export class PayPlusBillingNotConfiguredError extends Error {
 function creds() {
   const apiKey = process.env.PAYPLUS_API_KEY;
   const secretKey = process.env.PAYPLUS_SECRET_KEY;
-  if (!apiKey || !secretKey) throw new PayPlusBillingNotConfiguredError();
-  return { apiKey, secretKey };
+  // PayPlus rejects generateLink outright without a payment page uid:
+  //   405 not-authorize-missing-payment-page-uid
+  // There is no "default page" fallback — the uid identifies which of the merchant's configured
+  // payment pages to render, and it is required on every call.
+  const pageUid = process.env.PAYPLUS_PAGE_UID;
+  if (!apiKey || !secretKey || !pageUid) throw new PayPlusBillingNotConfiguredError();
+  return { apiKey, secretKey, pageUid };
 }
 
 /** Generates a hosted payment page that both charges the first period and stores a reusable
@@ -51,7 +56,7 @@ function creds() {
  * webhook can attribute the resulting token to the right business/plan/billing cycle. */
 export async function createSubscriptionCheckoutLink(businessId: string, plan: string, returnUrl: string, cycle: "monthly" | "annual" = "monthly"): Promise<string> {
   const amountIls = planPriceForCycle(plan, cycle);
-  const { apiKey, secretKey } = creds();
+  const { apiKey, secretKey, pageUid } = creds();
 
   const planLabel = plan === "premium" ? "Premium" : "Standard";
   const cycleLabel = cycle === "annual" ? "שנתי" : "חודשי";
@@ -63,6 +68,7 @@ export async function createSubscriptionCheckoutLink(businessId: string, plan: s
       Authorization: JSON.stringify({ api_key: apiKey, secret_key: secretKey }),
     },
     body: JSON.stringify({
+      payment_page_uid: pageUid,
       charge_method: 3, // charge now AND create a reusable token
       amount: amountIls,
       currency_code: "ILS",

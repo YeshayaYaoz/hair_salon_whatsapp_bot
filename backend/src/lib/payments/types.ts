@@ -4,6 +4,8 @@ export type PaymentProviderName = (typeof PAYMENT_PROVIDERS)[number];
 export interface PaymentCredentials {
   apiKey: string;
   apiSecret: string;
+  /** PayPlus's payment page uid. Required by PayPlus, ignored by every other provider. */
+  pageUid?: string;
 }
 
 export interface CreatePaymentLinkParams {

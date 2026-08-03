@@ -275,7 +275,7 @@ async function runTool(
       select: {
         timezone: true, name: true,
         depositEnabled: true, depositAmountIls: true, depositHoldMinutes: true,
-        paymentProvider: true, paymentApiKey: true, paymentApiSecret: true,
+        paymentProvider: true, paymentApiKey: true, paymentApiSecret: true, paymentPageUid: true,
       },
     });
 
@@ -355,7 +355,11 @@ async function runTool(
         const creds =
           biz.paymentProvider === "tori_managed"
             ? { apiKey: "", apiSecret: "" }
-            : { apiKey: decryptSecret(biz.paymentApiKey!), apiSecret: decryptSecret(biz.paymentApiSecret!) };
+            : {
+                apiKey: decryptSecret(biz.paymentApiKey!),
+                apiSecret: decryptSecret(biz.paymentApiSecret!),
+                pageUid: biz.paymentPageUid ?? undefined,
+              };
         const link = await provider.createPaymentLink(creds, {
           amountIls: biz.depositAmountIls,
           description: `מקדמה לתור — ${service.name}, ${biz.name}`,

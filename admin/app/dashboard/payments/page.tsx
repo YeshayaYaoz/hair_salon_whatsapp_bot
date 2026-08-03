@@ -151,13 +151,17 @@ function ProviderCard<T extends string>({
   onSelect: (v: T) => void;
   connected: boolean;
   connectedProvider?: string | null;
-  onConnect: (apiKey: string, apiSecret: string) => Promise<void>;
+  onConnect: (apiKey: string, apiSecret: string, pageUid?: string) => Promise<void>;
   onDisconnect: () => Promise<void>;
   needsCredentials: boolean;
   requirementNote?: string;
 }) {
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
+  // PayPlus-only. Not a secret — it names one of the merchant's configured payment pages — but
+  // PayPlus refuses every charge without it, so connecting without it produces a provider that
+  // looks connected and fails on the first real payment.
+  const [pageUid, setPageUid] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -170,8 +174,8 @@ function ProviderCard<T extends string>({
     setSaving(true);
     setError(null);
     try {
-      await onConnect(apiKey, apiSecret);
-      setApiKey(""); setApiSecret("");
+      await onConnect(apiKey, apiSecret, pageUid || undefined);
+      setApiKey(""); setApiSecret(""); setPageUid("");
       setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to connect");
@@ -247,6 +251,26 @@ function ProviderCard<T extends string>({
                 <input value={apiSecret} onChange={(e) => setApiSecret(e.target.value)} placeholder="API Secret" required className="w-full" dir="ltr" type="password" />
               </div>
             </div>
+            {selected === "payplus" && (
+              <div>
+                <label htmlFor="payplus-page-uid" className="block text-xs font-medium text-gray-600 mb-1.5">
+                  Payment Page UID
+                </label>
+                <input
+                  id="payplus-page-uid"
+                  value={pageUid}
+                  onChange={(e) => setPageUid(e.target.value)}
+                  placeholder="00000000-0000-0000-0000-000000000000"
+                  required
+                  className="w-full"
+                  dir="ltr"
+                />
+                <p className="text-xs text-gray-600 mt-1.5">
+                  מזהה דף התשלום שלכם ב-PayPlus. נמצא בממשק PayPlus תחת „דפי תשלום”. בלעדיו PayPlus
+                  דוחה כל בקשת תשלום.
+                </p>
+              </div>
+            )}
             {error && <p className="text-red-600 text-xs">{error}</p>}
             <div className="flex items-center gap-3 mt-1">
               <button
@@ -372,10 +396,10 @@ export default function PaymentsPage() {
           connected={Boolean(me?.paymentConnected) && me?.paymentProvider !== "tori_managed"}
           connectedProvider={me?.paymentProvider}
           needsCredentials
-          onConnect={async (apiKey, apiSecret) => {
+          onConnect={async (apiKey, apiSecret, pageUid) => {
             await apiFetch("/api/business/me/payment-provider", {
               method: "PUT",
-              body: JSON.stringify({ provider: paymentProvider, apiKey, apiSecret }),
+              body: JSON.stringify({ provider: paymentProvider, apiKey, apiSecret, pageUid }),
             });
             await load();
           }}
