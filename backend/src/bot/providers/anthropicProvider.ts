@@ -58,6 +58,38 @@ function toAnthropicTools(tools: GenericTool[]): Anthropic.Tool[] {
   }));
 }
 
+/**
+ * Marks the end of the conversation as a cache breakpoint.
+ *
+ * The system prompt and tool definitions were already cached, but the messages were not — so every
+ * call re-billed the whole history at full price. That is the part that actually grows: sixteen
+ * turns plus tool results (availability listings, price lookups) are resent on every single call,
+ * and one customer message costs two or three calls because of the tool loop.
+ *
+ * The breakpoint goes on the last block, so each call caches the prefix the *next* call will read.
+ * That costs a cache write (1.25x) on content that would otherwise be billed at 1x, which only pays
+ * off if a later call reads it — and inside a tool loop, two to three calls land seconds apart on a
+ * strictly growing prefix, so it does. Across a conversation the same prefix is read again on every
+ * follow-up message within the cache's five-minute window.
+ *
+ * Anthropic allows four breakpoints; this is the third (tools, system, messages).
+ */
+export function withCacheBreakpoint(messages: Anthropic.MessageParam[]): Anthropic.MessageParam[] {
+  const last = messages[messages.length - 1];
+  if (!last) return messages;
+
+  // A plain-string message has no block to attach cache_control to — promote it to block form.
+  const blocks: Anthropic.ContentBlockParam[] =
+    typeof last.content === "string"
+      ? [{ type: "text", text: last.content }]
+      : [...(last.content as Anthropic.ContentBlockParam[])];
+  if (blocks.length === 0) return messages;
+
+  const tail = blocks[blocks.length - 1];
+  blocks[blocks.length - 1] = { ...tail, cache_control: { type: "ephemeral" } } as Anthropic.ContentBlockParam;
+  return [...messages.slice(0, -1), { ...last, content: blocks }];
+}
+
 function toAnthropicMessages(turns: GenericTurn[]): Anthropic.MessageParam[] {
   return turns.map((turn) => {
     if (turn.role === "assistant") {
@@ -116,7 +148,7 @@ export const anthropicProvider: AiProvider = {
       { type: "text", text: system.volatile },
     ];
     const anthropicTools = toAnthropicTools(tools);
-    const messages = toAnthropicMessages(turns);
+    const messages = withCacheBreakpoint(toAnthropicMessages(turns));
 
     const call = () =>
       anthropic.messages.create({
