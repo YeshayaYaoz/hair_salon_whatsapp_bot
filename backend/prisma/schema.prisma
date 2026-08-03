@@ -51,6 +51,14 @@ model Business {
   billingCyclesCompleted    Int       @default(0) // successful charges — drives the loyalty discount
   loyaltyDiscountIls        Int       @default(0) // auto-applied recurring discount once tenure threshold is hit
   lastBillingReminderSentAt DateTime? // last "charge in 2 days" heads-up, to avoid duplicates
+  // Consecutive failed charges in the current dunning run. Reset to 0 on any success. Drives the
+  // retry schedule in subscriptionBillingJob — one declined card must not cut a paying business
+  // off the same night.
+  billingFailedAttempts     Int       @default(0)
+  // Set the moment a charge is claimed for this business, BEFORE the money moves. It is what stops
+  // a second run charging the same business again after a crash between PayPlus succeeding and our
+  // own update landing — see the claim query in subscriptionBillingJob.
+  billingClaimedAt          DateTime?
   walletBalanceAgorot       Int       @default(0) // prepaid balance in agorot (1/100 ILS) — funds metered add-ons once the plan's monthly message quota is exceeded
   messagesUsedThisCycle     Int       @default(0) // proactive WhatsApp sends (reminders/reviews/digests/etc.) counted against the plan quota this billing cycle; reset on each successful charge
   // Highest AI-spend alert step (percent of the plan's inference budget) already emailed to the

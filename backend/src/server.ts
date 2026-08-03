@@ -127,10 +127,8 @@ function scheduleRetentionJob() {
   const delay = next.getTime() - now.getTime();
   setTimeout(() => {
     runTrackedJob("retention", runRetentionJob);
-    runTrackedJob("subscriptionBilling", runSubscriptionBillingJob);
     setInterval(() => {
       runTrackedJob("retention", runRetentionJob);
-      runTrackedJob("subscriptionBilling", runSubscriptionBillingJob);
     }, 24 * 60 * 60 * 1000);
   }, delay);
   console.log(`[retention] Next run scheduled in ${Math.round(delay / 60000)} minutes`);
@@ -147,6 +145,11 @@ setInterval(() => {
   runTrackedJob("billingReminder", runBillingReminderJob);
   runTrackedJob("healthDigest", runHealthDigestJob);
   runTrackedJob("aiCostAlert", runAiCostAlertJob);
+  // Hourly, not on a daily timer anchored to process start. That timer re-anchored on every
+  // redeploy, so a deploy at the wrong moment skipped a day's billing entirely. Running hourly is
+  // safe because the job claims each business before charging and a claim lasts the calendar day
+  // (see subscriptionBillingJob), so the extra runs find nothing to do.
+  runTrackedJob("subscriptionBilling", runSubscriptionBillingJob);
 }, ONE_HOUR);
 // Also run immediately on startup to catch any missed windows
 runTrackedJob("reminders", runReminderJob);
@@ -156,6 +159,7 @@ runTrackedJob("roiReport", runRoiReportJob);
 runTrackedJob("billingReminder", runBillingReminderJob);
 runTrackedJob("healthDigest", runHealthDigestJob);
 runTrackedJob("aiCostAlert", runAiCostAlertJob);
+runTrackedJob("subscriptionBilling", runSubscriptionBillingJob);
 
 // Yield-management (empty-slot) campaign scan — runs once daily at 18:00 local business time;
 // like the digest job, the underlying function itself gates on each business's local clock, so
