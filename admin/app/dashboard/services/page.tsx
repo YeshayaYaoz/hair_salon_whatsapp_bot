@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiFetch, apiUpload } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SkeletonRow } from "../../lib/Skeleton";
@@ -45,6 +45,7 @@ interface EditState {
 
 export default function ServicesPage() {
   const { t, lang, businessType } = useLanguage();
+  const he = lang === "he";
   // Overnight verticals price by night, not by the minute. Duration is still STORED in minutes
   // (the slot engine's unit, shared by every vertical) — only the input is expressed in nights
   // and converted at the boundary, so nothing downstream needs a special case.
@@ -206,11 +207,30 @@ export default function ServicesPage() {
     const [linkDraft, setLinkDraft] = useState("");
     const inputId = `photo-upload-${serviceId ?? "new"}`;
     const total = urls.length + (pending?.length ?? 0);
+    const [dragging, setDragging] = useState(false);
+    // dragenter/dragleave fire for every child element the pointer crosses, so a plain boolean
+    // flickers off the moment the cursor moves over the icon or the label inside the zone.
+    // Counting enters and leaves is what makes the highlight stable.
+    const dragDepth = useRef(0);
 
-    async function handleFiles(files: FileList | null) {
-      if (!files || files.length === 0) return;
-      const chosen = Array.from(files);
+    function acceptDropped(list: FileList | null): File[] {
+      // A drag can carry anything — a PDF, a folder, a link. Filter to images rather than letting
+      // the server reject them one by one after the upload has already been paid for.
+      return Array.from(list ?? []).filter((f) => f.type.startsWith("image/"));
+    }
+
+    async function handleFiles(files: FileList | null, alreadyFiltered?: File[]) {
+      const chosen = alreadyFiltered ?? Array.from(files ?? []);
+      if (chosen.length === 0) return;
       setUploadError(null);
+
+      // 10 is the server's cap too; catching it here avoids uploading files that will be rejected.
+      const room = 10 - total;
+      if (chosen.length > room) {
+        setUploadError(he ? `אפשר עד 10 תמונות ליחידה. נוספו ${room}.` : `Up to 10 photos per unit. Added ${room}.`);
+        chosen.splice(room);
+        if (chosen.length === 0) return;
+      }
 
       if (!serviceId) {
         onPendingChange?.([...(pending ?? []), ...chosen]);
@@ -291,18 +311,46 @@ export default function ServicesPage() {
         )}
 
         {total < 10 && (
-          <div className="flex flex-wrap items-center gap-3">
+          <div
+            // The whole zone is a drop target, and also a plain label for the file input — so
+            // clicking anywhere in it opens the picker. Drag and drop is a desktop convenience;
+            // the click path stays the primary one because most owners are on a phone.
+            onDragEnter={(e) => { e.preventDefault(); dragDepth.current += 1; setDragging(true); }}
+            onDragOver={(e) => { e.preventDefault(); }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              dragDepth.current -= 1;
+              if (dragDepth.current <= 0) { dragDepth.current = 0; setDragging(false); }
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              dragDepth.current = 0;
+              setDragging(false);
+              if (busy) return;
+              const images = acceptDropped(e.dataTransfer.files);
+              if (images.length === 0) {
+                setUploadError(he ? "אפשר לגרור לכאן רק קבצי תמונה." : "Only image files can be dropped here.");
+                return;
+              }
+              handleFiles(null, images);
+            }}
+            className={`flex flex-wrap items-center gap-3 rounded-xl border border-dashed p-3 transition ${
+              dragging ? "border-[#1B7FA0] bg-[#E0F5FB]" : "border-gray-300 bg-gray-50/50"
+            }`}
+          >
             <label
               htmlFor={inputId}
               className={`inline-flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg border transition cursor-pointer ${
                 busy ? "opacity-50 pointer-events-none" : ""
-              } border-[#1B7FA0] text-[#1B7FA0] hover:bg-[#E0F5FB]`}
+              } border-[#1B7FA0] text-[#1B7FA0] bg-white hover:bg-[#E0F5FB]`}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5V18a2 2 0 002 2h14a2 2 0 002-2v-1.5M12 3v13m0-13l-4 4m4-4l4 4" />
               </svg>
               {busy ? t.uploading : t.uploadPhotos}
             </label>
+            {/* Hidden on touch: there is no dragging on a phone, and the hint would just be noise. */}
+            <span className="hidden sm:inline text-xs text-gray-600">{t.orDragHere}</span>
             {/* capture is deliberately omitted: on a phone this lets the OS offer both the camera
                 and the existing gallery, and the photos are usually already taken. */}
             <input
