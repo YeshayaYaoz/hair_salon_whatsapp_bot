@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { clearToken, apiFetch, decodeToken, exitImpersonation } from "../lib/api";
+import { clearToken, apiFetch, decodeToken, exitImpersonation, reloadAs } from "../lib/api";
 import { useLanguage } from "../lib/LanguageContext";
 import { AuthGuard } from "../lib/AuthGuard";
 import { MobileSetupBar } from "../lib/MobileSetupBar";
@@ -102,8 +102,9 @@ function ImpersonationBanner() {
       <span>👁️ {he ? "צופה כעסק זה (מצב תמיכה)" : "Viewing as this business (support mode)"}</span>
       <button
         onClick={() => {
-          if (exitImpersonation()) router.push("/dashboard/admin");
-          else router.push("/login");
+          // Same reasoning as entering: leaving impersonation changes who is signed in, so the
+          // whole app has to re-initialise rather than keep the business's data on screen.
+          reloadAs(exitImpersonation() ? "/dashboard/admin" : "/login");
         }}
         className="bg-white/20 hover:bg-white/30 rounded-lg px-3 py-1 text-xs font-semibold"
       >
@@ -164,7 +165,9 @@ function SidebarContent({ pathname, isSuperAdmin }: { pathname: string; isSuperA
 
   function logout() {
     clearToken();
-    router.push("/login");
+    // Full load: router.push leaves the previous account's data in memory, so the next person to
+    // sign in on this device can briefly see it before the new fetches land.
+    reloadAs("/login");
   }
 
   function navLinkStyle(active: boolean) {
@@ -313,7 +316,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   function logout() {
     clearToken();
-    router.push("/login");
+    // Full load: router.push leaves the previous account's data in memory, so the next person to
+    // sign in on this device can briefly see it before the new fetches land.
+    reloadAs("/login");
   }
 
   const moreActive = MORE_ITEMS.some((i) => i.href === pathname) || pathname.startsWith("/dashboard/admin");

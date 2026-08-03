@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch, startImpersonation } from "../../lib/api";
+import { apiFetch, startImpersonation, reloadAs } from "../../lib/api";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SkeletonRow } from "../../lib/Skeleton";
@@ -158,7 +158,9 @@ export default function AdminBusinessesPage() {
     try {
       const { token } = await apiFetch<{ token: string }>(`/api/business/admin/businesses/${b.id}/impersonate`, { method: "POST" });
       startImpersonation(token);
-      router.push("/dashboard/analytics");
+      // Full reload, not router.push — see reloadAs. Client-side navigation would keep this
+      // admin page's state and every cached fetch made as the admin.
+      reloadAs("/dashboard/analytics");
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Failed");
       setActionBusy(false);

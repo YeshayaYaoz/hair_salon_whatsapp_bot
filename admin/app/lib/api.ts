@@ -43,6 +43,22 @@ export function exitImpersonation(): boolean {
   return true;
 }
 
+/**
+ * Navigates after the signed-in identity has changed, with a full page load.
+ *
+ * Swapping the token is only half of switching accounts: router.push() is a client-side
+ * navigation, so every provider, every piece of component state and every list already fetched
+ * with the previous token survives it. The admin would land on the dashboard still looking at the
+ * previous business's services, customers and language settings — data belonging to someone else,
+ * which is worse than a stale screen.
+ *
+ * A real page load is the only way to guarantee nothing carries over. It costs a second, and this
+ * happens rarely; correctness wins outright.
+ */
+export function reloadAs(path: string): void {
+  window.location.href = path;
+}
+
 // The backend mostly returns terse English strings for infra/auth-level errors (session expired,
 // not found, unauthorized) — the ones customers never see but business owners using this dashboard
 // do. Translate the common ones so an owner reading Hebrew doesn't hit a raw English string; any

@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch, setToken, friendlyError } from "../lib/api";
+import { apiFetch, setToken, reloadAs, friendlyError } from "../lib/api";
 import { useLanguage } from "../lib/LanguageContext";
 
 export default function LoginPage() {
@@ -77,7 +77,10 @@ export default function LoginPage() {
       const body = mode === "login" ? { email, password } : { name, email, password };
       const { token } = await apiFetch<{ token: string }>(path, { method: "POST", body: JSON.stringify(body) });
       setToken(token);
-      router.push("/dashboard/analytics");
+      // Full load rather than router.push: signing in changes who the app is for, and anything
+      // rendered from a previous session in this tab — a logged-out owner switching accounts, or
+      // an admin who just left impersonation — would otherwise survive the navigation.
+      reloadAs("/dashboard/analytics");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Something went wrong";
       setError(message);
