@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
-import { formatTimeInTz, formatDateTimeInTz, partsInTz, dayKeyInTz, formatDateIn, localeFor } from "../../lib/tz";
+import { formatTimeInTz, formatDateTimeInTz, partsInTz, dayKeyInTz, formatDateIn, localeFor, describeLocalInput } from "../../lib/tz";
 import { SkeletonBlock, SkeletonRow } from "../../lib/Skeleton";
 import { EmptyState } from "../../lib/EmptyState";
 import { formatPhone } from "../../lib/formatPhone";
@@ -199,7 +199,13 @@ function NewAppointmentModal({ tz, onClose, onCreated }: { tz: string; onClose: 
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "מועד" : "Date & time"}</label>
           <input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} {...req} className="w-full" dir="ltr" />
-          <p className="text-[11px] text-gray-600 mt-1">{he ? `לפי אזור הזמן ${tz}` : `In timezone ${tz}`}</p>
+          {/* The native picker follows the BROWSER's locale, so it can offer mm/dd/yyyy and a 12-hour
+              clock to a Hebrew-speaking owner. Echoing the choice back in their own format is what
+              makes a wrong date visible before it's saved. */}
+          {describeLocalInput(startTime, localeFor(lang), true) && (
+            <p className="text-[11px] font-medium text-[#145F78] mt-1">{describeLocalInput(startTime, localeFor(lang), true)}</p>
+          )}
+          <p className="text-[11px] text-gray-600 mt-0.5">{he ? `לפי אזור הזמן ${tz}` : `In timezone ${tz}`}</p>
         </div>
 
         {error && <p className="text-red-600 text-sm">{error}</p>}
@@ -292,6 +298,15 @@ function WeekCalendar({
   // device that may still be on yesterday.
   const todayKey = dayKeyInTz(new Date(), tz);
 
+  // Phones get one day at a time instead of seven columns. At 390px each column was ~44px wide,
+  // so an appointment chip had room for two or three characters of a customer's name — present,
+  // but unreadable. Defaults to today when today is in view, otherwise the first day of the week.
+  const todayIndex = days.findIndex((d) => localDayKey(d) === todayKey);
+  const [mobileDay, setMobileDay] = useState(0);
+  useEffect(() => { setMobileDay(todayIndex >= 0 ? todayIndex : 0); }, [todayIndex, weekStart]);
+  const shownDay = days[Math.min(mobileDay, days.length - 1)] ?? days[0];
+  const shownAppts = apptsByDay(shownDay).slice().sort((a, b) => a.startTime.localeCompare(b.startTime));
+
   function apptsByDay(day: Date) {
     const key = localDayKey(day);
     // Include pending_payment holds too — they block the slot exactly like a confirmed booking
@@ -301,6 +316,65 @@ function WeekCalendar({
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      {/* ── Phone: one day at a time ───────────────────────────────────────────────────────── */}
+      <div className="md:hidden">
+        <div className="flex border-b border-gray-200" role="tablist" aria-label={t.calendarView}>
+          {days.map((d, i) => {
+            const today = localDayKey(d) === todayKey;
+            const selected = i === Math.min(mobileDay, days.length - 1);
+            const count = apptsByDay(d).length;
+            return (
+              <button
+                key={d.toISOString()}
+                role="tab"
+                aria-selected={selected}
+                onClick={() => setMobileDay(i)}
+                className={`flex-1 py-2 flex flex-col items-center gap-0.5 border-b-2 transition ${
+                  selected ? "border-[#1B7FA0] bg-[#E0F5FB]/50" : "border-transparent"
+                }`}
+              >
+                <span className={`text-[11px] ${today ? "text-[#145F78] font-semibold" : "text-gray-600"}`}>{t.daysShort[d.getDay()]}</span>
+                <span className={`text-sm font-semibold ${selected ? "text-[#145F78]" : today ? "text-[#1B7FA0]" : "text-gray-700"}`}>{d.getDate()}</span>
+                {/* A dot rather than a number: at this width a count competes with the date. */}
+                <span className={`w-1.5 h-1.5 rounded-full ${count > 0 ? (selected ? "bg-[#145F78]" : "bg-[#1B7FA0]/50") : "bg-transparent"}`} />
+              </button>
+            );
+          })}
+        </div>
+        {shownAppts.length === 0 ? (
+          <p className="px-4 py-10 text-center text-sm text-gray-600">{t.noAppointments}</p>
+        ) : (
+          <ul className="divide-y divide-gray-100">
+            {shownAppts.map((a) => (
+              <li key={a.id} className="flex items-center gap-3 px-4 py-3">
+                <span className="text-sm font-bold tabular-nums text-[#145F78] shrink-0 w-12">{formatTimeInTz(a.startTime, tz)}</span>
+                <span className={`w-1 self-stretch rounded-full shrink-0 ${a.status === "pending_payment" ? "bg-amber-500" : "bg-[#1B7FA0]"}`} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {a.customer.name ?? <span dir="ltr">{formatPhone(a.customer.phone)}</span>}
+                  </p>
+                  <p className="text-xs text-gray-600 truncate">
+                    {a.status === "pending_payment" ? `⏳ ${t.awaitingDeposit}` : a.service.name}
+                    {a.staff ? ` · ${a.staff.name}` : ""}
+                  </p>
+                </div>
+                {new Date(a.startTime) >= new Date() && (
+                  <button
+                    onClick={() => onCancel(a.id)}
+                    disabled={cancellingId === a.id}
+                    className="row-action text-xs text-gray-600 hover:text-red-600 px-2 rounded-lg hover:bg-red-50 transition shrink-0"
+                  >
+                    {t.cancel}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* ── Desktop: the full week grid ─────────────────────────────────────────────────────── */}
+      <div className="hidden md:block">
       {/* Day headers */}
       <div className="grid border-b border-gray-200" style={{ gridTemplateColumns: "3.5rem repeat(7, 1fr)" }}>
         <div className="px-2 py-2 border-e border-gray-100" />
@@ -362,6 +436,7 @@ function WeekCalendar({
             })}
           </div>
         ))}
+      </div>
       </div>
     </div>
   );
@@ -588,21 +663,45 @@ export default function AppointmentsPage() {
             />
           ) : (
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-              <div className="grid" style={{ gridTemplateColumns: "3.5rem repeat(7, 1fr)" }}>
-                <div className="px-2 py-2 border-e border-b border-gray-100" />
-                {Array.from({ length: 7 }).map((_, i) => (
-                  <div key={i} className="px-1 py-2 border-e border-b border-gray-100 last:border-e-0 flex flex-col items-center gap-1">
-                    <SkeletonBlock className="h-2.5 w-6" />
-                    <SkeletonBlock className="h-4 w-4" />
+              {/* Two skeletons, because the loaded views differ: a phone gets the day tabs + agenda,
+                  a desktop gets the week grid. One shape standing in for the other makes the layout
+                  visibly jump the moment data lands. */}
+              <div className="md:hidden">
+                <div className="flex border-b border-gray-200">
+                  {Array.from({ length: 7 }).map((_, i) => (
+                    <div key={i} className="flex-1 py-2 flex flex-col items-center gap-1">
+                      <SkeletonBlock className="h-2.5 w-5" />
+                      <SkeletonBlock className="h-4 w-4" />
+                    </div>
+                  ))}
+                </div>
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 last:border-b-0">
+                    <SkeletonBlock className="h-4 w-10 shrink-0" />
+                    <div className="flex-1 flex flex-col gap-1.5">
+                      <SkeletonBlock className="h-3 w-28" />
+                      <SkeletonBlock className="h-2.5 w-20" />
+                    </div>
                   </div>
                 ))}
               </div>
-              {Array.from({ length: 6 }).map((_, row) => (
-                <div key={row} className="grid border-b border-gray-100/70 last:border-b-0" style={{ gridTemplateColumns: "3.5rem repeat(7, 1fr)", minHeight: 48 }}>
-                  <div className="px-2 pt-2 border-e border-gray-100"><SkeletonBlock className="h-2.5 w-6" /></div>
-                  {Array.from({ length: 7 }).map((_, col) => <div key={col} className="border-e border-gray-100 last:border-e-0 p-1" />)}
+              <div className="hidden md:block">
+                <div className="grid" style={{ gridTemplateColumns: "3.5rem repeat(7, 1fr)" }}>
+                  <div className="px-2 py-2 border-e border-b border-gray-100" />
+                  {Array.from({ length: 7 }).map((_, i) => (
+                    <div key={i} className="px-1 py-2 border-e border-b border-gray-100 last:border-e-0 flex flex-col items-center gap-1">
+                      <SkeletonBlock className="h-2.5 w-6" />
+                      <SkeletonBlock className="h-4 w-4" />
+                    </div>
+                  ))}
                 </div>
-              ))}
+                {Array.from({ length: 6 }).map((_, row) => (
+                  <div key={row} className="grid border-b border-gray-100/70 last:border-b-0" style={{ gridTemplateColumns: "3.5rem repeat(7, 1fr)", minHeight: 48 }}>
+                    <div className="px-2 pt-2 border-e border-gray-100"><SkeletonBlock className="h-2.5 w-6" /></div>
+                    {Array.from({ length: 7 }).map((_, col) => <div key={col} className="border-e border-gray-100 last:border-e-0 p-1" />)}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </>

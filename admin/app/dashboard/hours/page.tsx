@@ -7,6 +7,7 @@ import { SkeletonBlock } from "../../lib/Skeleton";
 import { SavedBadge } from "../../lib/SavedBadge";
 import { SpecialPeriods } from "../../lib/SpecialPeriods";
 import { GoogleHoursSync } from "../../lib/GoogleHoursSync";
+import { describeLocalInput, localeFor } from "../../lib/tz";
 
 interface DayHours {
   dayOfWeek: number;
@@ -87,10 +88,16 @@ function BlockedTimesSection() {
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "מתחילת" : "From"}</label>
             <input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} required className="w-full" dir="ltr" />
+            {describeLocalInput(start, localeFor(lang), true) && (
+              <p className="text-[11px] font-medium text-[#145F78] mt-1">{describeLocalInput(start, localeFor(lang), true)}</p>
+            )}
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "ועד" : "Until"}</label>
             <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} required className="w-full" dir="ltr" />
+            {describeLocalInput(end, localeFor(lang), true) && (
+              <p className="text-[11px] font-medium text-[#145F78] mt-1">{describeLocalInput(end, localeFor(lang), true)}</p>
+            )}
           </div>
         </div>
         <div>
@@ -208,13 +215,17 @@ export default function HoursPage() {
             key={h.dayOfWeek}
             className={`flex items-center gap-4 px-5 py-3.5 ${i !== hours.length - 1 ? "border-b border-gray-200/50" : ""} ${!h.enabled ? "opacity-50" : ""}`}
           >
-            <input
-              type="checkbox"
-              checked={h.enabled}
-              onChange={(e) => update(i, { enabled: e.target.checked })}
-              aria-label={lang === "he" ? `פתוח ביום ${t.days[h.dayOfWeek]}` : `Open on ${t.days[h.dayOfWeek]}`}
-            />
-            <span className="w-24 text-sm font-medium text-gray-700">{t.days[h.dayOfWeek]}</span>
+            {/* Label wrapper, so the day name is part of the tap target — the native box is 16px,
+                which is a small thing to hit with a thumb. */}
+            <label className="row-action flex items-center gap-4 cursor-pointer -my-1 py-1">
+              <input
+                type="checkbox"
+                checked={h.enabled}
+                onChange={(e) => update(i, { enabled: e.target.checked })}
+                aria-label={lang === "he" ? `פתוח ביום ${t.days[h.dayOfWeek]}` : `Open on ${t.days[h.dayOfWeek]}`}
+              />
+              <span className="w-24 text-sm font-medium text-gray-700">{t.days[h.dayOfWeek]}</span>
+            </label>
             <div className="flex items-center gap-2 ms-auto" dir={lang === "he" ? "rtl" : "ltr"}>
               <label className="text-gray-600 text-xs">{lang === "he" ? "מ־" : "from"}</label>
               <input
