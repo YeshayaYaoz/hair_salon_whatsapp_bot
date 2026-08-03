@@ -53,6 +53,9 @@ businessRouter.get("/me", async (req: AuthedRequest, res) => {
   const { passwordHash, whatsappAccessToken, paymentApiKey, paymentApiSecret, invoiceApiKey, invoiceApiSecret, ...safe } = business;
   res.json({
     ...safe,
+    // Re-pointed at the current host, same as service photos: the URL was absolute when written,
+    // so a row created under an old/wrong PUBLIC_BACKEND_URL would otherwise stay a dead link.
+    whatsappProfilePictureUrl: safe.whatsappProfilePictureUrl ? toPublicUploadUrl(safe.whatsappProfilePictureUrl) : null,
     whatsappConnected: Boolean(whatsappAccessToken),
     paymentConnected: Boolean(paymentApiKey),
     invoiceConnected:
@@ -794,7 +797,27 @@ businessRouter.post("/me/whatsapp/profile-picture", async (req: AuthedRequest, r
   } catch (err) {
     return res.status(502).json({ error: err instanceof Error ? err.message : "Failed to set profile picture" });
   }
-  res.json({ ok: true });
+
+  // Keep our own copy, so the widget shows the picture that is actually set instead of an empty
+  // placeholder on every reload. Meta holds the image but only hands it back through a short-lived
+  // URL, so there is nothing to display later unless we store one ourselves.
+  //
+  // Saved only after Meta accepted it — storing first would show the owner a picture their
+  // customers never see. A failure here is not worth failing the request over: the picture IS set
+  // on WhatsApp, which is what the owner asked for; only the preview would be stale.
+  let pictureUrl: string | null = null;
+  try {
+    const previous = business.whatsappProfilePictureUrl;
+    const saved = await saveImage(business.id, imageBuffer, "whatsapp-profile");
+    pictureUrl = saved.url;
+    await prisma.business.update({ where: { id: business.id }, data: { whatsappProfilePictureUrl: saved.url } });
+    // Only after the new one is committed — a crash between the two must not leave the row
+    // pointing at a file that is already gone.
+    if (previous) await deleteImageByUrl(business.id, previous);
+  } catch (err) {
+    console.error("[profile-picture] Set on WhatsApp but failed to store a local copy:", err);
+  }
+  res.json({ ok: true, url: pictureUrl });
 });
 
 // --- Payment provider (PayPlus / Tranzila / Cardcom / Grow / Tori-managed) — the business's own

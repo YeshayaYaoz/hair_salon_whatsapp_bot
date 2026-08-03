@@ -59,6 +59,10 @@ model Business {
   aiCostAlertStepSent       Int       @default(0)
   pendingYieldCampaign      Json? // set when the empty-slot campaign is awaiting the owner's WhatsApp confirmation
   address                   String?
+  // Last profile picture uploaded through the dashboard, kept so the widget can show what is
+  // currently set instead of an empty camera icon on every page load. Meta stores the picture but
+  // exposes it only via a short-lived URL, so a copy of our own is what makes it displayable.
+  whatsappProfilePictureUrl String?
   whatsappPhoneNumberId     String?   @unique
   // Cartesia-provisioned phone number for the voice bot, one per salon — same 1:1 routing model as
   // whatsappPhoneNumberId: the number Cartesia's tool call reports as "called" identifies the salon.
