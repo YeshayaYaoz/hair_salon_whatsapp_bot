@@ -12,6 +12,7 @@ import {
   PayPlusBillingNotConfiguredError,
 } from "./payplusSubscription.js";
 import { captureError } from "../lib/errorMonitoring.js";
+import { explainPayPlusError } from "../lib/payplusErrors.js";
 
 export const payplusBillingRouter = Router();
 export const payplusBillingWebhookRouter = Router();
@@ -36,7 +37,7 @@ payplusBillingRouter.post("/payplus/checkout", requireAuth, async (req: AuthedRe
     if (err instanceof PayPlusBillingNotConfiguredError) {
       return res.status(503).json({ error: "חיוב מנויים אינו מוגדר בשרת. פנו לתמיכה." });
     }
-    const detail = err instanceof Error ? err.message : String(err);
+    const detail = explainPayPlusError(err instanceof Error ? err.message : String(err));
     return res.status(502).json({
       // PayPlus's own rejection reason ("invalid api key", "payment page not found"), passed
       // through. This endpoint is owner-only (requireAuth), so it isn't leaking anything to the

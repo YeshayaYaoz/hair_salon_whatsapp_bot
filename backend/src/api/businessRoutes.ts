@@ -30,6 +30,7 @@ import { anthropicRejectsTemperature } from "../bot/providers/anthropicProvider.
 import { applyTemplate } from "../lib/applyTemplate.js";
 import { matchPeriodKinds, resolvePeriod } from "../lib/hebrewPeriods.js";
 import { classifyPeriodText } from "../lib/classifyPeriodText.js";
+import { explainPayPlusError } from "../lib/payplusErrors.js";
 import multer from "multer";
 import { saveImage, deleteImageByUrl, MAX_UPLOAD_BYTES, ALLOWED_MIME, UnsupportedImageError } from "../lib/storage.js";
 import { getPaymentProvider, PAYMENT_PROVIDERS, UnknownPaymentProviderError } from "../lib/payments/index.js";
@@ -958,7 +959,9 @@ businessRouter.post("/payments/link", async (req: AuthedRequest, res) => {
   } catch (err) {
     if (err instanceof UnknownPaymentProviderError) return res.status(400).json({ error: err.message });
     console.error("Payment link creation failed:", err);
-    res.status(502).json({ error: "Payment provider request failed" });
+    // Same reasoning as the subscription checkout route: the provider already said what's wrong,
+    // and a generic message just sends the owner to support with nothing.
+    res.status(502).json({ error: explainPayPlusError(err instanceof Error ? err.message : String(err)) });
   }
 });
 
