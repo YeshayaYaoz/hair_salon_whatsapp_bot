@@ -10,6 +10,7 @@ import { syncAppointmentToCalendar, deleteCalendarEvent } from "../lib/googleCal
 import { captureError } from "../lib/errorMonitoring.js";
 import { logClaudeUsage } from "../lib/usageLedger.js";
 import { notifyOwner } from "../lib/ownerNotify.js";
+import { toPublicUploadUrl } from "../lib/storage.js";
 import { getAiProvider, ProviderCallError, type GenericTool, type GenericTurn } from "./providers/index.js";
 
 // Which LLM backend actually answers a message is resolved per-business (Business.aiProvider) in
@@ -577,7 +578,12 @@ async function runTool(
     }
     // The images themselves are sent by the webhook layer after the text reply — the model only
     // needs to know they're on the way so it can write a one-line lead-in.
-    lastPhotos.value = service.imageUrls.map((url, i) => ({ url, caption: i === 0 ? service.name : undefined }));
+    lastPhotos.value = service.imageUrls.map((url, i) => ({
+      // WhatsApp fetches these from its own servers, so a URL pointing at the wrong host is a
+      // silent delivery failure rather than a visible error.
+      url: toPublicUploadUrl(url),
+      caption: i === 0 ? service.name : undefined,
+    }));
     return JSON.stringify({
       sent: true,
       count: service.imageUrls.length,

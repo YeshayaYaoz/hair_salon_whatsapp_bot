@@ -29,8 +29,15 @@ import sharp from "sharp";
 /** Where uploads live. On Railway this is the volume mount path; locally it's a gitignored dir. */
 const UPLOADS_DIR = resolve(process.env.UPLOADS_DIR ?? "./uploads");
 
-/** Public base for serving files back. Must be absolute: WhatsApp fetches these URLs itself. */
-const PUBLIC_BASE = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+/**
+ * Public base for serving files back. Must be absolute: WhatsApp fetches these URLs itself.
+ *
+ * PUBLIC_BACKEND_URL, not APP_URL. Express serves /uploads from THIS process; APP_URL points at the
+ * dashboard, which is a different host and has no such route. Building URLs from it produced links
+ * that 404'd — broken thumbnails for the owner, and a failed image send for every customer who
+ * asked to see a unit.
+ */
+const PUBLIC_BASE = (process.env.PUBLIC_BACKEND_URL ?? process.env.APP_URL ?? "http://localhost:4000").replace(/\/$/, "");
 
 /** WhatsApp rejects images over 5MB. Reject earlier, with a message the owner can act on. */
 export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
@@ -105,6 +112,28 @@ export function publicUrl(key: string): string {
 }
 
 /**
+ * Re-points a stored upload URL at the current host.
+ *
+ * Absolute URLs were written into Service.imageUrls at upload time, so every row created while the
+ * base was wrong still holds a dead link — and any future domain change would break them the same
+ * way. Rewriting on read fixes both without a migration: the path after /uploads/ is the real
+ * identifier, the host in front of it is disposable.
+ *
+ * Only touches URLs that look like our own uploads. A link the owner pasted from their website is
+ * left exactly as it is.
+ */
+export function toPublicUploadUrl(url: string): string {
+  const marker = "/uploads/";
+  const at = url.indexOf(marker);
+  if (at === -1) return url;
+  // Guard against rewriting an external URL that merely happens to contain "/uploads/" — ours
+  // always have a business-id segment and a generated filename directly after the marker.
+  const key = url.slice(at + marker.length);
+  if (!/^[\w-]+\/[\w-]+\.jpg$/.test(key)) return url;
+  return `${PUBLIC_BASE}${marker}${key}`;
+}
+
+/**
  * Deletes a stored image, given the URL held on the Service row.
  *
  * Returns silently for anything that isn't one of our own uploads — services can also hold pasted
@@ -113,10 +142,13 @@ export function publicUrl(key: string): string {
  * files or anywhere else on disk.
  */
 export async function deleteImageByUrl(businessId: string, url: string): Promise<void> {
-  const prefix = `${PUBLIC_BASE}/uploads/`;
-  if (!url.startsWith(prefix)) return; // an external URL the owner pasted — not ours to delete
+  // Matched on the path, not the full URL: rows written before PUBLIC_BASE was corrected carry a
+  // different host, and those files still need deleting.
+  const marker = "/uploads/";
+  const at = url.indexOf(marker);
+  if (at === -1) return; // an external URL the owner pasted — not ours to delete
 
-  const key = url.slice(prefix.length);
+  const key = url.slice(at + marker.length);
   const target = resolve(UPLOADS_DIR, key);
   const allowedDir = resolve(businessDir(businessId));
   if (!target.startsWith(allowedDir + "/")) {

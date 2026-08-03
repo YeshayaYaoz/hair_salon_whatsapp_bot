@@ -10,7 +10,8 @@ let dir: string;
 async function loadStorage() {
   vi.resetModules();
   process.env.UPLOADS_DIR = dir;
-  process.env.APP_URL = "https://api.example.com";
+  process.env.PUBLIC_BACKEND_URL = "https://api.example.com";
+  delete process.env.APP_URL;
   return import("./storage.js");
 }
 
@@ -89,6 +90,40 @@ describe("saveImage", () => {
   });
 });
 
+describe("toPublicUploadUrl", () => {
+  it("re-points a URL written under a different host", async () => {
+    const { toPublicUploadUrl } = await loadStorage();
+    // Rows created while PUBLIC_BASE pointed at the dashboard hold a link that 404s.
+    expect(toPublicUploadUrl("https://torionline.com/uploads/biz1/abc-123.jpg")).toBe(
+      "https://api.example.com/uploads/biz1/abc-123.jpg"
+    );
+  });
+
+  it("leaves a URL that already points at the right host alone", async () => {
+    const { toPublicUploadUrl } = await loadStorage();
+    const url = "https://api.example.com/uploads/biz1/abc-123.jpg";
+    expect(toPublicUploadUrl(url)).toBe(url);
+  });
+
+  it("does not touch a link the owner pasted from their own site", async () => {
+    const { toPublicUploadUrl } = await loadStorage();
+    for (const url of [
+      "https://zimmermeron.co.il/sites/tamar.jpg",
+      // Contains "/uploads/" but isn't one of ours — a WordPress media path, which is exactly the
+      // shape an owner is most likely to paste.
+      "https://example.com/wp-content/uploads/2026/08/room.jpeg",
+    ]) {
+      expect(toPublicUploadUrl(url)).toBe(url);
+    }
+  });
+
+  it("round-trips a freshly saved image", async () => {
+    const { saveImage, toPublicUploadUrl } = await loadStorage();
+    const saved = await saveImage("biz1", await samplePng(100, 100), "a.png");
+    expect(toPublicUploadUrl(saved.url)).toBe(saved.url);
+  });
+});
+
 describe("deleteImageByUrl", () => {
   it("deletes a file this app stored", async () => {
     const { saveImage, deleteImageByUrl } = await loadStorage();
@@ -100,6 +135,13 @@ describe("deleteImageByUrl", () => {
   it("ignores external URLs — services can hold pasted links we don't own", async () => {
     const { deleteImageByUrl } = await loadStorage();
     await expect(deleteImageByUrl("biz1", "https://someone-elses-site.com/photo.jpg")).resolves.toBeUndefined();
+  });
+
+  it("still deletes a file whose stored URL carries the old, wrong host", async () => {
+    const { saveImage, deleteImageByUrl } = await loadStorage();
+    const saved = await saveImage("biz1", await samplePng(100, 100), "a.png");
+    await deleteImageByUrl("biz1", `https://torionline.com/uploads/${saved.key}`);
+    expect(existsSync(join(dir, saved.key))).toBe(false);
   });
 
   it("refuses to delete another business's file", async () => {

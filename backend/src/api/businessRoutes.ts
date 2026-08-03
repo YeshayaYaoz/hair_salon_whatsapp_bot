@@ -32,7 +32,7 @@ import { matchPeriodKinds, resolvePeriod } from "../lib/hebrewPeriods.js";
 import { classifyPeriodText } from "../lib/classifyPeriodText.js";
 import { explainPayPlusError } from "../lib/payplusErrors.js";
 import multer from "multer";
-import { saveImage, deleteImageByUrl, MAX_UPLOAD_BYTES, ALLOWED_MIME, UnsupportedImageError } from "../lib/storage.js";
+import { saveImage, deleteImageByUrl, toPublicUploadUrl, MAX_UPLOAD_BYTES, ALLOWED_MIME, UnsupportedImageError } from "../lib/storage.js";
 import { getPaymentProvider, PAYMENT_PROVIDERS, UnknownPaymentProviderError } from "../lib/payments/index.js";
 import { getInvoiceProvider, INVOICE_PROVIDERS, UnknownInvoiceProviderError, resolveInvoiceCredentials } from "../lib/invoices/index.js";
 
@@ -1393,7 +1393,8 @@ businessRouter.delete("/services/:id/photos", async (req: AuthedRequest, res) =>
 
 businessRouter.get("/services", async (req: AuthedRequest, res) => {
   const services = await prisma.service.findMany({ where: { businessId: req.businessId! } });
-  res.json(services);
+  // Photo URLs are re-pointed at the current host on the way out — see toPublicUploadUrl.
+  res.json(services.map((s) => ({ ...s, imageUrls: s.imageUrls.map(toPublicUploadUrl) })));
 });
 
 businessRouter.post("/services", async (req: AuthedRequest, res) => {
