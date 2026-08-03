@@ -197,6 +197,16 @@ export async function checkUploadsDir(): Promise<void> {
   }
 
   console.log(`[storage] Uploads directory ready and writable: ${UPLOADS_DIR}`);
+  // The other half of the setup, and the half that fails silently. Photo URLs are absolute and are
+  // fetched by WhatsApp's servers and by the owner's browser, so if this base isn't the public
+  // address of THIS backend, every photo is a broken image with no error anywhere.
+  console.log(`[storage] Photo URLs will be built as: ${publicUrl("<businessId>/<file>.jpg")}`);
+  if (!process.env.PUBLIC_BACKEND_URL) {
+    console.warn(
+      `⚠ PUBLIC_BACKEND_URL is not set — photo URLs fall back to APP_URL, which points at the` +
+        ` dashboard. The dashboard does not serve /uploads, so photos will 404.`
+    );
+  }
 }
 
 /** Mount path for serving uploads back out. Exported so server.ts and this file can't disagree. */
