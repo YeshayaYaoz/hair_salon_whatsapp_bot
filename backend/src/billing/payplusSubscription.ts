@@ -90,7 +90,7 @@ export async function createSubscriptionCheckoutLink(businessId: string, plan: s
   });
 
   const webhookSecret = process.env.PAYPLUS_BILLING_WEBHOOK_SECRET;
-  const appUrl = (process.env.API_PUBLIC_URL ?? process.env.APP_URL ?? "").replace(/\/$/, "");
+  const appUrl = (process.env.PUBLIC_BACKEND_URL ?? process.env.APP_URL ?? "").replace(/\/$/, "");
 
   const res = await fetch(`${BASE_URL}/PaymentPages/generateLink`, {
     method: "POST",
