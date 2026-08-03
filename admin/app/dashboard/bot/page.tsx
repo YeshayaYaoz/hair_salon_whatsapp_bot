@@ -22,6 +22,8 @@ interface BotProfile {
   aiModel?: string | null;
   /** null = use the server default. Kept nullable so the slider can express "back to normal". */
   aiTemperature?: number | null;
+  greetingButtonText?: string;
+  greetingButtonUrl?: string;
 }
 
 interface AiProviderMeta {
@@ -151,6 +153,7 @@ export default function BotPage() {
     remindersEnabled: true, reviewsEnabled: true,
     cancellationPolicy: "", referralText: "", digestEnabled: true, availabilityInfo: "",
     pricingNotes: "", availabilitySuggestionsEnabled: true, aiProvider: "anthropic", aiModel: null, aiTemperature: null,
+    greetingButtonText: "", greetingButtonUrl: "",
   });
   const [bookingModel, setBookingModel] = useState<string>("slot");
   const [botEnabled, setBotEnabled] = useState(true);
@@ -179,6 +182,8 @@ export default function BotPage() {
         aiProvider: me.aiProvider ?? "anthropic",
         aiModel: me.aiModel ?? null,
         aiTemperature: me.aiTemperature ?? null,
+        greetingButtonText: me.greetingButtonText ?? "",
+        greetingButtonUrl: me.greetingButtonUrl ?? "",
       });
       setBookingModel(me.bookingModel ?? "slot");
       setBotEnabled(me.botEnabled ?? true);
@@ -290,6 +295,33 @@ export default function BotPage() {
               className="w-full"
             />
           </Field>
+          <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 flex flex-col gap-3">
+            <div>
+              <p className="text-xs font-semibold text-gray-800">{t.greetingButtonTitle}</p>
+              <p className="text-xs text-gray-600 mt-1">{t.greetingButtonHint}</p>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <Field label={t.greetingButtonLabel}>
+                <input
+                  value={fields.greetingButtonText ?? ""}
+                  onChange={(e) => set("greetingButtonText", e.target.value)}
+                  placeholder={t.greetingButtonLabelPlaceholder}
+                  maxLength={20}
+                  className="w-full"
+                />
+              </Field>
+              <Field label={t.greetingButtonUrlLabel}>
+                <input
+                  value={fields.greetingButtonUrl ?? ""}
+                  onChange={(e) => set("greetingButtonUrl", e.target.value)}
+                  placeholder="https://…"
+                  dir="ltr"
+                  className="w-full"
+                />
+              </Field>
+            </div>
+          </div>
+
           <Field label={t.personality}>
             <textarea
               rows={3}

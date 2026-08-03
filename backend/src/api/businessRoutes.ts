@@ -518,6 +518,10 @@ const profileSchema = z.object({
   timezone: z.string().optional(),
   notificationPhone: z.string().optional(),
   botGreeting: z.string().optional(),
+  // Both or neither: WhatsApp rejects a cta_url message missing either half, and a half-configured
+  // button would silently fall back to plain text with no hint as to why.
+  greetingButtonText: z.string().max(20).optional(),
+  greetingButtonUrl: z.string().optional(),
   botPersonality: z.string().optional(),
   googleMapsUrl: z.string().optional(),
   remindersEnabled: z.boolean().optional(),

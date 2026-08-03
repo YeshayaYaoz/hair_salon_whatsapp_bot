@@ -118,6 +118,11 @@ const translations = {
     googleMapsUrl: "Google Maps link", googleMapsUrlHint: "Used for two things: the bot sends it when customers ask for directions, and it's attached to post-visit thank-you messages. Find it in Google Business Profile → Share → Copy link.",
     greeting: "Opening greeting", personality: "Personality & tone",
     greetingPlaceholder: "e.g. Hello! Welcome to Shir's salon 💇‍♀️ How can I help?",
+    greetingButtonTitle: "Button under the greeting",
+    greetingButtonHint: "Adds one tappable button to the first message a customer gets — usually a link to your website. Fill in both fields, or leave both empty for a plain text greeting. Once you have a button, drop the link from the greeting text itself.",
+    greetingButtonLabel: "Button text (max 20 characters)",
+    greetingButtonLabelPlaceholder: "e.g. Visit our site",
+    greetingButtonUrlLabel: "Where it leads",
     greetingHint: "Square brackets are instructions to the bot, not text customers see. Write [list of all units] and the bot fills in your real services and prices. If it has nothing to fill in with, it drops that line instead of sending the brackets.",
     personalityPlaceholder: "e.g. Be friendly and use emojis occasionally. Always respond in Hebrew.",
 
@@ -276,6 +281,11 @@ const translations = {
     googleMapsUrl: "קישור Google Maps", googleMapsUrlHint: "משמש לשני דברים: הבוט שולח אותו כשלקוחות מבקשים הוראות הגעה או ניווט, והוא מצורף להודעות התודה אחרי הביקור. מצא אותו בפרופיל העסק Google ← שתף ← העתק קישור.",
     greeting: "ברכת פתיחה", personality: "אישיות וטון",
     greetingPlaceholder: "לדוג׳ שלום! ברוכים הבאים לסלון שיר 💇‍♀️ במה אוכל לעזור?",
+    greetingButtonTitle: "כפתור מתחת לברכה",
+    greetingButtonHint: "מוסיף כפתור אחד להודעה הראשונה שהלקוח מקבל — בדרך כלל קישור לאתר. מלאו את שני השדות, או השאירו את שניהם ריקים לברכה רגילה. אחרי שיש כפתור, כדאי להוריד את הקישור מטקסט הברכה עצמו.",
+    greetingButtonLabel: "טקסט הכפתור (עד 20 תווים)",
+    greetingButtonLabelPlaceholder: "לדוגמה: לאתר שלנו",
+    greetingButtonUrlLabel: "לאן הוא מוביל",
     greetingHint: "טקסט בסוגריים מרובעות הוא הוראה לבוט, לא טקסט שהלקוח רואה. אפשר לכתוב [פירוט של כל היחידות] והבוט ימלא את השירותים והמחירים האמיתיים. אם אין לו מה למלא שם — הוא ישמיט את השורה במקום לשלוח את הסוגריים.",
     personalityPlaceholder: "לדוג׳ היה ידידותי ותשתמש באמוג׳ים מדי פעם. תמיד ענה בעברית.",
 

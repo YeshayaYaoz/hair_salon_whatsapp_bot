@@ -110,6 +110,11 @@ model Business {
   // reject the parameter entirely — see anthropicProvider.
   aiTemperature             Float?
   botGreeting               String? // custom greeting override
+  // Turns the first reply of a conversation into a WhatsApp interactive message with one tappable
+  // button. Both are needed for the button to appear; without them the greeting is sent as plain
+  // text exactly as before.
+  greetingButtonText        String? // max 20 chars — WhatsApp rejects longer
+  greetingButtonUrl         String?
   botPersonality            String? // tone/personality instructions for the bot
   googleMapsUrl             String? // linked in post-visit review requests
   remindersEnabled          Boolean   @default(true)

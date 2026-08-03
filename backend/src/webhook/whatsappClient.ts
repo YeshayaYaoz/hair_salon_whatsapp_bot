@@ -74,6 +74,32 @@ export async function sendWhatsAppImage(params: SendCommon & { imageUrl: string;
   });
 }
 
+/**
+ * A message whose body is followed by a tappable button that opens a URL.
+ *
+ * WhatsApp's own limits, all enforced by rejecting the send rather than truncating: the body is
+ * capped at 1024 characters and the button label at 20. The caller trims rather than risking a
+ * rejected first impression — a greeting that fails to send leaves the customer with silence.
+ *
+ * Only one button is allowed on a cta_url message, and it must carry an https URL.
+ */
+export async function sendWhatsAppCtaUrl(
+  params: SendCommon & { body: string; buttonText: string; url: string; footer?: string }
+) {
+  await send(params, {
+    type: "interactive",
+    interactive: {
+      type: "cta_url",
+      body: { text: params.body.slice(0, 1024) },
+      ...(params.footer ? { footer: { text: params.footer.slice(0, 60) } } : {}),
+      action: {
+        name: "cta_url",
+        parameters: { display_text: params.buttonText.slice(0, 20), url: params.url },
+      },
+    },
+  });
+}
+
 export interface ListRow {
   id: string;
   title: string; // max 24 chars per WhatsApp's limit

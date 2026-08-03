@@ -2,7 +2,7 @@ import { Router } from "express";
 import express from "express";
 import crypto from "crypto";
 import { resolveBusinessByPhoneNumberId } from "../tenants/resolve.js";
-import { sendWhatsAppMessage, sendWhatsAppList, sendWhatsAppImage, WhatsAppAuthError, type ListRow } from "./whatsappClient.js";
+import { sendWhatsAppMessage, sendWhatsAppList, sendWhatsAppImage, sendWhatsAppCtaUrl, WhatsAppAuthError, type ListRow } from "./whatsappClient.js";
 import { sendWhatsAppTokenExpiredEmail } from "../lib/email.js";
 import { handleIncomingMessage } from "../bot/claudeBot.js";
 import { clearHistory, appendTurn } from "../bot/conversationStore.js";
@@ -338,7 +338,15 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
     // canned replies and interactive UI pieces.
     const lang: "he" | "en" = detectLang(textToProcess);
 
-    const { text: reply, offeredSlots, photos } = await handleIncomingMessage(business.id, customerPhone, textToProcess);
+    const { text: reply, offeredSlots, photos, isFirstReply } = await handleIncomingMessage(business.id, customerPhone, textToProcess);
+
+    // A greeting with a button turns the first thing a customer sees into something they can act
+    // on, instead of a wall of text with a URL they have to notice, select and paste. Only on the
+    // opening message: a button on every reply becomes furniture and stops being read.
+    const greetingButton =
+      isFirstReply && business.greetingButtonText && business.greetingButtonUrl
+        ? { text: business.greetingButtonText, url: business.greetingButtonUrl }
+        : null;
 
     if (offeredSlots && offeredSlots.length > 0) {
       await sendWhatsAppList({
@@ -350,6 +358,23 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
         sectionTitle: lang === "he" ? "מועדים פנויים" : "Available times",
         rows: buildSlotRows(offeredSlots, lang),
       });
+    } else if (greetingButton) {
+      try {
+        await sendWhatsAppCtaUrl({
+          phoneNumberId,
+          accessToken,
+          to: customerPhone,
+          body: reply,
+          buttonText: greetingButton.text,
+          url: greetingButton.url,
+        });
+      } catch (ctaErr) {
+        // A malformed button URL, or a WABA that hasn't been approved for interactive messages,
+        // must not cost the customer their first reply — fall back to plain text.
+        console.error("[whatsapp] Greeting button failed, sending plain text instead:", ctaErr);
+        captureError(ctaErr, { businessId: business.id, customerPhone, kind: "greetingButton" });
+        await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: reply });
+      }
     } else {
       await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: reply });
     }

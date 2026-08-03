@@ -167,6 +167,9 @@ export interface BotResult {
   offeredSlots?: AvailableSlot[];
   /** Photos to send as separate WhatsApp image messages after the text reply. */
   photos?: { url: string; caption?: string }[];
+  /** True when this reply opened the conversation — nothing had been said before it. Lets the
+   * webhook dress the first message up (greeting button) without guessing. */
+  isFirstReply?: boolean;
 }
 
 /**
@@ -845,5 +848,10 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     console.log(`[bot] escalated to ${model} for this turn (tool error recovery)`);
   }
 
-  return { text: replyText, offeredSlots: lastOfferedSlots.value, photos: lastPhotos.value };
+  return {
+    text: replyText,
+    offeredSlots: lastOfferedSlots.value,
+    photos: lastPhotos.value,
+    isFirstReply: history.length === 0,
+  };
 }
