@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch } from "../../lib/api";
+import { apiFetch, apiUpload } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SkeletonRow } from "../../lib/Skeleton";
 import { readableOnTint } from "../../lib/readableColor";
@@ -64,6 +64,8 @@ export default function ServicesPage() {
   const [newCapacity, setNewCapacity] = useState("1");
   const [newColor, setNewColor] = useState(COLORS[0].hex);
   const [newImageUrls, setNewImageUrls] = useState<string[]>([]);
+  // Files chosen before the service exists. Uploaded right after it's created — see addService.
+  const [newPhotoFiles, setNewPhotoFiles] = useState<File[]>([]);
   const [newLinkUrl, setNewLinkUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   // Tracked separately from `error` (which also carries add/save failures) so a failed *list* load
@@ -130,7 +132,7 @@ export default function ServicesPage() {
     setAdding(true);
     setError(null);
     try {
-      await apiFetch("/api/business/services", {
+      const created = await apiFetch<{ id: string }>("/api/business/services", {
         method: "POST",
         body: JSON.stringify({
           name: newName,
@@ -143,7 +145,20 @@ export default function ServicesPage() {
           linkUrl: newLinkUrl || undefined,
         }),
       });
-      setNewName(""); setNewDescription(""); setNewPrice(""); setNewDuration(""); setNewCapacity("1"); setNewColor(COLORS[0].hex); setNewImageUrls([]); setNewLinkUrl("");
+
+      // Uploads need a service to attach to, so anything queued in the form goes up now. A failure
+      // here must not read as "the unit wasn't created" — it was — so it's reported separately.
+      if (newPhotoFiles.length > 0) {
+        const form = new FormData();
+        for (const f of newPhotoFiles) form.append("photos", f);
+        try {
+          await apiUpload(`/api/business/services/${created.id}/photos`, form);
+        } catch (uploadErr) {
+          setError(uploadErr instanceof Error ? uploadErr.message : String(uploadErr));
+        }
+      }
+
+      setNewName(""); setNewDescription(""); setNewPrice(""); setNewDuration(""); setNewCapacity("1"); setNewColor(COLORS[0].hex); setNewImageUrls([]); setNewPhotoFiles([]); setNewLinkUrl("");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add service");
@@ -158,54 +173,183 @@ export default function ServicesPage() {
   }
 
   /**
-   * Editor for the list of photo links the bot sends over WhatsApp.
+   * Photo manager for a service/unit.
    *
-   * These are pasted public URLs rather than uploads: the app has no object storage, and WhatsApp
-   * fetches the image from the link itself, so whatever is stored here must stay reachable. Each
-   * row previews the link so a typo or a dead host is visible here instead of surfacing as a
-   * missing photo in a customer's chat.
+   * Uploading is the primary path now that there is real storage behind it: owners photograph
+   * their units on a phone, and "paste a public direct link to the image file" is an instruction
+   * most of them cannot follow without a support call. Pasting a link is kept for the case where
+   * the photo already lives somewhere (a website, a booking site), tucked behind a disclosure so
+   * it doesn't compete with the obvious action.
+   *
+   * Two modes, because uploads need a row to attach to:
+   * - Existing service (serviceId set): each file uploads immediately and the server returns the
+   *   stored URLs. Removing a photo deletes the file too.
+   * - New service (no id yet): files are held locally with object-URL previews and uploaded by the
+   *   parent right after the service is created.
    */
-  function PhotoList({ urls, onChange }: { urls: string[]; onChange: (next: string[]) => void }) {
+  function PhotoManager({
+    serviceId,
+    urls,
+    onUrlsChange,
+    pending,
+    onPendingChange,
+  }: {
+    serviceId: string | null;
+    urls: string[];
+    onUrlsChange: (next: string[]) => void;
+    pending?: File[];
+    onPendingChange?: (files: File[]) => void;
+  }) {
+    const [busy, setBusy] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const [showLinkInput, setShowLinkInput] = useState(false);
+    const [linkDraft, setLinkDraft] = useState("");
+    const inputId = `photo-upload-${serviceId ?? "new"}`;
+    const total = urls.length + (pending?.length ?? 0);
+
+    async function handleFiles(files: FileList | null) {
+      if (!files || files.length === 0) return;
+      const chosen = Array.from(files);
+      setUploadError(null);
+
+      if (!serviceId) {
+        onPendingChange?.([...(pending ?? []), ...chosen]);
+        return;
+      }
+      setBusy(true);
+      try {
+        const form = new FormData();
+        for (const f of chosen) form.append("photos", f);
+        const res = await apiUpload<{ imageUrls: string[] }>(`/api/business/services/${serviceId}/photos`, form);
+        onUrlsChange(res.imageUrls);
+      } catch (err) {
+        setUploadError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function removeUrl(url: string) {
+      if (!serviceId) {
+        onUrlsChange(urls.filter((u) => u !== url));
+        return;
+      }
+      setBusy(true);
+      try {
+        const res = await apiFetch<{ imageUrls: string[] }>(`/api/business/services/${serviceId}/photos`, {
+          method: "DELETE",
+          body: JSON.stringify({ url }),
+        });
+        onUrlsChange(res.imageUrls);
+      } catch (err) {
+        setUploadError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setBusy(false);
+      }
+    }
+
     return (
       <div className="flex flex-col gap-2">
         <div className="text-xs font-semibold text-gray-600">{t.photos}</div>
-        {urls.map((url, i) => (
-          <div key={i} className="flex items-center gap-2">
-            {url.trim() ? (
-              /* eslint-disable-next-line @next/next/no-img-element -- arbitrary owner-pasted URL, not a local/optimizable asset */
-              <img src={url} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0 bg-gray-100" onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
-            ) : (
-              <div className="w-9 h-9 rounded-lg shrink-0 bg-gray-100" />
-            )}
+
+        {(urls.length > 0 || (pending?.length ?? 0) > 0) && (
+          <div className="flex flex-wrap gap-2">
+            {urls.map((url) => (
+              <div key={url} className="relative group">
+                {/* eslint-disable-next-line @next/next/no-img-element -- user content on the API host, not a local/optimizable asset */}
+                <img src={url} alt="" className="w-20 h-20 rounded-lg object-cover bg-gray-100 border border-gray-200" onError={(e) => { e.currentTarget.style.opacity = "0.3"; }} />
+                <button
+                  type="button"
+                  onClick={() => removeUrl(url)}
+                  aria-label={t.removePhoto}
+                  title={t.removePhoto}
+                  className="absolute -top-1.5 -end-1.5 w-6 h-6 rounded-full bg-white border border-gray-300 text-gray-600 hover:text-red-600 hover:border-red-300 shadow-sm flex items-center justify-center transition"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+            {(pending ?? []).map((file, i) => (
+              <div key={`${file.name}-${i}`} className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element -- local object URL for a file not yet uploaded */}
+                <img src={URL.createObjectURL(file)} alt="" className="w-20 h-20 rounded-lg object-cover bg-gray-100 border border-dashed border-[#1B7FA0]/50 opacity-70" />
+                <button
+                  type="button"
+                  onClick={() => onPendingChange?.((pending ?? []).filter((_, j) => j !== i))}
+                  aria-label={t.removePhoto}
+                  className="absolute -top-1.5 -end-1.5 w-6 h-6 rounded-full bg-white border border-gray-300 text-gray-600 hover:text-red-600 shadow-sm flex items-center justify-center transition"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {total < 10 && (
+          <div className="flex flex-wrap items-center gap-3">
+            <label
+              htmlFor={inputId}
+              className={`inline-flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg border transition cursor-pointer ${
+                busy ? "opacity-50 pointer-events-none" : ""
+              } border-[#1B7FA0] text-[#1B7FA0] hover:bg-[#E0F5FB]`}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5V18a2 2 0 002 2h14a2 2 0 002-2v-1.5M12 3v13m0-13l-4 4m4-4l4 4" />
+              </svg>
+              {busy ? t.uploading : t.uploadPhotos}
+            </label>
+            {/* capture is deliberately omitted: on a phone this lets the OS offer both the camera
+                and the existing gallery, and the photos are usually already taken. */}
             <input
-              value={url}
-              onChange={(e) => onChange(urls.map((u, j) => (j === i ? e.target.value : u)))}
-              placeholder="https://…"
-              dir="ltr"
-              className="flex-1 min-w-32 text-sm"
+              id={inputId}
+              type="file"
+              accept="image/*"
+              multiple
+              className="sr-only"
+              onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }}
             />
             <button
               type="button"
-              onClick={() => onChange(urls.filter((_, j) => j !== i))}
-              aria-label={t.removePhoto}
-              title={t.removePhoto}
-              className="text-gray-600 hover:text-red-600 transition p-1.5 rounded hover:bg-red-50"
+              onClick={() => setShowLinkInput((v) => !v)}
+              className="text-xs text-gray-600 hover:text-[#1B7FA0] underline underline-offset-2"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              {t.orPasteLink}
             </button>
           </div>
-        ))}
-        {urls.length < 10 && (
-          <button
-            type="button"
-            onClick={() => onChange([...urls, ""])}
-            className="self-start text-xs text-[#1B7FA0] hover:text-[#145F78] font-semibold px-2 py-1 rounded hover:bg-[#E0F5FB] transition"
-          >
-            + {t.addPhoto}
-          </button>
         )}
+
+        {showLinkInput && (
+          <div className="flex flex-col gap-1">
+            <div className="flex gap-2">
+              <input
+                value={linkDraft}
+                onChange={(e) => setLinkDraft(e.target.value)}
+                placeholder="https://…"
+                dir="ltr"
+                className="flex-1 min-w-32 text-sm"
+              />
+              <button
+                type="button"
+                disabled={!linkDraft.trim()}
+                onClick={() => { onUrlsChange([...urls, linkDraft.trim()]); setLinkDraft(""); }}
+                className="text-sm font-semibold px-3 py-2 rounded-lg bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white transition"
+              >
+                {t.add}
+              </button>
+            </div>
+            <p className="text-xs text-gray-600">{t.pasteLinkHint}</p>
+          </div>
+        )}
+
+        {!serviceId && (pending?.length ?? 0) > 0 && (
+          <p className="text-xs text-[#1B7FA0]">{t.photosQueued(pending!.length)}</p>
+        )}
+        {uploadError && <p className="text-xs text-red-600">{uploadError}</p>}
         <p className="text-xs text-gray-600">{t.photosHint}</p>
       </div>
     );
@@ -302,7 +446,17 @@ export default function ServicesPage() {
                     />
                   </div>
                   <div className="mb-3">
-                    <PhotoList urls={editState.imageUrls} onChange={(next) => setEditState((p) => ({ ...p, imageUrls: next }))} />
+                    <PhotoManager
+                      serviceId={s.id}
+                      urls={editState.imageUrls}
+                      onUrlsChange={(next: string[]) => {
+                        setEditState((p) => ({ ...p, imageUrls: next }));
+                        // Photo changes are written by their own endpoint immediately, so the row
+                        // behind the editor is already stale — refresh it rather than waiting for
+                        // Save, which would otherwise re-send the pre-upload list.
+                        setServices((prev) => prev.map((svc) => (svc.id === s.id ? { ...svc, imageUrls: next } : svc)));
+                      }}
+                    />
                   </div>
                   <div className="flex gap-2 mb-2">
                     <input value={editState.linkUrl} onChange={(e) => setEditState((p) => ({ ...p, linkUrl: e.target.value }))} placeholder={t.linkUrlOptional} dir="ltr" className="flex-1 min-w-32 text-sm" />
@@ -387,7 +541,13 @@ export default function ServicesPage() {
             placeholder={t.descriptionOptional}
             className="w-full"
           />
-          <PhotoList urls={newImageUrls} onChange={setNewImageUrls} />
+          <PhotoManager
+            serviceId={null}
+            urls={newImageUrls}
+            onUrlsChange={setNewImageUrls}
+            pending={newPhotoFiles}
+            onPendingChange={setNewPhotoFiles}
+          />
           <div className="flex gap-2">
             <input placeholder={t.linkUrlOptional} value={newLinkUrl} onChange={(e) => setNewLinkUrl(e.target.value)} dir="ltr" className="flex-1 min-w-32" />
           </div>

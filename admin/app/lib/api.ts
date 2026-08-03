@@ -126,6 +126,43 @@ export function friendlyError(raw: string): string {
   return raw;
 }
 
+/**
+ * Uploads files as multipart/form-data.
+ *
+ * Separate from apiFetch because that one always sets Content-Type: application/json. For a
+ * FormData body the browser has to set the header itself — it has to append the multipart boundary
+ * — and overriding it produces a request the server cannot parse.
+ */
+export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+  const token = getToken();
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method: "POST",
+      body: formData,
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    });
+  } catch {
+    throw new Error(
+      currentLang() === "he"
+        ? "בעיית חיבור לרשת — בדוק את החיבור לאינטרנט ונסה שוב."
+        : "Network error — check your connection and try again."
+    );
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const raw = typeof data.error === "string" ? data.error : extractZodMessage(data.error);
+    throw new Error(
+      raw
+        ? friendlyError(raw)
+        : currentLang() === "he"
+          ? `העלאת התמונות נכשלה (${res.status})`
+          : `Upload failed (${res.status})`
+    );
+  }
+  return data as T;
+}
+
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   let res: Response;

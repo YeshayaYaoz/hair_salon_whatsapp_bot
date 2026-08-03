@@ -1,1 +1,4 @@
 .email-preview/
+
+# Local uploads dir. In production this is a Railway volume mount (UPLOADS_DIR).
+uploads/

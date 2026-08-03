@@ -38,6 +38,7 @@ const RECOMMENDED: RequiredVar[] = [
   { name: "DEEPSEEK_API_KEY", description: "lets a business opt their WhatsApp bot into DeepSeek instead of Claude (Bot settings page) — without it, that provider choice fails at send time" },
   { name: "WHATSAPP_APP_SECRET", description: "verifies WhatsApp webhook signatures, and (as the Meta app secret) exchanges the Embedded Signup code for an access token" },
   { name: "WHATSAPP_VERIFY_TOKEN", description: "required for Meta to verify the webhook URL" },
+  { name: "UPLOADS_DIR", description: "mount path of the Railway volume holding owner-uploaded unit photos — without it uploads land on the container's ephemeral disk and vanish on the next deploy" },
   { name: "PAYPLUS_API_KEY", description: "Tori's own PayPlus account — recurring subscription billing" },
   { name: "PAYPLUS_SECRET_KEY", description: "Tori's own PayPlus account — recurring subscription billing" },
   // NOTE: managed *payment clearing* is disabled at the API layer (see businessRoutes.ts) — third-

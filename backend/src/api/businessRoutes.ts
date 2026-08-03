@@ -30,6 +30,8 @@ import { anthropicRejectsTemperature } from "../bot/providers/anthropicProvider.
 import { applyTemplate } from "../lib/applyTemplate.js";
 import { matchPeriodKinds, resolvePeriod } from "../lib/hebrewPeriods.js";
 import { classifyPeriodText } from "../lib/classifyPeriodText.js";
+import multer from "multer";
+import { saveImage, deleteImageByUrl, MAX_UPLOAD_BYTES, ALLOWED_MIME, UnsupportedImageError } from "../lib/storage.js";
 import { getPaymentProvider, PAYMENT_PROVIDERS, UnknownPaymentProviderError } from "../lib/payments/index.js";
 import { getInvoiceProvider, INVOICE_PROVIDERS, UnknownInvoiceProviderError, resolveInvoiceCredentials } from "../lib/invoices/index.js";
 
@@ -1297,6 +1299,72 @@ const serviceSchema = z.object({
   linkUrl: z.string().optional(),
 });
 
+/**
+ * Photo uploads for a service/unit.
+ *
+ * memoryStorage rather than multer's disk storage: every file is re-encoded by sharp before it is
+ * written, so multer's copy would only be a temp file to clean up. The size cap is enforced by
+ * multer (before the body is fully read) as well as by the type check below.
+ */
+const photoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_UPLOAD_BYTES, files: 10 },
+  fileFilter: (_req, file, cb) => {
+    // A phone can report an empty or odd mimetype for HEIC; sharp is the real gate, this just
+    // rejects the obvious non-images before spending memory on them.
+    if (file.mimetype && !ALLOWED_MIME.includes(file.mimetype) && !file.mimetype.startsWith("image/")) {
+      return cb(new UnsupportedImageError(`הקובץ "${file.originalname}" אינו תמונה.`));
+    }
+    cb(null, true);
+  },
+});
+
+businessRouter.post("/services/:id/photos", photoUpload.array("photos", 10), async (req: AuthedRequest, res) => {
+  const service = await prisma.service.findFirst({
+    where: { id: req.params.id, businessId: req.businessId! },
+    select: { id: true, imageUrls: true },
+  });
+  if (!service) return res.status(404).json({ error: "השירות לא נמצא" });
+
+  const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+  if (files.length === 0) return res.status(400).json({ error: "לא נבחרו תמונות" });
+  if (service.imageUrls.length + files.length > 10) {
+    return res.status(400).json({ error: "אפשר עד 10 תמונות לכל יחידה" });
+  }
+
+  const urls: string[] = [];
+  for (const file of files) {
+    const saved = await saveImage(req.businessId!, file.buffer, file.originalname);
+    urls.push(saved.url);
+  }
+
+  const updated = await prisma.service.update({
+    where: { id: service.id },
+    data: { imageUrls: [...service.imageUrls, ...urls] },
+    select: { imageUrls: true },
+  });
+  res.status(201).json({ imageUrls: updated.imageUrls, added: urls.length });
+});
+
+/** Removes one photo from a service, and deletes the file when it was one of our own uploads. */
+businessRouter.delete("/services/:id/photos", async (req: AuthedRequest, res) => {
+  const parsed = z.object({ url: z.string().min(1) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const service = await prisma.service.findFirst({
+    where: { id: req.params.id, businessId: req.businessId! },
+    select: { id: true, imageUrls: true },
+  });
+  if (!service) return res.status(404).json({ error: "השירות לא נמצא" });
+
+  const remaining = service.imageUrls.filter((u) => u !== parsed.data.url);
+  await prisma.service.update({ where: { id: service.id }, data: { imageUrls: remaining } });
+  // After the DB write: a leaked file is harmless, a row pointing at a deleted file is a broken
+  // image in a customer's chat.
+  await deleteImageByUrl(req.businessId!, parsed.data.url);
+  res.json({ imageUrls: remaining });
+});
+
 businessRouter.get("/services", async (req: AuthedRequest, res) => {
   const services = await prisma.service.findMany({ where: { businessId: req.businessId! } });
   res.json(services);
@@ -1321,7 +1389,16 @@ businessRouter.put("/services/:id", async (req: AuthedRequest, res) => {
 });
 
 businessRouter.delete("/services/:id", async (req: AuthedRequest, res) => {
+  // Read the photos before deleting the row, or their files are orphaned on the volume forever
+  // with nothing left pointing at them.
+  const service = await prisma.service.findFirst({
+    where: { id: req.params.id, businessId: req.businessId! },
+    select: { imageUrls: true },
+  });
   await prisma.service.deleteMany({ where: { id: req.params.id, businessId: req.businessId! } });
+  for (const url of service?.imageUrls ?? []) {
+    await deleteImageByUrl(req.businessId!, url);
+  }
   res.json({ ok: true });
 });
 
