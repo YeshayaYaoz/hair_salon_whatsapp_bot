@@ -141,5 +141,8 @@ function reportBillingWebhookProblems(): void {
   const base = (process.env.PUBLIC_BACKEND_URL ?? process.env.APP_URL ?? "").trim().replace(/\/+$/, "");
   if (!base) return; // the storage check already complains loudly about a missing public base
   const withScheme = /^https?:\/\//i.test(base) ? base : `https://${base}`;
-  console.log(`[billing] PayPlus callback URL (set this on the payment page in PayPlus):\n          ${withScheme}/webhook/billing/payplus/${secret}`);
+  // Nothing to configure in PayPlus's dashboard for this one: refURL_callback is sent on every
+  // generateLink call (see payplusSubscription.ts), so the URL travels with each transaction.
+  // Printed anyway — it is the address to curl when a payment goes through and nothing activates.
+  console.log(`[billing] PayPlus subscription callback (sent per-transaction, no PayPlus-side setup needed):\n          ${withScheme}/webhook/billing/payplus/${secret}`);
 }
