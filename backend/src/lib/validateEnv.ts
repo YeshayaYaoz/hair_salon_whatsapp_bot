@@ -57,6 +57,30 @@ const RECOMMENDED: RequiredVar[] = [
   { name: "WHATSAPP_REVIEW_TEMPLATE", description: "approved template name for post-visit review requests — without it, review requests outside the 24h window are not delivered" },
 ];
 
+/**
+ * Names that are easy to get subtly wrong, mapped to what the code actually reads.
+ *
+ * A misnamed variable is worse than a missing one: the value is visibly set in the Railway UI, so
+ * everything looks configured, and the failure surfaces much later as a provider error with no
+ * obvious connection to a typo. PAYPLUS_UID_PAGE for PAYPLUS_PAGE_UID cost a round of debugging a
+ * PayPlus 405; this turns the next one into a line in the startup log.
+ */
+const COMMON_TYPOS: Record<string, string> = {
+  PAYPLUS_UID_PAGE: "PAYPLUS_PAGE_UID",
+  PAYPLUS_PAGE_ID: "PAYPLUS_PAGE_UID",
+  UPLOAD_DIR: "UPLOADS_DIR",
+  DIRECT_DATABASE_URL: "DIRECT_URL",
+  APP_URL_BASE: "APP_URL",
+};
+
+function reportLikelyTypos(): void {
+  const found = Object.entries(COMMON_TYPOS).filter(([wrong, right]) => process.env[wrong] && !process.env[right]);
+  if (found.length === 0) return;
+  console.warn("\n⚠ Environment variables that look misnamed — the app is NOT reading these:\n");
+  for (const [wrong, right] of found) console.warn(`  - ${wrong} is set, but the app reads ${right}. Rename it.`);
+  console.warn("");
+}
+
 export function validateEnv(): void {
   const missing = REQUIRED.filter((v) => !process.env[v.name]);
   if (missing.length > 0) {
@@ -65,6 +89,8 @@ export function validateEnv(): void {
     console.error("\nSet these in Railway's Variables tab and redeploy.\n");
     process.exit(1);
   }
+
+  reportLikelyTypos();
 
   const missingRecommended = RECOMMENDED.filter((v) => !process.env[v.name]);
   if (missingRecommended.length > 0) {
