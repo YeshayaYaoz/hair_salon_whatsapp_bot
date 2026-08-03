@@ -54,7 +54,14 @@ export interface AiProvider {
   /** Resolves the model id to bill/send: business.aiModel if set, else this provider's default
    * cheap or smart tier. */
   resolveModel(tier: "cheap" | "smart", override: string | null | undefined): string;
-  send(params: { model: string; system: SystemPromptParts; tools: GenericTool[]; turns: GenericTurn[] }): Promise<GenericResponse>;
+  send(params: {
+    model: string;
+    system: SystemPromptParts;
+    tools: GenericTool[];
+    turns: GenericTurn[];
+    /** Sampling temperature. Omitted means the provider's own default (see DEFAULT_TEMPERATURE). */
+    temperature?: number;
+  }): Promise<GenericResponse>;
 }
 
 export class ProviderCallError extends Error {
@@ -66,3 +73,21 @@ export class ProviderCallError extends Error {
     this.name = "ProviderCallError";
   }
 }
+
+/**
+ * Low on purpose.
+ *
+ * Temperature was previously unset, so it defaulted to maximum sampling variability — which is what
+ * produced invented Hebrew: the model would sample a novel phrasing instead of the fixed idiom,
+ * e.g. "מבורך הבא" in place of "ברוך הבא". Hebrew is full of fixed collocations where any variation
+ * is simply wrong, and nothing this bot does benefits from linguistic invention: it quotes prices,
+ * offers times, and confirms bookings. Not 0, so identical repeated questions don't produce
+ * word-for-word identical replies, which reads robotic in a chat thread.
+ *
+ * Businesses can override this (Business.aiTemperature); this is the value used when they haven't.
+ */
+export const DEFAULT_TEMPERATURE = 0.2;
+
+/** The range the dashboard slider offers, and the range the API validates against. */
+export const TEMPERATURE_MIN = 0;
+export const TEMPERATURE_MAX = 1;

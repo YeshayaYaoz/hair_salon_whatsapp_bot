@@ -50,6 +50,18 @@ function WhatsAppLogoSection() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Show the picture that is actually set. Previously `preview` only ever held the data URL from
+  // the current upload, so the moment the page reloaded the owner saw an empty camera icon and had
+  // no way to tell whether a picture was set at all.
+  useEffect(() => {
+    apiFetch<{ whatsappProfilePictureUrl?: string | null }>("/api/business/me")
+      .then((me) => {
+        if (me.whatsappProfilePictureUrl) setPreview(me.whatsappProfilePictureUrl);
+      })
+      // Non-fatal: an unreachable stored picture must not break uploading a new one.
+      .catch(() => {});
+  }, []);
+
   async function onFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = ""; // allow re-choosing the same file consecutively
@@ -64,10 +76,13 @@ function WhatsAppLogoSection() {
     try {
       const dataUrl = await resizeImageToDataUrl(file);
       setPreview(dataUrl);
-      await apiFetch("/api/business/me/whatsapp/profile-picture", {
+      const result = await apiFetch<{ url?: string | null }>("/api/business/me/whatsapp/profile-picture", {
         method: "POST",
         body: JSON.stringify({ imageBase64: dataUrl }),
       });
+      // Swap the local data URL for the stored one, so what is on screen is what will come back on
+      // the next load rather than something that only exists in this tab.
+      if (result.url) setPreview(result.url);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err) {

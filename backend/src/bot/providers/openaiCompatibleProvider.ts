@@ -1,18 +1,8 @@
 import OpenAI, { APIError } from "openai";
 import type { AiProvider, GenericTool, GenericTurn, GenericResponse, SystemPromptParts } from "./types.js";
-import { ProviderCallError } from "./types.js";
+import { ProviderCallError, DEFAULT_TEMPERATURE } from "./types.js";
 
-/**
- * Low temperature, deliberately.
- *
- * This was previously unset, so it defaulted to maximum sampling variability — which is what
- * produced invented Hebrew: the model would sample a novel phrasing instead of the fixed idiom,
- * e.g. "מבורך הבא" in place of "ברוך הבא". Hebrew is full of fixed collocations where any variation
- * is simply wrong, and nothing this bot does benefits from linguistic invention: it quotes prices,
- * offers times, and confirms bookings. Not 0, so identical repeated questions don't produce
- * word-for-word identical replies, which reads robotic in a chat thread.
- */
-const TEMPERATURE = 0.2;
+
 
 const RETRYABLE_STATUSES = new Set([408, 409, 429, 500, 502, 503]);
 const RETRY_DELAY_MS = 700;
@@ -110,14 +100,14 @@ export function createOpenAiCompatibleProvider(config: {
       return tier === "smart" ? config.defaultSmartModel : config.defaultCheapModel;
     },
 
-    async send({ model, system, tools, turns }) {
+    async send({ model, system, tools, turns, temperature }) {
       if (!apiKey) {
         throw new ProviderCallError(`${config.apiKeyEnvVar} is not configured on the server`, false);
       }
       const messages = toOpenAiMessages(system, turns);
       const openaiTools = toOpenAiTools(tools);
 
-      const call = () => client.chat.completions.create({ model, max_tokens: 1024, temperature: TEMPERATURE, messages, tools: openaiTools });
+      const call = () => client.chat.completions.create({ model, max_tokens: 1024, temperature: temperature ?? DEFAULT_TEMPERATURE, messages, tools: openaiTools });
 
       try {
         return fromOpenAiResponse(await call());

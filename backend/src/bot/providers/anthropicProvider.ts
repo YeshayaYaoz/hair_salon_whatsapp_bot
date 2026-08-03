@@ -1,6 +1,6 @@
 import Anthropic, { APIError } from "@anthropic-ai/sdk";
 import type { AiProvider, GenericTool, GenericTurn, GenericResponse } from "./types.js";
-import { ProviderCallError } from "./types.js";
+import { ProviderCallError, DEFAULT_TEMPERATURE } from "./types.js";
 
 // maxRetries: 0 here because we do our own retry below — that lets us log each attempt and
 // control the backoff explicitly, rather than relying on the SDK's opaque internal retry (which
@@ -10,20 +10,7 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, maxRetr
 const MODEL_CHEAP = "claude-haiku-4-5-20251001";
 const MODEL_SMART = "claude-sonnet-5";
 
-/**
- * Low temperature, deliberately.
- *
- * This was previously unset, so it defaulted to maximum sampling variability — which is what
- * produced invented Hebrew: the model would sample a novel phrasing instead of the fixed idiom,
- * e.g. "מבורך הבא" in place of "ברוך הבא". Hebrew is full of fixed collocations where any variation
- * is simply wrong, and nothing this bot does benefits from linguistic invention: it quotes prices,
- * offers times, and confirms bookings. Not 0, so identical repeated questions don't produce
- * word-for-word identical replies, which reads robotic in a chat thread.
- *
- * Note this no longer applies on models that reject the parameter (see below) — there the Hebrew
- * guardrails are only the prompt's "no invented wording" rules.
- */
-const TEMPERATURE = 0.2;
+
 
 /**
  * Newer Anthropic models reject `temperature` outright — the API answers
@@ -36,6 +23,12 @@ const TEMPERATURE = 0.2;
  * result is cached per model id so it costs one failed call per model per process, not per message.
  */
 const temperatureRejected = new Set<string>();
+
+/** Whether this model has already answered "temperature is deprecated" once in this process. The
+ * dashboard reads this so the temperature slider can say it has no effect instead of pretending. */
+export function anthropicRejectsTemperature(model: string): boolean {
+  return temperatureRejected.has(model);
+}
 
 function isTemperatureRejection(err: unknown): boolean {
   return err instanceof APIError && err.status === 400 && /temperature/i.test(err.message);
@@ -63,6 +56,38 @@ function toAnthropicTools(tools: GenericTool[]): Anthropic.Tool[] {
     input_schema: t.input_schema as Anthropic.Tool.InputSchema,
     ...(i === tools.length - 1 ? { cache_control: { type: "ephemeral" as const } } : {}),
   }));
+}
+
+/**
+ * Marks the end of the conversation as a cache breakpoint.
+ *
+ * The system prompt and tool definitions were already cached, but the messages were not — so every
+ * call re-billed the whole history at full price. That is the part that actually grows: sixteen
+ * turns plus tool results (availability listings, price lookups) are resent on every single call,
+ * and one customer message costs two or three calls because of the tool loop.
+ *
+ * The breakpoint goes on the last block, so each call caches the prefix the *next* call will read.
+ * That costs a cache write (1.25x) on content that would otherwise be billed at 1x, which only pays
+ * off if a later call reads it — and inside a tool loop, two to three calls land seconds apart on a
+ * strictly growing prefix, so it does. Across a conversation the same prefix is read again on every
+ * follow-up message within the cache's five-minute window.
+ *
+ * Anthropic allows four breakpoints; this is the third (tools, system, messages).
+ */
+export function withCacheBreakpoint(messages: Anthropic.MessageParam[]): Anthropic.MessageParam[] {
+  const last = messages[messages.length - 1];
+  if (!last) return messages;
+
+  // A plain-string message has no block to attach cache_control to — promote it to block form.
+  const blocks: Anthropic.ContentBlockParam[] =
+    typeof last.content === "string"
+      ? [{ type: "text", text: last.content }]
+      : [...(last.content as Anthropic.ContentBlockParam[])];
+  if (blocks.length === 0) return messages;
+
+  const tail = blocks[blocks.length - 1];
+  blocks[blocks.length - 1] = { ...tail, cache_control: { type: "ephemeral" } } as Anthropic.ContentBlockParam;
+  return [...messages.slice(0, -1), { ...last, content: blocks }];
 }
 
 function toAnthropicMessages(turns: GenericTurn[]): Anthropic.MessageParam[] {
@@ -115,7 +140,7 @@ export const anthropicProvider: AiProvider = {
     return tier === "smart" ? MODEL_SMART : MODEL_CHEAP;
   },
 
-  async send({ model, system, tools, turns }) {
+  async send({ model, system, tools, turns, temperature }) {
     // Two system blocks: the cache breakpoint sits on the stable one, so the per-minute clock
     // text in `volatile` trails it and never invalidates the cached prefix.
     const cachedSystem: Anthropic.TextBlockParam[] = [
@@ -123,13 +148,13 @@ export const anthropicProvider: AiProvider = {
       { type: "text", text: system.volatile },
     ];
     const anthropicTools = toAnthropicTools(tools);
-    const messages = toAnthropicMessages(turns);
+    const messages = withCacheBreakpoint(toAnthropicMessages(turns));
 
     const call = () =>
       anthropic.messages.create({
         model,
         max_tokens: 1024,
-        ...(temperatureRejected.has(model) ? {} : { temperature: TEMPERATURE }),
+        ...(temperatureRejected.has(model) ? {} : { temperature: temperature ?? DEFAULT_TEMPERATURE }),
         system: cachedSystem,
         tools: anthropicTools,
         messages,

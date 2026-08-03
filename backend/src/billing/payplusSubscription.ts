@@ -8,8 +8,17 @@
  * salon charging *their* customers, not for Tori charging the salon.
  */
 
+import { randomBytes } from "crypto";
+import { prisma } from "../lib/prisma.js";
+
 const GRAPH_VERSION = "v1.0";
-const BASE_URL = `https://restapi.payplus.co.il/api/${GRAPH_VERSION}`;
+// Sandbox and production are different hosts. PayPlus issues separate keys for each, so pointing
+// PAYPLUS_ENV at "sandbox" and pasting the staging keys exercises the whole flow — including a real
+// callback — without charging a card.
+const BASE_URL =
+  process.env.PAYPLUS_ENV === "sandbox"
+    ? `https://restapidev.payplus.co.il/api/${GRAPH_VERSION}`
+    : `https://restapi.payplus.co.il/api/${GRAPH_VERSION}`;
 
 export const PLAN_PRICES_ILS: Record<string, number> = { standard: 149, premium: 299 };
 // Annual plan: 10 months' worth charged upfront (2 months free) — a common SaaS annual incentive.
@@ -34,7 +43,7 @@ export function planPriceForCycle(plan: string, cycle: string): number {
 
 export class PayPlusBillingNotConfiguredError extends Error {
   constructor() {
-    super("PAYPLUS_API_KEY/PAYPLUS_SECRET_KEY are not set — subscription billing is unavailable");
+    super("PAYPLUS_API_KEY / PAYPLUS_SECRET_KEY / PAYPLUS_PAGE_UID are not all set — subscription billing is unavailable");
     this.name = "PayPlusBillingNotConfiguredError";
   }
 }
@@ -42,19 +51,100 @@ export class PayPlusBillingNotConfiguredError extends Error {
 function creds() {
   const apiKey = process.env.PAYPLUS_API_KEY;
   const secretKey = process.env.PAYPLUS_SECRET_KEY;
-  if (!apiKey || !secretKey) throw new PayPlusBillingNotConfiguredError();
-  return { apiKey, secretKey };
+  // PayPlus rejects generateLink outright without a payment page uid:
+  //   405 not-authorize-missing-payment-page-uid
+  // There is no "default page" fallback — the uid identifies which of the merchant's configured
+  // payment pages to render, and it is required on every call.
+  const pageUid = process.env.PAYPLUS_PAGE_UID;
+  if (!apiKey || !secretKey || !pageUid) throw new PayPlusBillingNotConfiguredError();
+  return { apiKey, secretKey, pageUid };
 }
 
 /** Generates a hosted payment page that both charges the first period and stores a reusable
- * token for future recurring charges. more_info carries "<businessId>:<plan>:<cycle>" so the
- * webhook can attribute the resulting token to the right business/plan/billing cycle. */
+ * token for future charges.
+ *
+ * charge_method is 1 (a normal charge) with create_token — NOT 3.
+ *
+ * PayPlus's charge_method 3 is their own standing-order product: they hold the schedule and decide
+ * when to charge, and it needs the "recurring payment" permission enabled on the account. We don't
+ * want that. We want the card stored and a token handed back, so our own billing job decides when
+ * and how much — which is what makes loyalty discounts, plan switches and mid-cycle proration
+ * possible. `create_token` is a separate flag from charge_method and does exactly that.
+ *
+ * more_info is capped at 19 characters by PayPlus, which a cuid alone exceeds — so it carries a
+ * short random reference and the plan/cycle are parked on the business row for the webhook to read.
+ */
 export async function createSubscriptionCheckoutLink(businessId: string, plan: string, returnUrl: string, cycle: "monthly" | "annual" = "monthly"): Promise<string> {
   const amountIls = planPriceForCycle(plan, cycle);
-  const { apiKey, secretKey } = creds();
-
   const planLabel = plan === "premium" ? "Premium" : "Standard";
   const cycleLabel = cycle === "annual" ? "שנתי" : "חודשי";
+
+  return generateCheckoutPage({
+    businessId,
+    amountIls,
+    itemName: `תורי — מנוי ${planLabel} (${cycleLabel})`,
+    returnUrl,
+    pending: { checkoutPurpose: "subscription", checkoutPlan: plan, checkoutCycle: cycle },
+  });
+}
+
+/**
+ * Hosted page for a one-off wallet top-up.
+ *
+ * Exists because the wallet's charge-the-saved-token path only works for a business that HAS a
+ * saved token, and plenty don't: anyone activated before tokenisation was switched on, anyone
+ * activated by hand from the admin panel, and anyone whose checkout returned no token (the webhook
+ * activates them anyway — see its comment). For those owners "טען יתרה" simply answered "no active
+ * subscription", which is both untrue from where they sit and not something they can act on.
+ *
+ * The page stores a token too, so the *next* top-up is a one-click token charge.
+ */
+export async function createWalletTopupLink(businessId: string, amountIls: number, returnUrl: string): Promise<string> {
+  return generateCheckoutPage({
+    businessId,
+    amountIls,
+    itemName: `תורי — טעינת ארנק הודעות (₪${amountIls})`,
+    returnUrl,
+    pending: { checkoutPurpose: "wallet", checkoutAmountIls: amountIls },
+  });
+}
+
+/** Fields parked on the Business row for the webhook to read back — see the more_info note above. */
+interface PendingCheckout {
+  checkoutPurpose: "subscription" | "wallet";
+  checkoutPlan?: string;
+  checkoutCycle?: string;
+  checkoutAmountIls?: number;
+}
+
+async function generateCheckoutPage(params: {
+  businessId: string;
+  amountIls: number;
+  itemName: string;
+  returnUrl: string;
+  pending: PendingCheckout;
+}): Promise<string> {
+  const { businessId, amountIls, itemName, returnUrl } = params;
+  const { apiKey, secretKey, pageUid } = creds();
+
+  // 16 hex chars, comfortably inside the 19-character limit.
+  const checkoutRef = randomBytes(8).toString("hex");
+  const business = await prisma.business.update({
+    where: { id: businessId },
+    data: {
+      checkoutRef,
+      // Cleared explicitly so a stale field from an abandoned checkout of the other kind can't be
+      // picked up by the webhook alongside this one's ref.
+      checkoutPlan: null,
+      checkoutCycle: null,
+      checkoutAmountIls: null,
+      ...params.pending,
+    },
+    select: { name: true, email: true },
+  });
+
+  const webhookSecret = process.env.PAYPLUS_BILLING_WEBHOOK_SECRET?.trim();
+  const appUrl = (process.env.PUBLIC_BACKEND_URL ?? process.env.APP_URL ?? "").replace(/\/$/, "");
 
   const res = await fetch(`${BASE_URL}/PaymentPages/generateLink`, {
     method: "POST",
@@ -63,13 +153,24 @@ export async function createSubscriptionCheckoutLink(businessId: string, plan: s
       Authorization: JSON.stringify({ api_key: apiKey, secret_key: secretKey }),
     },
     body: JSON.stringify({
-      charge_method: 3, // charge now AND create a reusable token
+      payment_page_uid: pageUid,
+      charge_method: 1,
+      create_token: true,
       amount: amountIls,
       currency_code: "ILS",
       sendEmailApproval: true,
-      more_info: `${businessId}:${plan}:${cycle}`,
+      sendEmailFailure: false,
+      // Server-to-server notification. Without it the only signal a payment succeeded is the
+      // customer's browser landing on refURL_success — so anyone who closes the tab after paying
+      // is charged and never activated.
+      ...(appUrl && webhookSecret ? { refURL_callback: `${appUrl}/webhook/billing/payplus/${webhookSecret}` } : {}),
+      // PayPlus issues the receipt itself once "חשבונית+" is enabled on the account, which is why
+      // the customer object below is mandatory rather than nice-to-have.
+      initial_invoice: true,
+      customer: { customer_name: business.name, email: business.email },
+      more_info: checkoutRef,
       refURL_success: returnUrl,
-      items: [{ name: `תורי — מנוי ${planLabel} (${cycleLabel})`, quantity: 1, price: amountIls }],
+      items: [{ name: itemName, quantity: 1, price: amountIls }],
     }),
   });
 

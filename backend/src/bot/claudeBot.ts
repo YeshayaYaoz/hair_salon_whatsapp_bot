@@ -2,7 +2,7 @@ import { prisma } from "../lib/prisma.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { appendTurn, getHistory, type Turn } from "./conversationStore.js";
 import { findAvailableSlots, createAppointment, attachDepositPaymentLink, SlotUnavailableError, OutsideBusinessHoursError, type AvailableSlot } from "../booking/availability.js";
-import { getPaymentProvider } from "../lib/payments/index.js";
+import { depositCallbackUrl, getPaymentProvider } from "../lib/payments/index.js";
 import { parseBookingTime, parseDateString, dayOfWeekForDate, instantPartsInTz, zonedDateParts } from "../lib/timezone.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
 import { decryptSecret } from "../lib/crypto.js";
@@ -10,6 +10,7 @@ import { syncAppointmentToCalendar, deleteCalendarEvent } from "../lib/googleCal
 import { captureError } from "../lib/errorMonitoring.js";
 import { logClaudeUsage } from "../lib/usageLedger.js";
 import { notifyOwner } from "../lib/ownerNotify.js";
+import { toPublicUploadUrl } from "../lib/storage.js";
 import { getAiProvider, ProviderCallError, type GenericTool, type GenericTurn } from "./providers/index.js";
 
 // Which LLM backend actually answers a message is resolved per-business (Business.aiProvider) in
@@ -166,6 +167,9 @@ export interface BotResult {
   offeredSlots?: AvailableSlot[];
   /** Photos to send as separate WhatsApp image messages after the text reply. */
   photos?: { url: string; caption?: string }[];
+  /** True when this reply opened the conversation — nothing had been said before it. Lets the
+   * webhook dress the first message up (greeting button) without guessing. */
+  isFirstReply?: boolean;
 }
 
 /**
@@ -275,7 +279,7 @@ async function runTool(
       select: {
         timezone: true, name: true,
         depositEnabled: true, depositAmountIls: true, depositHoldMinutes: true,
-        paymentProvider: true, paymentApiKey: true, paymentApiSecret: true,
+        paymentProvider: true, paymentApiKey: true, paymentApiSecret: true, paymentPageUid: true, paymentWebhookSecret: true,
       },
     });
 
@@ -355,13 +359,18 @@ async function runTool(
         const creds =
           biz.paymentProvider === "tori_managed"
             ? { apiKey: "", apiSecret: "" }
-            : { apiKey: decryptSecret(biz.paymentApiKey!), apiSecret: decryptSecret(biz.paymentApiSecret!) };
+            : {
+                apiKey: decryptSecret(biz.paymentApiKey!),
+                apiSecret: decryptSecret(biz.paymentApiSecret!),
+                pageUid: biz.paymentPageUid ?? undefined,
+              };
         const link = await provider.createPaymentLink(creds, {
           amountIls: biz.depositAmountIls,
           description: `מקדמה לתור — ${service.name}, ${biz.name}`,
           customerName,
           customerPhone,
           referenceId: appointment.id,
+          callbackUrl: depositCallbackUrl(businessId, biz.paymentProvider!, biz.paymentWebhookSecret) ?? undefined,
         });
         await attachDepositPaymentLink(appointment.id, {
           provider: biz.paymentProvider!,
@@ -573,7 +582,12 @@ async function runTool(
     }
     // The images themselves are sent by the webhook layer after the text reply — the model only
     // needs to know they're on the way so it can write a one-line lead-in.
-    lastPhotos.value = service.imageUrls.map((url, i) => ({ url, caption: i === 0 ? service.name : undefined }));
+    lastPhotos.value = service.imageUrls.map((url, i) => ({
+      // WhatsApp fetches these from its own servers, so a URL pointing at the wrong host is a
+      // silent delivery failure rather than a visible error.
+      url: toPublicUploadUrl(url),
+      caption: i === 0 ? service.name : undefined,
+    }));
     return JSON.stringify({
       sent: true,
       count: service.imageUrls.length,
@@ -676,7 +690,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   // booking intent to the owner, so it gets a reduced tool set with no slot/booking tools.
   const biz = await prisma.business.findUniqueOrThrow({
     where: { id: businessId },
-    select: { bookingModel: true, aiProvider: true, aiModel: true, timezone: true },
+    select: { bookingModel: true, aiProvider: true, aiModel: true, timezone: true, aiTemperature: true },
   });
   const activeTools = biz.bookingModel === "inquiry" ? inquiryTools : tools;
   const provider = getAiProvider(biz.aiProvider);
@@ -699,7 +713,14 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   console.log(`[bot] provider=${provider.key} model=${model} business=${businessId} phone=${customerPhone} msg="${messageText.slice(0, 80)}"`);
 
   async function call(currentModel: string) {
-    const res = await provider.send({ model: currentModel, system, tools: activeTools, turns });
+    const res = await provider.send({
+      model: currentModel,
+      system,
+      tools: activeTools,
+      turns,
+      // null (the default) means "use the app default" — see DEFAULT_TEMPERATURE.
+      temperature: biz.aiTemperature ?? undefined,
+    });
     await recordUsage(businessId, customerPhone, provider.key, currentModel, res.usage);
     return res;
   }
@@ -828,5 +849,10 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     console.log(`[bot] escalated to ${model} for this turn (tool error recovery)`);
   }
 
-  return { text: replyText, offeredSlots: lastOfferedSlots.value, photos: lastPhotos.value };
+  return {
+    text: replyText,
+    offeredSlots: lastOfferedSlots.value,
+    photos: lastPhotos.value,
+    isFirstReply: history.length === 0,
+  };
 }

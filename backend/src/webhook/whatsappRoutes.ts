@@ -2,7 +2,7 @@ import { Router } from "express";
 import express from "express";
 import crypto from "crypto";
 import { resolveBusinessByPhoneNumberId } from "../tenants/resolve.js";
-import { sendWhatsAppMessage, sendWhatsAppList, sendWhatsAppImage, WhatsAppAuthError, type ListRow } from "./whatsappClient.js";
+import { sendWhatsAppMessage, sendWhatsAppList, sendWhatsAppImage, sendWhatsAppCtaUrl, sendWhatsAppButtons, WhatsAppAuthError, type ListRow } from "./whatsappClient.js";
 import { sendWhatsAppTokenExpiredEmail } from "../lib/email.js";
 import { handleIncomingMessage } from "../bot/claudeBot.js";
 import { clearHistory, appendTurn } from "../bot/conversationStore.js";
@@ -79,6 +79,11 @@ function extractMessage(message: any): ExtractedMessage {
     const body = (message.text?.body as string ?? "").trim();
     if (RESET_KEYWORDS.some((k) => body.toLowerCase() === k.toLowerCase())) return { kind: "reset" };
     return { kind: "text", text: body };
+  }
+  // A quick-reply tap. The title is exactly what the customer would have typed, so it enters the
+  // conversation as an ordinary message and the bot needs no special case for it.
+  if (message.type === "interactive" && message.interactive?.type === "button_reply") {
+    return { kind: "text", text: (message.interactive.button_reply?.title as string ?? "").trim() };
   }
   if (message.type === "interactive" && message.interactive?.type === "list_reply") {
     // The row id is the slot's ISO start time (see buildSlotRows); phrase it as a natural reply
@@ -226,6 +231,23 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
     accessToken = decryptSecret(business.whatsappAccessToken);
     businessRef = { id: business.id, name: business.name, email: business.email };
 
+    // Register anyone who writes in as a customer, before doing anything else with the message.
+    //
+    // Customer rows used to be created only by booking (availability.ts) and the waitlist, which
+    // silently excluded every inquiry-mode business: a B&B never books through the bot, so its
+    // Customers page stayed empty however many people had messaged, and the Conversations list
+    // showed phone numbers with no names attached. The dashboard's own empty state promises that
+    // "every customer who writes to the bot is saved here automatically" — this makes that true.
+    //
+    // Non-fatal: a failure here must not cost the customer their reply.
+    await prisma.customer
+      .upsert({
+        where: { businessId_phone: { businessId: business.id, phone: customerPhone } },
+        create: { businessId: business.id, phone: customerPhone },
+        update: {},
+      })
+      .catch((err) => console.error("[webhook] Failed to register customer:", err));
+
     // The owner's own number replying to a pending yield-management campaign proposal
     // (see yieldCampaignJob.ts) is handled here, before any of this routes to the customer bot.
     if (business.pendingYieldCampaign && business.notificationPhone && customerPhone === business.notificationPhone && extracted.kind === "text") {
@@ -321,7 +343,19 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
     // canned replies and interactive UI pieces.
     const lang: "he" | "en" = detectLang(textToProcess);
 
-    const { text: reply, offeredSlots, photos } = await handleIncomingMessage(business.id, customerPhone, textToProcess);
+    const { text: reply, offeredSlots, photos, isFirstReply } = await handleIncomingMessage(business.id, customerPhone, textToProcess);
+
+    // A greeting with a button turns the first thing a customer sees into something they can act
+    // on, instead of a wall of text with a URL they have to notice, select and paste. Only on the
+    // opening message: a button on every reply becomes furniture and stops being read.
+    const greetingButton =
+      isFirstReply && business.greetingButtonText && business.greetingButtonUrl
+        ? { text: business.greetingButtonText, url: business.greetingButtonUrl }
+        : null;
+    // WhatsApp allows one interactive type per message, so these two can't both be attached.
+    // Quick replies win: keeping the customer answering inside the chat is worth more than sending
+    // them to a website, and the website link is usually also in the greeting text.
+    const quickReplies = isFirstReply && business.quickReplies.length > 0 ? business.quickReplies : null;
 
     if (offeredSlots && offeredSlots.length > 0) {
       await sendWhatsAppList({
@@ -333,6 +367,31 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
         sectionTitle: lang === "he" ? "מועדים פנויים" : "Available times",
         rows: buildSlotRows(offeredSlots, lang),
       });
+    } else if (quickReplies) {
+      try {
+        await sendWhatsAppButtons({ phoneNumberId, accessToken, to: customerPhone, body: reply, buttons: quickReplies });
+      } catch (btnErr) {
+        console.error("[whatsapp] Quick replies failed, sending plain text instead:", btnErr);
+        captureError(btnErr, { businessId: business.id, customerPhone, kind: "quickReplies" });
+        await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: reply });
+      }
+    } else if (greetingButton) {
+      try {
+        await sendWhatsAppCtaUrl({
+          phoneNumberId,
+          accessToken,
+          to: customerPhone,
+          body: reply,
+          buttonText: greetingButton.text,
+          url: greetingButton.url,
+        });
+      } catch (ctaErr) {
+        // A malformed button URL, or a WABA that hasn't been approved for interactive messages,
+        // must not cost the customer their first reply — fall back to plain text.
+        console.error("[whatsapp] Greeting button failed, sending plain text instead:", ctaErr);
+        captureError(ctaErr, { businessId: business.id, customerPhone, kind: "greetingButton" });
+        await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: reply });
+      }
     } else {
       await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: reply });
     }

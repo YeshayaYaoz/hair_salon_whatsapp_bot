@@ -32,16 +32,45 @@ model Business {
   // salon's own merchant account for charging their customers, not this.
   subscriptionPlan          String? // "standard" | "premium"
   subscriptionToken         String? // encrypted at rest — PayPlus recurring charge token
+  // PayPlus caps more_info at 19 characters, which a cuid alone exceeds. The checkout link carries
+  // this short reference instead, and the webhook looks the business up by it. plan/cycle can't fit
+  // either, so they're parked here when the link is generated and read back on the callback.
+  checkoutRef               String?   @unique
+  checkoutPlan              String?
+  checkoutCycle             String?
+  // What the pending hosted-payment page is for: "subscription" (activate a plan) or "wallet"
+  // (credit the prepaid balance). Null on rows predating wallet checkouts, which were all
+  // subscriptions — the webhook treats null as "subscription" for exactly that reason.
+  checkoutPurpose           String?
+  // Amount the pending page was generated for, in whole shekels. Needed for wallet top-ups: the
+  // credit must come from what we asked for, never from an amount echoed back in the callback.
+  checkoutAmountIls         Int?
   nextBillingDate           DateTime?
   lastBillingAttemptAt      DateTime?
   billingCycle              String    @default("monthly") // "monthly" | "annual"
   billingCyclesCompleted    Int       @default(0) // successful charges — drives the loyalty discount
   loyaltyDiscountIls        Int       @default(0) // auto-applied recurring discount once tenure threshold is hit
   lastBillingReminderSentAt DateTime? // last "charge in 2 days" heads-up, to avoid duplicates
+  // Consecutive failed charges in the current dunning run. Reset to 0 on any success. Drives the
+  // retry schedule in subscriptionBillingJob — one declined card must not cut a paying business
+  // off the same night.
+  billingFailedAttempts     Int       @default(0)
+  // Set the moment a charge is claimed for this business, BEFORE the money moves. It is what stops
+  // a second run charging the same business again after a crash between PayPlus succeeding and our
+  // own update landing — see the claim query in subscriptionBillingJob.
+  billingClaimedAt          DateTime?
   walletBalanceAgorot       Int       @default(0) // prepaid balance in agorot (1/100 ILS) — funds metered add-ons once the plan's monthly message quota is exceeded
   messagesUsedThisCycle     Int       @default(0) // proactive WhatsApp sends (reminders/reviews/digests/etc.) counted against the plan quota this billing cycle; reset on each successful charge
+  // Highest AI-spend alert step (percent of the plan's inference budget) already emailed to the
+  // super admin, so a business parked above the threshold produces one mail and not one an hour.
+  // Cleared automatically when 30-day spend falls back under the step — see aiCostAlerts.ts.
+  aiCostAlertStepSent       Int       @default(0)
   pendingYieldCampaign      Json? // set when the empty-slot campaign is awaiting the owner's WhatsApp confirmation
   address                   String?
+  // Last profile picture uploaded through the dashboard, kept so the widget can show what is
+  // currently set instead of an empty camera icon on every page load. Meta stores the picture but
+  // exposes it only via a short-lived URL, so a copy of our own is what makes it displayable.
+  whatsappProfilePictureUrl String?
   whatsappPhoneNumberId     String?   @unique
   // Cartesia-provisioned phone number for the voice bot, one per salon — same 1:1 routing model as
   // whatsappPhoneNumberId: the number Cartesia's tool call reports as "called" identifies the salon.
@@ -97,7 +126,22 @@ model Business {
   // means "use that provider's built-in cheap/smart pair" (see bot/providers/index.ts).
   aiProvider                String    @default("anthropic")
   aiModel                   String?
+  // Sampling temperature for the bot's replies. Null = use the app default (0.2), which is low on
+  // purpose: high temperature is what produced invented Hebrew ("מבורך הבא" for "ברוך הבא"), since
+  // Hebrew is full of fixed collocations where any variation is simply wrong. Exposed per-business
+  // because some owners want a little more variety in small talk. Note that newer Anthropic models
+  // reject the parameter entirely — see anthropicProvider.
+  aiTemperature             Float?
   botGreeting               String? // custom greeting override
+  // Turns the first reply of a conversation into a WhatsApp interactive message with one tappable
+  // button. Both are needed for the button to appear; without them the greeting is sent as plain
+  // text exactly as before.
+  greetingButtonText        String? // max 20 chars — WhatsApp rejects longer
+  greetingButtonUrl         String?
+  // Up to 3 tappable replies on the opening message. Takes precedence over the URL button when
+  // both are set: WhatsApp allows one interactive type per message, and keeping the customer
+  // answering inside the chat beats sending them to a website.
+  quickReplies              String[]
   botPersonality            String? // tone/personality instructions for the bot
   googleMapsUrl             String? // linked in post-visit review requests
   remindersEnabled          Boolean   @default(true)
@@ -112,6 +156,11 @@ model Business {
   paymentProvider  String? // "payplus" | "tranzila" | "cardcom"
   paymentApiKey    String? // encrypted at rest — provider's key/terminal/username
   paymentApiSecret String? // encrypted at rest — provider's secret/password
+  // PayPlus only: the uid of the payment page to render. Not a secret (it identifies a page, not
+  // an account), and PayPlus rejects generateLink without it — 405
+  // not-authorize-missing-payment-page-uid — so a business enabling deposits cannot work until
+  // this is filled in. Other providers ignore it.
+  paymentPageUid   String?
   // Random per-business secret embedded in the payment webhook URL path (…/webhook/payments/
   // :provider/:businessId/:webhookSecret). Unlike businessId/appointmentId, this is never exposed
   // to the customer (only the payment LINK is; the webhook URL is configured once, server-side, in

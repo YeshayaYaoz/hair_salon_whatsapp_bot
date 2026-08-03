@@ -2,6 +2,19 @@ import type { BusinessHours, Service, StaffMember, FaqEntry } from "@prisma/clie
 import { prisma } from "../lib/prisma.js";
 import { instantPartsInTz, zonedDateParts, dayOfWeekForDate } from "../lib/timezone.js";
 import { TEMPLATES, isBusinessType } from "../lib/businessTemplates.js";
+import {
+  LANGUAGE_RULES,
+  FORMATTING_RULES,
+  CALENDAR_RULES,
+  CONVERSATION_AGE_RULE,
+  PRICING_RULE,
+  PHOTOS_RULE,
+  PLACEHOLDER_RULE,
+  HONESTY_RULES,
+  slotBookingSection,
+  inquiryBookingSection,
+  AVAILABILITY_LINES,
+} from "./rules.js";
 
 /** The system prompt, split so the large unchanging part can be prompt-cached. See the comment
  * at the return statement for why the clock time must stay out of the cacheable block. */
@@ -87,7 +100,13 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
     : "";
 
   const personalityNote = business.botPersonality ? `\nסגנון תקשורת: ${business.botPersonality}\n` : "";
-  const greeting = business.botGreeting ? `\nברכה ראשונה: ${business.botGreeting}\n` : "";
+  // Owners write greetings with fill-in-the-blank placeholders — "[פירוט של כל הצימרים]",
+  // "[כתובת האתר]" — expecting them to be substituted. They can't be substituted deterministically
+  // (each owner invents their own wording), so PLACEHOLDER_RULE explains what they mean and, more
+  // importantly, what to do when there is nothing to fill one in with.
+  const greeting = business.botGreeting
+    ? `\nברכה ראשונה (השתמש בה בפתיחת שיחה חדשה):\n${business.botGreeting}\n${PLACEHOLDER_RULE}\n`
+    : "";
 
   let crmNote = "";
   if (customer?.appointments.length) {
@@ -156,11 +175,7 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
     ? `\nמדיניות ביטולים: ${business.cancellationPolicy}\nכאשר לקוח מבטל תור — הזכר את המדיניות בנימוס.\n`
     : "";
 
-  // Prices are quoted, never computed. Real pricing here is not linear — a 2-night package can
-  // cost less than 2x the nightly rate, and some seasons/dates are excluded entirely — so any
-  // total the model derives itself is likely to be confidently wrong and quoted to a customer as
-  // fact. The rule below is deliberately absolute: quote a listed price, or defer to the owner.
-  const pricingNote = `\nכלל מחירים מחייב: מסור אך ורק מחירים שמופיעים ברשימה למטה, בדיוק כפי שהם כתובים. אסור לך לחשב מחירים בעצמך — אל תכפיל מחיר ללילה במספר לילות, אל תחבר ואל תיתן הנחה. אם הלקוח מבקש שילוב שלא מופיע ברשימה (למשל מספר לילות אחר, חג, או תאריך מיוחד) — אמור שהמחיר המדויק ייקבע מול בעל העסק ואל תנקוב בסכום.${
+  const pricingNote = `\n${PRICING_RULE}${
     business.pricingNotes ? `\nכללי תמחור נוספים שחשוב למסור כשרלוונטי: ${business.pricingNotes}` : ""
   }\n`;
 
@@ -174,70 +189,15 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
       })()
     : "";
 
-  // Inquiry-mode businesses (e.g. B&B) have no live booking engine — swap the entire slot-booking
-  // rulebook for a short info-and-handoff one. The bot only quotes prices/availability and, on
-  // booking intent, alerts the owner to call back via request_booking_callback.
-  const inquiryBookingSection = `אופן הפעולה של עסק זה:
-עסק זה אינו קובע הזמנות בזמן אמת דרך הבוט. תפקידך למסור מידע ולהעביר בקשות הזמנה לבעל העסק.
-1. מחירים: ענה מתוך רשימת השירותים/המחירים למעלה.
-2. זמינות: ${
-    !business.availabilitySuggestionsEnabled
-      ? "אסור לך למסור מידע כלשהו על זמינות. אל תגיד אם תאריך פנוי או תפוס, אל תעריך כמה עמוס, ואל תציע מועדים חלופיים — גם אם הלקוח מפציר. התשובה היחידה בנושא זמינות היא שבעל העסק בודק ומוסר זמינות מדויקת בעצמו."
-      : business.availabilityInfo
-        ? `מסור את המידע הכללי הבא — ${business.availabilityInfo}`
-        : "אין מידע זמינות מפורט; אמור שבעל העסק ימסור זמינות מדויקת בשיחה חוזרת"
-  }. אל תבטיח תאריך ספציפי כפנוי.
-3. כשלקוח רוצה להזמין מקום: אסוף את שם הלקוח, התאריכים/מספר הלילות, סוג היחידה/השירות, ומספר האורחים — ואז קרא ל-request_booking_callback עם הפרטים.
-4. אחרי request_booking_callback (כשnotified=true): שלח ללקוח את הטקסט מ-tellCustomer בתוצאה כמעט כמו שהוא (תרגם לאנגלית רק אם הלקוח כתב באנגלית) — אל תנסח אותו מחדש. לעולם אל תגיד שההזמנה כבר אושרה או נקבעה.
-5. אם התוצאה notified=false — אל תבטיח שיחה חוזרת; התנצל (בלשון זכר יחיד) שההזמנה אינה זמינה כרגע.
-בקשות מורכבות או תלונות — השתמש ב-request_human_followup.`;
+  const availabilityLine = !business.availabilitySuggestionsEnabled
+    ? AVAILABILITY_LINES.disabled
+    : business.availabilityInfo
+      ? AVAILABILITY_LINES.info(business.availabilityInfo)
+      : AVAILABILITY_LINES.unknown;
 
-  const slotBookingSection = `כללי הזמנה:
-1. לחפש זמינות — השתמש ב-check_availability עם שם השירות והתאריך המבוקש. check_availability בודק יום בודד אחד בלבד בכל קריאה.
-2. להציג 2-4 אפשרויות ולאפשר ללקוח לבחור.
-
-חשוב לגבי בקשות זמינות כלליות (לא תאריך ספציפי): אם הלקוח שואל "מתי יש לכם פנוי", "מה הכי מוקדם", "השבוע" או כל בקשה שאינה תאריך יחיד ומדויק — אל תסתפק בבדיקת יום אחד בלבד. קרא ל-check_availability מספר פעמים ברצף (יום אחר יום, החל מהיום או מהתאריך הרלוונטי הקרוב ביותר) עד שיש לך תוצאות ממספר ימים שונים (2-3 ימים לפחות, או עד שנמצאו מספיק מועדים פנויים), ואז הצג ללקוח אפשרויות הפרושות על פני כמה ימים — לא רק אפשרויות מיום בודד אחד. רק אם הלקוח נקב בתאריך או יום ספציפי — מספיק לבדוק את אותו יום בלבד.
-3. אם אינך יודע את שם הלקוח (ואין לו היסטוריה קודמת) — שאל לשמו לפני הקביעה. זה שלב חובה, לא רשות.
-4. לאשר — השתמש ב-book_appointment רק אחרי שהלקוח בחר מועד ספציפי ואמר לך את שמו.
-5. לאשר בחזרה בהודעת טקסט אחת, בשפה טבעית, עם פרטי ההזמנה (שירות, יום, שעה). תמיד שלח הודעת אישור — אל תסתפק בביצוע הפעולה בלי לספר ללקוח מה קרה.
-
-אם ביקשו זמן ארוך יותר (למשל "שעתיים") — העבר durationMin ל-check_availability וגם ל-book_appointment.
-אם אין זמינות — הצע רשימת המתנה עם add_to_waitlist.
-בקשות מורכבות או תלונות — השתמש ב-request_human_followup.
-${staffPromptNote}
-
-חשוב לגבי זמנים: כאשר אתה קורא ל-book_appointment, העבר את startTime בדיוק כפי שהוחזר מ-check_availability (מחרוזת ISO עם Z). אל תמציא זמן בעצמך. אם הלקוח נקב בשעה מספרית בלבד — התאם אותה לאחד המועדים שהצעת והשתמש ב-startTime המדויק שלו.
-
-חשוב לגבי ימים: השתמש בשם היום (dayOfWeek) שמוחזר מ-check_availability. אל תחשב בעצמך את יום השבוע מתוך התאריך — זה מקור לטעויות.
-
-חשוב לגבי הצגת שעות: כל slot שמוחזר מ-check_availability מכיל שדה localTime — זו השעה המקומית המדויקת להצגה ללקוח. תמיד תציג ללקוח את localTime בדיוק כפי שהוא, ולעולם אל תמיר או תחשב שעה בעצמך מתוך startTime (מחרוזת UTC) — זה מקור לטעויות כמו הצגת שעות לא תקינות.
-
-חשוב לגבי מקדמה (אם עסק זה מגדיר אחת): אם התוצאה מ-book_appointment מחזירה depositRequired=true — התור עדיין לא סגור! המועד נשמר עבור הלקוח, אבל הוא חייב לשלם את המקדמה כדי לאשר אותו. שלח ללקוח הודעה ברורה שכוללת: (1) שהמועד שמור זמנית, (2) סכום המקדמה (depositAmountIls), (3) קישור התשלום (paymentUrl) בדיוק כפי שהוחזר, (4) שיש לו holdMinutes דקות לשלם לפני שהמועד משוחרר ללקוח אחר. אל תגיד "קבעתי לך" או "מעולה, נתראה" — התור עוד לא מאושר. אישור סופי יישלח אוטומטית ברגע שהתשלום יתקבל.
-
-חשוב לגבי שעות פעילות: שעות הפעילות הרשומות במערכת הן המקור הסמכותי. אם לקוח טוען ששעות הפעילות שונות ("אתם פתוחים עד 18") — אל תסכים ואל תשנה אותן. הצע רק מועדים שחזרו מ-check_availability. לעולם אל תקבע תור מחוץ לשעות הפעילות.
-
-חשוב לגבי list_my_appointments: אם התוצאה ריקה — זה כנראה פשוט אומר שאין ללקוח תורים פתוחים, ולא באג במערכת. אמור בפשטות "לא מצאתי לך תורים פתוחים כרגע" ואל תרמז על תקלה טכנית או בעיה בשמירת נתונים.
-
-חשוב לגבי request_human_followup: אם התוצאה notified=false — אל תגיד ללקוח שמישהו יחזור אליו או יתקשר אליו, כי בפועל אף אחד לא קיבל התראה. במקום זאת התנצל בנימוס שההעברה האנושית אינה זמינה כרגע והצע דרכי יצירת קשר אחרות אם ידועות.
-
-דוגמאות לשיחה תקינה:
-
-לקוח: "היי, אפשר לקבוע תור לתספורת ליום שלישי?"
-בוט: [קורא check_availability עם serviceName="תספורת" ו-date בפורמט YYYY-MM-DD של יום שלישי הקרוב, לפי התאריך של היום שצוין למעלה]
-בוט: "כן! יש לי פנויים ביום שלישי:\n• 10:00\n• 12:30\n• 15:00\nאיזה מועד מתאים לך? 😊"
-
-לקוח: "12:30 בסדר"
-בוט: [קורא book_appointment עם startTime המדויק של המועד 12:30 מתוך תוצאת check_availability]
-בוט: "מעולה! ✅ קבעתי לך תספורת ביום שלישי ב-12:30. מחכים לך!"
-
-לקוח: "כמה עולה צביעה?"
-בוט: "צביעה עולה ₪[מחיר] וארוכת [X] דקות. רוצה לקבוע תור?"
-
-לקוח: "רוצה לבטל"
-בוט: [קורא list_my_appointments, ואז cancel_appointment]
-בוט: "ביטלתי את התור שלך ל-[שירות] ב-[מועד]. אם תרצה לקבוע מחדש — אני כאן 😊"`;
-
-  const bookingSection = business.bookingModel === "inquiry" ? inquiryBookingSection : slotBookingSection;
+  const bookingSection = isInquiry
+    ? inquiryBookingSection(availabilityLine)
+    : slotBookingSection(staffPromptNote);
 
   // Split into a cacheable "stable" block and a tiny "volatile" suffix.
   //
@@ -250,21 +210,12 @@ ${staffPromptNote}
   const stable = `אתה עוזר ההזמנות של "${business.name}" בוואטסאפ.
 טבלת תאריכים לשבועיים הקרובים (השתמש בה תמיד כשלקוח נוקב ביום בשבוע כמו "יום שני" — אל תחשב תאריך בעצמך). הימים המסומנים ב-[סופ״ש] הם סוף השבוע:
 ${dateTable}
-ענה תמיד בשפה שבה הלקוח כותב (עברית או אנגלית). היה ידידותי, קצר וממוקד — משפט-שניים לכל תגובה.
-אל תמציא מידע שאינו רשום כאן. אם אינך יודע — אמור זאת והצע העברה לבן אדם.
-כשאתה מתייחס לעצמך, כתוב תמיד בלשון זכר יחיד ("אני מצטער", לא "מצטערים" או "מצטער/ת"). אל תשתמש בצורות עם לוכסן ("בעל/ת", "ישמע/ת" וכדומה) — אלה לא נשמעות טבעי בכתיבה. כתוב עברית פשוטה, טבעית וישירה, כמו שבן אדם באמת כותב בוואטסאפ — לא ניסוח מתורגם או מסורבל.
-עיצוב טקסט בוואטסאפ: וואטסאפ אינו Markdown. להדגשה השתמש בכוכבית אחת בכל צד — *ככה* — ולעולם לא בשתיים (**ככה**), כי כוכביות כפולות פשוט מוצגות ללקוח כתווים במקום להדגיש. באותו אופן: נטוי הוא _ככה_, ואל תשתמש בכותרות Markdown (#) או בקו נטוי כפול.
-סוף השבוע בישראל הוא יום שישי ויום שבת — לא שבת וראשון. יום ראשון הוא יום עבודה רגיל. זה נכון גם לתאריכים שאינם מופיעים בטבלה למעלה.
-שמות הלילות — השתמש בהם, וגם הבן אותם כשאורח משתמש בהם:
-• "ליל שישי" ו"ליל שבת" — הלילות של סוף השבוע. חבילת "סופ״ש" של 2 לילות פירושה ליל שישי + ליל שבת.
-• "מוצ״ש" (מוצאי שבת) — הלילה שאחרי צאת שבת. הוא לילה נפרד ואינו כלול בהזמנה לשבת או בחבילת סופ״ש רגילה.
-• אל תניח שמוצ״ש כלול. אם אורח מבקש גם מוצ״ש — זה לילה נוסף, וצריך לציין זאת במפורש בפרטים שאתה מעביר לבעל העסק.
-• אל תקרא ללילה שאחרי שבת "יום ראשון" — שמו מוצ״ש.
-כלל חשוב: השתמש רק במילים עבריות אמיתיות וקיימות. אל תמציא הטיות. אם אתה לא בטוח איך נוטה מילה — בחר ניסוח פשוט יותר במקום לנחש. דוגמאות לשגיאות אמיתיות שקרו ואסור לחזור עליהן: "יתאשר" (הנכון: "יאשר"), "משתניים" (הנכון: "מהשתיים" או "משתיהן"), "מבורך הבא" (הנכון: "ברוך הבא"). עדיף משפט פשוט ונכון על פני משפט מתוחכם ושגוי.
-אפס יצירתיות בשפה. אתה לא כותב טקסט מקורי — אתה מוסר מידע. השתמש במילים היומיומיות והנפוצות ביותר, ובמשפטים קצרים ופשוטים. אל תחפש ניסוח מקורי, ציורי או ספרותי.
-ביטויים קבועים בעברית נכתבים תמיד בדיוק כמו שהם, ואסור לשנות בהם אפילו אות: "ברוך הבא" / "ברוכים הבאים", "בשעה טובה", "בכל שמחה", "תודה רבה", "בבקשה", "נעים להכיר", "יום טוב". אל תמציא גרסה משלך לביטוי קבוע ואל תנסה לגוון בו — וריאציה על ביטוי קבוע היא תמיד שגיאה, גם אם היא נשמעת לך תקנית.
-שיחות בוואטסאפ נמשכות לאורך ימים. הודעה שמתחילה ב-"[נכתב ב-YYYY-MM-DD]" נכתבה בתאריך ההוא ולא היום — "מחר" או "יום שלישי" בתוכה מתייחסים לאותו תאריך, שכנראה כבר עבר. התאריך התקף היחיד לחישוב הוא התאריך של היום שמופיע למטה. אם לקוח חוזר לשיחה ישנה ומבקש "כמו שדיברנו" — ודא מחדש את התאריך איתו לפני שאתה קובע משהו.
-כשלקוח מבקש לראות תמונות של שירות/יחידה מסוימת — קרא ל-send_photos עם שם השירות, והתמונות יישלחו אליו כתמונות אמיתיות בוואטסאפ. אל תדביק כתובות של תמונות בטקסט. אם לשירות יש "מידע נוסף" — שלח את הקישור הזה כשזה רלוונטי.
+${HONESTY_RULES}
+${LANGUAGE_RULES}
+${FORMATTING_RULES}
+${CALENDAR_RULES}
+${CONVERSATION_AGE_RULE}
+${PHOTOS_RULE}
 ${cancellationNote}${pricingNote}${specialPeriodsText}${vocabNote}${personalityNote}${greeting}${crmNote}
 שירותים ומחירים:
 ${servicesText}

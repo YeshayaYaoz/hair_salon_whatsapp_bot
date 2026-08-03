@@ -21,6 +21,8 @@ export interface HealthSnapshot {
   brokenWhatsapp: string[]; // names of businesses whose token is invalid
   missingNotificationPhone: string[];
   botDisabled: string[];
+  /** Active paid subscriptions with no saved card — these are silently never billed. */
+  unbillable: string[];
   staleJobs: string[]; // jobs that errored, or haven't run in over a day
 }
 
@@ -37,6 +39,8 @@ export async function collectHealthSnapshot(): Promise<HealthSnapshot> {
         whatsappTokenValid: true,
         notificationPhone: true,
         botEnabled: true,
+        subscriptionPlan: true,
+        subscriptionToken: true,
       },
     }),
     prisma.appointment.count({ where: { createdAt: { gte: since } } }),
@@ -68,6 +72,12 @@ export async function collectHealthSnapshot(): Promise<HealthSnapshot> {
     brokenWhatsapp: live.filter((b) => b.whatsappAccessToken && !b.whatsappTokenValid).map((b) => b.name),
     missingNotificationPhone: live.filter((b) => !b.notificationPhone?.trim()).map((b) => b.name),
     botDisabled: live.filter((b) => !b.botEnabled).map((b) => b.name),
+    // The billing job requires a token (see its query), so a business without one is skipped every
+    // night with no log line and no alert — an active paid plan that is quietly never charged.
+    // Nothing else in the system notices, which is why it belongs here.
+    unbillable: businesses
+      .filter((b) => b.subscriptionStatus === "active" && b.subscriptionPlan && !b.subscriptionToken && !b.blockedAt)
+      .map((b) => b.name),
     staleJobs,
   };
 }
@@ -77,7 +87,7 @@ function renderHtml(s: HealthSnapshot): string {
     items.length === 0 ? "<span style='color:#16a34a'>none ✓</span>" : items.map((i) => `<code>${i}</code>`).join(", ");
 
   const issues =
-    s.brokenWhatsapp.length + s.missingNotificationPhone.length + s.botDisabled.length + s.staleJobs.length;
+    s.brokenWhatsapp.length + s.missingNotificationPhone.length + s.botDisabled.length + s.staleJobs.length + s.unbillable.length;
 
   return `
     <h2>Tori — daily health</h2>
@@ -96,6 +106,7 @@ function renderHtml(s: HealthSnapshot): string {
       <li>No owner notification phone: ${list(s.missingNotificationPhone)}</li>
       <li>Bot switched off: ${list(s.botDisabled)}</li>
       <li>Jobs with no success in 24h: ${list(s.staleJobs)}</li>
+      <li>Active plan but <strong>no saved card — never billed</strong>: ${list(s.unbillable)}</li>
     </ul>
   `;
 }
@@ -108,7 +119,8 @@ export async function runHealthDigestJob() {
     snapshot.brokenWhatsapp.length +
     snapshot.missingNotificationPhone.length +
     snapshot.botDisabled.length +
-    snapshot.staleJobs.length;
+    snapshot.staleJobs.length +
+    snapshot.unbillable.length;
   await sendAdminAlertEmail(
     `Tori health — ${snapshot.appointmentsLast24h} bookings, ${issues} issue(s)`,
     renderHtml(snapshot)

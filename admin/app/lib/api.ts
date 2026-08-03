@@ -43,6 +43,22 @@ export function exitImpersonation(): boolean {
   return true;
 }
 
+/**
+ * Navigates after the signed-in identity has changed, with a full page load.
+ *
+ * Swapping the token is only half of switching accounts: router.push() is a client-side
+ * navigation, so every provider, every piece of component state and every list already fetched
+ * with the previous token survives it. The admin would land on the dashboard still looking at the
+ * previous business's services, customers and language settings — data belonging to someone else,
+ * which is worse than a stale screen.
+ *
+ * A real page load is the only way to guarantee nothing carries over. It costs a second, and this
+ * happens rarely; correctness wins outright.
+ */
+export function reloadAs(path: string): void {
+  window.location.href = path;
+}
+
 // The backend mostly returns terse English strings for infra/auth-level errors (session expired,
 // not found, unauthorized) — the ones customers never see but business owners using this dashboard
 // do. Translate the common ones so an owner reading Hebrew doesn't hit a raw English string; any
@@ -124,6 +140,43 @@ export function friendlyError(raw: string): string {
   const known = ERROR_TRANSLATIONS[raw];
   if (known) return known[currentLang()];
   return raw;
+}
+
+/**
+ * Uploads files as multipart/form-data.
+ *
+ * Separate from apiFetch because that one always sets Content-Type: application/json. For a
+ * FormData body the browser has to set the header itself — it has to append the multipart boundary
+ * — and overriding it produces a request the server cannot parse.
+ */
+export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+  const token = getToken();
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method: "POST",
+      body: formData,
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    });
+  } catch {
+    throw new Error(
+      currentLang() === "he"
+        ? "בעיית חיבור לרשת — בדוק את החיבור לאינטרנט ונסה שוב."
+        : "Network error — check your connection and try again."
+    );
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const raw = typeof data.error === "string" ? data.error : extractZodMessage(data.error);
+    throw new Error(
+      raw
+        ? friendlyError(raw)
+        : currentLang() === "he"
+          ? `העלאת התמונות נכשלה (${res.status})`
+          : `Upload failed (${res.status})`
+    );
+  }
+  return data as T;
 }
 
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {

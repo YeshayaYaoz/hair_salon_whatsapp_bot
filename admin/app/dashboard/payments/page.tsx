@@ -23,6 +23,24 @@ interface ProviderMeta {
   instructionsUrl?: string;
 }
 
+/**
+ * Where the Webhook/Notify field actually lives inside each provider's dashboard.
+ *
+ * Separate from `instructions` above, which covers getting API keys. Salons were being handed a
+ * URL and told to "paste it into your provider's Webhook settings" with no idea where that is —
+ * and skipping it fails silently: everything looks connected right up until a customer pays a
+ * deposit and the appointment is never confirmed.
+ *
+ * Only filled in for providers whose dashboard has actually been walked through. A guessed menu
+ * path is worse than none — it sends the owner hunting in the wrong place.
+ */
+const WEBHOOK_LOCATION: Partial<Record<PaymentProviderName, { he: string; en: string }>> = {
+  payplus: {
+    he: 'בחשבון PayPlus: הגדרות דף הסליקה ← "החזרת המידע לאחר ביצוע עסקה" ← פתחו את "הגדרות תשובה חזרה" ← הדביקו בשדה ה-CallBack ושמרו.',
+    en: 'In PayPlus: payment page settings → "Return info after transaction" → expand "Callback settings" → paste into the CallBack field and save.',
+  },
+};
+
 const PAYMENT_META: Record<PaymentProviderName, ProviderMeta> = {
   payplus: {
     label: "PayPlus",
@@ -155,27 +173,36 @@ function ProviderCard<T extends string>({
   onSelect: (v: T) => void;
   connected: boolean;
   connectedProvider?: string | null;
-  onConnect: (apiKey: string, apiSecret: string) => Promise<void>;
+  onConnect: (apiKey: string, apiSecret: string, pageUid?: string) => Promise<void>;
   onDisconnect: () => Promise<void>;
   needsCredentials: boolean;
   requirementNote?: string;
 }) {
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
+  // PayPlus-only. Not a secret — it names one of the merchant's configured payment pages — but
+  // PayPlus refuses every charge without it, so connecting without it produces a provider that
+  // looks connected and fails on the first real payment.
+  const [pageUid, setPageUid] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
+  // Collapsed once connected. A finished setup is not something the owner needs to look at again,
+  // and leaving the credential form open invites re-entering keys that are already working — or
+  // worse, letting a password manager autofill over them.
+  const [expanded, setExpanded] = useState(false);
 
   const info = meta[selected];
+  const showBody = !connected || expanded;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError(null);
     try {
-      await onConnect(apiKey, apiSecret);
-      setApiKey(""); setApiSecret("");
+      await onConnect(apiKey, apiSecret, pageUid || undefined);
+      setApiKey(""); setApiSecret(""); setPageUid("");
       setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to connect");
@@ -194,8 +221,41 @@ function ProviderCard<T extends string>({
         </div>
         <ConnectedPill connected={connected} he={he} />
         {saved && <SavedBadge text={he ? "נשמר" : "Saved"} />}
+        {connected && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="text-xs font-medium text-gray-500 hover:text-gray-700 transition shrink-0"
+            aria-expanded={expanded}
+          >
+            {expanded ? (he ? "סגירה" : "Close") : (he ? "שינוי" : "Change")}
+          </button>
+        )}
       </div>
 
+      {!showBody && (
+        <div className="px-5 py-3.5 flex items-center gap-3 flex-wrap">
+          <p className="text-xs text-gray-600 flex-1 min-w-0">
+            {he
+              ? `מחובר ל-${info.label}. אין צורך לעשות כלום — לחצו „שינוי” כדי להחליף ספק או מפתחות.`
+              : `Connected to ${info.label}. Nothing to do here — use "Change" to switch provider or keys.`}
+          </p>
+          <button
+            type="button"
+            disabled={disconnecting}
+            onClick={async () => {
+              if (!confirm(he ? "לנתק?" : "Disconnect?")) return;
+              setDisconnecting(true);
+              try { await onDisconnect(); setSaved(false); } finally { setDisconnecting(false); }
+            }}
+            className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50 transition shrink-0"
+          >
+            {he ? "נתק" : "Disconnect"}
+          </button>
+        </div>
+      )}
+
+      {showBody && (
       <div className="p-5">
         {/* Provider tabs */}
         <div className="flex flex-wrap gap-2 mb-4">
@@ -244,13 +304,37 @@ function ProviderCard<T extends string>({
             <div className="grid sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">API Key</label>
-                <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="API Key" required className="w-full" dir="ltr" />
+                <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="API Key" required className="w-full" dir="ltr" autoComplete="off" name="provider-api-key" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">API Secret</label>
-                <input value={apiSecret} onChange={(e) => setApiSecret(e.target.value)} placeholder="API Secret" required className="w-full" dir="ltr" type="password" />
+                <input value={apiSecret} onChange={(e) => setApiSecret(e.target.value)} placeholder="API Secret" required className="w-full" dir="ltr" type="password" autoComplete="new-password" name="provider-api-secret" />
               </div>
             </div>
+            {selected === "payplus" && (
+              <div>
+                <label htmlFor="payplus-page-uid" className="block text-xs font-medium text-gray-600 mb-1.5">
+                  Payment Page UID
+                </label>
+                <input
+                  id="payplus-page-uid"
+                  value={pageUid}
+                  onChange={(e) => setPageUid(e.target.value)}
+                  placeholder="00000000-0000-0000-0000-000000000000"
+                  required
+                  className="w-full"
+                  dir="ltr"
+                  // Browsers happily autofill an email address into this box, and PayPlus then
+                  // rejects every charge with a 405 while the dashboard shows "connected".
+                  autoComplete="off"
+                  name="payplus-page-uid"
+                />
+                <p className="text-xs text-gray-600 mt-1.5">
+                  מזהה דף התשלום שלכם ב-PayPlus. נמצא בממשק PayPlus תחת „דפי תשלום”. בלעדיו PayPlus
+                  דוחה כל בקשת תשלום.
+                </p>
+              </div>
+            )}
             {error && <p className="text-red-600 text-xs">{error}</p>}
             <div className="flex items-center gap-3 mt-1">
               <button
@@ -306,6 +390,7 @@ function ProviderCard<T extends string>({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
@@ -376,10 +461,10 @@ export default function PaymentsPage() {
           connected={Boolean(me?.paymentConnected) && me?.paymentProvider !== "tori_managed"}
           connectedProvider={me?.paymentProvider}
           needsCredentials
-          onConnect={async (apiKey, apiSecret) => {
+          onConnect={async (apiKey, apiSecret, pageUid) => {
             await apiFetch("/api/business/me/payment-provider", {
               method: "PUT",
-              body: JSON.stringify({ provider: paymentProvider, apiKey, apiSecret }),
+              body: JSON.stringify({ provider: paymentProvider, apiKey, apiSecret, pageUid }),
             });
             await load();
           }}
@@ -442,9 +527,18 @@ export default function PaymentsPage() {
               : `So deposit-appointments get confirmed automatically and receipts get issued on a successful payment, paste this into ${PAYMENT_META[me.paymentProvider as PaymentProviderName].label}'s Webhook/Notify settings. The URL includes a secret key — don't share it.`}
           </p>
           {me.paymentWebhookSecret ? (
-            <code className="block text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-600 break-all" dir="ltr">
-              {`${API_URL}/webhook/payments/${me.paymentProvider}/${me.id}/${me.paymentWebhookSecret}`}
-            </code>
+            <>
+              <code className="block text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-600 break-all" dir="ltr">
+                {`${API_URL}/webhook/payments/${me.paymentProvider}/${me.id}/${me.paymentWebhookSecret}`}
+              </code>
+              {WEBHOOK_LOCATION[me.paymentProvider as PaymentProviderName] && (
+                <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                  {he
+                    ? WEBHOOK_LOCATION[me.paymentProvider as PaymentProviderName]!.he
+                    : WEBHOOK_LOCATION[me.paymentProvider as PaymentProviderName]!.en}
+                </p>
+              )}
+            </>
           ) : (
             <p className="text-xs text-amber-600">
               {he

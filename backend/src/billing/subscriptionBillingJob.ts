@@ -29,6 +29,46 @@ async function notifyOwner(business: {
   }
 }
 
+/**
+ * Days to wait before retrying after each consecutive failed charge.
+ *
+ * A single decline used to flip the business straight to past_due, which blocks the bot that same
+ * night — so a card with a temporary hold on it cost a paying salon their booking line. These are
+ * the gaps between attempts: first failure retries two days later, second another two, and only a
+ * third failure gives up. Every entry must be at least a day, or the claim guard below (which
+ * allows one attempt per business per day) would silently swallow the retry.
+ */
+const RETRY_AFTER_DAYS = [2, 2];
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Midnight boundary used by the claim guard — one charge attempt per business per calendar day. */
+function startOfDay(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
+/**
+ * Claims a business for charging, atomically, before any money moves.
+ *
+ * Without this, `nextBillingDate` only advanced after a successful charge — so if the process died
+ * between PayPlus taking the money and our update landing, the next run charged the same business
+ * again. Railway redeploys make that a real scenario, not a thought experiment, and a double charge
+ * is the single worst bug this file could have.
+ *
+ * The conditional updateMany is the lock: only one caller can transition a row whose
+ * billingClaimedAt is null or older than today, so a concurrent run (or a restarted one) sees zero
+ * rows affected and skips. Returns false when the claim was lost.
+ */
+async function claimForCharging(businessId: string, now: Date): Promise<boolean> {
+  const { count } = await prisma.business.updateMany({
+    where: {
+      id: businessId,
+      OR: [{ billingClaimedAt: null }, { billingClaimedAt: { lt: startOfDay(now) } }],
+    },
+    data: { billingClaimedAt: now },
+  });
+  return count === 1;
+}
+
 /** Nightly job: charges every business whose PayPlus subscription token is due today. Runs
  * alongside the other daily jobs (reminders/reviews/digest/retention) via runTrackedJob. */
 export async function runSubscriptionBillingJob(): Promise<void> {
@@ -43,11 +83,18 @@ export async function runSubscriptionBillingJob(): Promise<void> {
     select: {
       id: true, name: true, subscriptionToken: true, subscriptionPlan: true, billingCycle: true,
       billingCyclesCompleted: true, loyaltyDiscountIls: true, paymentProvider: true, invoiceProvider: true,
+      billingFailedAttempts: true,
       notificationPhone: true, whatsappPhoneNumberId: true, whatsappAccessToken: true,
     },
   });
 
   for (const business of due) {
+    // Claimed before the charge, never after — see claimForCharging.
+    if (!(await claimForCharging(business.id, now))) {
+      console.warn(`[subscriptionBilling] ${business.id} already claimed today — skipping to avoid a double charge`);
+      continue;
+    }
+
     const basePrice = PLAN_PRICES_ILS[business.subscriptionPlan!];
     if (!basePrice) {
       console.error(`[subscriptionBilling] Unknown plan "${business.subscriptionPlan}" for business ${business.id} — skipping`);
@@ -80,6 +127,7 @@ export async function runSubscriptionBillingJob(): Promise<void> {
           nextBillingDate: new Date(now.getTime() + periodDays * 24 * 60 * 60 * 1000),
           lastBillingAttemptAt: now,
           billingCyclesCompleted: cyclesCompleted,
+          billingFailedAttempts: 0, // paid — any dunning run in progress is over
           messagesUsedThisCycle: 0, // new cycle paid for — reset the plan's message quota
           ...(justEarnedDiscount ? { loyaltyDiscountIls: LOYALTY_DISCOUNT_ILS } : {}),
         },
@@ -93,22 +141,44 @@ export async function runSubscriptionBillingJob(): Promise<void> {
         );
       }
     } else {
-      // One failed charge doesn't cancel the account outright — mark past_due so
-      // requireActiveSubscription blocks access until the owner updates their payment method.
+      // Dunning: retry over several days before pulling access. Only the final failure sets
+      // past_due (which is what requireActiveSubscription blocks on), so a card with a temporary
+      // hold no longer takes a paying salon's bot offline the same night.
+      const attempts = business.billingFailedAttempts + 1;
+      const retryInDays = RETRY_AFTER_DAYS[attempts - 1];
+      const givingUp = retryInDays === undefined;
+
       await prisma.business.update({
         where: { id: business.id },
-        data: { subscriptionStatus: "past_due", lastBillingAttemptAt: now },
+        data: {
+          billingFailedAttempts: attempts,
+          lastBillingAttemptAt: now,
+          ...(givingUp
+            ? { subscriptionStatus: "past_due" }
+            : // Re-armed for the retry day. Left as-is on the final failure: past_due is terminal
+              // until the owner acts, and a due date in the past would keep re-charging them.
+              { nextBillingDate: new Date(now.getTime() + retryInDays * DAY_MS) }),
+        },
       });
-      console.error(`[subscriptionBilling] Charge failed for ${business.id} (${business.name}): ${result.error}`);
+      console.error(
+        `[subscriptionBilling] Charge failed for ${business.id} (${business.name}), attempt ${attempts}: ${result.error}` +
+          (givingUp ? " — giving up, marked past_due" : ` — retrying in ${retryInDays} days`)
+      );
 
       await notifyOwner(
         business,
-        `⚠️ החיוב החודשי עבור תורי (₪${amountIls}) נכשל. כדי למנוע עצירת הבוט, אנא עדכן/י את אמצעי התשלום בדשבורד: ${FRONTEND_URL}/dashboard/billing`
+        givingUp
+          ? `⚠️ החיוב עבור תורי (₪${amountIls}) נכשל שוב והבוט נעצר. כדי להפעיל מחדש, עדכנו אמצעי תשלום: ${FRONTEND_URL}/dashboard/billing`
+          : `⚠️ החיוב עבור תורי (₪${amountIls}) לא עבר. הבוט ממשיך לעבוד כרגיל — ננסה שוב בעוד ${retryInDays} ימים. אם תרצו, אפשר לעדכן אמצעי תשלום כבר עכשיו: ${FRONTEND_URL}/dashboard/billing`
       );
-      sendAdminAlertEmail(
-        `⚠️ חיוב נכשל — ${business.name}`,
-        `<h2 style="color:#fff;margin-bottom:8px;">${business.name} עבר ל-past_due</h2><p style="color:#a1a1aa;">חיוב של ₪${amountIls} נכשל: ${result.error}</p>`
-      ).catch((err) => console.error("[subscriptionBilling] Churn-risk admin alert failed:", err));
+      // Only worth waking the operator when the account has actually stopped. The intermediate
+      // retries are routine and would just train us to ignore the alert.
+      if (givingUp) {
+        sendAdminAlertEmail(
+          `⚠️ חיוב נכשל — ${business.name}`,
+          `<h2 style="color:#fff;margin-bottom:8px;">${business.name} עבר ל-past_due</h2><p style="color:#a1a1aa;">חיוב של ₪${amountIls} נכשל ${attempts} פעמים. השגיאה האחרונה: ${result.error}</p>`
+        ).catch((err) => console.error("[subscriptionBilling] Churn-risk admin alert failed:", err));
+      }
     }
   }
 }

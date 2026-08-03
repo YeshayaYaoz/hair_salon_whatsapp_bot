@@ -19,11 +19,19 @@ import { runMetricSnapshotJob } from "./billing/metricSnapshotJob.js";
 import { runWhatsAppHealthJob } from "./lib/whatsappHealthJob.js";
 import { runTrackedJob } from "./lib/jobStatus.js";
 import { runHealthDigestJob } from "./lib/healthDigest.js";
+import { runAiCostAlertJob } from "./lib/aiCostAlerts.js";
 import { leadFinderRouter } from "./leadfinder/routes.js";
 import { voiceRouter } from "./api/voiceRoutes.js";
+import { UPLOADS_ROUTE, UPLOADS_ROOT, UnsupportedImageError, MAX_UPLOAD_BYTES, checkUploadsDir } from "./lib/storage.js";
+import multer from "multer";
 
 validateEnv(); // exits the process before anything binds to a port if required config is missing
 initErrorMonitoring();
+// Non-blocking: a misconfigured uploads dir breaks photos, not the whole app, so it reports and
+// lets everything else start rather than taking the bot down with it.
+// Deferred until the port is bound: the check calls this server's own /health from the outside, so
+// running it before listen() would always fail against itself.
+setTimeout(() => void checkUploadsDir(), 3000);
 
 // Surface crashes that slip past every try/catch instead of dying silently in a Railway log.
 process.on("uncaughtException", (err) => {
@@ -56,6 +64,24 @@ app.use(express.urlencoded({ extended: true })); // Tranzila's notify webhook po
 app.use("/webhook/payments", paymentWebhookRouter);
 app.use("/webhook/billing/payplus", payplusBillingWebhookRouter);
 
+// Owner-uploaded unit photos. Served straight off the Railway volume: WhatsApp fetches these URLs
+// itself when the bot sends an image, so they have to be publicly readable with no auth. The
+// filenames are random, and nothing sensitive is ever stored here — only photos the owner intends
+// customers to see. immutable caching is safe because a file is never rewritten, only replaced
+// under a new random name.
+app.use(
+  UPLOADS_ROUTE,
+  express.static(UPLOADS_ROOT, {
+    maxAge: "365d",
+    immutable: true,
+    index: false,
+    dotfiles: "deny",
+    // Without this, a request for a path that isn't a file falls through to the API routers below
+    // and answers with a JSON 404 that looks like an API error.
+    fallthrough: false,
+  })
+);
+
 app.use("/api/auth", authRouter);
 app.use("/api/public", publicRouter);
 app.use("/api/business", businessRouter);
@@ -69,6 +95,21 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 // individual routes already handle their own errors, this just ensures nothing falls through
 // to Express's default (unmonitored) error page.
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  // Upload failures are the owner's problem to fix, not ours to swallow as a 500: an oversized
+  // photo or an unsupported file needs to come back as something they can act on.
+  if (err instanceof UnsupportedImageError) {
+    return res.status(400).json({ error: err.message });
+  }
+  if (err instanceof multer.MulterError) {
+    const message =
+      err.code === "LIMIT_FILE_SIZE"
+        ? `הקובץ גדול מדי. הגודל המרבי הוא ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB לתמונה.`
+        : err.code === "LIMIT_FILE_COUNT"
+          ? "אפשר להעלות עד 10 תמונות בבת אחת."
+          : "העלאת הקובץ נכשלה. נסו שוב.";
+    return res.status(400).json({ error: message });
+  }
+
   console.error("[express] Unhandled route error:", err);
   captureError(err, { kind: "expressErrorHandler" });
   if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
@@ -86,10 +127,8 @@ function scheduleRetentionJob() {
   const delay = next.getTime() - now.getTime();
   setTimeout(() => {
     runTrackedJob("retention", runRetentionJob);
-    runTrackedJob("subscriptionBilling", runSubscriptionBillingJob);
     setInterval(() => {
       runTrackedJob("retention", runRetentionJob);
-      runTrackedJob("subscriptionBilling", runSubscriptionBillingJob);
     }, 24 * 60 * 60 * 1000);
   }, delay);
   console.log(`[retention] Next run scheduled in ${Math.round(delay / 60000)} minutes`);
@@ -105,6 +144,12 @@ setInterval(() => {
   runTrackedJob("roiReport", runRoiReportJob);
   runTrackedJob("billingReminder", runBillingReminderJob);
   runTrackedJob("healthDigest", runHealthDigestJob);
+  runTrackedJob("aiCostAlert", runAiCostAlertJob);
+  // Hourly, not on a daily timer anchored to process start. That timer re-anchored on every
+  // redeploy, so a deploy at the wrong moment skipped a day's billing entirely. Running hourly is
+  // safe because the job claims each business before charging and a claim lasts the calendar day
+  // (see subscriptionBillingJob), so the extra runs find nothing to do.
+  runTrackedJob("subscriptionBilling", runSubscriptionBillingJob);
 }, ONE_HOUR);
 // Also run immediately on startup to catch any missed windows
 runTrackedJob("reminders", runReminderJob);
@@ -113,6 +158,8 @@ runTrackedJob("digest", runDigestJob);
 runTrackedJob("roiReport", runRoiReportJob);
 runTrackedJob("billingReminder", runBillingReminderJob);
 runTrackedJob("healthDigest", runHealthDigestJob);
+runTrackedJob("aiCostAlert", runAiCostAlertJob);
+runTrackedJob("subscriptionBilling", runSubscriptionBillingJob);
 
 // Yield-management (empty-slot) campaign scan — runs once daily at 18:00 local business time;
 // like the digest job, the underlying function itself gates on each business's local clock, so

@@ -25,10 +25,15 @@ import { parseBookingTime } from "../lib/timezone.js";
 import { getJobStatuses } from "../lib/jobStatus.js";
 import { listTemplates, BUSINESS_TYPES } from "../lib/businessTemplates.js";
 import { AI_PROVIDER_KEYS } from "../bot/providers/index.js";
+import { DEFAULT_TEMPERATURE, TEMPERATURE_MIN, TEMPERATURE_MAX } from "../bot/providers/types.js";
+import { anthropicRejectsTemperature } from "../bot/providers/anthropicProvider.js";
 import { applyTemplate } from "../lib/applyTemplate.js";
 import { matchPeriodKinds, resolvePeriod } from "../lib/hebrewPeriods.js";
 import { classifyPeriodText } from "../lib/classifyPeriodText.js";
-import { getPaymentProvider, PAYMENT_PROVIDERS, UnknownPaymentProviderError } from "../lib/payments/index.js";
+import { explainPayPlusError } from "../lib/payplusErrors.js";
+import multer from "multer";
+import { saveImage, deleteImageByUrl, toPublicUploadUrl, MAX_UPLOAD_BYTES, ALLOWED_MIME, UnsupportedImageError } from "../lib/storage.js";
+import { depositCallbackUrl, getPaymentProvider, PAYMENT_PROVIDERS, UnknownPaymentProviderError } from "../lib/payments/index.js";
 import { getInvoiceProvider, INVOICE_PROVIDERS, UnknownInvoiceProviderError, resolveInvoiceCredentials } from "../lib/invoices/index.js";
 
 export const businessRouter = Router();
@@ -48,6 +53,9 @@ businessRouter.get("/me", async (req: AuthedRequest, res) => {
   const { passwordHash, whatsappAccessToken, paymentApiKey, paymentApiSecret, invoiceApiKey, invoiceApiSecret, ...safe } = business;
   res.json({
     ...safe,
+    // Re-pointed at the current host, same as service photos: the URL was absolute when written,
+    // so a row created under an old/wrong PUBLIC_BACKEND_URL would otherwise stay a dead link.
+    whatsappProfilePictureUrl: safe.whatsappProfilePictureUrl ? toPublicUploadUrl(safe.whatsappProfilePictureUrl) : null,
     whatsappConnected: Boolean(whatsappAccessToken),
     paymentConnected: Boolean(paymentApiKey),
     invoiceConnected:
@@ -513,6 +521,13 @@ const profileSchema = z.object({
   timezone: z.string().optional(),
   notificationPhone: z.string().optional(),
   botGreeting: z.string().optional(),
+  // Both or neither: WhatsApp rejects a cta_url message missing either half, and a half-configured
+  // button would silently fall back to plain text with no hint as to why.
+  greetingButtonText: z.string().max(20).optional(),
+  greetingButtonUrl: z.string().optional(),
+  // WhatsApp allows at most 3, each at most 20 characters, and rejects the send if either is
+  // exceeded — so the limits are enforced here rather than surfacing as a failed first message.
+  quickReplies: z.array(z.string().min(1).max(20)).max(3).optional(),
   botPersonality: z.string().optional(),
   googleMapsUrl: z.string().optional(),
   remindersEnabled: z.boolean().optional(),
@@ -528,6 +543,9 @@ const profileSchema = z.object({
   availabilitySuggestionsEnabled: z.boolean().optional(),
   aiProvider: z.enum(AI_PROVIDER_KEYS).optional(),
   aiModel: z.string().max(100).nullable().optional(),
+  // null resets to the app default rather than pinning 0 — the two are different intentions and
+  // the slider needs to be able to express "back to normal".
+  aiTemperature: z.number().min(TEMPERATURE_MIN).max(TEMPERATURE_MAX).nullable().optional(),
 });
 
 // Display metadata for the Bot page's provider/model picker — which providers are actually
@@ -542,6 +560,12 @@ businessRouter.get("/me/ai-providers", async (_req: AuthedRequest, res) => {
       // which this bot depends on entirely. See bot/providers/index.ts.
       { key: "deepseek", label: "DeepSeek", configured: Boolean(process.env.DEEPSEEK_API_KEY), defaultModels: ["deepseek-chat"] },
     ],
+    temperature: { default: DEFAULT_TEMPERATURE, min: TEMPERATURE_MIN, max: TEMPERATURE_MAX },
+    // Models known to reject the parameter outright (Anthropic answers 400 "temperature is
+    // deprecated for this model"). Detected at runtime on the first rejection, so this is empty
+    // until a model has actually refused once in this process — the dashboard uses it to say the
+    // slider has no effect rather than letting the owner move a control that does nothing.
+    temperatureIgnoredBy: ["claude-sonnet-5", "claude-opus-5"].filter(anthropicRejectsTemperature),
   });
 });
 
@@ -773,7 +797,27 @@ businessRouter.post("/me/whatsapp/profile-picture", async (req: AuthedRequest, r
   } catch (err) {
     return res.status(502).json({ error: err instanceof Error ? err.message : "Failed to set profile picture" });
   }
-  res.json({ ok: true });
+
+  // Keep our own copy, so the widget shows the picture that is actually set instead of an empty
+  // placeholder on every reload. Meta holds the image but only hands it back through a short-lived
+  // URL, so there is nothing to display later unless we store one ourselves.
+  //
+  // Saved only after Meta accepted it — storing first would show the owner a picture their
+  // customers never see. A failure here is not worth failing the request over: the picture IS set
+  // on WhatsApp, which is what the owner asked for; only the preview would be stale.
+  let pictureUrl: string | null = null;
+  try {
+    const previous = business.whatsappProfilePictureUrl;
+    const saved = await saveImage(business.id, imageBuffer, "whatsapp-profile");
+    pictureUrl = saved.url;
+    await prisma.business.update({ where: { id: business.id }, data: { whatsappProfilePictureUrl: saved.url } });
+    // Only after the new one is committed — a crash between the two must not leave the row
+    // pointing at a file that is already gone.
+    if (previous) await deleteImageByUrl(business.id, previous);
+  } catch (err) {
+    console.error("[profile-picture] Set on WhatsApp but failed to store a local copy:", err);
+  }
+  res.json({ ok: true, url: pictureUrl });
 });
 
 // --- Payment provider (PayPlus / Tranzila / Cardcom / Grow / Tori-managed) — the business's own
@@ -793,6 +837,21 @@ const paymentConnectSchema = z
     }),
     apiKey: z.string().min(1).optional(),
     apiSecret: z.string().min(1).optional(),
+    // PayPlus only. Not a secret — it names one of the merchant's configured payment pages — but
+    // PayPlus refuses every generateLink call without it (405
+    // not-authorize-missing-payment-page-uid), so connecting without it produces a provider that
+    // verifies fine and then fails on the first real charge.
+    // Rejecting an email here specifically: browsers autofill one into this box (it sits next to
+    // two credential fields), PayPlus then answers 405 on every charge, and the dashboard still
+    // says "connected" — so the owner has a payment provider that verifies and never works.
+    pageUid: z
+      .string()
+      .min(1)
+      .max(120)
+      .refine((v) => !v.includes("@"), {
+        message: "Payment Page UID looks like an email address — copy the page uid from PayPlus's \"payment pages\" screen.",
+      })
+      .optional(),
   })
   .refine((v) => v.apiKey && v.apiSecret, {
     message: "apiKey and apiSecret are required for this provider",
@@ -803,7 +862,15 @@ businessRouter.put("/me/payment-provider", async (req: AuthedRequest, res) => {
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const provider = getPaymentProvider(parsed.data.provider);
-  const creds = { apiKey: parsed.data.apiKey ?? "", apiSecret: parsed.data.apiSecret ?? "" };
+  if (parsed.data.provider === "payplus" && !parsed.data.pageUid) {
+    return res.status(400).json({ error: "PayPlus דורש מזהה דף תשלום (Payment Page UID). מצאו אותו בממשק PayPlus תחת דפי תשלום." });
+  }
+
+  const creds = {
+    apiKey: parsed.data.apiKey ?? "",
+    apiSecret: parsed.data.apiSecret ?? "",
+    pageUid: parsed.data.pageUid,
+  };
   const verification = await provider.verifyCredentials(creds);
   if (!verification.valid) return res.status(400).json({ error: verification.error ?? "Invalid credentials" });
 
@@ -819,6 +886,7 @@ businessRouter.put("/me/payment-provider", async (req: AuthedRequest, res) => {
       paymentProvider: parsed.data.provider,
       paymentApiKey: encryptSecret(parsed.data.apiKey!),
       paymentApiSecret: encryptSecret(parsed.data.apiSecret!),
+      paymentPageUid: parsed.data.pageUid ?? null,
       paymentWebhookSecret: webhookSecret,
     },
   });
@@ -828,7 +896,7 @@ businessRouter.put("/me/payment-provider", async (req: AuthedRequest, res) => {
 businessRouter.delete("/me/payment-provider", async (req: AuthedRequest, res) => {
   await prisma.business.update({
     where: { id: req.businessId! },
-    data: { paymentProvider: null, paymentApiKey: null, paymentApiSecret: null },
+    data: { paymentProvider: null, paymentApiKey: null, paymentApiSecret: null, paymentPageUid: null },
   });
   res.json({ ok: true });
 });
@@ -850,6 +918,11 @@ const invoiceConnectSchema = z
     }),
     apiKey: z.string().min(1).optional(),
     apiSecret: z.string().min(1).optional(),
+    // PayPlus only. Not a secret — it names one of the merchant's configured payment pages — but
+    // PayPlus refuses every generateLink call without it (405
+    // not-authorize-missing-payment-page-uid), so connecting without it produces a provider that
+    // verifies fine and then fails on the first real charge.
+    pageUid: z.string().min(1).max(120).optional(),
   })
   .refine((v) => NO_KEYS_NEEDED.has(v.provider) || (v.apiKey && v.apiSecret), {
     message: "apiKey and apiSecret are required for this provider",
@@ -904,7 +977,7 @@ businessRouter.post("/payments/link", async (req: AuthedRequest, res) => {
 
   const business = await prisma.business.findUniqueOrThrow({
     where: { id: req.businessId! },
-    select: { paymentProvider: true, paymentApiKey: true, paymentApiSecret: true },
+    select: { id: true, paymentProvider: true, paymentApiKey: true, paymentApiSecret: true, paymentPageUid: true, paymentWebhookSecret: true },
   });
   if (!business.paymentProvider || !business.paymentApiKey || !business.paymentApiSecret) {
     return res.status(400).json({ error: "No payment provider connected" });
@@ -916,13 +989,22 @@ businessRouter.post("/payments/link", async (req: AuthedRequest, res) => {
     const creds =
       business.paymentProvider === "tori_managed"
         ? { apiKey: "", apiSecret: "" }
-        : { apiKey: decryptSecret(business.paymentApiKey), apiSecret: decryptSecret(business.paymentApiSecret) };
-    const result = await provider.createPaymentLink(creds, parsed.data);
+        : {
+            apiKey: decryptSecret(business.paymentApiKey),
+            apiSecret: decryptSecret(business.paymentApiSecret),
+            pageUid: business.paymentPageUid ?? undefined,
+          };
+    const result = await provider.createPaymentLink(creds, {
+      ...parsed.data,
+      callbackUrl: depositCallbackUrl(business.id, business.paymentProvider, business.paymentWebhookSecret) ?? undefined,
+    });
     res.json(result);
   } catch (err) {
     if (err instanceof UnknownPaymentProviderError) return res.status(400).json({ error: err.message });
     console.error("Payment link creation failed:", err);
-    res.status(502).json({ error: "Payment provider request failed" });
+    // Same reasoning as the subscription checkout route: the provider already said what's wrong,
+    // and a generic message just sends the owner to support with nothing.
+    res.status(502).json({ error: explainPayPlusError(err instanceof Error ? err.message : String(err)) });
   }
 });
 
@@ -936,7 +1018,7 @@ businessRouter.post("/invoices/receipt", async (req: AuthedRequest, res) => {
 
   const business = await prisma.business.findUniqueOrThrow({
     where: { id: req.businessId! },
-    select: { invoiceProvider: true, invoiceApiKey: true, invoiceApiSecret: true, paymentProvider: true, paymentApiKey: true, paymentApiSecret: true },
+    select: { invoiceProvider: true, invoiceApiKey: true, invoiceApiSecret: true, paymentProvider: true, paymentApiKey: true, paymentApiSecret: true, paymentPageUid: true },
   });
   const resolved = resolveInvoiceCredentials(business);
   if (!resolved) return res.status(400).json({ error: "No invoice provider connected" });
@@ -1286,9 +1368,76 @@ const serviceSchema = z.object({
   linkUrl: z.string().optional(),
 });
 
+/**
+ * Photo uploads for a service/unit.
+ *
+ * memoryStorage rather than multer's disk storage: every file is re-encoded by sharp before it is
+ * written, so multer's copy would only be a temp file to clean up. The size cap is enforced by
+ * multer (before the body is fully read) as well as by the type check below.
+ */
+const photoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_UPLOAD_BYTES, files: 10 },
+  fileFilter: (_req, file, cb) => {
+    // A phone can report an empty or odd mimetype for HEIC; sharp is the real gate, this just
+    // rejects the obvious non-images before spending memory on them.
+    if (file.mimetype && !ALLOWED_MIME.includes(file.mimetype) && !file.mimetype.startsWith("image/")) {
+      return cb(new UnsupportedImageError(`הקובץ "${file.originalname}" אינו תמונה.`));
+    }
+    cb(null, true);
+  },
+});
+
+businessRouter.post("/services/:id/photos", photoUpload.array("photos", 10), async (req: AuthedRequest, res) => {
+  const service = await prisma.service.findFirst({
+    where: { id: req.params.id, businessId: req.businessId! },
+    select: { id: true, imageUrls: true },
+  });
+  if (!service) return res.status(404).json({ error: "השירות לא נמצא" });
+
+  const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+  if (files.length === 0) return res.status(400).json({ error: "לא נבחרו תמונות" });
+  if (service.imageUrls.length + files.length > 10) {
+    return res.status(400).json({ error: "אפשר עד 10 תמונות לכל יחידה" });
+  }
+
+  const urls: string[] = [];
+  for (const file of files) {
+    const saved = await saveImage(req.businessId!, file.buffer, file.originalname);
+    urls.push(saved.url);
+  }
+
+  const updated = await prisma.service.update({
+    where: { id: service.id },
+    data: { imageUrls: [...service.imageUrls, ...urls] },
+    select: { imageUrls: true },
+  });
+  res.status(201).json({ imageUrls: updated.imageUrls, added: urls.length });
+});
+
+/** Removes one photo from a service, and deletes the file when it was one of our own uploads. */
+businessRouter.delete("/services/:id/photos", async (req: AuthedRequest, res) => {
+  const parsed = z.object({ url: z.string().min(1) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const service = await prisma.service.findFirst({
+    where: { id: req.params.id, businessId: req.businessId! },
+    select: { id: true, imageUrls: true },
+  });
+  if (!service) return res.status(404).json({ error: "השירות לא נמצא" });
+
+  const remaining = service.imageUrls.filter((u) => u !== parsed.data.url);
+  await prisma.service.update({ where: { id: service.id }, data: { imageUrls: remaining } });
+  // After the DB write: a leaked file is harmless, a row pointing at a deleted file is a broken
+  // image in a customer's chat.
+  await deleteImageByUrl(req.businessId!, parsed.data.url);
+  res.json({ imageUrls: remaining });
+});
+
 businessRouter.get("/services", async (req: AuthedRequest, res) => {
   const services = await prisma.service.findMany({ where: { businessId: req.businessId! } });
-  res.json(services);
+  // Photo URLs are re-pointed at the current host on the way out — see toPublicUploadUrl.
+  res.json(services.map((s) => ({ ...s, imageUrls: s.imageUrls.map(toPublicUploadUrl) })));
 });
 
 businessRouter.post("/services", async (req: AuthedRequest, res) => {
@@ -1310,7 +1459,16 @@ businessRouter.put("/services/:id", async (req: AuthedRequest, res) => {
 });
 
 businessRouter.delete("/services/:id", async (req: AuthedRequest, res) => {
+  // Read the photos before deleting the row, or their files are orphaned on the volume forever
+  // with nothing left pointing at them.
+  const service = await prisma.service.findFirst({
+    where: { id: req.params.id, businessId: req.businessId! },
+    select: { imageUrls: true },
+  });
   await prisma.service.deleteMany({ where: { id: req.params.id, businessId: req.businessId! } });
+  for (const url of service?.imageUrls ?? []) {
+    await deleteImageByUrl(req.businessId!, url);
+  }
   res.json({ ok: true });
 });
 

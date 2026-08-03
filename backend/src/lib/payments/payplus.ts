@@ -2,7 +2,10 @@ import type { PaymentProvider, PaymentCredentials, CreatePaymentLinkParams, Paym
 
 // PayPlus "Generate Payment Link" API. apiKey = PayPlus API Key, apiSecret = PayPlus Secret Key.
 // Docs: https://restapidoc.payplus.co.il (PaymentPages/generateLink)
-const BASE_URL = "https://restapi.payplus.co.il/api/v1.0";
+const BASE_URL =
+  process.env.PAYPLUS_ENV === "sandbox"
+    ? "https://restapidev.payplus.co.il/api/v1.0"
+    : "https://restapi.payplus.co.il/api/v1.0";
 
 export const payplusProvider: PaymentProvider = {
   async createPaymentLink(creds: PaymentCredentials, params: CreatePaymentLinkParams): Promise<PaymentLinkResult> {
@@ -13,13 +16,19 @@ export const payplusProvider: PaymentProvider = {
         Authorization: JSON.stringify({ api_key: creds.apiKey, secret_key: creds.apiSecret }),
       },
       body: JSON.stringify({
-        payment_page_uid: undefined, // uses the merchant's default payment page
+        // Required, not optional: PayPlus answers 405 not-authorize-missing-payment-page-uid
+        // without it. There is no "merchant default page" fallback, which an earlier comment here
+        // assumed — the uid identifies which configured page to render.
+        payment_page_uid: creds.pageUid,
         charge_method: 1, // charge (not just token/auth)
         amount: params.amountIls,
         currency_code: "ILS",
         sendEmailApproval: true,
         sendEmailFailure: false,
         more_info: params.referenceId,
+        // Overrides the account-level Callback field in PayPlus's dashboard, which is why several
+        // businesses can share one merchant account — see CreatePaymentLinkParams.callbackUrl.
+        ...(params.callbackUrl ? { refURL_callback: params.callbackUrl } : {}),
         refURL_success: undefined,
         customer: {
           customer_name: params.customerName,

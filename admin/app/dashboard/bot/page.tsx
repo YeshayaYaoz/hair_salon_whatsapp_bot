@@ -20,6 +20,11 @@ interface BotProfile {
   availabilitySuggestionsEnabled?: boolean;
   aiProvider?: string;
   aiModel?: string | null;
+  /** null = use the server default. Kept nullable so the slider can express "back to normal". */
+  aiTemperature?: number | null;
+  greetingButtonText?: string;
+  greetingButtonUrl?: string;
+  quickReplies?: string[];
 }
 
 interface AiProviderMeta {
@@ -27,6 +32,14 @@ interface AiProviderMeta {
   label: string;
   configured: boolean;
   defaultModels: string[];
+}
+
+interface AiProvidersResponse {
+  providers: AiProviderMeta[];
+  temperature: { default: number; min: number; max: number };
+  /** Models the API has already refused a temperature for. Newer Anthropic models reject the
+   * parameter outright, and a slider that quietly does nothing is worse than no slider. */
+  temperatureIgnoredBy: string[];
 }
 
 function VoicePhoneSection() {
@@ -140,7 +153,8 @@ export default function BotPage() {
     botGreeting: "", botPersonality: "",
     remindersEnabled: true, reviewsEnabled: true,
     cancellationPolicy: "", referralText: "", digestEnabled: true, availabilityInfo: "",
-    pricingNotes: "", availabilitySuggestionsEnabled: true, aiProvider: "anthropic", aiModel: null,
+    pricingNotes: "", availabilitySuggestionsEnabled: true, aiProvider: "anthropic", aiModel: null, aiTemperature: null,
+    greetingButtonText: "", greetingButtonUrl: "", quickReplies: [],
   });
   const [bookingModel, setBookingModel] = useState<string>("slot");
   const [botEnabled, setBotEnabled] = useState(true);
@@ -150,6 +164,8 @@ export default function BotPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aiProviders, setAiProviders] = useState<AiProviderMeta[] | null>(null);
+  const [tempMeta, setTempMeta] = useState<{ default: number; min: number; max: number }>({ default: 0.2, min: 0, max: 1 });
+  const [tempIgnoredBy, setTempIgnoredBy] = useState<string[]>([]);
 
   useEffect(() => {
     apiFetch<BotProfile & { bookingModel?: string; botEnabled?: boolean }>("/api/business/me").then((me) => {
@@ -166,13 +182,21 @@ export default function BotPage() {
         availabilitySuggestionsEnabled: me.availabilitySuggestionsEnabled ?? true,
         aiProvider: me.aiProvider ?? "anthropic",
         aiModel: me.aiModel ?? null,
+        aiTemperature: me.aiTemperature ?? null,
+        greetingButtonText: me.greetingButtonText ?? "",
+        greetingButtonUrl: me.greetingButtonUrl ?? "",
+        quickReplies: me.quickReplies ?? [],
       });
       setBookingModel(me.bookingModel ?? "slot");
       setBotEnabled(me.botEnabled ?? true);
       setLoaded(true);
     });
-    apiFetch<{ providers: AiProviderMeta[] }>("/api/business/me/ai-providers")
-      .then((res) => setAiProviders(res.providers))
+    apiFetch<AiProvidersResponse>("/api/business/me/ai-providers")
+      .then((res) => {
+        setAiProviders(res.providers);
+        if (res.temperature) setTempMeta(res.temperature);
+        setTempIgnoredBy(res.temperatureIgnoredBy ?? []);
+      })
       .catch(() => {});
   }, []);
 
@@ -190,7 +214,7 @@ export default function BotPage() {
     }
   }
 
-  function set(key: keyof BotProfile, value: string | boolean | null) {
+  function set(key: keyof BotProfile, value: string | number | boolean | string[] | null) {
     setFields((f) => ({ ...f, [key]: value }));
   }
 
@@ -264,15 +288,67 @@ export default function BotPage() {
 
       <form onSubmit={save}>
         <Section title={t.botPersonalityTitle} description={t.botPersonalityDesc}>
-          <Field label={t.greeting}>
+          <Field label={t.greeting} hint={t.greetingHint}>
             <textarea
-              rows={2}
+              rows={4}
               placeholder={t.greetingPlaceholder}
               value={fields.botGreeting}
               onChange={(e) => set("botGreeting", e.target.value)}
               className="w-full"
             />
           </Field>
+          <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 flex flex-col gap-3">
+            <div>
+              <p className="text-xs font-semibold text-gray-800">{t.quickRepliesTitle}</p>
+              <p className="text-xs text-gray-600 mt-1">{t.quickRepliesHint}</p>
+            </div>
+            <div className="grid sm:grid-cols-3 gap-2">
+              {[0, 1, 2].map((i) => (
+                <input
+                  key={i}
+                  value={(fields.quickReplies ?? [])[i] ?? ""}
+                  onChange={(e) => {
+                    const next = [...(fields.quickReplies ?? [])];
+                    next[i] = e.target.value;
+                    // Trailing blanks are dropped so leaving the middle box empty doesn't send an
+                    // empty button, which WhatsApp rejects.
+                    set("quickReplies", next.map((v) => (v ?? "").trim()).filter(Boolean));
+                  }}
+                  placeholder={t.quickReplyPlaceholders[i]}
+                  maxLength={20}
+                  className="w-full text-sm"
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 flex flex-col gap-3">
+            <div>
+              <p className="text-xs font-semibold text-gray-800">{t.greetingButtonTitle}</p>
+              <p className="text-xs text-gray-600 mt-1">{t.greetingButtonHint}</p>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <Field label={t.greetingButtonLabel}>
+                <input
+                  value={fields.greetingButtonText ?? ""}
+                  onChange={(e) => set("greetingButtonText", e.target.value)}
+                  placeholder={t.greetingButtonLabelPlaceholder}
+                  maxLength={20}
+                  className="w-full"
+                />
+              </Field>
+              <Field label={t.greetingButtonUrlLabel}>
+                <input
+                  value={fields.greetingButtonUrl ?? ""}
+                  onChange={(e) => set("greetingButtonUrl", e.target.value)}
+                  placeholder="https://…"
+                  dir="ltr"
+                  className="w-full"
+                />
+              </Field>
+            </div>
+          </div>
+
           <Field label={t.personality}>
             <textarea
               rows={3}
@@ -329,6 +405,14 @@ export default function BotPage() {
                 ))}
             </select>
           </Field>
+
+          <TemperatureSlider
+            value={fields.aiTemperature ?? null}
+            onChange={(v) => set("aiTemperature", v)}
+            meta={tempMeta}
+            ignored={Boolean(fields.aiModel && tempIgnoredBy.includes(fields.aiModel))}
+            he={he}
+          />
         </Section>
 
         <Section
@@ -446,6 +530,98 @@ export default function BotPage() {
       </form>
 
       <VoicePhoneSection />
+    </div>
+  );
+}
+
+/**
+ * Controls how much the bot varies its wording.
+ *
+ * Low is the default and it is not an arbitrary preference: high temperature is what produced
+ * invented Hebrew in production ("מבורך הבא" instead of "ברוך הבא"), because Hebrew is full of
+ * fixed collocations where any variation is simply wrong. So the scale is labelled by what it
+ * actually does to replies, not by the number — an owner reading "0.8" has no way to know it means
+ * "may invent phrasings your customers will notice".
+ *
+ * When the selected model refuses the parameter (newer Anthropic models answer 400 for it), the
+ * control says so and disables itself. A slider that silently does nothing is worse than none.
+ */
+function TemperatureSlider({
+  value,
+  onChange,
+  meta,
+  ignored,
+  he,
+}: {
+  value: number | null;
+  onChange: (v: number | null) => void;
+  meta: { default: number; min: number; max: number };
+  ignored: boolean;
+  he: boolean;
+}) {
+  const current = value ?? meta.default;
+  const isDefault = value === null;
+
+  const describe = (t: number) =>
+    t <= 0.15
+      ? he ? "עקבי מאוד — כמעט אותה תשובה בכל פעם" : "Very consistent — near-identical answers"
+      : t <= 0.35
+        ? he ? "עקבי — מומלץ לעברית" : "Consistent — recommended for Hebrew"
+        : t <= 0.6
+          ? he ? "מגוון — ניסוחים משתנים" : "Varied — wording changes between replies"
+          : he ? "יצירתי — עלול להמציא ניסוחים שגויים" : "Creative — may invent incorrect phrasings";
+
+  return (
+    <div className="block">
+      <div className="flex items-baseline justify-between mb-1.5">
+        <label htmlFor="ai-temperature" className="text-xs font-medium text-gray-600">
+          {he ? "מגוון בניסוח" : "Wording variety"}
+        </label>
+        <span className="text-xs text-gray-600 tabular-nums" dir="ltr">
+          {current.toFixed(2)}{isDefault ? (he ? " (ברירת מחדל)" : " (default)") : ""}
+        </span>
+      </div>
+
+      <input
+        id="ai-temperature"
+        type="range"
+        min={meta.min}
+        max={meta.max}
+        step={0.05}
+        value={current}
+        disabled={ignored}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full accent-[#1B7FA0] disabled:opacity-50"
+      />
+
+      <div className="flex items-center justify-between gap-3 mt-1">
+        <span className={`text-xs ${current > 0.6 ? "text-amber-700 font-medium" : "text-gray-600"}`}>
+          {describe(current)}
+        </span>
+        {!isDefault && !ignored && (
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="text-xs text-[#1B7FA0] hover:underline shrink-0"
+          >
+            {he ? "אפס לברירת מחדל" : "Reset to default"}
+          </button>
+        )}
+      </div>
+
+      <p className="text-xs text-gray-600 mt-1.5">
+        {he
+          ? "נמוך = הבוט חוזר על אותם ניסוחים מדויקים. גבוה = מגוון יותר, אבל מגדיל את הסיכון לשגיאות עברית אצל הלקוחות."
+          : "Low = the bot repeats the same exact wording. High = more variety, but a higher risk of Hebrew errors reaching customers."}
+      </p>
+
+      {ignored && (
+        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">
+          {he
+            ? "המודל שנבחר לא תומך בהגדרה הזאת ומתעלם ממנה. כדי לשלוט במגוון הניסוח, בחר מודל אחר."
+            : "The selected model doesn't support this setting and ignores it. Pick a different model to control wording variety."}
+        </p>
+      )}
     </div>
   );
 }

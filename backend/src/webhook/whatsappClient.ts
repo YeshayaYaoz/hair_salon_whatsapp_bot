@@ -74,6 +74,62 @@ export async function sendWhatsAppImage(params: SendCommon & { imageUrl: string;
   });
 }
 
+/**
+ * A message whose body is followed by a tappable button that opens a URL.
+ *
+ * WhatsApp's own limits, all enforced by rejecting the send rather than truncating: the body is
+ * capped at 1024 characters and the button label at 20. The caller trims rather than risking a
+ * rejected first impression — a greeting that fails to send leaves the customer with silence.
+ *
+ * Only one button is allowed on a cta_url message, and it must carry an https URL.
+ */
+export async function sendWhatsAppCtaUrl(
+  params: SendCommon & { body: string; buttonText: string; url: string; footer?: string }
+) {
+  await send(params, {
+    type: "interactive",
+    interactive: {
+      type: "cta_url",
+      body: { text: params.body.slice(0, 1024) },
+      ...(params.footer ? { footer: { text: params.footer.slice(0, 60) } } : {}),
+      action: {
+        name: "cta_url",
+        parameters: { display_text: params.buttonText.slice(0, 20), url: params.url },
+      },
+    },
+  });
+}
+
+/**
+ * A message followed by up to three tappable reply buttons.
+ *
+ * Tapping one sends the button's title back as an ordinary message (see extractMessage's
+ * button_reply branch), so the bot needs no special handling — the customer simply didn't have to
+ * type. That is the whole value on a phone keyboard, and it also keeps the conversation inside
+ * WhatsApp rather than sending them to a website.
+ *
+ * WhatsApp's limits, all enforced by rejecting the send: three buttons maximum, 20 characters per
+ * title, and titles must be unique within a message. Trimmed here rather than risking a rejection.
+ */
+export async function sendWhatsAppButtons(
+  params: SendCommon & { body: string; buttons: string[]; footer?: string }
+) {
+  const titles = params.buttons.map((b) => b.trim().slice(0, 20)).filter(Boolean).slice(0, 3);
+  await send(params, {
+    type: "interactive",
+    interactive: {
+      type: "button",
+      body: { text: params.body.slice(0, 1024) },
+      ...(params.footer ? { footer: { text: params.footer.slice(0, 60) } } : {}),
+      action: {
+        // The id comes back on the reply; the title is what the customer sees and what we treat as
+        // their message, so using the title as the id keeps the two from drifting apart.
+        buttons: titles.map((title, i) => ({ type: "reply", reply: { id: `qr_${i}`, title } })),
+      },
+    },
+  });
+}
+
 export interface ListRow {
   id: string;
   title: string; // max 24 chars per WhatsApp's limit
