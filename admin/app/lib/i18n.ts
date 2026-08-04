@@ -9,6 +9,7 @@ const translations = {
       whatsapp: "WhatsApp", bot: "Bot", payments: "Payments", faq: "FAQ", settings: "Settings", billing: "My subscription", logout: "Log out",
     },
     navGroups: { setup: "Get started", overview: "Home", operations: "Day-to-day", business: "My business", account: "Setup & account" },
+    sectionTabsLabel: "Sections in this area",
     // Bottom-tab labels. The full nav names are written for the sidebar and overflow a ~56px tab
     // ("Pricing & Services" / "מחירים ושירותים" truncated to an ellipsis), so the four tabs get
     // their own short forms rather than being cut off.
@@ -178,6 +179,7 @@ const translations = {
       whatsapp: "וואטסאפ", bot: "בוט", payments: "סליקה וחשבוניות", faq: "שאלות נפוצות", settings: "הגדרות", billing: "המנוי שלי", logout: "התנתקות",
     },
     navGroups: { setup: "הפעלה ראשונית", overview: "ראשי", operations: "ניהול יומי", business: "העסק שלי", account: "הגדרות וחשבון" },
+    sectionTabsLabel: "מדורים באזור הזה",
     navShort: { analytics: "ראשי", appointments: "תורים", customers: "לקוחות", services: "מחירים" },
     days: ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"],
     daysShort: ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"],

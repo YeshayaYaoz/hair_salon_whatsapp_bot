@@ -100,9 +100,14 @@ previously stored tokens undecryptable (salons would need to reconnect WhatsApp)
 Each of these can build directly from `backend/Dockerfile` and `admin/Dockerfile`:
 
 1. Create a managed Postgres instance on the platform, copy its `DATABASE_URL`.
-2. Deploy `backend/` as a service: set `DATABASE_URL`, `JWT_SECRET`, `TOKEN_ENCRYPTION_KEY`,
-   `ANTHROPIC_API_KEY`, `WHATSAPP_VERIFY_TOKEN`. The container runs `prisma migrate deploy`
-   automatically on start.
+2. Deploy `backend/` as a service: set `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`,
+   `TOKEN_ENCRYPTION_KEY`, `ANTHROPIC_API_KEY`, `WHATSAPP_VERIFY_TOKEN`. The container runs
+   `prisma migrate deploy` automatically on start.
+
+   `DIRECT_URL` is easy to miss and fails quietly: `schema.prisma` declares it as `directUrl`, so
+   Prisma needs it to resolve the datasource at all, and `migrate deploy` will not run without it.
+   On a pooled provider (Neon) it is the same URL with `-pooler` removed from the host; anywhere
+   without a pooler, repeat `DATABASE_URL` verbatim.
 3. Deploy `admin/` as a service: set build arg `NEXT_PUBLIC_API_URL` to the backend's public URL.
 4. Point Meta's webhook at `https://<backend-public-url>/webhook/whatsapp`.
 
