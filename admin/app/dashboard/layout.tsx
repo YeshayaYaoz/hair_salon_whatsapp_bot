@@ -8,6 +8,8 @@ import { clearToken, apiFetch, decodeToken, exitImpersonation, reloadAs } from "
 import { useLanguage } from "../lib/LanguageContext";
 import { AuthGuard } from "../lib/AuthGuard";
 import { useNextSetupStep } from "../lib/useNextSetupStep";
+import { SectionTabs } from "../lib/SectionTabs";
+import { SECTION_FOLLOWER_HREFS } from "../lib/sections";
 import { useDialog } from "../lib/useDialog";
 
 // One nav item. Icons are Heroicons outline path data.
@@ -94,7 +96,16 @@ const BOTTOM_TAB_KEYS: NavItem["key"][] = ["analytics", "appointments", "custome
 const BOTTOM_TAB_ITEMS = BOTTOM_TAB_KEYS
   .map((key) => NAV_ITEMS.find((i) => i.key === key))
   .filter((i): i is NavItem => Boolean(i));
-const MORE_ITEMS = NAV_ITEMS.filter((i) => !BOTTOM_TAB_KEYS.includes(i.key));
+// The mobile grid lists a section's leader, not all of its members: "bot" stands in for the FAQ
+// page too, and "settings" for WhatsApp, payments and billing (see lib/sections.ts). That takes the
+// sheet from nine tiles to five, and the dropped pages are one tab away once you arrive.
+//
+// The desktop sidebar deliberately keeps listing every destination. It has room for all seventeen
+// rows, and taking working links away from a nav that fits them helps nobody — the sections exist
+// to relieve a constraint that only mobile has.
+const MORE_ITEMS = NAV_ITEMS.filter(
+  (i) => !BOTTOM_TAB_KEYS.includes(i.key) && !SECTION_FOLLOWER_HREFS.has(i.href)
+);
 
 /**
  * One destination in the "More" sheet's grid.
@@ -483,6 +494,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       >
         <ImpersonationBanner />
         <TrialBanner status={trial?.status ?? null} createdAt={trial?.createdAt ?? null} />
+        {/* Renders only on pages that have siblings; null everywhere else. Placed here rather than
+            inside each member page so a section added later can't ship without its tabs. */}
+        <SectionTabs />
         {children}
       </main>
 
