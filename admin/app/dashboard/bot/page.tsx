@@ -63,8 +63,17 @@ function VoicePhoneSection() {
     setSaving(true);
     setError(null);
     try {
-      await apiFetch("/api/business/me/voice-phone", { method: "PUT", body: JSON.stringify({ voicePhoneNumber: value }) });
+      // The number saves even when Cartesia can't be reached — but then the line won't answer, so
+      // the owner has to be told rather than shown a plain "saved".
+      const result = await apiFetch<{ warning?: string }>("/api/business/me/voice-phone", {
+        method: "PUT",
+        body: JSON.stringify({ voicePhoneNumber: value }),
+      });
       setCurrent(value);
+      if (result.warning) {
+        setError(result.warning);
+        return;
+      }
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {

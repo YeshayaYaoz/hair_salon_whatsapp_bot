@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth, signImpersonationToken, type AuthedRequest } from "../lib/auth.js";
 import { logAdminAction } from "../lib/adminAudit.js";
 import { sendAdminAlertEmail, sendBusinessNoticeEmail } from "../lib/email.js";
+import { assignNumberToAgent, CartesiaNotConfiguredError } from "../lib/cartesiaAdmin.js";
 import { captureError } from "../lib/errorMonitoring.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import { requireActiveSubscription } from "../lib/subscriptionGate.js";
@@ -722,7 +723,30 @@ businessRouter.put("/me/voice-phone", async (req: AuthedRequest, res) => {
     if (err?.code === "P2002") return res.status(409).json({ error: "This number is already connected to another business" });
     throw err;
   }
-  res.json({ ok: true });
+
+  // Point the number at the shared voice agent in Cartesia. Skipping this is the one step that
+  // breaks a new salon's line invisibly: a number with no agent behind it answers and hangs up
+  // immediately, and the call never reaches us so nothing appears in our logs.
+  //
+  // Reported, never fatal. The number is saved either way, and a Cartesia outage must not stop an
+  // owner configuring their own settings — but they do need to know the line won't answer yet.
+  let voiceAgentWarning: string | null = null;
+  try {
+    const result = await assignNumberToAgent(parsed.data.voicePhoneNumber);
+    if (result.changed) console.log(`[cartesia] Assigned ${parsed.data.voicePhoneNumber} to the voice agent`);
+  } catch (err) {
+    if (err instanceof CartesiaNotConfiguredError) {
+      // Expected until the operator sets the keys — not worth alarming the owner about.
+      console.warn("[cartesia] Skipping number assignment:", err.message);
+    } else {
+      console.error("[cartesia] Failed to assign number to the voice agent:", err);
+      captureError(err, { businessId: req.businessId, kind: "cartesiaAssign" });
+      voiceAgentWarning =
+        "המספר נשמר, אך לא הצלחנו לחבר אותו לבוט הקולי אצל הספק. שיחות נכנסות לא ייענו עד שזה יטופל.";
+    }
+  }
+
+  res.json({ ok: true, ...(voiceAgentWarning ? { warning: voiceAgentWarning } : {}) });
 });
 
 businessRouter.delete("/me/voice-phone", async (req: AuthedRequest, res) => {
