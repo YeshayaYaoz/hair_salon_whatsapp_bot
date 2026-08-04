@@ -3,6 +3,25 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* The root layout sets viewport-fit=cover so fixed bars can reach the physical screen edge
+       instead of being letterboxed above the home indicator. The trade is that we now own all four
+       insets. Naming them once keeps the fallback in one place: on every non-notched device — and
+       in headless Chromium — env() resolves to 0px, so every calc() built on these collapses to
+       the plain value it had before.
+
+       These are deliberately physical (top/bottom/left/right), not logical (block/inline). A notch
+       is a fact about the hardware: it does not swap sides when the document turns RTL. */
+    --safe-t: env(safe-area-inset-top, 0px);
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-l: env(safe-area-inset-left, 0px);
+    --safe-r: env(safe-area-inset-right, 0px);
+
+    /* Published by MobileSetupBar while it is on screen, so <main> can reserve the right amount of
+       room for it. See .dashboard-main below. */
+    --mobile-setup-bar-h: 0px;
+  }
+
   body {
     background-color: #F4F6F8;
     color: #111827;

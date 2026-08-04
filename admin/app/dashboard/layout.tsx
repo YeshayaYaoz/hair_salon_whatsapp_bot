@@ -35,9 +35,14 @@ const ICONS = {
   faq: "M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
   whatsapp: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z",
   bot: "M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z",
+  // A card terminal: this page is about taking money from customers.
   payments: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z",
   settings: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z",
-  billing: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z",
+  // A receipt, not the card terminal above. These two used to share byte-identical artwork, which
+  // made "תשלומים וסליקה" and "המנוי שלי" indistinguishable in the More sheet — the same pair whose
+  // *names* were confusable until they were renamed. The salon's own invoice is not the salon's
+  // customers paying it, and the icons should say so at a glance.
+  billing: "M9 14.25l6-6m4.5-3.493V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0c1.1.128 1.907 1.077 1.907 2.185zM9.75 9h.008v.008H9.75V9zm4.875 6h.008v.008h-.008V15z",
 };
 
 // Grouped by *when you'd reach for it* rather than a flat categorical list, so the order itself
@@ -353,9 +358,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <SidebarContent pathname={pathname} isSuperAdmin={isSuperAdmin} />
       </aside>
 
-      {/* Mobile top bar */}
+      {/* Mobile top bar. The pl/pr here (rather than the ps/pe used everywhere else in this file)
+          is deliberate: --safe-* describe the physical screen, so they must not flip with `dir`. */}
       <div
-        className="md:hidden fixed top-0 start-0 end-0 z-30 flex items-center px-4 h-14"
+        className="md:hidden fixed top-0 start-0 end-0 z-30 flex items-center
+          h-[calc(3.5rem+var(--safe-t))] pt-[var(--safe-t)]
+          pl-[calc(1rem+var(--safe-l))] pr-[calc(1rem+var(--safe-r))]"
         style={{ background: "rgba(255,255,255,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid #E5E7EB" }}
       >
         <div className="flex items-center gap-2.5">
@@ -367,7 +375,19 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       </div>
 
       {/* Main content */}
-      <main id="main-content" tabIndex={-1} className="flex-1 md:ms-64 p-4 pt-[4.5rem] pb-24 md:p-8 md:pt-8 md:pb-8 overflow-auto">
+      {/* The bottom padding was a flat `pb-24` (96px), which was only ever right when the setup bar
+          was absent: with it showing, real chrome is ~119px, so the last ~23px of every page sat
+          permanently underneath it — a constant in this file silently invalidated by a component in
+          another one. It is now the sum of what is actually on screen: the 4rem tab bar, whatever
+          MobileSetupBar currently measures itself to be (0px when it isn't rendered), the
+          home-indicator inset the tab bar reserves, and 1rem of breathing room. */}
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="flex-1 md:ms-64 px-4 pt-[calc(4.5rem+var(--safe-t))]
+          pb-[calc(4rem+var(--mobile-setup-bar-h)+var(--safe-b)+1rem)]
+          md:p-8 md:pt-8 md:pb-8 overflow-auto"
+      >
         <ImpersonationBanner />
         <TrialBanner status={trial?.status ?? null} createdAt={trial?.createdAt ?? null} />
         {children}
@@ -375,9 +395,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
       <MobileSetupBar />
 
-      {/* Mobile bottom tab bar */}
+      {/* Mobile bottom tab bar. It grows by the home-indicator inset and pads it back out, so the
+          4rem of tabs sits above the indicator rather than being letterboxed above a band that
+          doesn't share its background. */}
       <nav
-        className="md:hidden fixed bottom-0 start-0 end-0 z-30 flex items-stretch h-16"
+        className="md:hidden fixed bottom-0 start-0 end-0 z-30 flex items-stretch
+          h-[calc(4rem+var(--safe-b))] pb-[var(--safe-b)]
+          pl-[var(--safe-l)] pr-[var(--safe-r)]"
         style={{ background: "rgba(255,255,255,0.97)", backdropFilter: "blur(12px)", borderTop: "1px solid #E5E7EB" }}
       >
         {BOTTOM_TAB_ITEMS.filter((i) => isVisibleFor(i, businessType)).map((item) => {
@@ -420,7 +444,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </button>
       </nav>
 
-      {/* "More" bottom sheet — remaining nav items that don't fit the 5-tab bar */}
+      {/* "More" bottom sheet — the nav items that don't fit the four tabs alongside it.
+          It rests on top of the tab bar, which is itself now taller by the home-indicator inset,
+          so the sheet must not reserve that inset a second time: the bar below already clears it. */}
       {moreOpen && (
         <div className="md:hidden fixed inset-0 z-40" onClick={() => setMoreOpen(false)}>
           <div className="absolute inset-0 bg-black/30" />
@@ -430,7 +456,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             aria-modal="true"
             aria-labelledby="more-sheet-title"
             onClick={(e) => e.stopPropagation()}
-            className="absolute bottom-16 start-0 end-0 bg-white rounded-t-2xl shadow-2xl p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] max-h-[70vh] overflow-y-auto"
+            className="absolute bottom-[calc(4rem+var(--safe-b))] start-0 end-0 bg-white rounded-t-2xl shadow-2xl p-3 max-h-[70vh] overflow-y-auto"
           >
             {/* Sticky header: the sheet scrolls, and without this the only way out (other than
                 tapping the dim backdrop, which isn't obvious) scrolled away with the content. */}

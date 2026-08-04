@@ -251,18 +251,18 @@ export default function LandingPage() {
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         /* Offset in-page anchor scrolling for the 62px fixed nav, so section headings aren't
            hidden behind it when clicking links like #pricing / #faq. */
-        html { scroll-padding-top: 76px; scroll-behavior: smooth; }
+        html { scroll-padding-top: calc(76px + var(--safe-t)); scroll-behavior: smooth; }
         @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
         .lp {
           background: #fff; color: #111;
           font-family: var(--font-heebo), 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
           direction: rtl; -webkit-font-smoothing: antialiased; overflow-x: hidden;
         }
-        #scroll-bar { position: fixed; top: 0; left: 0; height: 2px; background: #25D366; z-index: 9999; width: 0; transition: width 0.05s linear; }
+        #scroll-bar { position: fixed; top: var(--safe-t); left: 0; height: 2px; background: #25D366; z-index: 9999; width: 0; transition: width 0.05s linear; }
 
         /* STICKY CTA */
         #sticky-cta {
-          position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+          position: fixed; bottom: calc(28px + var(--safe-b)); left: 50%; transform: translateX(-50%);
           z-index: 500; opacity: 0; transition: opacity 0.3s ease;
           background: #25D366; color: #fff; font-size: 14px; font-weight: 700;
           padding: 13px 28px; border-radius: 40px; text-decoration: none;
@@ -274,10 +274,14 @@ export default function LandingPage() {
 
         /* NAV */
         .lp-nav {
-          position: fixed; top: 0; left: 0; right: 0; z-index: 200; height: 62px;
+          position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+          /* The bar's own 62px, plus the status-bar/notch strip it now extends underneath, so the
+             logo and links stay where they were rather than sliding up into the notch. */
+          height: calc(62px + var(--safe-t)); padding-top: var(--safe-t);
           background: rgba(255,255,255,0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
           border-bottom: 1px solid rgba(0,0,0,0.07);
-          display: flex; align-items: center; justify-content: space-between; padding: 0 44px;
+          display: flex; align-items: center; justify-content: space-between;
+          padding-left: calc(44px + var(--safe-l)); padding-right: calc(44px + var(--safe-r));
         }
         .lp-nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; animation: fadeDown 0.5s ease 0.1s both; }
         .lp-nav-logo img { width: 52px; height: 52px; border-radius: 12px; }
@@ -290,7 +294,7 @@ export default function LandingPage() {
 
         /* HERO */
         .lp-hero {
-          min-height: 100vh; padding-top: 62px;
+          min-height: 100vh; padding-top: calc(62px + var(--safe-t));
           display: grid; grid-template-columns: 1fr 1fr;
           align-items: center; gap: 48px;
           padding-left: 60px; padding-right: 60px;
@@ -776,9 +780,20 @@ export default function LandingPage() {
         .reveal.d1 { transition-delay: 0.08s; } .reveal.d2 { transition-delay: 0.16s; } .reveal.d3 { transition-delay: 0.24s; }
         .reveal.d4 { transition-delay: 0.08s; } .reveal.d5 { transition-delay: 0.16s; } .reveal.d6 { transition-delay: 0.24s; }
 
+        /* Held back until the very end so it wins over the section rules above without needing
+           !important. In portrait these insets are 0 on every device, so this costs nothing; it
+           only bites in landscape on a notched phone, where iOS reports a 44px camera housing over
+           one edge while the section gutters here are 20px. Padding the inner containers keeps the
+           section backgrounds running edge to edge and moves only the text out from under it. */
+        .lp-stats-band-inner, .lp-flow-inner, .lp-features-inner, .lp-testi-inner,
+        .lp-ba-inner, .lp-premium-inner, .lp-pricing-inner, .lp-demo-inner,
+        .lp-roi-inner, .lp-faq-inner, .lp-compare-inner {
+          padding-left: var(--safe-l); padding-right: var(--safe-r);
+        }
+
         /* RESPONSIVE */
         @media (max-width: 1000px) {
-          .lp-hero { grid-template-columns: 1fr; text-align: center; padding: 24px 20px 0; justify-items: center; min-height: auto; }
+          .lp-hero { grid-template-columns: 1fr; text-align: center; padding: calc(24px + var(--safe-t)) calc(20px + var(--safe-r)) 0 calc(20px + var(--safe-l)); justify-items: center; min-height: auto; }
           .lp-hero-text { padding: 28px 0 12px; }
           .lp-h1 { max-width: 100%; margin-bottom: 14px; }
           .lp-hero-sub { max-width: 100%; }
@@ -786,7 +801,9 @@ export default function LandingPage() {
           .lp-hero-phone { display: none; }
         }
         @media (max-width: 900px) {
-          .lp-nav { padding: 0 20px; }
+          /* Longhand, not the "padding: 0 20px" shorthand this replaces: the shorthand would reset
+             the notch offset the base .lp-nav rule sets on padding-top. */
+          .lp-nav { padding-left: calc(20px + var(--safe-l)); padding-right: calc(20px + var(--safe-r)); }
           .lp-nav-links { display: none; }
           .hamburger-btn { display: flex; }
           .lp-nav-cta { display: none; }
@@ -849,7 +866,7 @@ export default function LandingPage() {
         .hamburger-btn.open span:nth-child(2) { opacity: 0; }
         .hamburger-btn.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
         #mobile-nav {
-          position: fixed; top: 62px; left: 0; right: 0; z-index: 190;
+          position: fixed; top: calc(62px + var(--safe-t)); left: 0; right: 0; z-index: 190;
           background: rgba(255,255,255,0.98); backdrop-filter: blur(20px);
           border-bottom: 1px solid #EBEBEB;
           display: flex; flex-direction: column; gap: 2px; padding: 12px 16px 16px;
