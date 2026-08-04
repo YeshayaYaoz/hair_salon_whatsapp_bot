@@ -17,9 +17,11 @@
     --safe-l: env(safe-area-inset-left, 0px);
     --safe-r: env(safe-area-inset-right, 0px);
 
-    /* Published by MobileSetupBar while it is on screen, so <main> can reserve the right amount of
-       room for it. See .dashboard-main below. */
-    --mobile-setup-bar-h: 0px;
+    /* How much of the bottom of the screen the mobile nav dock takes up, published by the dashboard
+       layout from a real measurement (see the ResizeObserver there). It changes with the setup
+       strip and the home-indicator inset, so page padding and the More sheet both read it rather
+       than each guessing. 0 until the dock mounts, and on desktop, where there is no dock. */
+    --mobile-dock-occupied: 0px;
   }
 
   body {

@@ -102,9 +102,8 @@ for (const [label, email] of [
       const r = main.getBoundingClientRect();
 
       // Every fixed element occupying the bottom of the viewport. Deliberately NOT "flush with the
-      // bottom edge": the setup bar stacks *on top of* the tab bar, so its own bottom sits 64px up.
-      // Requiring flushness counted only the tab bar and would have declared the clipping fixed
-      // while the setup bar was still covering content.
+      // bottom edge" — the dock now floats, so its own bottom sits ~10px up (plus the home-indicator
+      // inset), and requiring flushness would find nothing at all.
       const bottomChrome = [...document.querySelectorAll("body *")]
         .filter((el) => {
           const s = getComputedStyle(el);
@@ -119,14 +118,30 @@ for (const [label, email] of [
 
       const topOfChrome = bottomChrome.length ? Math.min(...bottomChrome.map((c) => c.top)) : window.innerHeight;
 
+      // The setup prompt is no longer a bar of its own: it is a strip inside the dock, so it is the
+      // dock's direct <a> child. (The tabs are links too, but they live inside the dock's <nav>.)
+      const dock = [...document.querySelectorAll("body > * *")].find((el) => {
+        const s = getComputedStyle(el);
+        return s.position === "fixed" && el.querySelector(":scope > nav") && el.getBoundingClientRect().height > 0;
+      });
+      const setupStrip = dock ? dock.querySelector(":scope > a") : null;
+
       return {
         paddingBottom: parseFloat(cs.paddingBottom),
         pathname: location.pathname,
+        setupStripPresent: Boolean(setupStrip),
+        // Smallest tappable dimension in the dock — tabs must stay finger-sized as it shrinks.
+        minDockTap: dock
+          ? Math.min(...[...dock.querySelectorAll("nav > a, nav > button")].map((el) => {
+              const r = el.getBoundingClientRect();
+              return Math.round(Math.min(r.width, r.height));
+            }))
+          : null,
         // The inline checklist is the thing the fixed bar must not duplicate. Identified by its
         // heading rather than a class, so it survives restyling.
         hasInlineChecklist: [...document.querySelectorAll("h2,h3")]
           .some((h) => /השלמת ההגדרות|Finish setting up/.test(h.textContent || "")),
-        setupBarVar: getComputedStyle(document.documentElement).getPropertyValue("--mobile-setup-bar-h").trim(),
+        dockOccupied: getComputedStyle(document.documentElement).getPropertyValue("--mobile-dock-occupied").trim(),
         chromeHeight: window.innerHeight - topOfChrome,
         bottomChrome,
         // Where the last line of real content can reach, in page coordinates.
@@ -135,8 +150,7 @@ for (const [label, email] of [
       };
     });
 
-    // The setup bar is the only <a> pinned to the bottom; the tab bar is a <nav>.
-    const setupBarPresent = m.bottomChrome.some((c) => c.tag === "a");
+    const setupBarPresent = m.setupStripPresent;
 
     // Stated as the rule itself rather than as a path, because which page an account lands on
     // varies: a business that hasn't picked a type yet is redirected to /dashboard/onboarding,
@@ -156,7 +170,10 @@ for (const [label, email] of [
     check(`${label} / ${pageLabel}: <main> reserves at least the chrome it sits under`,
       m.paddingBottom >= m.chromeHeight,
       `padding-bottom ${m.paddingBottom}px vs ${m.chromeHeight}px of chrome ` +
-      `(--mobile-setup-bar-h ${m.setupBarVar || "unset"})`);
+      `(--mobile-dock-occupied ${m.dockOccupied || "unset"})`);
+
+    check(`${label} / ${pageLabel}: dock tab targets stay finger-sized`,
+      m.minDockTap !== null && m.minDockTap >= 44, `smallest dimension ${m.minDockTap}px`);
   }
 
   await page.close();

@@ -73,7 +73,7 @@ const translations = {
     noStaff: "No staff members yet. Add one below.", remove: "Remove",
 
     // Hours
-    hoursTitle: "Opening Hours", hoursSubtitle: "Set when your salon is open for bookings",
+    hoursTitle: "Schedule", hoursSubtitle: "Set when your salon is open for bookings",
     saveHours: "Save hours", to: "to",
 
     // WhatsApp
@@ -239,7 +239,7 @@ const translations = {
     noStaff: "עוד אין אנשי צוות. מוסיפים למטה 👇", remove: "הסרה",
 
     // Hours
-    hoursTitle: "שעות פעילות", hoursSubtitle: "מתי אתם פתוחים? הבוט יקבע תורים רק בשעות האלה.",
+    hoursTitle: "לוח זמנים", hoursSubtitle: "מתי אתם פתוחים? הבוט יקבע תורים רק בשעות האלה.",
     saveHours: "שמירת שעות", to: "עד",
 
     // WhatsApp

@@ -3,11 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { clearToken, apiFetch, decodeToken, exitImpersonation, reloadAs } from "../lib/api";
 import { useLanguage } from "../lib/LanguageContext";
 import { AuthGuard } from "../lib/AuthGuard";
-import { MobileSetupBar } from "../lib/MobileSetupBar";
+import { useNextSetupStep } from "../lib/useNextSetupStep";
 import { useDialog } from "../lib/useDialog";
 
 // One nav item. Icons are Heroicons outline path data.
@@ -88,13 +88,55 @@ function isVisibleFor(item: NavItem, businessType: string | null): boolean {
 // Curated deliberately rather than taken as the first N of NAV_GROUPS: that ordering is grouped
 // for the desktop sidebar, and slicing it happened to hand a prime mobile tab to the waitlist
 // while burying everything else. These four are the daily drivers; setup destinations are reached
-// via MobileSetupBar (while setup is incomplete) and the More sheet. Four tabs + More also leaves
-// noticeably bigger touch targets than five did.
+// via the dock's setup strip (while setup is incomplete) and the More sheet. Four tabs + More also
+// leaves noticeably bigger touch targets than five did.
 const BOTTOM_TAB_KEYS: NavItem["key"][] = ["analytics", "appointments", "customers", "services"];
 const BOTTOM_TAB_ITEMS = BOTTOM_TAB_KEYS
   .map((key) => NAV_ITEMS.find((i) => i.key === key))
   .filter((i): i is NavItem => Boolean(i));
 const MORE_ITEMS = NAV_ITEMS.filter((i) => !BOTTOM_TAB_KEYS.includes(i.key));
+
+/**
+ * One destination in the "More" sheet's grid.
+ *
+ * A tile rather than a list row because nine full-width rows didn't fit the sheet's 70vh cap, so
+ * the sheet always scrolled and you could never see all your options at once. Three columns fit
+ * the same nine in three rows with room to spare, and the target grows from a 44px-tall row to a
+ * 70px square.
+ *
+ * Labels get two lines: "מחירים ושירותים" and "סליקה וחשבוניות" do not fit one line of a
+ * ~105px tile, and truncating the longest names in a menu whose whole job is recognition would
+ * defeat the point.
+ */
+function MoreTile({
+  href, icon, label, active, tone = "brand",
+}: {
+  href: string;
+  icon: string;
+  label: string;
+  active: boolean;
+  tone?: "brand" | "admin";
+}) {
+  const activeBg = tone === "admin" ? "#FEF3C7" : "#DCF1F8";
+  const activeFg = tone === "admin" ? "#92400E" : "#136B87";
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className="h-[66px] flex flex-col items-center justify-center gap-1 px-1 rounded-xl text-[11px] font-medium leading-tight text-center transition"
+      style={{
+        background: active ? activeBg : "#F5F7F9",
+        color: active ? activeFg : "#374151",
+        border: `1px solid ${active ? activeBg : "#EDF1F4"}`,
+      }}
+    >
+      <svg className="w-[22px] h-[22px] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.2 : 1.75} d={icon} />
+      </svg>
+      <span className="line-clamp-2">{label}</span>
+    </Link>
+  );
+}
 
 function ImpersonationBanner() {
   const router = useRouter();
@@ -294,7 +336,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { t, lang, businessType } = useLanguage();
   const he = lang === "he";
-  const activeItem = NAV_ITEMS.find((item) => item.href === pathname);
   const [moreOpen, setMoreOpen] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [trial, setTrial] = useState<{ status: string; createdAt: string } | null>(null);
@@ -319,6 +360,40 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     setMoreOpen(false); // close the sheet on navigation
   }, [pathname]);
+
+  // The single setup nudge, rendered as a strip inside the dock rather than as a bar of its own.
+  const setupStep = useNextSetupStep(lang);
+
+  // How much of the bottom of the screen the dock actually occupies — its own height plus the gap
+  // it floats above and the home-indicator inset below that. Published so <main> can reserve it and
+  // the More sheet can sit on top of it, neither of which can otherwise know: the dock grows by
+  // 34px when the setup strip appears, and by --safe-b on a notched phone.
+  //
+  // Measured rather than computed from constants. The previous arrangement hard-coded the number in
+  // one file and changed the chrome in another, which is exactly how content ended up underneath it.
+  const dockRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const root = document.documentElement;
+    const publish = () => {
+      const el = dockRef.current;
+      const rect = el?.getBoundingClientRect();
+      // Zero height means `md:hidden` has it display:none — on desktop nothing is occupied, and
+      // without this guard the whole viewport height would be reported.
+      const occupied = !rect || rect.height === 0 ? 0 : Math.round(window.innerHeight - rect.top);
+      root.style.setProperty("--mobile-dock-occupied", `${occupied}px`);
+    };
+    publish();
+
+    const ro = new ResizeObserver(publish);
+    if (dockRef.current) ro.observe(dockRef.current);
+    window.addEventListener("resize", publish);
+    window.addEventListener("orientationchange", publish);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", publish);
+      window.removeEventListener("orientationchange", publish);
+    };
+  }, [setupStep, businessType, isSuperAdmin]);
 
   function logout() {
     clearToken();
@@ -358,34 +433,23 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <SidebarContent pathname={pathname} isSuperAdmin={isSuperAdmin} />
       </aside>
 
-      {/* Mobile top bar. The pl/pr here (rather than the ps/pe used everywhere else in this file)
-          is deliberate: --safe-* describe the physical screen, so they must not flip with `dir`. */}
-      <div
-        className="md:hidden fixed top-0 start-0 end-0 z-30 flex items-center
-          h-[calc(3.5rem+var(--safe-t))] pt-[var(--safe-t)]
-          pl-[calc(1rem+var(--safe-l))] pr-[calc(1rem+var(--safe-r))]"
-        style={{ background: "rgba(255,255,255,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid #E5E7EB" }}
-      >
-        <div className="flex items-center gap-2.5">
-          <Image src="/tori_logo-white.jpeg" alt="תורי" width={36} height={36} className="rounded-lg" />
-          <span className="font-semibold text-gray-900 text-base">
-            {activeItem ? t.nav[activeItem.key] : "תורי"}
-          </span>
-        </div>
-      </div>
+      {/* There is deliberately no mobile top bar any more. It was 56px of fixed chrome carrying a
+          36px logo and one string — `t.nav[activeItem.key]`, which is the page's own <h1> verbatim,
+          printed again about 110px below it. The right ~250px was empty. The page heading names the
+          page and the dock shows where you are; there was nothing left for a second bar to say.
 
-      {/* Main content */}
-      {/* The bottom padding was a flat `pb-24` (96px), which was only ever right when the setup bar
-          was absent: with it showing, real chrome is ~119px, so the last ~23px of every page sat
-          permanently underneath it — a constant in this file silently invalidated by a component in
-          another one. It is now the sum of what is actually on screen: the 4rem tab bar, whatever
-          MobileSetupBar currently measures itself to be (0px when it isn't rendered), the
-          home-indicator inset the tab bar reserves, and 1rem of breathing room. */}
+          It did incidentally hold content clear of the status bar, so <main> now reserves --safe-t
+          itself. */}
+
+      {/* Main content. The bottom padding is the dock's real occupied height (published by the
+          effect above) plus breathing room. It used to be a flat `pb-24` (96px) that assumed no
+          setup bar, so when one appeared the last ~23px of every page went underneath it — the
+          constant lived here while the bar that invalidated it lived in another file. */}
       <main
         id="main-content"
         tabIndex={-1}
-        className="flex-1 md:ms-64 px-4 pt-[calc(4.5rem+var(--safe-t))]
-          pb-[calc(4rem+var(--mobile-setup-bar-h)+var(--safe-b)+1rem)]
+        className="flex-1 md:ms-64 px-4 pt-[calc(1rem+var(--safe-t))]
+          pb-[calc(var(--mobile-dock-occupied)+1rem)]
           md:p-8 md:pt-8 md:pb-8 overflow-auto"
       >
         <ImpersonationBanner />
@@ -393,60 +457,116 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         {children}
       </main>
 
-      <MobileSetupBar />
+      {/* The mobile nav dock: one floating card, holding the optional setup strip and the tabs.
+          Floating rather than edge-to-edge because a bar welded to the bottom of the screen reads
+          as part of the device; lifted onto the page with a shadow, it reads as part of the app.
+          It is opaque, not translucent — content sliding under a floating card looks like a
+          rendering fault, whereas content sliding under a screen-wide bar looks intentional.
 
-      {/* Mobile bottom tab bar. It grows by the home-indicator inset and pads it back out, so the
-          4rem of tabs sits above the indicator rather than being letterboxed above a band that
-          doesn't share its background. */}
-      <nav
-        className="md:hidden fixed bottom-0 start-0 end-0 z-30 flex items-stretch
-          h-[calc(4rem+var(--safe-b))] pb-[var(--safe-b)]
-          pl-[var(--safe-l)] pr-[var(--safe-r)]"
-        style={{ background: "rgba(255,255,255,0.97)", backdropFilter: "blur(12px)", borderTop: "1px solid #E5E7EB" }}
+          The setup prompt lives *inside* it. It used to be a second fixed bar of its own, 55px
+          stacked on the tab bar at the same z-index, so which drew on top came down to DOM order.
+          As a 34px strip sharing this card there is one piece of chrome and nothing to stack. */}
+      <div
+        ref={dockRef}
+        className="md:hidden fixed z-30 rounded-2xl overflow-hidden
+          bottom-[calc(0.625rem+var(--safe-b))]
+          left-[calc(0.75rem+var(--safe-l))] right-[calc(0.75rem+var(--safe-r))]"
+        style={{
+          background: "#FFFFFF",
+          border: "1px solid #E6ECF1",
+          boxShadow: "0 6px 24px rgba(15,29,42,0.14), 0 2px 6px rgba(15,29,42,0.08)",
+        }}
       >
-        {BOTTOM_TAB_ITEMS.filter((i) => isVisibleFor(i, businessType)).map((item) => {
-          const active = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition"
-              style={{ color: active ? "#1B7FA0" : "#6B7280" }}
+        {setupStep && (
+          <Link
+            href={setupStep.href}
+            className="flex items-center gap-2 px-3 h-[34px] border-b"
+            style={{
+              background: setupStep.critical ? "#FFFBEB" : "#F3F7FA",
+              borderColor: setupStep.critical ? "#FDE68A" : "#E8EEF3",
+            }}
+          >
+            {/* One number, not two. A circular "6" badge next to a "6/6" counter said the same
+                thing twice on a 34px strip, and "6" alone read as "six done" rather than "step
+                six". The fraction carries both the position and the progress. */}
+            <span
+              className="shrink-0 px-1.5 py-0.5 rounded-md text-[11px] font-bold tabular-nums"
+              style={{
+                background: setupStep.critical ? "#FDE68A" : "#DCF1F8",
+                color: setupStep.critical ? "#78350F" : "#136B87",
+              }}
             >
-              <svg
-                className="w-5 h-5 transition"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                style={{ color: active ? "#1B7FA0" : "#6B7280" }}
+              {setupStep.stepNumber}/{setupStep.totalCount}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-[12px] font-semibold" style={{ color: "#0F1D2A" }}>
+              {setupStep.label}
+            </span>
+            <span className="shrink-0 text-base leading-none" style={{ color: "#1B7FA0" }} aria-hidden>
+              {he ? "←" : "→"}
+            </span>
+          </Link>
+        )}
+
+        <nav className="flex items-stretch h-[60px]" aria-label={he ? "ניווט ראשי" : "Main navigation"}>
+          {BOTTOM_TAB_ITEMS.filter((i) => isVisibleFor(i, businessType)).map((item) => {
+            const active = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className="flex-1 flex flex-col items-center justify-center gap-[3px] text-[11px] font-medium transition"
+                style={{ color: active ? "#136B87" : "#6B7280" }}
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.5 : 1.75} d={item.icon} />
+                {/* A tinted pill, not just a colour swap. The old active state was hue alone
+                    (#1B7FA0 against #6B7280) plus a stroke-width change, which is invisible to a
+                    red-green colour-blind user and nearly invisible to everyone in sunlight. */}
+                <span
+                  className="flex items-center justify-center w-11 h-7 rounded-full transition"
+                  style={{ background: active ? "#DCF1F8" : "transparent" }}
+                >
+                  <svg className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.2 : 1.75} d={item.icon} />
+                  </svg>
+                </span>
+                <span className="truncate max-w-[68px] text-center leading-tight">
+                  {(t.navShort as Record<string, string>)[item.key] ?? t.nav[item.key]}
+                </span>
+              </Link>
+            );
+          })}
+
+          <button
+            type="button"
+            onClick={() => setMoreOpen((v) => !v)}
+            aria-expanded={moreOpen}
+            aria-haspopup="dialog"
+            className="flex-1 flex flex-col items-center justify-center gap-[3px] text-[11px] font-medium transition"
+            style={{ color: moreOpen || moreActive ? "#136B87" : "#6B7280" }}
+          >
+            <span
+              className="flex items-center justify-center w-11 h-7 rounded-full transition"
+              style={{ background: moreOpen || moreActive ? "#DCF1F8" : "transparent" }}
+            >
+              <svg className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={moreOpen || moreActive ? 2.2 : 1.75} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
-              <span className="truncate max-w-[64px] text-center leading-tight">
-                {(t.navShort as Record<string, string>)[item.key] ?? t.nav[item.key]}
-              </span>
-            </Link>
-          );
-        })}
+            </span>
+            <span>{he ? "עוד" : "More"}</span>
+          </button>
+        </nav>
+      </div>
 
-        <button
-          type="button"
-          onClick={() => setMoreOpen((v) => !v)}
-          aria-expanded={moreOpen}
-          aria-haspopup="dialog"
-          className="flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition"
-          style={{ color: moreOpen || moreActive ? "#1B7FA0" : "#6B7280" }}
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-          <span>{he ? "עוד" : "More"}</span>
-        </button>
-      </nav>
+      {/* "More" sheet — the nine destinations that don't fit the four tabs.
 
-      {/* "More" bottom sheet — the nav items that don't fit the four tabs alongside it.
-          It rests on top of the tab bar, which is itself now taller by the home-indicator inset,
-          so the sheet must not reserve that inset a second time: the bar below already clears it. */}
+          This was a scrolling list of nine full-width rows, about 618px of content against a 591px
+          cap, so it always scrolled: you opened it, saw six items, and had to drag to find out
+          whether the seventh was the one you wanted. That — not the bar — is what made "עוד" hard
+          to navigate.
+
+          As a three-column grid the same nine fit in three rows with everything visible at once,
+          the group headings survive, and each target grows from a 44px-tall row to a 70px tile.
+          It floats above the dock and shares its horizontal insets, so the two read as one system. */}
       {moreOpen && (
         <div className="md:hidden fixed inset-0 z-40" onClick={() => setMoreOpen(false)}>
           <div className="absolute inset-0 bg-black/30" />
@@ -456,7 +576,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             aria-modal="true"
             aria-labelledby="more-sheet-title"
             onClick={(e) => e.stopPropagation()}
-            className="absolute bottom-[calc(4rem+var(--safe-b))] start-0 end-0 bg-white rounded-t-2xl shadow-2xl p-3 max-h-[70vh] overflow-y-auto"
+            className="absolute bottom-[calc(var(--mobile-dock-occupied)+0.5rem)]
+              left-[calc(0.75rem+var(--safe-l))] right-[calc(0.75rem+var(--safe-r))]
+              bg-white rounded-2xl shadow-2xl p-3 max-h-[70vh] overflow-y-auto"
           >
             {/* Sticky header: the sheet scrolls, and without this the only way out (other than
                 tapping the dim backdrop, which isn't obvious) scrolled away with the content. */}
@@ -473,59 +595,55 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 </svg>
               </button>
             </div>
-            {/* Mirror the sidebar's grouping so the mobile sheet reads as sections, not a flat list */}
+            {/* Mirror the sidebar's grouping so the sheet reads as sections, not 9 flat siblings */}
             {NAV_GROUPS.map((group) => {
               const items = group.items.filter((i) => MORE_ITEMS.includes(i) && isVisibleFor(i, businessType));
               if (items.length === 0) return null;
               return (
                 <div key={group.titleKey}>
-                  <div className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-600">
+                  <div className="px-1 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-600">
                     {t.navGroups[group.titleKey]}
                   </div>
-                  {items.map((item) => {
-                    const active = pathname === item.href;
-                    return (
-                      <Link
+                  <div className="grid grid-cols-3 gap-2">
+                    {items.map((item) => (
+                      <MoreTile
                         key={item.href}
                         href={item.href}
-                        className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition ${active ? "bg-[#1B7FA0]/10 text-[#1B7FA0]" : "text-gray-700"}`}
-                      >
-                        <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d={item.icon} />
-                        </svg>
-                        {t.nav[item.key]}
-                      </Link>
-                    );
-                  })}
+                        icon={item.icon}
+                        label={t.nav[item.key]}
+                        active={pathname === item.href}
+                      />
+                    ))}
+                  </div>
                 </div>
               );
             })}
             {isSuperAdmin && (
-              <>
-                <Link
-                  href="/dashboard/admin"
-                  className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition ${pathname === "/dashboard/admin" ? "bg-amber-50 text-amber-700" : "text-gray-700"}`}
-                >
-                  <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+              <div>
+                <div className="px-1 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-600">
                   {t.adminSection}
-                </Link>
-                <Link
-                  href="/dashboard/admin/leads"
-                  className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition ${pathname === "/dashboard/admin/leads" ? "bg-amber-50 text-amber-700" : "text-gray-700"}`}
-                >
-                  <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
-                  </svg>
-                  {t.leadFinder}
-                </Link>
-              </>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <MoreTile
+                    href="/dashboard/admin"
+                    icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    label={t.adminSection}
+                    active={pathname === "/dashboard/admin"}
+                    tone="admin"
+                  />
+                  <MoreTile
+                    href="/dashboard/admin/leads"
+                    icon="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"
+                    label={t.leadFinder}
+                    active={pathname === "/dashboard/admin/leads"}
+                    tone="admin"
+                  />
+                </div>
+              </div>
             )}
-            <div className="h-px bg-gray-100 my-2" />
             <button
               onClick={logout}
-              className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-gray-600 transition"
+              className="mt-2.5 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium text-gray-600 border border-gray-200 transition"
             >
               <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
