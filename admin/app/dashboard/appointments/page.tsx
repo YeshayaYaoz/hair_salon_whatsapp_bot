@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
@@ -38,6 +39,54 @@ const STATUS_STYLES: Record<string, string> = {
 
 type Filter = "upcoming" | "past" | "cancelled" | "all";
 type ViewMode = "list" | "calendar";
+
+/**
+ * "N customers are waiting" — shown only when someone is, linking to the list.
+ *
+ * The mobile dock puts the waitlist's count on the bookings tab, since pricing keeps the fourth
+ * tab slot and the waitlist lives behind "More". A badge that leads to a screen with no mention of
+ * what it counted is worse than no badge, so this is where that tap arrives.
+ *
+ * Counts un-notified entries, matching the badge and the waitlist page's own "pending" split: an
+ * entry stays on the list after the owner replies, so counting all of them would never clear.
+ */
+function WaitlistCallout() {
+  const { t, lang } = useLanguage();
+  const he = lang === "he";
+  const [pending, setPending] = useState(0);
+
+  useEffect(() => {
+    apiFetch<{ waitlist: number }>("/api/business/me/nav-badges")
+      .then((b) => setPending(b.waitlist ?? 0))
+      .catch(() => {});
+  }, []);
+
+  if (pending === 0) return null;
+
+  return (
+    <Link
+      href="/dashboard/waitlist"
+      className="mb-5 flex items-center gap-3 rounded-xl px-4 py-3 transition"
+      style={{ background: "#FFF7ED", border: "1px solid #FED7AA" }}
+    >
+      <span
+        className="shrink-0 min-w-[24px] h-6 px-1.5 rounded-full flex items-center justify-center text-xs font-bold tabular-nums"
+        style={{ background: "#B91C1C", color: "#FFFFFF" }}
+        aria-hidden
+      >
+        {pending}
+      </span>
+      <span className="flex-1 text-sm font-semibold" style={{ color: "#7C2D12" }}>
+        {he
+          ? `${pending} ${pending === 1 ? "לקוח ממתין" : "לקוחות ממתינים"} שיתפנה מקום`
+          : `${pending} ${pending === 1 ? "customer is" : "customers are"} waiting for a slot`}
+      </span>
+      <span className="shrink-0 text-sm font-semibold" style={{ color: "#9A3412" }}>
+        {t.waitlistTitle} {he ? "←" : "→"}
+      </span>
+    </Link>
+  );
+}
 
 function GoogleCalendarSection() {
   const { lang } = useLanguage();
@@ -607,6 +656,11 @@ export default function AppointmentsPage() {
           </button>
         </div>
       </div>
+
+      {/* The bookings tab carries the waitlist's badge, because the waitlist has no tab of its own.
+          Without this the badge would be a dead end: you'd tap a count and land somewhere that
+          never mentions what it was counting. This is the other half of that. */}
+      <WaitlistCallout />
 
       <GoogleCalendarSection />
 

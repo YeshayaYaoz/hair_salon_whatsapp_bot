@@ -3,6 +3,27 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* The root layout sets viewport-fit=cover so fixed bars can reach the physical screen edge
+       instead of being letterboxed above the home indicator. The trade is that we now own all four
+       insets. Naming them once keeps the fallback in one place: on every non-notched device — and
+       in headless Chromium — env() resolves to 0px, so every calc() built on these collapses to
+       the plain value it had before.
+
+       These are deliberately physical (top/bottom/left/right), not logical (block/inline). A notch
+       is a fact about the hardware: it does not swap sides when the document turns RTL. */
+    --safe-t: env(safe-area-inset-top, 0px);
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-l: env(safe-area-inset-left, 0px);
+    --safe-r: env(safe-area-inset-right, 0px);
+
+    /* How much of the bottom of the screen the mobile nav dock takes up, published by the dashboard
+       layout from a real measurement (see the ResizeObserver there). It changes with the setup
+       strip and the home-indicator inset, so page padding and the More sheet both read it rather
+       than each guessing. 0 until the dock mounts, and on desktop, where there is no dock. */
+    --mobile-dock-occupied: 0px;
+  }
+
   body {
     background-color: #F4F6F8;
     color: #111827;

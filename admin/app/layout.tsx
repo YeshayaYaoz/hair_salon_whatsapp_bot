@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Heebo, Karantina } from "next/font/google";
 import { LanguageProvider } from "./lib/LanguageContext";
 import "./globals.css";
@@ -69,6 +69,26 @@ export const metadata: Metadata = {
   },
   category: "technology",
   classification: "Business Software",
+};
+
+/**
+ * There was no `viewport` export at all before this, which meant `viewport-fit` stayed at its
+ * default of `auto` — and under `auto` iOS shrinks the layout viewport to avoid the notch and home
+ * indicator, so `env(safe-area-inset-*)` reports 0 in every rule that asks for it. The dashboard's
+ * bottom tab bar therefore couldn't sit flush against the bottom of a modern iPhone; it floated
+ * above a letterbox band that didn't match its own background.
+ *
+ * `cover` gives us the full screen and hands back responsibility for all four insets. Everything
+ * pinned to an edge — the landing page's nav and sticky CTA, the dashboard's top bar, tab bar,
+ * setup bar and More sheet — reserves them via the --safe-* variables in globals.css.
+ *
+ * `width`/`initialScale` restate what Next.js already emitted by default, so declaring this export
+ * changes nothing but `viewportFit`.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 const heebo = Heebo({

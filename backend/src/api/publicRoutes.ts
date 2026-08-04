@@ -1,11 +1,11 @@
-import { Router } from "express";
+import { asyncRouter } from "../lib/asyncRouter.js";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { findAvailableSlots, createAppointment, OutsideBusinessHoursError, SlotUnavailableError } from "../booking/availability.js";
 import { hasActiveSubscription } from "../lib/subscriptionGate.js";
 import { rateLimit } from "../lib/rateLimit.js";
 
-export const publicRouter = Router();
+export const publicRouter = asyncRouter();
 
 // This whole router is unauthenticated by design (it's the public booking widget), so it's the
 // one surface anyone could hammer with a script. Reads are looser (a real customer browsing

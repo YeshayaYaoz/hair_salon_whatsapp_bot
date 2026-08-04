@@ -244,10 +244,10 @@ export default function LandingPageEN() {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
           direction: ltr; -webkit-font-smoothing: antialiased; overflow-x: hidden;
         }
-        #scroll-bar { position: fixed; top: 0; left: 0; height: 2px; background: #25D366; z-index: 9999; width: 0; transition: width 0.05s linear; }
+        #scroll-bar { position: fixed; top: var(--safe-t); left: 0; height: 2px; background: #25D366; z-index: 9999; width: 0; transition: width 0.05s linear; }
 
         #sticky-cta {
-          position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+          position: fixed; bottom: calc(28px + var(--safe-b)); left: 50%; transform: translateX(-50%);
           z-index: 500; opacity: 0; transition: opacity 0.3s ease;
           background: #25D366; color: #fff; font-size: 14px; font-weight: 700;
           padding: 13px 28px; border-radius: 40px; text-decoration: none;
@@ -257,10 +257,13 @@ export default function LandingPageEN() {
         #sticky-cta:hover { opacity: 0.88 !important; transform: translateX(-50%) translateY(-2px); }
 
         .lp-nav {
-          position: fixed; top: 0; left: 0; right: 0; z-index: 200; height: 62px;
+          position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+          /* The bar's own 62px, plus the notch strip it now extends underneath. */
+          height: calc(62px + var(--safe-t)); padding-top: var(--safe-t);
           background: rgba(255,255,255,0.92); backdrop-filter: blur(20px);
           border-bottom: 1px solid rgba(0,0,0,0.07);
-          display: flex; align-items: center; justify-content: space-between; padding: 0 44px;
+          display: flex; align-items: center; justify-content: space-between;
+          padding-left: calc(44px + var(--safe-l)); padding-right: calc(44px + var(--safe-r));
         }
         .lp-nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
         .lp-nav-logo span { font-size: 16px; font-weight: 700; color: #111; letter-spacing: -0.3px; }
@@ -275,7 +278,7 @@ export default function LandingPageEN() {
         @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
 
         .lp-hero {
-          min-height: 100vh; padding-top: 62px;
+          min-height: 100vh; padding-top: calc(62px + var(--safe-t));
           display: grid; grid-template-columns: 1fr 1fr;
           align-items: center; gap: 48px;
           padding-left: 60px; padding-right: 60px;
@@ -627,12 +630,23 @@ export default function LandingPageEN() {
         .caller-l { color: rgba(255,255,255,0.7); }
         .ai-l { color: #F59E0B; }
 
+        /* Last so it wins over the section rules above without !important. Zero in portrait and on
+           every non-notched device; in landscape on a notched phone iOS reports a 44px camera
+           housing over one edge while these gutters are 20px, so the text would otherwise run
+           underneath it. Only the inner containers move — section backgrounds stay edge to edge. */
+        .lp-trust-bar-inner, .lp-stats-band-inner, .lp-section-inner, .lp-flow-inner,
+        .lp-steps-inner, .lp-features-inner, .lp-ba-inner, .lp-testimonials-inner,
+        .lp-roi-inner, .lp-pricing-inner, .lp-compare-inner, .lp-faq-inner,
+        .lp-demo-inner, .lp-premium-inner {
+          padding-left: var(--safe-l); padding-right: var(--safe-r);
+        }
+
         /* Hamburger */
         .hamburger-btn { display: none; flex-direction: column; gap: 4px; background: none; border: none; cursor: pointer; padding: 6px; border-radius: 6px; }
         @media (max-width: 768px) {
           .hamburger-btn { display: flex; }
           .lp-nav-links, .lp-nav-cta { display: none; }
-          .lp-hero { grid-template-columns: 1fr; padding: 76px 20px 20px; }
+          .lp-hero { grid-template-columns: 1fr; padding: calc(76px + var(--safe-t)) calc(20px + var(--safe-r)) 20px calc(20px + var(--safe-l)); }
           .lp-hero-phone { display: none; }
           .lp-stats-band-inner { grid-template-columns: repeat(2,1fr); }
           .lp-feats-grid { grid-template-columns: 1fr; }
@@ -648,7 +662,7 @@ export default function LandingPageEN() {
         .hamburger-btn.open span:nth-child(1) { transform: translateY(5.5px) rotate(45deg); }
         .hamburger-btn.open span:nth-child(2) { opacity: 0; }
         .hamburger-btn.open span:nth-child(3) { transform: translateY(-5.5px) rotate(-45deg); }
-        #mobile-nav { position: fixed; top: 62px; left: 0; right: 0; z-index: 190; background: #fff; border-bottom: 1px solid #EBEBEB; display: flex; flex-direction: column; padding: 12px 20px; gap: 4px; transform: translateY(-8px); opacity: 0; pointer-events: none; transition: transform 0.2s, opacity 0.2s; }
+        #mobile-nav { position: fixed; top: calc(62px + var(--safe-t)); left: 0; right: 0; z-index: 190; background: #fff; border-bottom: 1px solid #EBEBEB; display: flex; flex-direction: column; padding: 12px calc(20px + var(--safe-r)) 12px calc(20px + var(--safe-l)); gap: 4px; transform: translateY(-8px); opacity: 0; pointer-events: none; transition: transform 0.2s, opacity 0.2s; }
         #mobile-nav.open { transform: none; opacity: 1; pointer-events: auto; }
         .mobile-nav-link { font-size: 15px; font-weight: 500; color: #333; text-decoration: none; padding: 10px 8px; border-radius: 8px; }
         .mobile-nav-link:hover { background: #F5F5F5; }

@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { asyncRouter } from "../lib/asyncRouter.js";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { findAvailableSlots, SlotUnavailableError, OutsideBusinessHoursError } from "../booking/availability.js";
@@ -6,7 +6,7 @@ import { bookAppointmentWithSideEffects, cancelAppointmentById, rescheduleAppoin
 import { parseBookingTime, instantPartsInTz } from "../lib/timezone.js";
 import { TEMPLATES, isBusinessType } from "../lib/businessTemplates.js";
 
-export const voiceRouter = Router();
+export const voiceRouter = asyncRouter();
 
 // Cartesia's agent hits these as custom tools during a live call, so it's a single shared secret
 // configured once in the Cartesia agent's tool auth header — not a per-business webhook secret like

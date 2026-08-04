@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { asyncRouter } from "../lib/asyncRouter.js";
 import { z } from "zod";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
@@ -13,7 +13,7 @@ import { generateOutreachDraft } from "./outreach.js";
 import { sendWhatsAppTemplate } from "../webhook/whatsappClient.js";
 import { sendOutreachEmail } from "../lib/email.js";
 
-export const leadFinderRouter = Router();
+export const leadFinderRouter = asyncRouter();
 
 // Every Lead Finder route is a super-admin-only internal tool — reuse the exact same auth
 // middleware as the rest of the admin surface rather than duplicating it.

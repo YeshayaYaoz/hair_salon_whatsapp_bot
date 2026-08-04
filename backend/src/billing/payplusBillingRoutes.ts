@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { asyncRouter } from "../lib/asyncRouter.js";
 import crypto from "crypto";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
@@ -21,8 +21,8 @@ import { explainPayPlusError } from "../lib/payplusErrors.js";
 /** Fallback return URL when the caller sends none — the dashboard page these actions start from. */
 const APP_URL = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
-export const payplusBillingRouter = Router();
-export const payplusBillingWebhookRouter = Router();
+export const payplusBillingRouter = asyncRouter();
+export const payplusBillingWebhookRouter = asyncRouter();
 
 /** Creates a PayPlus checkout link that charges the first period AND captures a recurring token. */
 payplusBillingRouter.post("/payplus/checkout", requireAuth, async (req: AuthedRequest, res) => {
