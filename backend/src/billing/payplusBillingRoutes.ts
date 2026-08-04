@@ -11,6 +11,8 @@ import {
   PLAN_PRICES_ILS,
   BILLING_PERIOD_DAYS,
   planPriceForCycle,
+  unusedCreditIls,
+  chargeAfterCredit,
   PayPlusBillingNotConfiguredError,
 } from "./payplusSubscription.js";
 import { captureError } from "../lib/errorMonitoring.js";
@@ -68,8 +70,15 @@ payplusBillingRouter.post("/payplus/switch-to-annual", requireAuth, async (req: 
   if (!business.subscriptionToken) {
     const returnUrl = parsedBody.success && parsedBody.data.returnUrl ? parsedBody.data.returnUrl : `${APP_URL}/dashboard/billing`;
     try {
-      const url = await createSubscriptionCheckoutLink(business.id, business.subscriptionPlan, returnUrl, "annual");
-      return res.json({ url });
+      const credit = unusedCreditIls(business);
+      const url = await createSubscriptionCheckoutLink(
+        business.id,
+        business.subscriptionPlan,
+        returnUrl,
+        "annual",
+        chargeAfterCredit(planPriceForCycle(business.subscriptionPlan, "annual"), credit)
+      );
+      return res.json({ url, creditedIls: credit });
     } catch (err) {
       console.error("PayPlus annual checkout failed:", err);
       captureError(err, { businessId: business.id, kind: "payplusAnnualCheckout" });
@@ -78,7 +87,10 @@ payplusBillingRouter.post("/payplus/switch-to-annual", requireAuth, async (req: 
     }
   }
 
-  const amountIls = planPriceForCycle(business.subscriptionPlan, "annual");
+  // Credit the days already paid for on the monthly plan. Charging the full annual price on day 3
+  // of a paid month bills them twice for the remaining 27 days.
+  const creditIls = unusedCreditIls(business);
+  const amountIls = chargeAfterCredit(planPriceForCycle(business.subscriptionPlan, "annual"), creditIls);
   const token = decryptSecret(business.subscriptionToken);
   const result = await chargeSubscriptionToken(token, amountIls, "תורי — מעבר למנוי שנתי");
   if (!result.success) return res.status(502).json({ error: `החיוב למנוי השנתי נכשל. ${explainPayPlusError(result.error ?? "")}` });
@@ -91,7 +103,7 @@ payplusBillingRouter.post("/payplus/switch-to-annual", requireAuth, async (req: 
       lastBillingAttemptAt: new Date(),
     },
   });
-  res.json({ ok: true, chargedIls: amountIls });
+  res.json({ ok: true, chargedIls: amountIls, creditedIls: creditIls });
 });
 
 /** Tops up the prepaid wallet used for metered add-ons (extra WhatsApp/SMS sends beyond the plan). */
@@ -143,8 +155,17 @@ payplusBillingRouter.put("/payplus/plan", requireAuth, async (req: AuthedRequest
   if (!business.subscriptionToken || !business.subscriptionPlan || !business.nextBillingDate) {
     const cycle = business.billingCycle === "annual" ? "annual" : "monthly";
     try {
-      const url = await createSubscriptionCheckoutLink(business.id, parsed.data.plan, `${APP_URL}/dashboard/billing`, cycle);
-      return res.json({ url });
+      // Same rule as the token path below, which charges only the difference in daily rates: the
+      // unused remainder of the current plan comes off a fresh period on the new one.
+      const credit = unusedCreditIls(business);
+      const url = await createSubscriptionCheckoutLink(
+        business.id,
+        parsed.data.plan,
+        `${APP_URL}/dashboard/billing`,
+        cycle,
+        chargeAfterCredit(planPriceForCycle(parsed.data.plan, cycle), credit)
+      );
+      return res.json({ url, creditedIls: credit });
     } catch (err) {
       console.error("PayPlus plan-change checkout failed:", err);
       captureError(err, { businessId: business.id, kind: "payplusPlanChangeCheckout" });

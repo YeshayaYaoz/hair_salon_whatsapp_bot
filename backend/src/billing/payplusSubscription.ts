@@ -41,6 +41,51 @@ export function planPriceForCycle(plan: string, cycle: string): number {
   return cycle === "annual" ? base * ANNUAL_MONTHS_CHARGED : base;
 }
 
+/**
+ * What a business has already paid for but not yet used on its current plan, in whole shekels.
+ *
+ * Every upgrade path has to subtract this. Without it, switching to annual on day 3 of a paid
+ * month means paying twice for the remaining 27 days — the customer notices, and they are right
+ * to. The mid-cycle plan change already worked this way (it charges the difference in daily
+ * rates); this makes the same rule apply everywhere, from one place.
+ *
+ * Deliberately based on the base plan price only. The loyalty discount and the managed-account
+ * surcharges are unchanged by a plan or cycle switch and carry straight over, so leaving them out
+ * of both sides keeps the arithmetic honest instead of crediting something that was never
+ * separately charged for these days.
+ *
+ * Returns 0 rather than a negative number for a business with no known period end — an unknown
+ * cycle must not silently become a discount.
+ */
+export function unusedCreditIls(
+  business: { subscriptionPlan: string | null; billingCycle: string; nextBillingDate: Date | null },
+  now: Date = new Date()
+): number {
+  if (!business.subscriptionPlan || !business.nextBillingDate) return 0;
+  const base = PLAN_PRICES_ILS[business.subscriptionPlan];
+  if (!base) return 0;
+
+  const cycle = business.billingCycle === "annual" ? "annual" : "monthly";
+  const periodDays = BILLING_PERIOD_DAYS[cycle];
+  const paidForPeriod = planPriceForCycle(business.subscriptionPlan, cycle);
+
+  const msRemaining = business.nextBillingDate.getTime() - now.getTime();
+  // Floored at 0: a due date in the past means the period is already spent, not that they owe us.
+  // Capped at the period length so a manually-pushed date cannot manufacture credit.
+  const daysRemaining = Math.min(periodDays, Math.max(0, Math.ceil(msRemaining / (24 * 60 * 60 * 1000))));
+
+  return Math.round((paidForPeriod / periodDays) * daysRemaining);
+}
+
+/** Smallest charge we will send to PayPlus. A zero or negative amount is rejected outright, and a
+ * credit larger than the upgrade is not a reason to fail the upgrade — it just costs a shekel. */
+export const MIN_CHARGE_ILS = 1;
+
+/** Applies a credit to an amount without ever producing something PayPlus will reject. */
+export function chargeAfterCredit(amountIls: number, creditIls: number): number {
+  return Math.max(MIN_CHARGE_ILS, amountIls - creditIls);
+}
+
 export class PayPlusBillingNotConfiguredError extends Error {
   constructor() {
     super("PAYPLUS_API_KEY / PAYPLUS_SECRET_KEY / PAYPLUS_PAGE_UID are not all set — subscription billing is unavailable");
@@ -74,15 +119,25 @@ function creds() {
  * more_info is capped at 19 characters by PayPlus, which a cuid alone exceeds — so it carries a
  * short random reference and the plan/cycle are parked on the business row for the webhook to read.
  */
-export async function createSubscriptionCheckoutLink(businessId: string, plan: string, returnUrl: string, cycle: "monthly" | "annual" = "monthly"): Promise<string> {
-  const amountIls = planPriceForCycle(plan, cycle);
+export async function createSubscriptionCheckoutLink(
+  businessId: string,
+  plan: string,
+  returnUrl: string,
+  cycle: "monthly" | "annual" = "monthly",
+  /** Already discounted by unusedCreditIls when this checkout is an upgrade, not a first purchase. */
+  amountOverrideIls?: number
+): Promise<string> {
+  const fullPrice = planPriceForCycle(plan, cycle);
+  const amountIls = amountOverrideIls ?? fullPrice;
   const planLabel = plan === "premium" ? "Premium" : "Standard";
   const cycleLabel = cycle === "annual" ? "שנתי" : "חודשי";
+  // Named on the payment page so the owner can see why it is not the list price.
+  const credited = amountIls < fullPrice ? ` — בקיזוז ₪${fullPrice - amountIls} ששולמו כבר` : "";
 
   return generateCheckoutPage({
     businessId,
     amountIls,
-    itemName: `תורי — מנוי ${planLabel} (${cycleLabel})`,
+    itemName: `תורי — מנוי ${planLabel} (${cycleLabel})${credited}`,
     returnUrl,
     pending: { checkoutPurpose: "subscription", checkoutPlan: plan, checkoutCycle: cycle },
   });
