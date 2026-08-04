@@ -86,6 +86,47 @@ describe("POST /api/voice/context", () => {
     expect(res.body.caller.isKnownCustomer).toBe(false);
   });
 
+  it("matches a locally-written number against the E.164 one Cartesia dials", async () => {
+    // The trap this guards: the owner types their line the way they say it ("055-507-7941") while
+    // Cartesia sends "+972555077941". Digits alone are not equal, so the call used to resolve to no
+    // business at all — the agent answering a real caller with no idea whose salon it is, and
+    // nothing in the logs suggesting a format problem.
+    mockPrisma.business.findMany.mockResolvedValue([{ id: "biz1", voicePhoneNumber: "055-507-7941" }]);
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ name: "Salon Dana", timezone: "Asia/Jerusalem", address: null, botGreeting: null });
+    mockPrisma.businessHours.findMany.mockResolvedValue([]);
+    mockPrisma.customer.findMany.mockResolvedValue([]);
+    mockPrisma.service.findMany.mockResolvedValue([]);
+    mockPrisma.faqEntry.findMany.mockResolvedValue([]);
+    mockPrisma.specialPeriod.findMany.mockResolvedValue([]);
+
+    const res = await request(app)
+      .post("/api/voice/context")
+      .set("Authorization", "Bearer test-secret")
+      .send({ calledNumber: "+972555077941", callerNumber: "+972502222222" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.businessName).toBe("Salon Dana");
+  });
+
+  it("recognises a caller who saved their own number in local format", async () => {
+    mockPrisma.business.findMany.mockResolvedValue([{ id: "biz1", voicePhoneNumber: "972501111111" }]);
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ name: "Salon Dana", timezone: "Asia/Jerusalem", address: null, botGreeting: null });
+    mockPrisma.businessHours.findMany.mockResolvedValue([]);
+    mockPrisma.customer.findMany.mockResolvedValue([{ id: "c1", phone: "0502222222", name: "אורי" }]);
+    mockPrisma.service.findMany.mockResolvedValue([]);
+    mockPrisma.faqEntry.findMany.mockResolvedValue([]);
+    mockPrisma.specialPeriod.findMany.mockResolvedValue([]);
+    mockPrisma.appointment.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post("/api/voice/context")
+      .set("Authorization", "Bearer test-secret")
+      .send({ calledNumber: "+972501111111", callerNumber: "+972502222222" });
+
+    expect(res.body.caller.isKnownCustomer).toBe(true);
+    expect(res.body.caller.name).toBe("אורי");
+  });
+
   it("surfaces a known caller's upcoming appointment", async () => {
     mockPrisma.business.findMany.mockResolvedValue([{ id: "biz1", voicePhoneNumber: "972501111111" }]);
     mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ name: "Salon Dana", timezone: "Asia/Jerusalem", address: null, botGreeting: null });
