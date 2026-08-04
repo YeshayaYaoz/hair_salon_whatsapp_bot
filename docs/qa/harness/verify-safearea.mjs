@@ -24,9 +24,14 @@ function check(name, ok, detail) {
 }
 
 async function login(page, email, password = "QaPassword123") {
-  // networkidle, not domcontentloaded: filling before React has hydrated sets the DOM value without
-  // the controlled component ever seeing it, so submit posts an empty form and nothing navigates.
+  // networkidle is not the same as hydrated: React can still be attaching handlers, and a click
+  // that lands first submits the form natively (the URL comes back as /login? with no fields) and
+  // never navigates. Waiting for the submit handler to exist is the actual precondition.
   await page.goto(`${BASE}/login`, { waitUntil: "networkidle" });
+  await page.waitForFunction(() => {
+    const btn = document.querySelector('button[type="submit"]');
+    return btn && Object.keys(btn).some((k) => k.startsWith("__react"));
+  }, { timeout: 20000 });
   await page.fill('input[type="email"]', email);
   await page.fill('input[type="password"]', password);
   await page.click('button[type="submit"]');

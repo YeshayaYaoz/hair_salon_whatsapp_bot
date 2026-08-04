@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { asyncRouter } from "../lib/asyncRouter.js";
 import crypto from "crypto";
 import { prisma } from "../lib/prisma.js";
 import { getInvoiceProvider, resolveInvoiceCredentials } from "../lib/invoices/index.js";
@@ -7,7 +7,7 @@ import { decryptSecret } from "../lib/crypto.js";
 import { sendWhatsAppMessage } from "./whatsappClient.js";
 import { syncAppointmentToCalendar } from "../lib/googleCalendar.js";
 
-export const paymentWebhookRouter = Router();
+export const paymentWebhookRouter = asyncRouter();
 
 interface ParsedPaymentEvent {
   success: boolean;

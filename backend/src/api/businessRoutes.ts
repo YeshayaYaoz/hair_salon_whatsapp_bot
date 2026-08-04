@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { asyncRouter } from "../lib/asyncRouter.js";
 import crypto from "crypto";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
@@ -36,7 +36,7 @@ import { saveImage, deleteImageByUrl, toPublicUploadUrl, MAX_UPLOAD_BYTES, ALLOW
 import { depositCallbackUrl, getPaymentProvider, PAYMENT_PROVIDERS, UnknownPaymentProviderError } from "../lib/payments/index.js";
 import { getInvoiceProvider, INVOICE_PROVIDERS, UnknownInvoiceProviderError, resolveInvoiceCredentials } from "../lib/invoices/index.js";
 
-export const businessRouter = Router();
+export const businessRouter = asyncRouter();
 businessRouter.use(requireAuth);
 
 // /me and /me/whatsapp stay reachable even with a lapsed subscription so a business can see its
@@ -1863,6 +1863,25 @@ businessRouter.patch("/customers/:id/bot-paused", async (req: AuthedRequest, res
 });
 
 // --- Waitlist ---
+
+/**
+ * Counts for the nav badges, which the dashboard shell fetches on every page.
+ *
+ * Deliberately not GET /waitlist: that returns every entry with its customer and service joined,
+ * which is a lot of rows and two joins to answer a question whose whole answer is one integer, on
+ * a request that fires on every navigation.
+ *
+ * Counts un-notified entries only. An entry stays on the list after the owner messages the
+ * customer, so counting all of them would produce a badge that never clears — and a badge that
+ * never clears stops being read, taking the ones that matter down with it. This matches how the
+ * waitlist page itself splits the list into pending and notified.
+ */
+businessRouter.get("/me/nav-badges", async (req: AuthedRequest, res) => {
+  const waitlist = await prisma.waitlistEntry.count({
+    where: { businessId: req.businessId!, notified: false },
+  });
+  res.json({ waitlist });
+});
 
 businessRouter.get("/waitlist", async (req: AuthedRequest, res) => {
   const entries = await prisma.waitlistEntry.findMany({

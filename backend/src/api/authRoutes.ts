@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { asyncRouter } from "../lib/asyncRouter.js";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { z } from "zod";
@@ -14,7 +14,7 @@ import {
   GoogleCalendarNotConfiguredError,
 } from "../lib/googleCalendar.js";
 
-export const authRouter = Router();
+export const authRouter = asyncRouter();
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,

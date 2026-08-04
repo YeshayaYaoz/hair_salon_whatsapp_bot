@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { asyncRouter } from "../lib/asyncRouter.js";
 import express from "express";
 import crypto from "crypto";
 import { resolveBusinessByPhoneNumberId } from "../tenants/resolve.js";
@@ -16,7 +16,7 @@ import { transcribeWhatsAppVoiceNote, TranscriptionNotConfiguredError } from "..
 import { sendYieldCampaignOffers, type PendingYieldCampaign } from "../billing/yieldCampaignJob.js";
 import { logWhatsAppBillingEvent } from "../lib/usageLedger.js";
 
-export const whatsappRouter = Router();
+export const whatsappRouter = asyncRouter();
 
 // Deduplicate Meta webhook deliveries — Meta guarantees at-least-once, so the same
 // message can arrive twice within seconds. We keep message IDs for 5 minutes.

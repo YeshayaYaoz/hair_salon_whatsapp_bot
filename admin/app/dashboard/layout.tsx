@@ -207,9 +207,12 @@ function TrialBanner({ status, createdAt }: { status: string | null; createdAt: 
   );
 }
 
-function SidebarContent({ pathname, isSuperAdmin }: { pathname: string; isSuperAdmin: boolean }) {
+function SidebarContent({
+  pathname, isSuperAdmin, waitlistPending,
+}: { pathname: string; isSuperAdmin: boolean; waitlistPending: number }) {
   const router = useRouter();
   const { lang, setLang, t, businessType } = useLanguage();
+  const he = lang === "he";
 
   function logout() {
     clearToken();
@@ -254,10 +257,15 @@ function SidebarContent({ pathname, isSuperAdmin }: { pathname: string; isSuperA
             </div>
             {group.items.filter((i) => isVisibleFor(i, businessType)).map((item) => {
               const active = pathname === item.href;
+              // On desktop the waitlist has its own row, so the count belongs on it rather than on
+              // bookings — the mobile dock only borrows the bookings tab because the waitlist has
+              // no tab to put it on.
+              const badge = item.key === "waitlist" ? waitlistPending : 0;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-label={badge > 0 ? `${t.nav[item.key]} — ${badge} ${he ? "ממתינים" : "waiting"}` : undefined}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all"
                   style={navLinkStyle(active)}
                   onMouseEnter={(e) => { if (!active) { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.06)"; (e.currentTarget as HTMLElement).style.color = "rgba(255,255,255,0.85)"; } }}
@@ -267,6 +275,16 @@ function SidebarContent({ pathname, isSuperAdmin }: { pathname: string; isSuperA
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.5 : 1.75} d={item.icon} />
                   </svg>
                   <span className="truncate">{t.nav[item.key]}</span>
+                  {badge > 0 && (
+                    <span
+                      className="ms-auto shrink-0 min-w-[20px] h-5 px-1.5 rounded-full flex items-center
+                        justify-center text-[11px] font-bold leading-none tabular-nums"
+                      style={{ background: "#DC2626", color: "#FFFFFF" }}
+                      aria-hidden
+                    >
+                      {badge > 99 ? "99+" : badge}
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -361,6 +379,17 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     setMoreOpen(false); // close the sheet on navigation
   }, [pathname]);
 
+  // Waitlist entries nobody has replied to yet. The waitlist doesn't get a tab of its own — pricing
+  // keeps the fourth slot — so without this the only sign that someone is waiting is behind "More",
+  // which an owner has no reason to open on a normal day. Re-fetched on navigation rather than
+  // polled: it's a single COUNT, and the moment it changes is the moment you acted on it.
+  const [waitlistPending, setWaitlistPending] = useState(0);
+  useEffect(() => {
+    apiFetch<{ waitlist: number }>("/api/business/me/nav-badges")
+      .then((b) => setWaitlistPending(b.waitlist ?? 0))
+      .catch(() => {});
+  }, [pathname]);
+
   // The single setup nudge, rendered as a strip inside the dock rather than as a bar of its own.
   const setupStep = useNextSetupStep(lang);
 
@@ -430,7 +459,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           boxShadow: "4px 0 24px rgba(0,0,0,0.15)",
         }}
       >
-        <SidebarContent pathname={pathname} isSuperAdmin={isSuperAdmin} />
+        <SidebarContent pathname={pathname} isSuperAdmin={isSuperAdmin} waitlistPending={waitlistPending} />
       </aside>
 
       {/* There is deliberately no mobile top bar any more. It was 56px of fixed chrome carrying a
@@ -510,11 +539,18 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <nav className="flex items-stretch h-[60px]" aria-label={he ? "ניווט ראשי" : "Main navigation"}>
           {BOTTOM_TAB_ITEMS.filter((i) => isVisibleFor(i, businessType)).map((item) => {
             const active = pathname === item.href;
+            // The waitlist has no tab of its own, so its badge rides on the bookings tab — the
+            // screen an owner is already going to, and the one whose page links onward to the list.
+            const badge = item.key === "appointments" ? waitlistPending : 0;
+            const label = (t.navShort as Record<string, string>)[item.key] ?? t.nav[item.key];
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
+                // The count is decoration to a screen reader unless it's spelled out: "3" next to
+                // "Bookings" announces as "3 Bookings", which is not what it means.
+                aria-label={badge > 0 ? `${label} — ${badge} ${he ? "ממתינים ברשימת ההמתנה" : "waiting on the waitlist"}` : undefined}
                 className="flex-1 flex flex-col items-center justify-center gap-[3px] text-[11px] font-medium transition"
                 style={{ color: active ? "#136B87" : "#6B7280" }}
               >
@@ -522,16 +558,27 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     (#1B7FA0 against #6B7280) plus a stroke-width change, which is invisible to a
                     red-green colour-blind user and nearly invisible to everyone in sunlight. */}
                 <span
-                  className="flex items-center justify-center w-11 h-7 rounded-full transition"
+                  className="relative flex items-center justify-center w-11 h-7 rounded-full transition"
                   style={{ background: active ? "#DCF1F8" : "transparent" }}
                 >
                   <svg className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={active ? 2.2 : 1.75} d={item.icon} />
                   </svg>
+                  {badge > 0 && (
+                    // Physical right/left, not end/start: the badge hangs off the icon's top-right
+                    // corner in both languages, because that is where a notification count lives by
+                    // convention — it is not part of the text flow and shouldn't mirror with it.
+                    <span
+                      className="absolute -top-0.5 right-1.5 min-w-[16px] h-4 px-1 rounded-full
+                        flex items-center justify-center text-[10px] font-bold leading-none tabular-nums"
+                      style={{ background: "#B91C1C", color: "#FFFFFF", boxShadow: "0 0 0 2px #FFFFFF" }}
+                      aria-hidden
+                    >
+                      {badge > 9 ? "9+" : badge}
+                    </span>
+                  )}
                 </span>
-                <span className="truncate max-w-[68px] text-center leading-tight">
-                  {(t.navShort as Record<string, string>)[item.key] ?? t.nav[item.key]}
-                </span>
+                <span className="truncate max-w-[68px] text-center leading-tight">{label}</span>
               </Link>
             );
           })}
