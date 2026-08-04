@@ -19,11 +19,26 @@ function requireCartesiaAuth(req: import("express").Request, res: import("expres
   next();
 }
 
-// Digits only, so "+972501234567", "972501234567", and "0501234567"-with-country-code all compare
-// the same way Customer.phone is stored (see whatsappRoutes.ts — stored verbatim as WhatsApp's
-// `message.from`, which is already digits-only with country code, no leading "+").
+/**
+ * Reduces a phone number to one comparable form: digits, country code, no leading zero.
+ *
+ * Digits alone is not enough. Cartesia sends the dialled number in E.164 ("+972555077941"), while
+ * the owner types their line the way they say it out loud ("055-507-7941"). Stripping punctuation
+ * leaves "972555077941" and "0555077941", which are not equal — so the call resolves to no
+ * business, /context 404s, and the agent answers a real caller with no idea whose salon it is.
+ * Nothing in the logs says "wrong format"; it just looks like the number was never configured.
+ *
+ * The national-trunk rule is the same one every Israeli number follows: a leading 0 is dropped
+ * when the country code goes on. Applied generally rather than only to +972, since it holds across
+ * the numbering plans this would ever see.
+ */
 function normalizePhone(phone: string): string {
-  return phone.replace(/\D/g, "");
+  const digits = phone.replace(/\D/g, "");
+  // Leading 0 = national format, so it carries no country code. Assume the business's own country;
+  // Israel is the only market this runs in, and a wrong guess here is no worse than the
+  // no-match it replaces.
+  if (digits.startsWith("0")) return `972${digits.slice(1)}`;
+  return digits;
 }
 
 /** Resolves which salon a call belongs to from the dialed number — every voice tool needs this first. */
