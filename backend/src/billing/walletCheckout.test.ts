@@ -77,7 +77,10 @@ describe("billing actions without a saved card token", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.url).toBe("https://payplus.example/pay/annual");
-    expect(createSubscriptionCheckoutLink).toHaveBeenCalledWith("biz1", "premium", expect.any(String), "annual");
+    // Fifth argument is the amount, already reduced by the unused part of the current month:
+    // 10 of 30 days left on ₪299 is ₪100 off the ₪2,990 annual price.
+    expect(createSubscriptionCheckoutLink).toHaveBeenCalledWith("biz1", "premium", expect.any(String), "annual", 2890);
+    expect(res.body.creditedIls).toBe(100);
     // The cycle must not flip to annual before the money actually arrives.
     expect(mockPrisma.business.update).not.toHaveBeenCalled();
   });

@@ -11,6 +11,51 @@ const SLOT_STEP_MIN = 30;
 // campaign scan) stays consistent with availability rather than re-deriving its own status list.
 export const SLOT_BLOCKING_STATUSES = ["confirmed", "pending_payment"];
 
+/**
+ * Whether a slot still has room, given everything already booked over it.
+ *
+ * This exists because availability and booking used to answer that question with two different
+ * rules, and they contradicted each other in both directions — visibly, in one WhatsApp message
+ * that told a customer 10:00 was taken and then offered them 10:00.
+ *
+ * The cause was appointments with no staff assigned (the normal case: the customer didn't ask for
+ * anyone). Availability iterated over real staff ids and matched conflicts on `a.staffId === id`,
+ * so an unassigned appointment matched nobody and blocked nothing — two customers could be booked
+ * into the same chair. Booking, given no staff preference, dropped the staff filter entirely and
+ * treated ANY overlap as a clash — so at a three-chair salon one booking closed the slot for
+ * everyone.
+ *
+ * The rule both now share: a slot holds as many appointments as there are staff. An assigned
+ * appointment occupies that specific person; an unassigned one occupies some unnamed free person.
+ * A business with no staff configured has exactly one resource, which is the old behaviour.
+ */
+export function slotHasRoom(params: {
+  /** Appointments already overlapping this slot — callers filter by time before calling. */
+  overlapping: { staffId: string | null }[];
+  /** How many staff can serve this slot. 0 is treated as 1: an unstaffed business is one resource. */
+  staffCount: number;
+  /** Set when the customer asked for a specific person; that exact person must be free. */
+  requestedStaffId?: string | null;
+}): boolean {
+  const resources = Math.max(1, params.staffCount);
+  const busyStaff = new Set<string>();
+  let unassigned = 0;
+  for (const a of params.overlapping) {
+    if (a.staffId) busyStaff.add(a.staffId);
+    else unassigned += 1;
+  }
+
+  if (params.requestedStaffId) {
+    if (busyStaff.has(params.requestedStaffId)) return false;
+    // The unassigned bookings still have to fit somewhere, and it cannot be this person — so they
+    // need room among the others. Without this, asking for a specific stylist could overbook the
+    // shop as a whole.
+    return unassigned <= resources - busyStaff.size - 1;
+  }
+
+  return busyStaff.size + unassigned < resources;
+}
+
 export interface AvailableSlot {
   startTime: string; // ISO (UTC)
   endTime: string;
@@ -98,15 +143,13 @@ export async function findAvailableSlots(
       continue;
     }
 
-    // 1:1 appointment (every existing service): a slot is free if some staff option has no overlap.
+    // 1:1 appointment (every existing service): offer the slot if the shop still has room for it,
+    // counting unassigned bookings as occupying someone — see slotHasRoom.
+    const overlapping = dayAppointments.filter(
+      (a: Appointment) => slotStart < a.endTime && slotEnd > a.startTime
+    );
     for (const staffId of staffOptions) {
-      const conflict = dayAppointments.some(
-        (a: Appointment) =>
-          (staffId === null || a.staffId === staffId) &&
-          slotStart < a.endTime &&
-          slotEnd > a.startTime
-      );
-      if (!conflict) {
+      if (slotHasRoom({ overlapping, staffCount: staff.length, requestedStaffId: preferredStaffId ? staffId : null })) {
         slots.push({ startTime: slotStart.toISOString(), endTime: slotEnd.toISOString(), staffId });
         break; // one slot per start time is enough to offer
       }
@@ -173,18 +216,22 @@ export async function createAppointment(params: {
     });
     if (booked >= capacity) throw new SlotUnavailableError();
   } else {
-    // 1:1 appointment: reject if any blocking appointment overlaps this window (for the same staff
-    // member, or business-wide when no staff is assigned).
-    const overlap = await prisma.appointment.findFirst({
-      where: {
-        businessId: params.businessId,
-        status: { in: SLOT_BLOCKING_STATUSES },
-        ...(params.staffId ? { staffId: params.staffId } : {}),
-        startTime: { lt: endTime },
-        endTime: { gt: params.startTime },
-      },
-    });
-    if (overlap) throw new SlotUnavailableError();
+    // 1:1 appointment: the same room check availability uses, so the two cannot disagree again.
+    const [overlapping, staffCount] = await Promise.all([
+      prisma.appointment.findMany({
+        where: {
+          businessId: params.businessId,
+          status: { in: SLOT_BLOCKING_STATUSES },
+          startTime: { lt: endTime },
+          endTime: { gt: params.startTime },
+        },
+        select: { staffId: true },
+      }),
+      prisma.staffMember.count({ where: { businessId: params.businessId } }),
+    ]);
+    if (!slotHasRoom({ overlapping, staffCount, requestedStaffId: params.staffId })) {
+      throw new SlotUnavailableError();
+    }
   }
 
   const appointment = await prisma.appointment.create({

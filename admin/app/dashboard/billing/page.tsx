@@ -178,13 +178,20 @@ export default function BillingPage() {
     try {
       // A business with a saved card is charged on the spot; one without gets a hosted PayPlus
       // page back instead, and has to go pay before anything changes here.
-      const result = await apiFetch<{ ok?: boolean; url?: string }>("/api/billing/payplus/switch-to-annual", {
+      const result = await apiFetch<{ ok?: boolean; url?: string; chargedIls?: number; creditedIls?: number }>("/api/billing/payplus/switch-to-annual", {
         method: "POST",
         body: JSON.stringify({ returnUrl: window.location.href }),
       });
       if (result.url) {
         window.location.href = result.url;
         return;
+      }
+      if (result.creditedIls) {
+        alert(
+          lang === "he"
+            ? `הועברת למנוי שנתי. חויבת ₪${result.chargedIls} — בקיזוז ₪${result.creditedIls} ששילמת כבר על התקופה הנוכחית.`
+            : `Switched to annual. Charged ₪${result.chargedIls}, after deducting ₪${result.creditedIls} you had already paid for the current period.`
+        );
       }
       await load();
     } catch (err) {
@@ -520,6 +527,13 @@ export default function BillingPage() {
                   {lang === "he"
                     ? `₪${PLAN_PRICES[activePlan] * 10} לשנה במקום ₪${PLAN_PRICES[activePlan] * 12} — חוסך לך ₪${PLAN_PRICES[activePlan] * 2} בשנה, מחויב פעם אחת.`
                     : `₪${PLAN_PRICES[activePlan] * 10}/year instead of ₪${PLAN_PRICES[activePlan] * 12} — saves you ₪${PLAN_PRICES[activePlan] * 2}/year, billed once.`}
+                </p>
+                {/* Said before they commit, not discovered on the payment page. Switching mid-month
+                    used to charge the full annual price on top of a month already paid for. */}
+                <p className="text-xs text-white/70 -mt-2 mb-4 leading-relaxed">
+                  {lang === "he"
+                    ? "מה ששילמת על התקופה הנוכחית ועוד לא ניצלת יקוזז מהסכום."
+                    : "Whatever you've already paid for the current period and not used is deducted."}
                 </p>
                 <button
                   onClick={switchToAnnual}

@@ -1,7 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { appendTurn, getHistory, type Turn } from "./conversationStore.js";
-import { findAvailableSlots, createAppointment, attachDepositPaymentLink, SlotUnavailableError, OutsideBusinessHoursError, type AvailableSlot } from "../booking/availability.js";
+import { findAvailableSlots, createAppointment, attachDepositPaymentLink, SlotUnavailableError, OutsideBusinessHoursError, SLOT_BLOCKING_STATUSES, type AvailableSlot } from "../booking/availability.js";
 import { depositCallbackUrl, getPaymentProvider } from "../lib/payments/index.js";
 import { parseBookingTime, parseDateString, dayOfWeekForDate, instantPartsInTz, zonedDateParts } from "../lib/timezone.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
@@ -304,6 +304,33 @@ async function runTool(
       biz.depositEnabled && biz.depositAmountIls > 0 && biz.paymentProvider && biz.paymentApiKey && biz.paymentApiSecret
     );
 
+    const startTime = parseBookingTime(input.startTime as string, biz.timezone || "Asia/Jerusalem");
+
+    // Already booked by this same customer? Return it instead of trying again.
+    //
+    // The model re-calls this tool for anything that sounds like it concerns the appointment — a
+    // real customer typed "אפשר לשלם?" right after booking and got told their slot had just been
+    // taken, because the conflict it hit was their own booking. From where they sat, the bot
+    // cancelled their appointment for no reason.
+    const alreadyBooked = await prisma.appointment.findFirst({
+      where: {
+        businessId,
+        serviceId: service.id,
+        startTime,
+        status: { in: SLOT_BLOCKING_STATUSES },
+        customer: { phone: customerPhone },
+      },
+      include: { service: true },
+    });
+    if (alreadyBooked) {
+      return JSON.stringify({
+        alreadyBooked: true,
+        status: alreadyBooked.status,
+        note: "This customer already has this exact appointment — it was NOT double-booked and nothing changed. Do not tell them the slot is taken. Answer whatever they actually asked.",
+        ...(alreadyBooked.depositPaymentUrl ? { paymentUrl: alreadyBooked.depositPaymentUrl } : {}),
+      });
+    }
+
     let appointment;
     try {
       appointment = await createAppointment({
@@ -311,7 +338,7 @@ async function runTool(
         serviceId: service.id,
         customerPhone,
         customerName,
-        startTime: parseBookingTime(input.startTime as string, biz.timezone || "Asia/Jerusalem"),
+        startTime,
         overrideDurationMin: input.durationMin as number | undefined,
         staffId: staffResolution.staffId ?? null,
         ...(depositRequired
