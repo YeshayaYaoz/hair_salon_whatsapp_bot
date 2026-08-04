@@ -6,7 +6,7 @@ const mockPrisma = {
   business: { findUniqueOrThrow: vi.fn() },
   service: { findUniqueOrThrow: vi.fn() },
   businessHours: { findUnique: vi.fn() },
-  staffMember: { findMany: vi.fn() },
+  staffMember: { findMany: vi.fn(), count: vi.fn() },
   appointment: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), count: vi.fn() },
   blockedTime: { findMany: vi.fn(), findFirst: vi.fn() },
   customer: { upsert: vi.fn() },
@@ -26,6 +26,9 @@ const FIXED_NOW = new Date("2026-07-01T00:00:00.000Z");
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // createAppointment now sizes the slot by staff count (see slotHasRoom); default to an
+  // unstaffed business, which is the single-resource behaviour these tests were written against.
+  mockPrisma.staffMember.count.mockResolvedValue(0);
   vi.useFakeTimers();
   vi.setSystemTime(FIXED_NOW);
 });
@@ -142,7 +145,9 @@ describe("createAppointment", () => {
     );
     mockPrisma.blockedTime.findFirst.mockResolvedValue(null);
     mockPrisma.customer.upsert.mockResolvedValue({ id: "cust1" });
-    mockPrisma.appointment.findFirst.mockResolvedValue(null); // no overlap
+    // Overlap is now a findMany + slotHasRoom check, so the two rules can't diverge — see
+    // slotHasRoom's comment for the bug that came from them diverging.
+    mockPrisma.appointment.findMany.mockResolvedValue([]); // no overlap
     mockPrisma.appointment.create.mockImplementation(({ data }: any) => Promise.resolve({ id: "appt1", ...data }));
   }
 
@@ -187,7 +192,7 @@ describe("createAppointment", () => {
 
   it("rejects a double-booking when the slot was taken between offer and confirm", async () => {
     mockHappyPath();
-    mockPrisma.appointment.findFirst.mockResolvedValue({ id: "existing-appt" }); // overlap found
+    mockPrisma.appointment.findMany.mockResolvedValue([{ staffId: null }]); // overlap found
     await expect(
       createAppointment({ ...baseParams, startTime: new Date("2026-07-09T07:00:00.000Z") })
     ).rejects.toThrow(SlotUnavailableError);
