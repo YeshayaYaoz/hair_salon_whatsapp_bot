@@ -63,6 +63,19 @@ describe("every rule reaches the prompt", () => {
     expect(stable).toContain(rule);
   });
 
+  /**
+   * Guards a real conversation: a family of five was offered the 10-guest unit at ₪3,000 and never
+   * shown the 7-guest one at ₪2,100 until they named it themselves. Only overnight businesses rent
+   * units with guest limits, so a salon must not carry this rule as noise.
+   */
+  it("includes the unit-fit rule for overnight businesses only", async () => {
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue(business());
+    expect((await buildSystemPrompt("biz1")).stable).toContain(RULES.UNIT_FIT_RULE);
+
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue(business({ businessType: "hair_salon" }));
+    expect((await buildSystemPrompt("biz1")).stable).not.toContain(RULES.UNIT_FIT_RULE);
+  });
+
   it("includes the placeholder rule only when the owner wrote a greeting", async () => {
     mockPrisma.business.findUniqueOrThrow.mockResolvedValue(business());
     expect((await buildSystemPrompt("biz1")).stable).not.toContain(RULES.PLACEHOLDER_RULE);

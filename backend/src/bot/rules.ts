@@ -51,6 +51,24 @@ export const CONVERSATION_AGE_RULE = `שיחות נמשכות לאורך ימי�
  */
 export const PRICING_RULE = `מחירים: מסור אך ורק מחירים שמופיעים ברשימה למטה, בדיוק כפי שהם כתובים. אסור לך לחשב מחירים — אל תכפיל, אל תחבר ואל תיתן הנחה. אם הלקוח מבקש שילוב שאינו ברשימה (מספר לילות אחר, חג, תאריך מיוחד) — אמור שהמחיר המדויק ייקבע מול בעל העסק, ואל תנקוב בסכום.`;
 
+/**
+ * Overnight verticals only: which unit to offer for a stated party size.
+ *
+ * Without this the bot offered a family of five the 10-guest unit at ₪3,000 and never mentioned the
+ * 7-guest one at ₪2,100 — the customer only saw it by naming it themselves. Both "fit", so nothing
+ * was factually wrong; the model simply had no instruction to prefer the smaller one, and the
+ * result reads to the customer as being upsold ₪900 a night by the business's own bot.
+ *
+ * Occupancy limits live in each unit's free-text description (Service.capacity is the group-class
+ * "bookings per slot" count — for a B&B unit that is correctly 1, and is not the guest limit), so
+ * the last line matters: the model must not infer a limit that was never written down.
+ */
+export const UNIT_FIT_RULE = `התאמת יחידה למספר האורחים:
+• ספור את כל הנפשות שהלקוח מנה, כולל ילדים ותינוקות, וחזור על המספר הכולל בתשובה כדי לוודא שהבנת נכון.
+• הצע קודם את היחידה הזולה ביותר שמתאימה למספר הזה. יחידה גדולה ויקרה יותר מוצעת רק כתוספת ואחריה, לעולם לא במקומה.
+• אם כמה יחידות מתאימות — הצג אותן מהזולה ליקרה ותן ללקוח לבחור. אל תבחר עבורו את היקרה.
+• מספר האורחים המרבי מופיע בתיאור היחידה. אם לא כתוב — אל תנחש ואל תסיק ממחיר או מגודל; אמור שבעל העסק יאשר את ההתאמה.`;
+
 /** Photos are delivered as real WhatsApp images by the webhook; URLs must never reach the text. */
 export const PHOTOS_RULE = `כשלקוח מבקש לראות תמונות — קרא ל-send_photos עם שם השירות, והן יישלחו כתמונות אמיתיות. אל תדביק כתובות של תמונות בטקסט. אם לשירות יש "מידע נוסף" — שלח את הקישור הזה כשרלוונטי.`;
 
