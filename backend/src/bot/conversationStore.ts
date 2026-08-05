@@ -28,9 +28,21 @@ export async function getHistory(businessId: string, customerPhone: string): Pro
   const k = cacheKey(businessId, customerPhone);
   if (cache.has(k)) return cache.get(k)!;
 
+  // An owner-triggered reset hides everything written before it from the bot without deleting a
+  // single row — the dashboard transcript still shows the whole thread. Only read on a cache miss,
+  // so this costs one extra query per conversation per process, not one per message.
+  const customer = await prisma.customer.findUnique({
+    where: { businessId_phone: { businessId, phone: customerPhone } },
+    select: { conversationResetAt: true },
+  });
+
   // Latest MAX_TURNS in chronological order.
   const rows = await prisma.conversationMessage.findMany({
-    where: { businessId, phone: customerPhone },
+    where: {
+      businessId,
+      phone: customerPhone,
+      ...(customer?.conversationResetAt ? { createdAt: { gt: customer.conversationResetAt } } : {}),
+    },
     orderBy: { createdAt: "desc" },
     take: MAX_TURNS,
   });
@@ -59,6 +71,16 @@ export async function appendTurn(businessId: string, customerPhone: string, turn
   prisma.conversationMessage.create({
     data: { businessId, phone: customerPhone, role: turn.role, content: turn.content },
   }).catch((err) => console.error("[conversationStore] Failed to persist turn:", err));
+}
+
+/**
+ * Drops the in-process cache for one thread. Call after moving conversationResetAt, or the cached
+ * turns keep being served and the reset appears to do nothing until the process restarts.
+ *
+ * Deliberately separate from clearHistory below: that deletes the transcript, this only forgets it.
+ */
+export function forgetCachedHistory(businessId: string, customerPhone: string): void {
+  cache.delete(cacheKey(businessId, customerPhone));
 }
 
 export async function clearHistory(businessId: string, customerPhone: string): Promise<void> {

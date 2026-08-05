@@ -712,6 +712,25 @@ function stampIfStale(turn: Turn, timezone: string | null): string {
 
 const AI_UNAVAILABLE_HE = "מצטער, הבוט אינו זמין כרגע. נסה שוב בעוד כמה דקות, או צור קשר ישיר עם העסק.";
 
+/**
+ * A thread counts as a new conversation once it has been quiet for this long.
+ *
+ * Matches WhatsApp's own 24-hour session window, which is the boundary the customer already feels:
+ * past it they are starting a conversation, not continuing one. Keying the greeting off "this
+ * number has never written before" instead meant a returning customer saw the opening message and
+ * its buttons exactly once in their life, and the owner could never see them again while testing.
+ */
+const NEW_CONVERSATION_GAP_MS = 24 * 60 * 60 * 1000;
+
+/** Whether this incoming message opens a conversation rather than continuing one. Exported for
+ * testing: it decides whether the greeting button and quick replies are attached. */
+export function opensNewConversation(history: Turn[], now: Date = new Date()): boolean {
+  const last = history[history.length - 1];
+  if (!last) return true; // nothing said before — either genuinely new, or reset by the owner
+  if (!last.at) return false; // undated turn: assume mid-conversation rather than re-greet
+  return now.getTime() - last.at.getTime() > NEW_CONVERSATION_GAP_MS;
+}
+
 export async function handleIncomingMessage(businessId: string, customerPhone: string, messageText: string): Promise<BotResult> {
   const system = await buildSystemPrompt(businessId, customerPhone);
   const history = await getHistory(businessId, customerPhone);
@@ -719,7 +738,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   // itself, and appendTurn below pushes into that same array — so by the end of this function
   // `history` always holds the two turns we just wrote, and `length === 0` is never true. The
   // greeting button and quick replies are gated on this flag, which is why neither ever appeared.
-  const isFirstReply = history.length === 0;
+  const isFirstReply = opensNewConversation(history);
 
   // "inquiry" businesses (e.g. B&B) have no live booking engine — the bot answers info and hands
   // booking intent to the owner, so it gets a reduced tool set with no slot/booking tools.

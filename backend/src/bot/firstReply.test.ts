@@ -23,6 +23,7 @@ describe("conversationStore aliasing", () => {
   it("hands back the live cached array, so callers must snapshot before appending", async () => {
     vi.doMock("../lib/prisma.js", () => ({
       prisma: {
+        customer: { findUnique: vi.fn(async () => null) },
         conversationMessage: {
           findMany: vi.fn(async () => turns.map((t) => ({ ...t, createdAt: new Date() }))),
           create: vi.fn(() => ({ catch: () => {} })),

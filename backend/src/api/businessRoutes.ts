@@ -20,7 +20,7 @@ import {
 import { sendWhatsAppMessage, getWabaId, subscribeAppToWaba, registerPhoneNumber, getPhoneNumberStatus, getSubscribedApps, createMessageTemplate, setWhatsAppProfilePicture, type CreateTemplateResult } from "../webhook/whatsappClient.js";
 import { reminderTemplate, reviewTemplate, REMINDER_TEMPLATE_BODY, REVIEW_TEMPLATE_BODY } from "../lib/whatsappTemplates.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
-import { appendTurn } from "../bot/conversationStore.js";
+import { appendTurn, forgetCachedHistory } from "../bot/conversationStore.js";
 import { createAppointment, OutsideBusinessHoursError, SlotUnavailableError } from "../booking/availability.js";
 import { parseBookingTime } from "../lib/timezone.js";
 import { getJobStatuses } from "../lib/jobStatus.js";
@@ -1893,6 +1893,28 @@ businessRouter.patch("/customers/:id/bot-paused", async (req: AuthedRequest, res
     data: { botPaused: parsed.data.paused, botPausedAt: parsed.data.paused ? new Date() : null },
   });
   res.json({ botPaused: updated.botPaused });
+});
+
+/**
+ * Start a fresh conversation with this customer without losing the transcript.
+ *
+ * Moves a marker rather than deleting rows: the bot reads nothing written before this instant, so
+ * the next incoming message is treated as an opening one (greeting, buttons, no stale context),
+ * while the dashboard still shows every message that was ever exchanged. Deleting was the only
+ * existing way to achieve this, and it destroyed the record the owner may need later.
+ */
+businessRouter.post("/customers/:id/reset-conversation", async (req: AuthedRequest, res) => {
+  const customer = await prisma.customer.findFirst({ where: { id: req.params.id, businessId: req.businessId! } });
+  if (!customer) return res.status(404).json({ error: "Not found" });
+
+  await prisma.customer.update({
+    where: { id: customer.id },
+    data: { conversationResetAt: new Date() },
+  });
+  // Without this the cached turns keep being served and the reset looks like it did nothing.
+  forgetCachedHistory(req.businessId!, customer.phone);
+
+  res.json({ ok: true });
 });
 
 // --- Waitlist ---

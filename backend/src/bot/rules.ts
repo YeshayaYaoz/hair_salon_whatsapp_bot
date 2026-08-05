@@ -31,12 +31,17 @@ export const LANGUAGE_RULES = `עברית: כתוב פשוט, קצר וטבעי 
  * derived "כלומר, לילה אחד פחות מהמינימום". Every line was correct and none of it was asked for —
  * the customer wanted a unit and a price. HONESTY_RULES already asks for one or two sentences,
  * which the model reads as a style preference; this names the specific things to cut.
+ *
+ * The last bullet is load-bearing. An earlier version of this rule capped the reply at a few lines,
+ * and the model started meeting the cap by dropping facts — FAQ answers came back partial. Cutting
+ * narration and cutting content look the same from a length target, so the rule has to say which
+ * one it means.
  */
 export const BREVITY_RULE = `תן את המסקנה, לא את הדרך אליה. החישובים שלך פנימיים — הלקוח רואה רק את התוצאה.
 • אל תציג חשבון ("2 מבוגרים + 5 ילדים — סה״כ 7"), אל תפרט ספירת לילות, ואל תסביר איך הגעת להמלצה.
 • אל תחזור ללקוח על מה שהוא כתב זה עתה "כדי לוודא" — אלא אם יש אי-בהירות אמיתית שמונעת ממך לענות.
 • תנאי מיוחד (מינימום לילות, תאריך חריג) — משפט אחד ענייני, בלי להסיק ממנו מסקנות בקול.
-• 4-5 שורות לכל היותר. אם יצא ארוך יותר — מחק את מה שהלקוח לא שאל עליו.`;
+• זהו כלל ניסוח בלבד, לא כלל תוכן. אסור לקצר על חשבון מידע: כל מה שהלקוח שאל עליו, וכל תשובה מהשאלות הנפוצות, נמסרים במלואם. נסח בקצרה — אל תשמיט.`;
 
 /** Backs up toWhatsAppFormatting(), which already rewrites `**bold**` before anything is sent. */
 export const FORMATTING_RULES = `עיצוב ההודעה:

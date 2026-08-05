@@ -49,6 +49,26 @@ function ConversationPanel({
   const notesSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [botPaused, setBotPaused] = useState(Boolean(customer.botPaused));
   const [togglingPause, setTogglingPause] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetDone, setResetDone] = useState(false);
+
+  /** Makes the bot treat the next incoming message as the start of a new conversation. The
+   * transcript below is untouched — that's the whole point of it being separate from deleting. */
+  async function resetConversation() {
+    if (!confirm(he
+      ? "לפתוח שיחה חדשה? הבוט יתייחס להודעה הבאה כתחילת שיחה ולא יזכור את מה שנאמר עד כה. היסטוריית ההודעות נשמרת ותמשיך להופיע כאן."
+      : "Start a fresh conversation? The bot will treat the next message as a new chat and won't remember what was said so far. The transcript is kept and stays visible here.")) return;
+    setResetting(true);
+    try {
+      await apiFetch(`/api/business/customers/${customer.id}/reset-conversation`, { method: "POST" });
+      setResetDone(true);
+      setTimeout(() => setResetDone(false), 4000);
+    } catch {
+      // best-effort — the button stays clickable to retry
+    } finally {
+      setResetting(false);
+    }
+  }
 
   async function toggleBotPaused(paused: boolean) {
     setTogglingPause(true);
@@ -156,6 +176,14 @@ function ConversationPanel({
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={resetConversation}
+              disabled={resetting}
+              title={he ? "הבוט יתחיל שיחה חדשה — ההיסטוריה נשמרת" : "The bot starts a new conversation — history is kept"}
+              className="text-xs font-medium text-gray-600 hover:text-[#145F78] hover:bg-[#1B7FA0]/10 disabled:opacity-50 px-2 py-1.5 rounded-lg transition"
+            >
+              {resetting ? "…" : resetDone ? (he ? "אופס ✓" : "Reset ✓") : (he ? "שיחה חדשה" : "New chat")}
+            </button>
             {!botPaused && (
               <button
                 onClick={() => toggleBotPaused(true)}
