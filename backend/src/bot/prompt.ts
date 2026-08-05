@@ -4,6 +4,7 @@ import { instantPartsInTz, zonedDateParts, dayOfWeekForDate } from "../lib/timez
 import { TEMPLATES, isBusinessType } from "../lib/businessTemplates.js";
 import {
   LANGUAGE_RULES,
+  BREVITY_RULE,
   FORMATTING_RULES,
   CALENDAR_RULES,
   CONVERSATION_AGE_RULE,
@@ -213,6 +214,7 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
 ${dateTable}
 ${HONESTY_RULES}
 ${LANGUAGE_RULES}
+${BREVITY_RULE}
 ${FORMATTING_RULES}
 ${CALENDAR_RULES}
 ${CONVERSATION_AGE_RULE}

@@ -715,6 +715,11 @@ const AI_UNAVAILABLE_HE = "מצטער, הבוט אינו זמין כרגע. נס
 export async function handleIncomingMessage(businessId: string, customerPhone: string, messageText: string): Promise<BotResult> {
   const system = await buildSystemPrompt(businessId, customerPhone);
   const history = await getHistory(businessId, customerPhone);
+  // Read this now, not at the return. conversationStore caches turns and hands back the array
+  // itself, and appendTurn below pushes into that same array — so by the end of this function
+  // `history` always holds the two turns we just wrote, and `length === 0` is never true. The
+  // greeting button and quick replies are gated on this flag, which is why neither ever appeared.
+  const isFirstReply = history.length === 0;
 
   // "inquiry" businesses (e.g. B&B) have no live booking engine — the bot answers info and hands
   // booking intent to the owner, so it gets a reduced tool set with no slot/booking tools.
@@ -901,6 +906,6 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     text: replyText,
     offeredSlots: lastOfferedSlots.value,
     photos: lastPhotos.value,
-    isFirstReply: history.length === 0,
+    isFirstReply,
   };
 }
