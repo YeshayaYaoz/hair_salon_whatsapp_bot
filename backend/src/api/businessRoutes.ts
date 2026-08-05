@@ -25,7 +25,7 @@ import { createAppointment, OutsideBusinessHoursError, SlotUnavailableError } fr
 import { parseBookingTime } from "../lib/timezone.js";
 import { getJobStatuses } from "../lib/jobStatus.js";
 import { listTemplates, BUSINESS_TYPES } from "../lib/businessTemplates.js";
-import { AI_PROVIDER_KEYS } from "../bot/providers/index.js";
+import { AI_PROVIDER_SELECTION_KEYS } from "../bot/providers/index.js";
 import { DEFAULT_TEMPERATURE, TEMPERATURE_MIN, TEMPERATURE_MAX } from "../bot/providers/types.js";
 import { anthropicRejectsTemperature } from "../bot/providers/anthropicProvider.js";
 import { applyTemplate } from "../lib/applyTemplate.js";
@@ -542,7 +542,7 @@ const profileSchema = z.object({
   availabilityInfo: z.string().max(600).optional(),
   pricingNotes: z.string().max(600).optional(),
   availabilitySuggestionsEnabled: z.boolean().optional(),
-  aiProvider: z.enum(AI_PROVIDER_KEYS).optional(),
+  aiProvider: z.enum(AI_PROVIDER_SELECTION_KEYS).optional(),
   aiModel: z.string().max(100).nullable().optional(),
   // null resets to the app default rather than pinning 0 — the two are different intentions and
   // the slider needs to be able to express "back to normal".
@@ -555,6 +555,15 @@ const profileSchema = z.object({
 businessRouter.get("/me/ai-providers", async (_req: AuthedRequest, res) => {
   res.json({
     providers: [
+      // Meta-choice, not a real backend: picks Claude or DeepSeek per message by complexity (see
+      // chooseTier in claudeBot.ts). Needs both configured — if DeepSeek's key is missing, "auto"
+      // would silently mean "always Claude", which isn't what the label promises.
+      {
+        key: "auto",
+        label: "אוטומטי (Claude ↔ DeepSeek)",
+        configured: Boolean(process.env.ANTHROPIC_API_KEY) && Boolean(process.env.DEEPSEEK_API_KEY),
+        defaultModels: [],
+      },
       { key: "anthropic", label: "Claude (Anthropic)", configured: Boolean(process.env.ANTHROPIC_API_KEY), defaultModels: ["claude-haiku-4-5-20251001", "claude-sonnet-5"] },
       { key: "openai", label: "OpenAI (GPT)", configured: Boolean(process.env.OPENAI_API_KEY), defaultModels: ["gpt-4o-mini", "gpt-4o"] },
       // deepseek-reasoner is intentionally not offered — it does not support function calling,

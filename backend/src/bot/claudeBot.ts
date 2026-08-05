@@ -18,23 +18,26 @@ import { getAiProvider, ProviderCallError, type GenericTool, type GenericTurn } 
 // bot/providers/ for the Anthropic/OpenAI/DeepSeek adapters.
 
 /**
- * Every customer-facing reply uses the smart tier.
+ * Routes only unambiguous, content-free acknowledgements to the cheap tier — everything else,
+ * including anything that could touch booking logic, stays on the smart tier.
  *
- * This used to default to the cheap tier (Haiku) for everything — the previous "simple message"
- * regex was dead code, since both branches returned "cheap". That produced a steady trickle of
- * invented Hebrew words in real conversations ("יתאשר" instead of "יאשר", "משתניים" — literally
- * "variables" — instead of "מהשתיים"), which no amount of prompt wording fixed, because it's a
- * model-capability limit rather than an instruction-following one: Hebrew morphology is simply
- * weaker on the small model.
+ * This used to just return "smart" unconditionally: an earlier "simple message" heuristic sent
+ * short messages to Haiku and produced a steady trickle of invented Hebrew words in real
+ * conversations ("יתאשר" instead of "יאשר", "משתניים" — literally "variables" — instead of
+ * "מהשתיים"). That's a model-capability limit on Hebrew morphology, not something prompt wording
+ * fixes, so the fix isn't a smarter classifier — it's a stricter one: only route messages where a
+ * wrong word literally cannot matter, because there's nothing to say beyond "acknowledged".
  *
- * The tradeoff is lopsided. Measured spend was well under ₪1/month per business at Haiku rates,
- * so the smart tier costs a few extra agorot a month — while malformed Hebrew is visible to the
- * business's own customers and makes the business look unprofessional. Quality wins.
- *
- * hadToolError is kept as a parameter (rather than dropped) because the escalation path in the
- * tool loop still calls this, and a future cheap tier for non-Hebrew businesses would want it.
+ * hadToolError forces "smart" outright — a tool that just failed needs the model that can actually
+ * reason about the retry, not the one being evaluated for cost.
  */
-function chooseTier(_messageText: string, _hadToolError: boolean): "cheap" | "smart" {
+const SIMPLE_MESSAGE_RE =
+  /^(hi|hey|hello|thanks|thank you|ok|okay|k|yes|no|sure|great|cool|byy?e|goodbye|היי|הי|שלום|ביי|תודה|תודה רבה|מעולה|סבבה|בסדר|בסדר גמור|כן|לא|אוקיי|אוקי|יאללה|נהדר|יופי|וואו|תודה!)[!.,?׃…\s]*$/iu;
+
+function chooseTier(messageText: string, hadToolError: boolean): "cheap" | "smart" {
+  if (hadToolError) return "smart";
+  const trimmed = messageText.trim();
+  if (trimmed.length > 0 && trimmed.length <= 20 && SIMPLE_MESSAGE_RE.test(trimmed)) return "cheap";
   return "smart";
 }
 
@@ -720,7 +723,6 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     select: { bookingModel: true, aiProvider: true, aiModel: true, timezone: true, aiTemperature: true },
   });
   const activeTools = biz.bookingModel === "inquiry" ? inquiryTools : tools;
-  const provider = getAiProvider(biz.aiProvider);
 
   const turns: GenericTurn[] = [
     ...history.map((t: Turn) => ({ role: t.role, text: stampIfStale(t, biz.timezone) }) as GenericTurn),
@@ -735,7 +737,17 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   // reply when the underlying tool call actually errored out (e.g. slot taken in the meantime).
   let unconfirmedBookingFailure: string | null = null;
   let tier = chooseTier(messageText, false);
-  let model = provider.resolveModel(tier, biz.aiModel);
+
+  // "auto" is a meta-choice, not a real backend: it picks Claude or DeepSeek per-message from the
+  // same tier the chosen provider then uses to pick its own cheap/smart model — so a business set
+  // to "auto" gets DeepSeek only for the same narrow class of message that would get Haiku under
+  // "Claude, auto model", and Claude Sonnet for everything else. modelOverride is dropped for
+  // "auto" because a pinned model id from one provider is meaningless once the provider itself is
+  // decided per-message.
+  const isMetaAuto = biz.aiProvider === "auto";
+  const modelOverride = isMetaAuto ? null : biz.aiModel;
+  let provider = getAiProvider(isMetaAuto ? (tier === "cheap" ? "deepseek" : "anthropic") : biz.aiProvider);
+  let model = provider.resolveModel(tier, modelOverride);
 
   console.log(`[bot] provider=${provider.key} model=${model} business=${businessId} phone=${customerPhone} msg="${messageText.slice(0, 80)}"`);
 
@@ -756,27 +768,35 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   try {
     response = await call(model);
   } catch (err) {
-    // Fall back to the cheap tier before giving up. The smart tier used to be unreachable (the old
-    // chooseTier returned "cheap" on every path), so making it the default put every reply behind a
-    // model that had never actually served production traffic — and anything account-level, like the
-    // model not being enabled on this API key, then took the bot down completely rather than
-    // degrading it. A worse reply beats no reply.
-    const fallbackModel = provider.resolveModel("cheap", biz.aiModel);
-    const canFallBack = fallbackModel !== model;
+    // A worse reply beats no reply. In "auto" mode the other backend is a different account and
+    // API surface entirely, so a failure (key revoked, model disabled, outage) is worth retrying
+    // there rather than assuming the whole request is doomed. Outside "auto", the only fallback
+    // available is this same provider's cheap tier — which does nothing if a model override pins
+    // both tiers to the same id, or if the failure is account-level rather than model-level.
+    let fallbackProvider = provider;
+    let fallbackModel: string;
+    if (isMetaAuto) {
+      fallbackProvider = getAiProvider(provider.key === "anthropic" ? "deepseek" : "anthropic");
+      fallbackModel = fallbackProvider.resolveModel(tier, null);
+    } else {
+      fallbackModel = provider.resolveModel("cheap", modelOverride);
+    }
+    const canFallBack = isMetaAuto ? true : fallbackModel !== model;
     console.error(
-      `[bot] ${provider.key} call failed on ${model}${canFallBack ? ` — falling back to ${fallbackModel}` : ""}:`,
+      `[bot] ${provider.key} call failed on ${model}${canFallBack ? ` — falling back to ${fallbackProvider.key}/${fallbackModel}` : ""}:`,
       err instanceof ProviderCallError ? err.message : err
     );
     captureError(err, { businessId, customerPhone, model, provider: provider.key });
 
     if (!canFallBack) return { text: AI_UNAVAILABLE_HE };
     try {
+      provider = fallbackProvider;
       model = fallbackModel;
-      tier = "cheap";
+      if (!isMetaAuto) tier = "cheap";
       response = await call(model);
     } catch (fallbackErr) {
-      console.error(`[bot] fallback to ${model} also failed:`, fallbackErr instanceof ProviderCallError ? fallbackErr.message : fallbackErr);
-      captureError(fallbackErr, { businessId, customerPhone, model, provider: provider.key, phase: "cheap fallback" });
+      console.error(`[bot] fallback to ${provider.key}/${model} also failed:`, fallbackErr instanceof ProviderCallError ? fallbackErr.message : fallbackErr);
+      captureError(fallbackErr, { businessId, customerPhone, model, provider: provider.key, phase: "fallback" });
       return { text: AI_UNAVAILABLE_HE };
     }
   }
@@ -798,15 +818,16 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
       console.log(`[bot] tool=${tc.name} result=${result.slice(0, 200)}`);
 
       // If a tool returned an error and we're still on the cheap tier, escalate for the retry —
-      // but only if the business hasn't pinned a specific model override, in which case there's
-      // no cheap/smart pair to escalate between. Currently inert: chooseTier always returns
-      // "smart" (see its comment), so there's nothing to escalate from. Kept because it's the
-      // correct behavior the moment any cheap tier is reintroduced.
-      if (result.includes('"error"') && tier === "cheap" && !biz.aiModel) {
+      // but only if the business hasn't pinned a specific model override, in which case there's no
+      // cheap/smart pair to escalate between. In "auto" mode, cheap tier means the request went to
+      // DeepSeek, so escalating means switching provider too, not just picking a different model
+      // from the same one.
+      if (result.includes('"error"') && tier === "cheap" && !modelOverride) {
         hadToolError = true;
         tier = "smart";
-        model = provider.resolveModel(tier, biz.aiModel);
-        console.log(`[bot] tool error detected — escalating to ${model}`);
+        if (isMetaAuto) provider = getAiProvider("anthropic");
+        model = provider.resolveModel(tier, modelOverride);
+        console.log(`[bot] tool error detected — escalating to ${provider.key}/${model}`);
       }
 
       if (tc.name === "book_appointment" || tc.name === "reschedule_appointment") {

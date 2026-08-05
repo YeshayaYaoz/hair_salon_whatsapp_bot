@@ -393,27 +393,35 @@ export default function BotPage() {
               ))}
             </select>
           </Field>
-          <Field
-            label={he ? "מודל (אופציונלי)" : "Model (optional)"}
-            hint={
-              he
-                ? "השאירו ריק כדי לתת לבוט לבחור אוטומטית בין מודל זול למהיר לבין מודל חכם יותר לפי הצורך. בחירת מודל ספציפי מבטלת את הבחירה האוטומטית."
-                : "Leave blank to let the bot auto-pick between a cheap/fast model and a smarter one as needed. Picking a specific model turns off that automatic switching."
-            }
-          >
-            <select
-              value={fields.aiModel ?? ""}
-              onChange={(e) => set("aiModel", e.target.value || null)}
-              className="w-full"
+          {fields.aiProvider === "auto" ? (
+            <div className="text-xs text-gray-500 px-1">
+              {he
+                ? "במצב אוטומטי הבוט בוחר בעצמו בין Claude ל-DeepSeek בכל הודעה, לפי המורכבות שלה — אין צורך (ואי אפשר) לבחור מודל ספציפי."
+                : "In automatic mode the bot picks Claude or DeepSeek per message based on complexity — there's no specific model to choose here."}
+            </div>
+          ) : (
+            <Field
+              label={he ? "מודל (אופציונלי)" : "Model (optional)"}
+              hint={
+                he
+                  ? "השאירו ריק כדי לתת לבוט לבחור אוטומטית בין מודל זול למהיר לבין מודל חכם יותר לפי הצורך. בחירת מודל ספציפי מבטלת את הבחירה האוטומטית."
+                  : "Leave blank to let the bot auto-pick between a cheap/fast model and a smarter one as needed. Picking a specific model turns off that automatic switching."
+              }
             >
-              <option value="">{he ? "אוטומטי (מומלץ)" : "Automatic (recommended)"}</option>
-              {aiProviders
-                ?.find((p) => p.key === fields.aiProvider)
-                ?.defaultModels.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-            </select>
-          </Field>
+              <select
+                value={fields.aiModel ?? ""}
+                onChange={(e) => set("aiModel", e.target.value || null)}
+                className="w-full"
+              >
+                <option value="">{he ? "אוטומטי (מומלץ)" : "Automatic (recommended)"}</option>
+                {aiProviders
+                  ?.find((p) => p.key === fields.aiProvider)
+                  ?.defaultModels.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+              </select>
+            </Field>
+          )}
 
           <TemperatureSlider
             value={fields.aiTemperature ?? null}
