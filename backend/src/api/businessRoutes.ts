@@ -19,6 +19,7 @@ import {
 import { sendWhatsAppMessage, getWabaId, subscribeAppToWaba, registerPhoneNumber, getPhoneNumberStatus, getSubscribedApps, createMessageTemplate, setWhatsAppProfilePicture, type CreateTemplateResult } from "../webhook/whatsappClient.js";
 import { reminderTemplate, reviewTemplate, REMINDER_TEMPLATE_BODY, REVIEW_TEMPLATE_BODY } from "../lib/whatsappTemplates.js";
 import { notifyWaitlist, waitlistOfferText } from "../lib/waitlist.js";
+import { AFFILIATE_PROVIDERS, AFFILIATE_KINDS, recordAffiliateClick, markAffiliateConversion } from "../lib/affiliates.js";
 import { appendTurn } from "../bot/conversationStore.js";
 import { createAppointment, OutsideBusinessHoursError, SlotUnavailableError } from "../booking/availability.js";
 import { parseBookingTime } from "../lib/timezone.js";
@@ -617,12 +618,22 @@ businessRouter.get("/me/setup-status", async (req: AuthedRequest, res) => {
   // and the mobile setup bar nagging forever.
   const needsHours = business.bookingModel !== "inquiry";
 
+  // Only asked of businesses that switched deposits on — which the clinic and aesthetics templates
+  // do automatically during onboarding, long before anyone connects a merchant account. Until one
+  // is connected the bot silently treats deposits as off (see booking/deposits.ts isDepositRequired),
+  // so the owner believes every booking is secured by a deposit while none of them are. Critical,
+  // because that gap is invisible from every other screen.
+  const needsPayments = business.depositEnabled && business.depositAmountIls > 0;
+
   const steps = [
     { key: "category", done: Boolean(business.businessTypeChosenAt), critical: false },
     { key: "whatsapp", done: Boolean(business.whatsappAccessToken) && business.whatsappTokenValid, critical: true },
     { key: "notificationPhone", done: Boolean(business.notificationPhone?.trim()), critical: true },
     { key: "services", done: serviceCount > 0, critical: true },
     ...(needsHours ? [{ key: "hours", done: hoursCount > 0, critical: true }] : []),
+    ...(needsPayments
+      ? [{ key: "payments", done: Boolean(business.paymentProvider && business.paymentApiKey), critical: true }]
+      : []),
     // Carried over from the older inline checklist on the analytics page when that duplicate was
     // removed — it was the one step this list didn't already cover, and dropping it would have
     // silently lost the nudge for businesses still on a trial.
@@ -857,6 +868,27 @@ const paymentConnectSchema = z
     message: "apiKey and apiSecret are required for this provider",
   });
 
+/**
+ * Records that this salon followed one of our affiliate links out to a provider's signup page.
+ *
+ * The click is all we can see from here — the signup happens on the provider's side and is
+ * reported by their affiliate dashboard, matched back to us by the businessId we pass as `ref`.
+ * The conversion worth alerting on is the salon connecting the provider afterwards, which the
+ * connect routes below handle.
+ */
+businessRouter.post("/me/affiliate-click", async (req: AuthedRequest, res) => {
+  const parsed = z
+    .object({
+      provider: z.enum(AFFILIATE_PROVIDERS),
+      kind: z.enum(AFFILIATE_KINDS),
+    })
+    .safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  await recordAffiliateClick(req.businessId!, parsed.data.provider, parsed.data.kind);
+  res.json({ ok: true });
+});
+
 businessRouter.put("/me/payment-provider", async (req: AuthedRequest, res) => {
   const parsed = paymentConnectSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
@@ -890,6 +922,11 @@ businessRouter.put("/me/payment-provider", async (req: AuthedRequest, res) => {
       paymentWebhookSecret: webhookSecret,
     },
   });
+
+  // Not awaited: if we referred this salon here, the operator gets an email — but a referral
+  // bookkeeping problem must not fail a connection the salon just completed successfully.
+  markAffiliateConversion({ businessId: req.businessId!, provider: parsed.data.provider, kind: "payments" });
+
   res.json({ ok: true, webhookSecret });
 });
 
@@ -941,6 +978,7 @@ businessRouter.put("/me/invoice-provider", async (req: AuthedRequest, res) => {
       where: { id: req.businessId! },
       data: { invoiceProvider: "payplus-invoice", invoiceApiKey: null, invoiceApiSecret: null },
     });
+    markAffiliateConversion({ businessId: req.businessId!, provider: "payplus-invoice", kind: "invoice" });
     return res.json({ ok: true });
   }
 
@@ -956,6 +994,9 @@ businessRouter.put("/me/invoice-provider", async (req: AuthedRequest, res) => {
       invoiceApiSecret: encryptSecret(parsed.data.apiSecret!),
     },
   });
+
+  markAffiliateConversion({ businessId: req.businessId!, provider: parsed.data.provider, kind: "invoice" });
+
   res.json({ ok: true });
 });
 

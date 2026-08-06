@@ -5,6 +5,7 @@ import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SavedBadge } from "../../lib/SavedBadge";
 import { SkeletonCard } from "../../lib/Skeleton";
+import { AffiliateOffer } from "../../lib/AffiliateOffer";
 import { readableWithWhiteText } from "../../lib/readableColor";
 
 const PAYMENT_PROVIDERS = ["payplus", "tranzila", "cardcom", "grow"] as const;
@@ -451,6 +452,9 @@ export default function PaymentsPage() {
       {me && (<>
 
       <div className="grid gap-5 lg:grid-cols-2 items-start animate-fade-up stagger-1">
+        <div>
+        {/* Only while the slot is empty — a salon that already has a provider is not shown this. */}
+        {!me?.paymentConnected && <AffiliateOffer kind="payments" businessId={me?.id ?? null} />}
         <ProviderCard
           he={he}
           title={he ? "ספק סליקה" : "Payment provider"}
@@ -474,6 +478,10 @@ export default function PaymentsPage() {
           }}
         />
 
+        </div>
+
+        <div>
+        {!me?.invoiceConnected && <AffiliateOffer kind="invoice" businessId={me?.id ?? null} />}
         <ProviderCard
           he={he}
           title={he ? "ספק חשבוניות" : "Invoice provider"}
@@ -506,6 +514,7 @@ export default function PaymentsPage() {
             await load();
           }}
         />
+        </div>
       </div>
 
       {/* Managed *payment* and managed *invoice* clearing were both intentionally removed: issuing

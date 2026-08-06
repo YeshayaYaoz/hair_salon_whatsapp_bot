@@ -5,6 +5,8 @@ export interface ApplyTemplateResult {
   businessType: BusinessType;
   firstTime: boolean;
   seededServices: number;
+  /** Days of opening hours pre-filled as a starting week (0 when the owner already had some). */
+  seededHours: number;
   appliedPresets: string[]; // which fields were actually written (skipped ones were already customized)
 }
 
@@ -87,7 +89,29 @@ export async function applyTemplate(businessId: string, type: BusinessType): Pro
     seededServices = template.seedServices.length;
   }
 
+  // Same rule as services: first selection only, and only when there is nothing to overwrite.
+  // Hours were the one critical step that started completely empty, so the owner filled in seven
+  // days by hand before the bot could book anything — while services arrived pre-filled and merely
+  // needed correcting. skipDuplicates guards the race where two requests land together; the unique
+  // index on (businessId, dayOfWeek) is what makes that safe.
+  let seededHours = 0;
+  if (firstTime && template.seedHours.length > 0) {
+    const existingHours = await prisma.businessHours.count({ where: { businessId } });
+    if (existingHours === 0) {
+      const created = await prisma.businessHours.createMany({
+        data: template.seedHours.map((h) => ({
+          businessId,
+          dayOfWeek: h.dayOfWeek,
+          openMin: h.openMin,
+          closeMin: h.closeMin,
+        })),
+        skipDuplicates: true,
+      });
+      seededHours = created.count;
+    }
+  }
+
   await prisma.business.update({ where: { id: businessId }, data });
 
-  return { businessType: type, firstTime, seededServices, appliedPresets };
+  return { businessType: type, firstTime, seededServices, seededHours, appliedPresets };
 }

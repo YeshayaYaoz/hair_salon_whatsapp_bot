@@ -196,6 +196,33 @@ model Business {
   blockedTimes        BlockedTime[]
   specialPeriods      SpecialPeriod[]
   linkedLeads         Lead[] // Lead Finder prospects that turned into this real, paying account
+  affiliateReferrals  AffiliateReferral[]
+}
+
+// A salon we sent to a provider's signup page through our affiliate link, and whether it came back
+// connected.
+//
+// Two separate things are worth knowing and only one of them is visible to us. The provider's own
+// affiliate dashboard reports the signup — we pass businessId as the `ref` sub-id so rows there can
+// be matched back to a salon. What we can see on our side is the conversion that actually matters
+// to the product: the salon connecting that provider afterwards, which is when convertedAt is set
+// and the operator is emailed.
+//
+// A row per click rather than a flag on Business, because a salon may be referred to more than one
+// provider — for payments and for invoicing separately — and the intent is to add more providers.
+model AffiliateReferral {
+  id         String   @id @default(cuid())
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId String
+  provider   String // "payplus"
+  kind       String // "payments" | "invoice" — one salon can be referred for both
+  clickedAt  DateTime @default(now())
+  // Set when the salon actually connects this provider for this kind. Null means the click never
+  // turned into anything we can see.
+  convertedAt DateTime?
+
+  @@unique([businessId, provider, kind])
+  @@index([businessId])
 }
 
 /// Tracks the last run of each global background job (reminders, reviews, digest, retention) so
