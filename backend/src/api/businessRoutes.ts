@@ -1298,7 +1298,29 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
     }
   }
 
-  const subscribed = wabaId ? await subscribeAppToWaba(wabaId, userToken) : false;
+  let subscribed = wabaId ? await subscribeAppToWaba(wabaId, userToken) : false;
+
+  // Confirm the subscription rather than trusting the call that claimed to make it.
+  //
+  // This is the step that fails silently: Meta only pushes webhook events to apps explicitly
+  // subscribed to the WABA, and when that doesn't take, the dashboard says "connected" while the
+  // bot never receives a single message. The existing remedy is a "Fix connection" button — which
+  // requires the owner to first notice their bot is dead and then guess that this is the cure.
+  // Asking Meta what it actually thinks, and retrying once, turns that into something that mostly
+  // resolves itself before anyone has to notice.
+  if (wabaId) {
+    const check = await getSubscribedApps(wabaId, userToken).catch(() => null);
+    const reallySubscribed = Boolean(check && !check.error && check.apps.length > 0);
+    if (!reallySubscribed) {
+      console.warn(`[embedded-signup] Subscription not visible for WABA ${wabaId} — retrying once`);
+      subscribed = await subscribeAppToWaba(wabaId, userToken);
+      const recheck = await getSubscribedApps(wabaId, userToken).catch(() => null);
+      subscribed = Boolean(recheck && !recheck.error && recheck.apps.length > 0);
+    } else {
+      subscribed = true;
+    }
+  }
+
   if (!subscribed) {
     captureError(new Error("WhatsApp embedded-signup: app subscription to WABA failed or wabaId unresolved"), {
       businessId: req.businessId, wabaId, phoneNumberId: phone.id,
