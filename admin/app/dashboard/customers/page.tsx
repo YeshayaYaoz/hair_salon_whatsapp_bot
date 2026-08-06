@@ -23,6 +23,38 @@ interface Customer {
   _count: { appointments: number };
 }
 
+/**
+ * Avatar plus name for one customer.
+ *
+ * Most customers have no name: the bot only asks for one when a booking is being made, so anyone
+ * who just asked a question is nameless, and that is the normal case rather than missing data. The
+ * initial used to come from `name ?? phone`, so every one of those rows showed a circle containing
+ * "9" — the first digit of the 972 country code — beside an em dash. Two pieces of furniture, no
+ * information. A nameless customer now gets a neutral glyph and says so in words.
+ */
+function CustomerIdentity({ customer, he }: { customer: Customer; he: boolean }) {
+  const name = customer.name?.trim();
+  return (
+    <div className="flex items-center gap-3">
+      <div className="w-8 h-8 rounded-full bg-[#1B7FA0]/20 border border-[#145F78]/40 flex items-center justify-center text-[#5BB8D4] font-semibold text-sm shrink-0">
+        {name ? (
+          name.charAt(0).toUpperCase()
+        ) : (
+          <svg className="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+        )}
+      </div>
+      {name
+        ? <span className="text-gray-700 font-medium truncate">{name}</span>
+        : <span className="text-gray-400 truncate">{he ? "ללא שם" : "No name"}</span>}
+      {customer.botPaused && (
+        <span title={he ? "בניהול ידני" : "Manually handled"} className="text-sm shrink-0">🙋</span>
+      )}
+    </div>
+  );
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -168,10 +200,16 @@ function ConversationPanel({
         <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-100 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-full bg-[#1B7FA0]/20 border border-[#145F78]/40 flex items-center justify-center text-[#5BB8D4] font-semibold text-sm shrink-0">
-              {(customer.name ?? customer.phone).charAt(0).toUpperCase()}
+              {customer.name?.trim()
+                ? customer.name.trim().charAt(0).toUpperCase()
+                : (
+                  <svg className="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                )}
             </div>
             <div className="min-w-0">
-              <div className="text-sm font-semibold text-gray-900 truncate">{customer.name ?? formatPhone(customer.phone)}</div>
+              <div className="text-sm font-semibold text-gray-900 truncate">{customer.name?.trim() || formatPhone(customer.phone)}</div>
               <div className="text-xs text-gray-600 font-mono" dir="ltr">{formatPhone(customer.phone)}</div>
             </div>
           </div>
@@ -505,7 +543,10 @@ export default function CustomersPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="ps-3 pe-1 py-3">
+                {/* Every column hugs its content except the name, which absorbs the slack. Sharing
+                    it between all seven instead left each cell floating in the middle of its own
+                    gap, far from the header above it. */}
+                <th className="ps-3 pe-1 py-3 w-px">
                   <input
                     type="checkbox"
                     checked={filtered.length > 0 && selected.size === filtered.length}
@@ -513,12 +554,12 @@ export default function CustomersPage() {
                     onClick={(e) => e.stopPropagation()}
                   />
                 </th>
-                <th className="text-start px-4 py-3 text-gray-600 font-medium">{t.customerIdCol}</th>
+                <th className="text-start px-4 py-3 text-gray-600 font-medium w-px whitespace-nowrap">{t.customerIdCol}</th>
                 <th className="text-start px-4 py-3 text-gray-600 font-medium">{t.customer}</th>
-                <th className="text-start px-4 py-3 text-gray-600 font-medium">{t.customerPhoneCol}</th>
-                <th className="text-start px-4 py-3 text-gray-600 font-medium text-end">{t.totalBookings}</th>
-                <th className="px-4 py-3" />
-                <th className="ps-1 pe-3" />
+                <th className="text-start px-4 py-3 text-gray-600 font-medium w-px whitespace-nowrap">{t.customerPhoneCol}</th>
+                <th className="text-end px-4 py-3 text-gray-600 font-medium w-px whitespace-nowrap">{t.totalBookings}</th>
+                <th className="px-4 py-3 w-px" />
+                <th className="ps-1 pe-3 w-px" />
               </tr>
             </thead>
             <tbody>
@@ -528,7 +569,7 @@ export default function CustomersPage() {
                   onClick={() => setOpen(c)}
                   className={`cursor-pointer hover:bg-gray-50 transition ${i !== filtered.length - 1 ? "border-b border-gray-200/50" : ""}`}
                 >
-                  <td className="ps-3 pe-1 py-3">
+                  <td className="ps-3 pe-1 py-3 w-px">
                     <input
                       type="checkbox"
                       checked={selected.has(c.id)}
@@ -536,25 +577,17 @@ export default function CustomersPage() {
                       onClick={(e) => e.stopPropagation()}
                     />
                   </td>
-                  <td className="px-4 py-3 text-gray-600 font-mono text-xs" dir="ltr">{customerDisplayId(c.id)}</td>
+                  <td className="px-4 py-3 text-gray-600 font-mono text-xs w-px whitespace-nowrap" dir="ltr">{customerDisplayId(c.id)}</td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-[#1B7FA0]/20 border border-[#145F78]/40 flex items-center justify-center text-[#5BB8D4] font-semibold text-sm shrink-0">
-                        {(c.name ?? c.phone).charAt(0).toUpperCase()}
-                      </div>
-                      <span className="text-gray-700 font-medium">{c.name ?? <span className="text-gray-600 italic">—</span>}</span>
-                      {c.botPaused && (
-                        <span title={lang === "he" ? "בניהול ידני" : "Manually handled"} className="text-sm shrink-0">🙋</span>
-                      )}
-                    </div>
+                    <CustomerIdentity customer={c} he={lang === "he"} />
                   </td>
-                  <td className="px-4 py-3 text-gray-600 font-mono text-xs" dir="ltr">{formatPhone(c.phone)}</td>
-                  <td className="px-4 py-3 text-end">
+                  <td className="px-4 py-3 text-gray-600 font-mono text-xs w-px whitespace-nowrap" dir="ltr">{formatPhone(c.phone)}</td>
+                  <td className="px-4 py-3 text-end w-px whitespace-nowrap">
                     <span className="inline-flex items-center justify-center min-w-[2rem] px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
                       {c._count.appointments}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-end">
+                  <td className="px-4 py-3 text-end w-px whitespace-nowrap">
                     <button
                       onClick={(e) => { e.stopPropagation(); setOpen(c); }}
                       className="row-action text-xs text-[#1B7FA0] hover:text-white bg-[#1B7FA0]/10 hover:bg-[#1B7FA0] transition border border-[#1B7FA0]/30 px-3 py-1.5 rounded-lg gap-1.5 font-medium"
@@ -565,8 +598,8 @@ export default function CustomersPage() {
                       {t.viewConversation}
                     </button>
                   </td>
-                  <td className="ps-1 pe-3">
-                    <svg className="w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <td className="ps-1 pe-3 w-px">
+                    <svg className="w-4 h-4 text-gray-300 rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </td>
