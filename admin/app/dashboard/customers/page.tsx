@@ -370,8 +370,28 @@ export default function CustomersPage() {
   const [open, setOpen] = useState<Customer | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [resettingAll, setResettingAll] = useState(false);
+  const [resetAllDone, setResetAllDone] = useState(false);
 
   const [loaded, setLoaded] = useState(false);
+
+  /** Makes the bot open a new conversation with every customer. Transcripts are kept — the reset
+   * moves a marker rather than deleting, so the confirm has to say so or it reads as destructive. */
+  async function resetAllConversations() {
+    if (!confirm(he
+      ? `לפתוח שיחה חדשה מול כל ${customers.length} הלקוחות? הבוט לא יזכור מה נאמר עד כה בשום שיחה. היסטוריית ההודעות נשמרת במלואה וממשיכה להופיע בכרטיס כל לקוח.`
+      : `Start a fresh conversation with all ${customers.length} customers? The bot won't remember anything said so far in any thread. Every transcript is kept and stays visible on each customer.`)) return;
+    setResettingAll(true);
+    try {
+      await apiFetch("/api/business/conversations/reset-all", { method: "POST" });
+      setResetAllDone(true);
+      setTimeout(() => setResetAllDone(false), 4000);
+    } catch {
+      // best-effort — the button stays clickable to retry
+    } finally {
+      setResettingAll(false);
+    }
+  }
 
   useEffect(() => {
     apiFetch<Customer[]>("/api/business/customers").then((c) => { setCustomers(c); setLoaded(true); });
@@ -442,6 +462,16 @@ export default function CustomersPage() {
               {he ? `שלח הודעה ל-${selected.size} נבחרים` : `Message ${selected.size} selected`}
             </button>
           )}
+          <button
+            onClick={resetAllConversations}
+            disabled={resettingAll}
+            title={he
+              ? "הבוט יתחיל שיחה חדשה מול כל הלקוחות — ההיסטוריה נשמרת"
+              : "The bot starts fresh with every customer — history is kept"}
+            className="text-xs font-semibold text-gray-600 hover:text-[#145F78] hover:bg-[#1B7FA0]/10 disabled:opacity-50 border border-gray-200 px-3 py-2 rounded-lg transition"
+          >
+            {resettingAll ? "…" : resetAllDone ? (he ? "אופס ✓" : "Reset ✓") : (he ? "אפס את כל השיחות" : "Reset all chats")}
+          </button>
           <input
             placeholder={t.searchPlaceholder}
             value={search}

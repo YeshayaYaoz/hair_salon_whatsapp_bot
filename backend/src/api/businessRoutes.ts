@@ -20,7 +20,7 @@ import {
 import { sendWhatsAppMessage, getWabaId, subscribeAppToWaba, registerPhoneNumber, getPhoneNumberStatus, getSubscribedApps, createMessageTemplate, setWhatsAppProfilePicture, type CreateTemplateResult } from "../webhook/whatsappClient.js";
 import { reminderTemplate, reviewTemplate, REMINDER_TEMPLATE_BODY, REVIEW_TEMPLATE_BODY } from "../lib/whatsappTemplates.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
-import { appendTurn, forgetCachedHistory } from "../bot/conversationStore.js";
+import { appendTurn, forgetCachedHistory, forgetAllCachedHistory } from "../bot/conversationStore.js";
 import { createAppointment, OutsideBusinessHoursError, SlotUnavailableError } from "../booking/availability.js";
 import { parseBookingTime } from "../lib/timezone.js";
 import { getJobStatuses } from "../lib/jobStatus.js";
@@ -294,6 +294,93 @@ businessRouter.post("/admin/businesses/:id/unblock", requireSuperAdmin, async (r
     targetBusinessName: business.name,
   });
   res.json({ ok: true });
+});
+
+/**
+ * Trade a salon's WhatsApp token for a long-lived one, and report when it expires.
+ *
+ * Embedded Signup hands back whatever Meta issues at the end of the flow, and it is stored as-is.
+ * A short-lived token dies in a couple of hours, and the failure is silent from the owner's side:
+ * the health job flips whatsappTokenValid and their bot simply stops answering, with a reconnect
+ * as the only remedy. Exchanging it for the 60-day version is one Graph call, but it needs the app
+ * secret, so it cannot happen anywhere but the server.
+ *
+ * GET reports expiry without changing anything, so the operator can look before acting — Meta
+ * reports expires_at 0 for tokens that never expire, which is reported as such rather than as
+ * "expired in 1970".
+ */
+async function tokenExpiry(token: string): Promise<{ expiresAt: string | null; neverExpires: boolean; scopes?: string[] }> {
+  const appId = process.env.META_APP_ID;
+  const appSecret = process.env.WHATSAPP_APP_SECRET;
+  if (!appId || !appSecret) throw new Error("META_APP_ID/WHATSAPP_APP_SECRET not configured");
+
+  // App access token (app_id|app_secret) rather than the token inspecting itself: a token that has
+  // already expired cannot authenticate its own debug call, which is exactly when we need to look.
+  const url = `https://graph.facebook.com/v23.0/debug_token?input_token=${encodeURIComponent(token)}&access_token=${encodeURIComponent(`${appId}|${appSecret}`)}`;
+  const data = (await (await fetch(url)).json()) as any;
+  if (data?.error) throw new Error(data.error.message ?? "debug_token failed");
+
+  const expiresAt = data?.data?.expires_at as number | undefined;
+  if (!expiresAt) return { expiresAt: null, neverExpires: true, scopes: data?.data?.scopes };
+  return { expiresAt: new Date(expiresAt * 1000).toISOString(), neverExpires: false, scopes: data?.data?.scopes };
+}
+
+businessRouter.get("/admin/businesses/:id/whatsapp-token", requireSuperAdmin, async (req: AuthedRequest, res) => {
+  const business = await prisma.business.findUnique({
+    where: { id: req.params.id },
+    select: { whatsappAccessToken: true, whatsappTokenValid: true },
+  });
+  if (!business?.whatsappAccessToken) return res.status(400).json({ error: "This business has no WhatsApp token" });
+
+  try {
+    const info = await tokenExpiry(decryptSecret(business.whatsappAccessToken));
+    res.json({ ...info, tokenValid: business.whatsappTokenValid });
+  } catch (err) {
+    res.status(502).json({ error: err instanceof Error ? err.message : "Could not read token" });
+  }
+});
+
+businessRouter.post("/admin/businesses/:id/whatsapp-token/extend", requireSuperAdmin, async (req: AuthedRequest, res) => {
+  const business = await prisma.business.findUnique({
+    where: { id: req.params.id },
+    select: { id: true, name: true, whatsappAccessToken: true },
+  });
+  if (!business?.whatsappAccessToken) return res.status(400).json({ error: "This business has no WhatsApp token" });
+
+  const appId = process.env.META_APP_ID;
+  const appSecret = process.env.WHATSAPP_APP_SECRET;
+  if (!appId || !appSecret) return res.status(500).json({ error: "META_APP_ID/WHATSAPP_APP_SECRET not configured" });
+
+  try {
+    const current = decryptSecret(business.whatsappAccessToken);
+    const url =
+      `https://graph.facebook.com/v23.0/oauth/access_token?grant_type=fb_exchange_token` +
+      `&client_id=${encodeURIComponent(appId)}&client_secret=${encodeURIComponent(appSecret)}` +
+      `&fb_exchange_token=${encodeURIComponent(current)}`;
+    const data = (await (await fetch(url)).json()) as any;
+    if (data?.error || !data?.access_token) {
+      console.error("[admin] Token exchange failed:", JSON.stringify(data));
+      return res.status(502).json({ error: data?.error?.message ?? "Meta returned no access_token" });
+    }
+
+    // Only overwrite once Meta has actually handed back a replacement — a failed exchange must
+    // leave the working token in place, since it is the only thing keeping the bot answering.
+    await prisma.business.update({
+      where: { id: business.id },
+      data: { whatsappAccessToken: encryptSecret(data.access_token as string), whatsappTokenValid: true },
+    });
+    await logAdminAction({
+      actorEmail: process.env.SUPER_ADMIN_EMAIL!,
+      action: "extend_whatsapp_token",
+      targetBusinessId: business.id,
+      targetBusinessName: business.name,
+    });
+
+    const info = await tokenExpiry(data.access_token as string).catch(() => null);
+    res.json({ ok: true, ...(info ?? {}) });
+  } catch (err) {
+    res.status(502).json({ error: err instanceof Error ? err.message : "Exchange failed" });
+  }
 });
 
 // Manually set a business's plan/subscription — for comping an account, a sales-negotiated
@@ -1915,6 +2002,23 @@ businessRouter.post("/customers/:id/reset-conversation", async (req: AuthedReque
   forgetCachedHistory(req.businessId!, customer.phone);
 
   res.json({ ok: true });
+});
+
+/**
+ * The same reset, for every thread at once — after changing services, prices or the greeting, when
+ * the alternative is opening each conversation in turn.
+ *
+ * Still marker-only: no transcript is deleted. Customers with no conversation are updated too,
+ * which is harmless (there is nothing before the marker to hide).
+ */
+businessRouter.post("/conversations/reset-all", async (req: AuthedRequest, res) => {
+  const { count } = await prisma.customer.updateMany({
+    where: { businessId: req.businessId! },
+    data: { conversationResetAt: new Date() },
+  });
+  forgetAllCachedHistory(req.businessId!);
+
+  res.json({ ok: true, count });
 });
 
 // --- Waitlist ---
