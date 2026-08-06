@@ -8,12 +8,6 @@ import { EmptyState } from "../../lib/EmptyState";
 import { formatPhone } from "../../lib/formatPhone";
 import { useDialog } from "../../lib/useDialog";
 
-// Short, stable, human-recognizable reference for a customer (there's no business-facing
-// numeric id in the system) — derived from the DB id so it never changes.
-function customerDisplayId(id: string): string {
-  return `#${id.slice(-6).toUpperCase()}`;
-}
-
 interface Customer {
   id: string;
   name?: string;
@@ -554,7 +548,6 @@ export default function CustomersPage() {
                     onClick={(e) => e.stopPropagation()}
                   />
                 </th>
-                <th className="text-start px-4 py-3 text-gray-600 font-medium w-px whitespace-nowrap">{t.customerIdCol}</th>
                 <th className="text-start px-4 py-3 text-gray-600 font-medium">{t.customer}</th>
                 <th className="text-start px-4 py-3 text-gray-600 font-medium w-px whitespace-nowrap">{t.customerPhoneCol}</th>
                 <th className="text-end px-4 py-3 text-gray-600 font-medium w-px whitespace-nowrap">{t.totalBookings}</th>
@@ -577,7 +570,6 @@ export default function CustomersPage() {
                       onClick={(e) => e.stopPropagation()}
                     />
                   </td>
-                  <td className="px-4 py-3 text-gray-600 font-mono text-xs w-px whitespace-nowrap" dir="ltr">{customerDisplayId(c.id)}</td>
                   <td className="px-4 py-3">
                     <CustomerIdentity customer={c} he={lang === "he"} />
                   </td>

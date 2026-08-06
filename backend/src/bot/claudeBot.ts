@@ -138,6 +138,27 @@ const tools: GenericTool[] = [
       required: ["reason"],
     },
   },
+  /**
+   * Records a name the moment it is mentioned, independently of any booking.
+   *
+   * Everywhere else a name gets written is the tail end of a completed action — book_appointment,
+   * or request_booking_callback. Neither necessarily happens: a guest asks about prices and photos,
+   * says who they are, and leaves. The name was in the transcript and nowhere else, so the
+   * customers list showed a page of nameless rows for a business that had been talking to people
+   * by name all week. Worst in inquiry mode, where there is no booking call to fall back on.
+   */
+  {
+    name: "save_customer_name",
+    description:
+      "Record the customer's name as soon as they give it, whether or not they are booking. Call this the first time a name is mentioned in the conversation. Do not call it again unless they correct their name, and never guess a name they did not state.",
+    input_schema: {
+      type: "object",
+      properties: {
+        customerName: { type: "string", description: "The name exactly as the customer gave it." },
+      },
+      required: ["customerName"],
+    },
+  },
 ];
 
 // Tool used only in "inquiry" booking mode (e.g. B&B): instead of booking a slot, the bot collects
@@ -160,6 +181,7 @@ const requestBookingCallbackTool: GenericTool = {
 // since there is no live booking engine for these verticals.
 const inquiryTools: GenericTool[] = [
   requestBookingCallbackTool,
+  tools.find((t) => t.name === "save_customer_name")!,
   // A guest asking to see the unit is the single most common request in this mode.
   tools.find((t) => t.name === "send_photos")!,
   tools.find((t) => t.name === "request_human_followup")!,
@@ -564,8 +586,23 @@ async function runTool(
     return JSON.stringify({ addedToWaitlist: true, service: service.name });
   }
 
+  if (name === "save_customer_name") {
+    const given = (input.customerName as string | undefined)?.trim();
+    if (!given) return JSON.stringify({ error: "No name was provided — do not call this without one." });
+    await saveCustomerName(businessId, customerPhone, given);
+    // Nothing for the customer to be told: they just said their name, and reading it back is the
+    // narration BREVITY_RULE exists to stop.
+    return JSON.stringify({ saved: true });
+  }
+
   if (name === "request_booking_callback") {
-    const label = (input.customerName as string | undefined) ?? customerPhone;
+    const givenName = (input.customerName as string | undefined)?.trim();
+    // Inquiry businesses never call book_appointment, and that is the only other place a name is
+    // written — so for a B&B the name the customer just gave went into the owner's alert and was
+    // then thrown away, leaving every guest nameless in the dashboard forever.
+    if (givenName) await saveCustomerName(businessId, customerPhone, givenName);
+
+    const label = givenName ?? customerPhone;
     const notified = await notifyOwner(
       businessId,
       `📞 בקשת הזמנה חדשה — יש לחזור ללקוח!\nלקוח: ${label}\nטלפון לחזרה: ${customerPhone}\nוואטסאפ: https://wa.me/${customerPhone.replace(/\D/g, "")}\nפרטים: ${input.details}`
@@ -708,6 +745,18 @@ function stampIfStale(turn: Turn, timezone: string | null): string {
   const turnDay = dayIsoInTz(turn.at, timezone);
   if (turnDay === dayIsoInTz(new Date(), timezone)) return turn.content;
   return `[נכתב ב-${turnDay}] ${turn.content}`;
+}
+
+/**
+ * Upsert, because someone who has only ever asked questions may have no Customer row yet — and in
+ * inquiry mode that is most of them, since no booking ever creates one.
+ */
+async function saveCustomerName(businessId: string, phone: string, name: string): Promise<void> {
+  await prisma.customer.upsert({
+    where: { businessId_phone: { businessId, phone } },
+    update: { name },
+    create: { businessId, phone, name },
+  });
 }
 
 const AI_UNAVAILABLE_HE = "מצטער, הבוט אינו זמין כרגע. נסה שוב בעוד כמה דקות, או צור קשר ישיר עם העסק.";

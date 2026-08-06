@@ -106,6 +106,18 @@ describe("booking section is chosen by booking model", () => {
     // Opening hours are meaningless for an overnight rental and would otherwise render empty.
     expect(stable).not.toContain("שעות פעילות:");
   });
+
+  /**
+   * Inquiry businesses have no booking call to hang name collection off, so without an explicit
+   * instruction the bot would chat with a guest by name and still leave the row nameless — which
+   * is what a real B&B's customers list looked like.
+   */
+  it("tells inquiry businesses to ask for a name and to record it outside of booking", async () => {
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue(business({ bookingModel: "inquiry" }));
+    const { stable } = await buildSystemPrompt("biz1");
+    expect(stable).toContain("save_customer_name");
+    expect(stable).toContain("גם אם אינו מזמין");
+  });
 });
 
 describe("availability stance for inquiry businesses", () => {
