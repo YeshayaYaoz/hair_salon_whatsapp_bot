@@ -265,6 +265,9 @@ export default function AdminBusinessesPage() {
   /** Result of the last token check/extend for the open drilldown. null = not looked at yet. */
   const [tokenInfo, setTokenInfo] = useState<{ expiresAt?: string | null; neverExpires?: boolean; error?: string } | null>(null);
   const [tokenBusy, setTokenBusy] = useState(false);
+  /** How long a takeover session lasts. Kept across drilldowns — it's an operator preference for
+   * the task at hand, not a property of the salon being opened. Server clamps it regardless. */
+  const [takeoverHours, setTakeoverHours] = useState(8);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [mrrHistory, setMrrHistory] = useState<MrrSnapshot[] | null>(null);
@@ -317,7 +320,10 @@ export default function AdminBusinessesPage() {
     setActionBusy(true);
     setActionError(null);
     try {
-      const { token } = await apiFetch<{ token: string }>(`/api/business/admin/businesses/${b.id}/impersonate`, { method: "POST" });
+      const { token } = await apiFetch<{ token: string }>(`/api/business/admin/businesses/${b.id}/impersonate`, {
+        method: "POST",
+        body: JSON.stringify({ hours: takeoverHours }),
+      });
       startImpersonation(token);
       // Full reload, not router.push — see reloadAs. Client-side navigation would keep this
       // admin page's state and every cached fetch made as the admin.
@@ -781,6 +787,16 @@ export default function AdminBusinessesPage() {
                 >
                   {he ? "👁️ צפה כעסק זה" : "👁️ View as this business"}
                 </button>
+                <select
+                  value={takeoverHours}
+                  onChange={(e) => setTakeoverHours(Number(e.target.value))}
+                  title={he ? "משך הגישה עד שתצטרך להיכנס מחדש" : "How long the session lasts before you have to re-enter"}
+                  className="text-xs py-1.5"
+                >
+                  <option value={1}>{he ? "שעה" : "1 hour"}</option>
+                  <option value={8}>{he ? "8 שעות" : "8 hours"}</option>
+                  <option value={24}>{he ? "24 שעות" : "24 hours"}</option>
+                </select>
               </div>
               <div className="flex items-center gap-2">
                 <input

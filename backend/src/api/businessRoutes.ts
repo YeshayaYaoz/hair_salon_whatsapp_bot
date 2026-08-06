@@ -2,7 +2,7 @@ import { asyncRouter } from "../lib/asyncRouter.js";
 import crypto from "crypto";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
-import { requireAuth, signImpersonationToken, type AuthedRequest } from "../lib/auth.js";
+import { requireAuth, signImpersonationToken, DEFAULT_IMPERSONATION_HOURS, MAX_IMPERSONATION_HOURS, type AuthedRequest } from "../lib/auth.js";
 import { logAdminAction } from "../lib/adminAudit.js";
 import { sendAdminAlertEmail, sendBusinessNoticeEmail } from "../lib/email.js";
 import { assignNumberToAgent, CartesiaNotConfiguredError } from "../lib/cartesiaAdmin.js";
@@ -471,13 +471,19 @@ businessRouter.post("/admin/businesses/:id/impersonate", requireSuperAdmin, asyn
   const business = await prisma.business.findUnique({ where: { id: req.params.id }, select: { id: true, name: true } });
   if (!business) return res.status(404).json({ error: "Not found" });
 
+  // Optional: the panel offers a few lengths. signImpersonationToken clamps it either way, so a
+  // hand-crafted request can't mint a longer-lived credential than the ceiling.
+  const hours = z.number().int().positive().max(MAX_IMPERSONATION_HOURS).optional().safeParse(req.body?.hours);
+
   const adminEmail = process.env.SUPER_ADMIN_EMAIL!;
-  const token = signImpersonationToken(business.id, adminEmail);
+  const token = signImpersonationToken(business.id, adminEmail, hours.success ? hours.data : undefined);
   await logAdminAction({
     actorEmail: adminEmail,
     action: "impersonate",
     targetBusinessId: business.id,
     targetBusinessName: business.name,
+    // Recorded so the trail shows how long the operator held access, not just that they took over.
+    details: `${hours.success && hours.data ? hours.data : DEFAULT_IMPERSONATION_HOURS}h`,
   });
   res.json({ token });
 });
