@@ -1,0 +1,11 @@
+-- Records the first time a WhatsApp message to notificationPhone actually succeeded. That send is
+-- the only proof the number is real and reachable; a format check cannot establish it, and the
+-- failure it guards against is silent — the bot promising a customer a callback while the owner
+-- alert went nowhere.
+--
+-- Deliberately left NULL for existing businesses rather than backfilled to "verified". We have no
+-- evidence their number works, and inventing that evidence is exactly the failure this column is
+-- meant to expose. It fills itself in: notifyOwner marks the number verified on its next successful
+-- send, so a business with a working number needs to do nothing and one with a broken number
+-- surfaces on the setup checklist.
+ALTER TABLE "Business" ADD COLUMN "notificationPhoneVerifiedAt" TIMESTAMP(3);

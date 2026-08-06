@@ -13,6 +13,7 @@ interface BusinessProfile {
   timezone: string;
   email: string;
   notificationPhone?: string;
+  notificationPhoneVerifiedAt?: string | null;
   googleMapsUrl?: string;
   depositEnabled?: boolean;
   depositAmountIls?: number;
@@ -165,9 +166,17 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailVerified, setEmailVerified] = useState(true); // assume verified until told otherwise, so the warning never flashes on load
+  // Reflects the server, not the input box: editing the field does not un-verify anything until
+  // the change is actually saved, and re-saving the same number keeps its verification.
+  const [savedNotificationPhone, setSavedNotificationPhone] = useState<string | null>(null);
+  const [notificationPhoneVerifiedAt, setNotificationPhoneVerifiedAt] = useState<string | null>(null);
+  const notificationPhoneVerified =
+    Boolean(notificationPhoneVerifiedAt) && fields.notificationPhone?.trim() === (savedNotificationPhone ?? "");
 
   useEffect(() => {
-    apiFetch<BusinessProfile & { emailVerifiedAt?: string | null }>("/api/business/me").then((me) => {
+    apiFetch<BusinessProfile & { emailVerifiedAt?: string | null; notificationPhoneVerifiedAt?: string | null }>("/api/business/me").then((me) => {
+      setSavedNotificationPhone(me.notificationPhone ?? "");
+      setNotificationPhoneVerifiedAt(me.notificationPhoneVerifiedAt ?? null);
       setFields({
         name: me.name,
         address: me.address ?? "",
@@ -207,6 +216,16 @@ export default function SettingsPage() {
           depositHoldMinutes: fields.depositHoldMinutes,
         }),
       });
+      // Re-read rather than assume: the server normalizes the phone (so what it stored may differ
+      // from what was typed) and clears verification when the number changed. Guessing either
+      // locally would show a green "verified" against a number that is now unproven.
+      const me = await apiFetch<{ notificationPhone?: string | null; notificationPhoneVerifiedAt?: string | null }>(
+        "/api/business/me"
+      );
+      setFields((f) => ({ ...f, notificationPhone: me.notificationPhone ?? "" }));
+      setSavedNotificationPhone(me.notificationPhone ?? "");
+      setNotificationPhoneVerifiedAt(me.notificationPhoneVerifiedAt ?? null);
+
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
@@ -269,6 +288,26 @@ export default function SettingsPage() {
               className="w-full"
             />
           </Field>
+          {/* A number that was typed is not a number that works, and the difference is invisible
+              until the day a customer is promised a callback that never comes. Verified means a
+              WhatsApp message to it actually succeeded — either the test button, or any real
+              booking alert that has already gone out. */}
+          {fields.notificationPhone?.trim() && (
+            notificationPhoneVerified ? (
+              <p className="flex items-center gap-1.5 text-xs mt-2" style={{ color: "#15803D" }}>
+                <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                {he ? "אומת — הודעה למספר הזה נשלחה בהצלחה" : "Verified — a message to this number went through"}
+              </p>
+            ) : (
+              <p className="text-xs mt-2" style={{ color: "#B45309" }}>
+                {he
+                  ? "עדיין לא אומת. שלחו הודעת בדיקה מעמוד וואטסאפ כדי לוודא שההתראות באמת מגיעות — עד אז אין דרך לדעת שהמספר נכון."
+                  : "Not verified yet. Send a test message from the WhatsApp page to confirm alerts actually arrive — until then there's no way to know the number is right."}
+              </p>
+            )
+          )}
           <Field label={t.googleMapsUrl} hint={t.googleMapsUrlHint}>
             <input
               placeholder="https://g.page/r/..."

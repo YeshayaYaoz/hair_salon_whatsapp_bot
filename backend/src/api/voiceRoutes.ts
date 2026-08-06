@@ -5,6 +5,9 @@ import { findAvailableSlots, SlotUnavailableError, OutsideBusinessHoursError } f
 import { bookAppointmentWithSideEffects, cancelAppointmentById, rescheduleAppointmentById, AppointmentNotFoundError } from "../booking/actions.js";
 import { parseBookingTime, instantPartsInTz } from "../lib/timezone.js";
 import { TEMPLATES, isBusinessType } from "../lib/businessTemplates.js";
+// Shared with the owner-notification phone: the same "typed by a human vs formatted by a
+// machine" mismatch this was written for applies wherever those two meet. See lib/phone.ts.
+import { normalizePhone } from "../lib/phone.js";
 
 export const voiceRouter = asyncRouter();
 
@@ -17,28 +20,6 @@ function requireCartesiaAuth(req: import("express").Request, res: import("expres
   const header = req.headers.authorization;
   if (!secret || header !== `Bearer ${secret}`) return res.status(401).json({ error: "Unauthorized" });
   next();
-}
-
-/**
- * Reduces a phone number to one comparable form: digits, country code, no leading zero.
- *
- * Digits alone is not enough. Cartesia sends the dialled number in E.164 ("+972555077941"), while
- * the owner types their line the way they say it out loud ("055-507-7941"). Stripping punctuation
- * leaves "972555077941" and "0555077941", which are not equal — so the call resolves to no
- * business, /context 404s, and the agent answers a real caller with no idea whose salon it is.
- * Nothing in the logs says "wrong format"; it just looks like the number was never configured.
- *
- * The national-trunk rule is the same one every Israeli number follows: a leading 0 is dropped
- * when the country code goes on. Applied generally rather than only to +972, since it holds across
- * the numbering plans this would ever see.
- */
-function normalizePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  // Leading 0 = national format, so it carries no country code. Assume the business's own country;
-  // Israel is the only market this runs in, and a wrong guess here is no worse than the
-  // no-match it replaces.
-  if (digits.startsWith("0")) return `972${digits.slice(1)}`;
-  return digits;
 }
 
 type ResolvedVoiceBusiness = {

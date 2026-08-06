@@ -20,6 +20,7 @@ import { sendWhatsAppMessage, getWabaId, subscribeAppToWaba, registerPhoneNumber
 import { reminderTemplate, reviewTemplate, REMINDER_TEMPLATE_BODY, REVIEW_TEMPLATE_BODY } from "../lib/whatsappTemplates.js";
 import { notifyWaitlist, waitlistOfferText } from "../lib/waitlist.js";
 import { AFFILIATE_PROVIDERS, AFFILIATE_KINDS, recordAffiliateClick, markAffiliateConversion } from "../lib/affiliates.js";
+import { normalizeOwnerPhone } from "../lib/phone.js";
 import { appendTurn } from "../bot/conversationStore.js";
 import { createAppointment, OutsideBusinessHoursError, SlotUnavailableError } from "../booking/availability.js";
 import { parseBookingTime } from "../lib/timezone.js";
@@ -573,7 +574,39 @@ businessRouter.get("/me/ai-providers", async (_req: AuthedRequest, res) => {
 businessRouter.put("/me", async (req: AuthedRequest, res) => {
   const parsed = profileSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  await prisma.business.update({ where: { id: req.businessId! }, data: parsed.data });
+
+  const data: Record<string, unknown> = { ...parsed.data };
+
+  // The notification phone used to be stored exactly as typed, with no validation of any kind —
+  // and it is the channel every owner alert and human handoff depends on. Normalizing it means
+  // Meta gets a number in the form it accepts rather than "050-123-4567"; rejecting an implausible
+  // one catches the truncated/pasted-wrong cases before they turn into an opaque send failure
+  // hours later, at the moment a customer was promised a callback.
+  if (parsed.data.notificationPhone !== undefined) {
+    const raw = parsed.data.notificationPhone.trim();
+    if (raw === "") {
+      data.notificationPhone = null;
+      data.notificationPhoneVerifiedAt = null;
+    } else {
+      const normalized = normalizeOwnerPhone(raw);
+      if (!normalized) {
+        return res.status(400).json({
+          error: "מספר הטלפון להתראות לא נראה תקין. הזינו מספר מלא, למשל 0501234567.",
+        });
+      }
+      data.notificationPhone = normalized;
+
+      // A different number is an unproven number: whatever we learned about the old one says
+      // nothing about this one. Re-verified by the next successful send (see notifyOwner).
+      const current = await prisma.business.findUniqueOrThrow({
+        where: { id: req.businessId! },
+        select: { notificationPhone: true },
+      });
+      if (current.notificationPhone !== normalized) data.notificationPhoneVerifiedAt = null;
+    }
+  }
+
+  await prisma.business.update({ where: { id: req.businessId! }, data });
   res.json({ ok: true });
 });
 
@@ -628,7 +661,11 @@ businessRouter.get("/me/setup-status", async (req: AuthedRequest, res) => {
   const steps = [
     { key: "category", done: Boolean(business.businessTypeChosenAt), critical: false },
     { key: "whatsapp", done: Boolean(business.whatsappAccessToken) && business.whatsappTokenValid, critical: true },
-    { key: "notificationPhone", done: Boolean(business.notificationPhone?.trim()), critical: true },
+    // Proven, not merely present. A number that was typed but never reached is the exact failure
+    // this step exists to prevent, and "non-empty" cannot tell the two apart. Businesses whose
+    // number already works are marked verified by their next ordinary alert (see notifyOwner), so
+    // this asks nothing of anyone whose setup is genuinely fine.
+    { key: "notificationPhone", done: Boolean(business.notificationPhoneVerifiedAt), critical: true },
     { key: "services", done: serviceCount > 0, critical: true },
     ...(needsHours ? [{ key: "hours", done: hoursCount > 0, critical: true }] : []),
     ...(needsPayments
@@ -680,7 +717,20 @@ businessRouter.post("/me/whatsapp/test-message", async (req: AuthedRequest, res)
       to,
       text: `✅ בדיקה מתורי — החיבור לוואטסאפ של "${business.name}" עובד. אם קיבלת את ההודעה הזו, שליחת ההודעות מוגדרת כמו שצריך.`,
     });
-    res.json({ ok: true, to });
+
+    // If the test went to the notification phone, it just proved the thing the setup checklist is
+    // asking about — so this button doubles as the deliberate way to complete that step, rather
+    // than waiting for the first real booking alert to prove it incidentally.
+    const verifiedNotificationPhone =
+      business.notificationPhone != null && to === business.notificationPhone.trim() && !business.notificationPhoneVerifiedAt;
+    if (verifiedNotificationPhone) {
+      await prisma.business.update({
+        where: { id: business.id },
+        data: { notificationPhoneVerifiedAt: new Date() },
+      });
+    }
+
+    res.json({ ok: true, to, verifiedNotificationPhone });
   } catch (err) {
     // Meta's own message is the useful part here (e.g. "24h window", bad number) — surface it.
     res.status(502).json({ error: err instanceof Error ? err.message : "Failed to send test message" });
@@ -742,6 +792,44 @@ businessRouter.delete("/me/voice-phone", async (req: AuthedRequest, res) => {
 });
 
 /**
+ * Submits the reminder + review templates to a business's own WABA.
+ *
+ * Extracted so it can run automatically the moment a number is connected, not only when the owner
+ * finds the button. The cost of it being manual was invisible and permanent: Meta takes ~24h to
+ * approve, and until then every reminder outside the 24-hour customer-service window is dropped —
+ * scheduledMessages marks reminderSentAt anyway ("retrying next hour would only hit the same
+ * wall"), so the reminder is not delayed, it is lost, and only a console.warn records it.
+ *
+ * Never throws: template submission failing must not fail the WhatsApp connection that just
+ * succeeded. The owner can still retry from the button, which is now a retry rather than the only
+ * path.
+ */
+async function submitWhatsAppTemplates(
+  businessId: string,
+  phoneNumberId: string,
+  accessToken: string,
+  knownWabaId: string | null
+): Promise<CreateTemplateResult[] | null> {
+  try {
+    let wabaId = knownWabaId ?? undefined;
+    if (!wabaId) {
+      wabaId = await getWabaId(phoneNumberId, accessToken);
+      await prisma.business.update({ where: { id: businessId }, data: { whatsappWabaId: wabaId } });
+    }
+    const reminder = reminderTemplate();
+    const review = reviewTemplate();
+    return await Promise.all([
+      createMessageTemplate(wabaId, accessToken, { name: reminder.name, languageCode: reminder.languageCode, bodyText: REMINDER_TEMPLATE_BODY }),
+      createMessageTemplate(wabaId, accessToken, { name: review.name, languageCode: review.languageCode, bodyText: REVIEW_TEMPLATE_BODY }),
+    ]);
+  } catch (err) {
+    console.error(`[whatsapp] Automatic template submission failed for ${businessId} (non-fatal):`, err);
+    captureError(err, { businessId, phase: "auto_submit_templates" });
+    return null;
+  }
+}
+
+/**
  * Submits the reminder + review message templates for approval to this business's own WABA, so
  * the owner doesn't have to hand-create them in Meta Business Manager. Templates take up to ~24h
  * for Meta to review; this only submits the request. Safe to call repeatedly (existing templates
@@ -753,23 +841,13 @@ businessRouter.post("/me/whatsapp/create-templates", async (req: AuthedRequest, 
     return res.status(400).json({ error: "Connect a WhatsApp number first" });
   }
 
-  const accessToken = decryptSecret(business.whatsappAccessToken);
-  let wabaId = business.whatsappWabaId ?? undefined;
-  if (!wabaId) {
-    try {
-      wabaId = await getWabaId(business.whatsappPhoneNumberId, accessToken);
-    } catch (err) {
-      return res.status(502).json({ error: err instanceof Error ? err.message : "Could not resolve WhatsApp Business Account" });
-    }
-    await prisma.business.update({ where: { id: business.id }, data: { whatsappWabaId: wabaId } });
-  }
-
-  const reminder = reminderTemplate();
-  const review = reviewTemplate();
-  const results: CreateTemplateResult[] = await Promise.all([
-    createMessageTemplate(wabaId, accessToken, { name: reminder.name, languageCode: reminder.languageCode, bodyText: REMINDER_TEMPLATE_BODY }),
-    createMessageTemplate(wabaId, accessToken, { name: review.name, languageCode: review.languageCode, bodyText: REVIEW_TEMPLATE_BODY }),
-  ]);
+  const results = await submitWhatsAppTemplates(
+    business.id,
+    business.whatsappPhoneNumberId,
+    decryptSecret(business.whatsappAccessToken),
+    business.whatsappWabaId
+  );
+  if (!results) return res.status(502).json({ error: "Could not submit templates to Meta. Please try again." });
   res.json({ results });
 });
 
@@ -1284,6 +1362,10 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
       throw err;
     }
   }
+
+  // Not awaited: Meta takes ~24h to approve either way, so there is nothing for the owner to wait
+  // for — and a template failure must not turn a successful connection into an error.
+  submitWhatsAppTemplates(req.businessId!, phone.id, userToken, wabaId ?? null);
 
   res.json({ ok: true, phoneNumber: phone.display_phone_number, subscribed });
 });

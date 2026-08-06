@@ -94,7 +94,12 @@ model Business {
   // every new attempt restarts — so we refuse to attempt again within 72h of the last one, which
   // is the only way to actually let the lockout expire instead of endlessly resetting it.
   whatsappRegisterAttemptedAt DateTime?
-  notificationPhone         String? // owner's personal phone for booking alerts
+  notificationPhone         String? // owner's personal phone for booking alerts, normalized to digits+country code
+  // Set the first time a WhatsApp message to notificationPhone actually succeeds — which is the
+  // only proof the number is real and reachable. A format check cannot establish that, and the
+  // failure it guards against is silent: the bot tells a customer "someone will call you back"
+  // while the alert went nowhere. Cleared whenever the number changes.
+  notificationPhoneVerifiedAt DateTime?
   // Set once the owner clicks the link we email them. Null means unverified — which is the state
   // every existing account starts in, so nothing may *require* this to be non-null.
   emailVerifiedAt           DateTime?
