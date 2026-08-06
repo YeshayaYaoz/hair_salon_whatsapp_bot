@@ -1,11 +1,10 @@
 import { prisma } from "../lib/prisma.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { appendTurn, getHistory, type Turn } from "./conversationStore.js";
-import { findAvailableSlots, createAppointment, attachDepositPaymentLink, SlotUnavailableError, OutsideBusinessHoursError, SLOT_BLOCKING_STATUSES, type AvailableSlot } from "../booking/availability.js";
-import { depositCallbackUrl, getPaymentProvider } from "../lib/payments/index.js";
+import { findAvailableSlots, createAppointment, SlotUnavailableError, OutsideBusinessHoursError, SLOT_BLOCKING_STATUSES, type AvailableSlot } from "../booking/availability.js";
+import { isDepositRequired, depositHoldFields, createDepositLink, releaseHold } from "../booking/deposits.js";
 import { parseBookingTime, parseDateString, dayOfWeekForDate, instantPartsInTz, zonedDateParts } from "../lib/timezone.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
-import { decryptSecret } from "../lib/crypto.js";
 import { syncAppointmentToCalendar, deleteCalendarEvent } from "../lib/googleCalendar.js";
 import { captureError } from "../lib/errorMonitoring.js";
 import { logClaudeUsage } from "../lib/usageLedger.js";
@@ -297,12 +296,10 @@ async function runTool(
     const staffResolution = await resolveStaffId(businessId, input.staffName as string | undefined);
     if (staffResolution.error) return staffResolution.error;
 
-    // A deposit is required only if the owner opted in AND actually has a connected merchant
-    // account to charge through — an enabled toggle with no provider must not silently block
-    // every booking, so it's treated the same as deposits being off.
-    const depositRequired = Boolean(
-      biz.depositEnabled && biz.depositAmountIls > 0 && biz.paymentProvider && biz.paymentApiKey && biz.paymentApiSecret
-    );
+    // Shared with the public booking page (booking/deposits.ts). It used to be decided here and
+    // nowhere else, which is how the website booking form ended up giving away free confirmed slots
+    // at salons that required a deposit over WhatsApp.
+    const depositRequired = isDepositRequired(biz);
 
     const startTime = parseBookingTime(input.startTime as string, biz.timezone || "Asia/Jerusalem");
 
@@ -341,13 +338,7 @@ async function runTool(
         startTime,
         overrideDurationMin: input.durationMin as number | undefined,
         staffId: staffResolution.staffId ?? null,
-        ...(depositRequired
-          ? {
-              status: "pending_payment" as const,
-              depositAmountIls: biz.depositAmountIls,
-              depositExpiresAt: new Date(Date.now() + biz.depositHoldMinutes * 60_000),
-            }
-          : {}),
+        ...(depositRequired ? depositHoldFields(biz) : {}),
       });
     } catch (err) {
       if (err instanceof SlotUnavailableError) {
@@ -382,33 +373,19 @@ async function runTool(
       // booking yet; that all happens once the deposit webhook marks it paid (see whatsappRoutes.ts
       // deposit webhook handler / the expiry job that releases unpaid holds).
       try {
-        const provider = getPaymentProvider(biz.paymentProvider!);
-        const creds =
-          biz.paymentProvider === "tori_managed"
-            ? { apiKey: "", apiSecret: "" }
-            : {
-                apiKey: decryptSecret(biz.paymentApiKey!),
-                apiSecret: decryptSecret(biz.paymentApiSecret!),
-                pageUid: biz.paymentPageUid ?? undefined,
-              };
-        const link = await provider.createPaymentLink(creds, {
-          amountIls: biz.depositAmountIls,
-          description: `מקדמה לתור — ${service.name}, ${biz.name}`,
+        const paymentUrl = await createDepositLink({
+          businessId,
+          biz,
+          appointmentId: appointment.id,
+          serviceName: service.name,
           customerName,
           customerPhone,
-          referenceId: appointment.id,
-          callbackUrl: depositCallbackUrl(businessId, biz.paymentProvider!, biz.paymentWebhookSecret) ?? undefined,
-        });
-        await attachDepositPaymentLink(appointment.id, {
-          provider: biz.paymentProvider!,
-          paymentUrl: link.paymentUrl,
-          providerRef: link.providerTransactionId,
         });
         return JSON.stringify({
           booked: false,
           depositRequired: true,
           depositAmountIls: biz.depositAmountIls,
-          paymentUrl: link.paymentUrl,
+          paymentUrl,
           holdMinutes: biz.depositHoldMinutes,
           dayOfWeek: weekdayHe,
           localTime,
@@ -419,7 +396,7 @@ async function runTool(
         // dead pending_payment row blocking the slot for depositHoldMinutes with no way to pay it.
         console.error("Deposit payment link creation failed:", err);
         captureError(err, { businessId, phase: "deposit_link" });
-        await prisma.appointment.delete({ where: { id: appointment.id } }).catch(() => {});
+        await releaseHold(appointment.id);
         return JSON.stringify({ error: "Could not generate a payment link right now. Apologize to the customer and offer to try again in a moment, or suggest they call the business directly." });
       }
     }

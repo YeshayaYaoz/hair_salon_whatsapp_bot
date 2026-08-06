@@ -41,18 +41,64 @@ function normalizePhone(phone: string): string {
   return digits;
 }
 
+type ResolvedVoiceBusiness = {
+  id: string;
+  timezone: string;
+  bookingModel: string;
+  subscriptionStatus: string;
+  subscriptionPlan: string | null;
+  blockedAt: Date | null;
+};
+
 /** Resolves which salon a call belongs to from the dialed number — every voice tool needs this first. */
-async function resolveBusinessByCalledNumber(calledNumber: string): Promise<{ id: string; timezone: string; bookingModel: string } | null> {
+async function resolveBusinessByCalledNumber(calledNumber: string): Promise<ResolvedVoiceBusiness | null> {
   const calledDigits = normalizePhone(calledNumber);
   // Prisma can't filter on a normalized expression without raw SQL, and voicePhoneNumber may be
   // stored with or without a leading "+" depending on how it was entered — fetch the (expected to
   // stay small) set of voice-enabled businesses and match on digits in memory instead.
   const candidates = await prisma.business.findMany({
     where: { voicePhoneNumber: { not: null } },
-    select: { id: true, voicePhoneNumber: true, timezone: true, bookingModel: true },
+    select: {
+      id: true, voicePhoneNumber: true, timezone: true, bookingModel: true,
+      subscriptionStatus: true, subscriptionPlan: true, blockedAt: true,
+    },
   });
   const matched = candidates.find((b) => normalizePhone(b.voicePhoneNumber!) === calledDigits);
-  return matched ? { id: matched.id, timezone: matched.timezone, bookingModel: matched.bookingModel } : null;
+  if (!matched) return null;
+  const { voicePhoneNumber: _ignored, ...business } = matched;
+  return business;
+}
+
+/**
+ * Voice is a Premium feature and was being given away.
+ *
+ * Every other tenant surface goes through requireActiveSubscription (see businessRoutes.ts), but
+ * this router only ever checked the shared Cartesia secret — which authenticates *Cartesia*, not
+ * the salon. So a business on Standard (₪149 against Premium's ₪299, which is sold on exactly this)
+ * got the full voice agent by putting a number in a text box, and a cancelled account kept it
+ * indefinitely, while its WhatsApp bot had already stopped answering.
+ *
+ * Returns true when the call has been refused, matching rejectIfInquiry below. The message is
+ * written to be spoken aloud, because that is what Cartesia will do with it.
+ */
+const VOICE_ACTIVE_STATUSES = new Set(["trial", "active"]);
+
+function rejectIfNotEntitled(business: ResolvedVoiceBusiness, res: import("express").Response): boolean {
+  if (business.blockedAt || !VOICE_ACTIVE_STATUSES.has(business.subscriptionStatus)) {
+    res.status(402).json({
+      error: "This business's subscription is not active. Apologize, say you can't take the booking right now, and ask the caller to contact the business directly.",
+    });
+    return true;
+  }
+  // Trials get voice so it can actually be evaluated before the plan is chosen; a paid account has
+  // to be on the plan that includes it.
+  if (business.subscriptionStatus === "active" && business.subscriptionPlan !== "premium") {
+    res.status(402).json({
+      error: "Voice calling is not included in this business's plan. Apologize, say you can't take the booking by phone, and ask the caller to message the business on WhatsApp instead.",
+    });
+    return true;
+  }
+  return false;
 }
 
 // Inquiry-mode businesses (B&B etc.) close bookings only human-to-human — the voice agent briefs
@@ -78,6 +124,7 @@ voiceRouter.post("/context", async (req, res) => {
 
   const business = await resolveBusinessByCalledNumber(parsed.data.calledNumber);
   if (!business) return res.status(404).json({ error: "No salon configured for this number" });
+  if (rejectIfNotEntitled(business, res)) return;
 
   const callerDigits = normalizePhone(parsed.data.callerNumber);
   // Midnight UTC today: SpecialPeriod.startDate/endDate are DATE columns, so comparing against a
@@ -190,6 +237,7 @@ voiceRouter.post("/check-availability", async (req, res) => {
 
   const business = await resolveBusinessByCalledNumber(parsed.data.calledNumber);
   if (!business) return res.status(404).json({ error: "No salon configured for this number" });
+  if (rejectIfNotEntitled(business, res)) return;
   if (rejectIfInquiry(business, res)) return;
 
   const service = await prisma.service.findFirst({ where: { businessId: business.id, name: { equals: parsed.data.serviceName, mode: "insensitive" } } });
@@ -232,6 +280,7 @@ voiceRouter.post("/book", async (req, res) => {
 
   const business = await resolveBusinessByCalledNumber(parsed.data.calledNumber);
   if (!business) return res.status(404).json({ error: "No salon configured for this number" });
+  if (rejectIfNotEntitled(business, res)) return;
   if (rejectIfInquiry(business, res)) return;
 
   const service = await prisma.service.findFirst({ where: { businessId: business.id, name: { equals: parsed.data.serviceName, mode: "insensitive" } } });
@@ -272,6 +321,7 @@ voiceRouter.post("/cancel", async (req, res) => {
 
   const business = await resolveBusinessByCalledNumber(parsed.data.calledNumber);
   if (!business) return res.status(404).json({ error: "No salon configured for this number" });
+  if (rejectIfNotEntitled(business, res)) return;
 
   try {
     await cancelAppointmentById(business.id, parsed.data.appointmentId);
@@ -298,6 +348,7 @@ voiceRouter.post("/reschedule", async (req, res) => {
 
   const business = await resolveBusinessByCalledNumber(parsed.data.calledNumber);
   if (!business) return res.status(404).json({ error: "No salon configured for this number" });
+  if (rejectIfNotEntitled(business, res)) return;
   if (rejectIfInquiry(business, res)) return;
 
   let newServiceId: string | undefined;

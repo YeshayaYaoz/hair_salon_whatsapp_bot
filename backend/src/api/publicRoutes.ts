@@ -2,7 +2,11 @@ import { asyncRouter } from "../lib/asyncRouter.js";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { findAvailableSlots, createAppointment, OutsideBusinessHoursError, SlotUnavailableError } from "../booking/availability.js";
+import { isDepositRequired, depositHoldFields, createDepositLink, releaseHold } from "../booking/deposits.js";
 import { hasActiveSubscription } from "../lib/subscriptionGate.js";
+import { notifyOwner } from "../lib/ownerNotify.js";
+import { syncAppointmentToCalendar } from "../lib/googleCalendar.js";
+import { captureError } from "../lib/errorMonitoring.js";
 import { rateLimit } from "../lib/rateLimit.js";
 
 export const publicRouter = asyncRouter();
@@ -103,6 +107,20 @@ publicRouter.post("/:businessId/book", publicBookLimiter, async (req, res) => {
   const service = await prisma.service.findFirst({ where: { id: serviceId, businessId } });
   if (!service) return res.status(404).json({ error: "Service not found" });
 
+  // The same business fields the WhatsApp bot consults before booking. This endpoint used to skip
+  // the question entirely and hand out confirmed slots for free — through the booking link the
+  // salon puts on its own website — while requiring a deposit from anyone who booked over WhatsApp.
+  const biz = await prisma.business.findUniqueOrThrow({
+    where: { id: businessId },
+    select: {
+      name: true, timezone: true,
+      depositEnabled: true, depositAmountIls: true, depositHoldMinutes: true,
+      paymentProvider: true, paymentApiKey: true, paymentApiSecret: true,
+      paymentPageUid: true, paymentWebhookSecret: true,
+    },
+  });
+  const depositRequired = isDepositRequired(biz);
+
   let appointment;
   try {
     appointment = await createAppointment({
@@ -111,12 +129,65 @@ publicRouter.post("/:businessId/book", publicBookLimiter, async (req, res) => {
       customerPhone,
       customerName,
       startTime: new Date(startTime),
+      ...(depositRequired ? depositHoldFields(biz) : {}),
     });
   } catch (err) {
     if (err instanceof OutsideBusinessHoursError) return res.status(400).json({ error: "That time is outside business hours." });
     if (err instanceof SlotUnavailableError) return res.status(409).json({ error: "That slot was just taken. Please pick another." });
     throw err;
   }
+
+  if (depositRequired) {
+    // Nothing is announced or synced yet: this is a hold, not a booking. The deposit webhook
+    // confirms it, alerts the owner and syncs the calendar once the money actually arrives.
+    try {
+      const paymentUrl = await createDepositLink({
+        businessId,
+        biz,
+        appointmentId: appointment.id,
+        serviceName: service.name,
+        customerName,
+        customerPhone,
+      });
+      return res.status(201).json({
+        id: appointment.id,
+        startTime: appointment.startTime,
+        endTime: appointment.endTime,
+        service: service.name,
+        depositRequired: true,
+        depositAmountIls: biz.depositAmountIls,
+        holdMinutes: biz.depositHoldMinutes,
+        paymentUrl,
+      });
+    } catch (err) {
+      // Release the hold rather than leaving a pending_payment row blocking the slot for the whole
+      // hold window with no link anyone could pay.
+      console.error("Deposit payment link creation failed (public booking):", err);
+      captureError(err, { businessId, phase: "deposit_link_public" });
+      await releaseHold(appointment.id);
+      return res.status(502).json({ error: "Could not start the deposit payment. Please try again in a moment, or contact the business directly." });
+    }
+  }
+
+  // Both of these were missing: a web booking reached no owner and no calendar, so it existed only
+  // in the dashboard until someone thought to look.
+  const tz = biz.timezone || "Asia/Jerusalem";
+  const when = appointment.startTime.toLocaleString("he-IL", {
+    timeZone: tz, weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit",
+  });
+  notifyOwner(businessId, `🌐 הזמנה חדשה מהאתר!\nלקוח: ${customerName} (${customerPhone})\nשירות: ${service.name}\nמועד: ${when}`);
+
+  syncAppointmentToCalendar(businessId, {
+    startTime: appointment.startTime,
+    endTime: appointment.endTime,
+    serviceName: service.name,
+    customerName,
+    customerPhone,
+  })
+    .then((eventId) => {
+      if (eventId) return prisma.appointment.update({ where: { id: appointment.id }, data: { calendarEventId: eventId } });
+    })
+    .catch((err) => console.error("Calendar sync failed (public booking):", err));
 
   res.status(201).json({
     id: appointment.id,

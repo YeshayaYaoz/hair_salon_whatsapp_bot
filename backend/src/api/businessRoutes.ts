@@ -18,7 +18,7 @@ import {
 } from "../lib/googleBusinessProfile.js";
 import { sendWhatsAppMessage, getWabaId, subscribeAppToWaba, registerPhoneNumber, getPhoneNumberStatus, getSubscribedApps, createMessageTemplate, setWhatsAppProfilePicture, type CreateTemplateResult } from "../webhook/whatsappClient.js";
 import { reminderTemplate, reviewTemplate, REMINDER_TEMPLATE_BODY, REVIEW_TEMPLATE_BODY } from "../lib/whatsappTemplates.js";
-import { notifyWaitlist } from "../lib/waitlist.js";
+import { notifyWaitlist, waitlistOfferText } from "../lib/waitlist.js";
 import { appendTurn } from "../bot/conversationStore.js";
 import { createAppointment, OutsideBusinessHoursError, SlotUnavailableError } from "../booking/availability.js";
 import { parseBookingTime } from "../lib/timezone.js";
@@ -1892,13 +1892,50 @@ businessRouter.get("/waitlist", async (req: AuthedRequest, res) => {
   res.json(entries);
 });
 
+/**
+ * Offers the slot to one waitlisted customer over WhatsApp, then marks the entry notified.
+ *
+ * This used to only flip the boolean and send nothing, while the dashboard button was labelled as
+ * though it had contacted the customer. An owner would click it, see the entry move to "notified",
+ * and reasonably assume the person had been told — so the entry was marked handled precisely when
+ * nobody had been reached.
+ *
+ * `notified` is now set only after the message actually goes out, so the two can't disagree.
+ */
 businessRouter.patch("/waitlist/:id/notify", async (req: AuthedRequest, res) => {
-  const result = await prisma.waitlistEntry.updateMany({
+  const entry = await prisma.waitlistEntry.findFirst({
     where: { id: req.params.id, businessId: req.businessId! },
-    data: { notified: true },
+    include: { customer: true, service: true },
   });
-  if (result.count === 0) return res.status(404).json({ error: "Not found" });
-  res.json({ ok: true });
+  if (!entry) return res.status(404).json({ error: "Not found" });
+
+  const business = await prisma.business.findUniqueOrThrow({
+    where: { id: req.businessId! },
+    select: { name: true, whatsappPhoneNumberId: true, whatsappAccessToken: true },
+  });
+  if (!business.whatsappPhoneNumberId || !business.whatsappAccessToken) {
+    return res.status(409).json({ error: "WhatsApp is not connected, so the customer can't be messaged yet." });
+  }
+
+  try {
+    await sendWhatsAppMessage({
+      phoneNumberId: business.whatsappPhoneNumberId,
+      accessToken: decryptSecret(business.whatsappAccessToken),
+      to: entry.customer.phone,
+      text: waitlistOfferText({
+        customerName: entry.customer.name,
+        serviceName: entry.service.name,
+        businessName: business.name,
+      }),
+    });
+  } catch (err) {
+    console.error(`[waitlist] Manual notify failed for entry ${entry.id}:`, err);
+    captureError(err, { businessId: req.businessId, phase: "waitlist_manual_notify" });
+    return res.status(502).json({ error: "Could not send the WhatsApp message. Please try again." });
+  }
+
+  await prisma.waitlistEntry.update({ where: { id: entry.id }, data: { notified: true } });
+  res.json({ ok: true, messaged: true });
 });
 
 businessRouter.delete("/waitlist/:id", async (req: AuthedRequest, res) => {

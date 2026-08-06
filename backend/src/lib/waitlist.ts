@@ -3,6 +3,31 @@ import { decryptSecret } from "./crypto.js";
 import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
 
 /**
+ * The offer text sent to a waitlisted customer. Shared so the automatic path (a slot freeing up)
+ * and the manual one (the owner pressing "notify" on the waitlist page) say the same thing —
+ * the manual button used to send nothing at all, so there was nothing to keep in sync.
+ */
+export function waitlistOfferText(params: {
+  customerName: string | null;
+  serviceName: string;
+  businessName: string;
+  /**
+   * Omitted for the manual button: the owner knows something freed up but the dashboard never asks
+   * which slot, so promising a specific time there would be inventing one.
+   */
+  when?: string;
+}): string {
+  const name = params.customerName ? params.customerName.split(" ")[0] : "היי";
+  const opening = params.when
+    ? `פתח מקום ל${params.serviceName} ב-${params.when} אצל ${params.businessName}.`
+    : `התפנה מקום ל${params.serviceName} אצל ${params.businessName}.`;
+  const reply = params.when
+    ? `רוצה לתפוס אותו? אפשר לכתוב "כן" ואשמור לך את המקום!`
+    : `רוצה לתפוס אותו? כתבו לנו ונתאם מועד.`;
+  return `${name}! 🎉 ${opening}\n${reply}`;
+}
+
+/**
  * When a slot frees up, offer it to waitlisted customers (oldest first) over WhatsApp.
  * Fire-and-forget; callers should not await this on the request path.
  */
@@ -28,8 +53,12 @@ export async function notifyWaitlist(businessId: string, serviceId: string, serv
   });
 
   for (const entry of waitlist) {
-    const name = entry.customer.name ? entry.customer.name.split(" ")[0] : "היי";
-    const text = `${name}! 🎉 פתח מקום ל${serviceName} ב-${when} אצל ${business.name}.\nרוצה לתפוס אותו? אפשר לכתוב "כן" ואשמור לך את המקום!`;
+    const text = waitlistOfferText({
+      customerName: entry.customer.name,
+      serviceName,
+      businessName: business.name,
+      when,
+    });
     try {
       await sendWhatsAppMessage({ phoneNumberId: business.whatsappPhoneNumberId, accessToken, to: entry.customer.phone, text });
       await prisma.waitlistEntry.update({ where: { id: entry.id }, data: { notified: true } });
