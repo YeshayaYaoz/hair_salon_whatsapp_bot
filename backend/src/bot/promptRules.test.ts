@@ -107,6 +107,19 @@ describe("every rule reaches the prompt", () => {
     expect(stable).not.toContain("אורחים]");
   });
 
+  /**
+   * A reply to an English-speaking customer is written in English from scratch, so the Hebrew
+   * vocabulary never constrains it — the model translated "צימר" as "cabin", which reads as a
+   * wooden hut rather than the suite it is. The English terms have to be stated too.
+   */
+  it("gives the bot the English words for this vertical, not just the Hebrew ones", async () => {
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue(business({ businessType: "bnb" }));
+    const { stable } = await buildSystemPrompt("biz1");
+    expect(stable).toContain("אורח");   // Hebrew, as before
+    expect(stable).toContain("suite");  // and the English it must use
+    expect(stable).toContain("guest");
+  });
+
   it("includes the placeholder rule only when the owner wrote a greeting", async () => {
     mockPrisma.business.findUniqueOrThrow.mockResolvedValue(business());
     expect((await buildSystemPrompt("biz1")).stable).not.toContain(RULES.PLACEHOLDER_RULE);

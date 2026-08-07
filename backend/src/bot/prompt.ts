@@ -191,7 +191,10 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
   const vocabNote = isBusinessType(business.businessType)
     ? (() => {
         const v = TEMPLATES[business.businessType as keyof typeof TEMPLATES].vocabulary;
-        return `\nמינוח לעסק זה: פנה אל מי שמזמין כ"${v.customer}" (רבים: "${v.customerPlural}"), התייחס לאיש/אשת הצוות כ"${v.staff}", ולשירות/פעולה כ"${v.service}". השתמש במונחים האלה באופן טבעי.\n`;
+        // The English line matters as much as the Hebrew one: a reply to an English-speaking
+        // customer is composed in English from scratch, so the Hebrew terms above never reach it and
+        // the model translates on its own. A B&B's "צימר" went out to guests as "cabin".
+        return `\nמינוח לעסק זה: פנה אל מי שמזמין כ"${v.customer}" (רבים: "${v.customerPlural}"), התייחס לאיש/אשת הצוות כ"${v.staff}", ולשירות/פעולה כ"${v.service}". השתמש במונחים האלה באופן טבעי.\nכשאתה עונה באנגלית, אלה המילים המקבילות — ורק הן: "${v.customerEn}" (רבים: "${v.customerPluralEn}"), "${v.staffEn}", "${v.serviceEn}". אל תתרגם את המונחים בעצמך ואל תבחר מילה נרדפת.\n`;
       })()
     : "";
 
