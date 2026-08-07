@@ -35,6 +35,11 @@ const COPY = {
     somethingWrong: "משהו השתבש. נסו שוב.",
     confirmed: "התור נקבע!",
     seeYouThen: "נתראה! אפשר גם לנהל את התורים דרך וואטסאפ.",
+    holdTitle: "כמעט סיימנו — נשארה המקדמה",
+    holdBody: "שמרנו לכם את המועד. כדי לאשר אותו סופית צריך לשלם מקדמה של",
+    holdExpiry: "המקום שמור עבורכם ל־",
+    payNow: "לתשלום המקדמה",
+    holdWarning: "בלי התשלום המועד ישוחרר אוטומטית וייפתח לאחרים.",
     poweredBy: "מופעל על ידי",
     minutesShort: "דק׳",
   },
@@ -55,6 +60,11 @@ const COPY = {
     somethingWrong: "Something went wrong",
     confirmed: "Booking confirmed!",
     seeYouThen: "We'll see you then. You can also manage bookings via WhatsApp.",
+    holdTitle: "Almost there — deposit required",
+    holdBody: "We're holding your time slot. To confirm it, pay a deposit of",
+    holdExpiry: "Your slot is held for",
+    payNow: "Pay the deposit",
+    holdWarning: "Without payment the slot is released automatically and opens up to others.",
     poweredBy: "Powered by",
     minutesShort: "min",
   },
@@ -120,7 +130,14 @@ export default function BookPage() {
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [booked, setBooked] = useState<{ startTime: string; service: string } | null>(null);
+  const [booked, setBooked] = useState<{
+    startTime: string;
+    service: string;
+    // Present only when the salon requires a deposit: the booking is a hold, not a confirmation,
+    // until this link is paid. Showing the usual "Booking confirmed!" here would be a lie that
+    // costs the customer their slot when the hold expires.
+    deposit?: { paymentUrl: string; amountIls: number; holdMinutes: number };
+  } | null>(null);
 
   useEffect(() => {
     fetch(`${API}/api/public/${businessId}`)
@@ -170,7 +187,13 @@ export default function BookPage() {
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error ?? c.bookingFailed);
-      setBooked({ startTime: data.startTime, service: data.service });
+      setBooked({
+        startTime: data.startTime,
+        service: data.service,
+        ...(data.depositRequired
+          ? { deposit: { paymentUrl: data.paymentUrl, amountIls: data.depositAmountIls, holdMinutes: data.holdMinutes } }
+          : {}),
+      });
       setStep("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : c.somethingWrong);
@@ -221,8 +244,45 @@ export default function BookPage() {
 
         {step !== "done" && <StepIndicator current={STEP_INDEX[step]} labels={c.steps} />}
 
+        {/* Held, awaiting a deposit — deliberately NOT the green confirmation below. The slot is
+            only reserved for holdMinutes, so telling this customer they're booked would cost them
+            the appointment when the hold expires. */}
+        {step === "done" && booked?.deposit && (
+          <div className="bg-white border-2 rounded-2xl p-6 text-center shadow-sm" style={{ borderColor: "#FDE68A" }}>
+            <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: "#FFFBEB", border: "2px solid #FDE68A" }}>
+              <svg className="w-7 h-7" style={{ color: "#B45309" }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h2 className="text-gray-900 font-semibold text-lg mb-1">{c.holdTitle}</h2>
+            <p className="text-gray-500 text-sm">{booked.service}</p>
+            <p className="text-[#1B7FA0] font-semibold text-sm mt-1">{formatDateTimeInTz(booked.startTime, tz, locale)}</p>
+
+            <p className="text-gray-600 text-sm mt-4">
+              {c.holdBody} <span className="font-bold text-gray-900">₪{booked.deposit.amountIls}</span>
+            </p>
+
+            <a
+              href={booked.deposit.paymentUrl}
+              className="mt-4 inline-flex items-center justify-center w-full py-3 rounded-xl font-semibold text-white transition"
+              style={{ background: "#1B7FA0" }}
+            >
+              {c.payNow}
+            </a>
+
+            {/* The Hebrew prefix ends in a maqaf and binds directly to the number ("ל־30 דק׳"),
+                so it must not be separated by a space the way the English reading needs. */}
+            <p className="text-gray-500 text-xs mt-3">
+              {c.holdExpiry}
+              {lang === "he" ? "" : " "}
+              {booked.deposit.holdMinutes} {c.minutesShort}
+            </p>
+            <p className="text-xs mt-1" style={{ color: "#B45309" }}>{c.holdWarning}</p>
+          </div>
+        )}
+
         {/* Done */}
-        {step === "done" && booked && (
+        {step === "done" && booked && !booked.deposit && (
           <div className="bg-white border border-green-200 rounded-2xl p-6 text-center shadow-sm">
             <div className="w-14 h-14 rounded-full bg-green-50 border-2 border-green-200 flex items-center justify-center mx-auto mb-4">
               <svg className="w-7 h-7 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">

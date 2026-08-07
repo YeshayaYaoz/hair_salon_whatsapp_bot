@@ -33,6 +33,24 @@ vi.mock("../booking/actions.js", async () => {
   };
 });
 
+/**
+ * A business entitled to use voice. Every fixture goes through this so the entitlement fields are
+ * present by default and each test states only what it is actually about — and so that adding a new
+ * gate later fails loudly in one place instead of across every test in the file.
+ */
+function voiceBusiness(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "biz1",
+    voicePhoneNumber: "972501111111",
+    timezone: "Asia/Jerusalem",
+    bookingModel: "slots",
+    subscriptionStatus: "active",
+    subscriptionPlan: "premium",
+    blockedAt: null,
+    ...overrides,
+  };
+}
+
 describe("POST /api/voice/context", () => {
   let app: express.Express;
 
@@ -68,7 +86,7 @@ describe("POST /api/voice/context", () => {
   });
 
   it("matches the called number regardless of a leading + or formatting differences", async () => {
-    mockPrisma.business.findMany.mockResolvedValue([{ id: "biz1", voicePhoneNumber: "972501111111" }]);
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
     mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ name: "Salon Dana", timezone: "Asia/Jerusalem", address: null, botGreeting: null });
     mockPrisma.businessHours.findMany.mockResolvedValue([]);
     mockPrisma.customer.findMany.mockResolvedValue([]);
@@ -86,12 +104,74 @@ describe("POST /api/voice/context", () => {
     expect(res.body.caller.isKnownCustomer).toBe(false);
   });
 
+  // Voice is the Premium feature (₪299 against Standard's ₪149) but this router only ever
+  // authenticated Cartesia, never the salon — so a Standard business got the whole voice agent by
+  // typing a number into a text box, and a cancelled account kept it after its WhatsApp bot had
+  // already gone quiet.
+  describe("entitlement", () => {
+    it("refuses a business on the Standard plan", async () => {
+      mockPrisma.business.findMany.mockResolvedValue([voiceBusiness({ subscriptionPlan: "standard" })]);
+      const res = await request(app)
+        .post("/api/voice/context")
+        .set("Authorization", "Bearer test-secret")
+        .send({ calledNumber: "972501111111", callerNumber: "972502222222" });
+      expect(res.status).toBe(402);
+    });
+
+    it("refuses a lapsed subscription", async () => {
+      mockPrisma.business.findMany.mockResolvedValue([voiceBusiness({ subscriptionStatus: "past_due" })]);
+      const res = await request(app)
+        .post("/api/voice/context")
+        .set("Authorization", "Bearer test-secret")
+        .send({ calledNumber: "972501111111", callerNumber: "972502222222" });
+      expect(res.status).toBe(402);
+    });
+
+    it("refuses a blocked business even while its subscription looks active", async () => {
+      mockPrisma.business.findMany.mockResolvedValue([voiceBusiness({ blockedAt: new Date("2026-01-01") })]);
+      const res = await request(app)
+        .post("/api/voice/context")
+        .set("Authorization", "Bearer test-secret")
+        .send({ calledNumber: "972501111111", callerNumber: "972502222222" });
+      expect(res.status).toBe(402);
+    });
+
+    it("allows a trial, which has no plan chosen yet", async () => {
+      // Otherwise voice could never be evaluated before deciding whether to pay for it.
+      mockPrisma.business.findMany.mockResolvedValue([
+        voiceBusiness({ subscriptionStatus: "trial", subscriptionPlan: null }),
+      ]);
+      mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ name: "Salon Dana", timezone: "Asia/Jerusalem", address: null, botGreeting: null });
+      mockPrisma.businessHours.findMany.mockResolvedValue([]);
+      mockPrisma.customer.findMany.mockResolvedValue([]);
+      mockPrisma.service.findMany.mockResolvedValue([]);
+      mockPrisma.faqEntry.findMany.mockResolvedValue([]);
+      mockPrisma.specialPeriod.findMany.mockResolvedValue([]);
+
+      const res = await request(app)
+        .post("/api/voice/context")
+        .set("Authorization", "Bearer test-secret")
+        .send({ calledNumber: "972501111111", callerNumber: "972502222222" });
+      expect(res.status).toBe(200);
+    });
+
+    it("gates the booking endpoint too, not just /context", async () => {
+      mockPrisma.business.findMany.mockResolvedValue([voiceBusiness({ subscriptionPlan: "standard" })]);
+      const res = await request(app)
+        .post("/api/voice/book")
+        .set("Authorization", "Bearer test-secret")
+        .send({ calledNumber: "972501111111", callerNumber: "972502222222", serviceName: "Haircut", startTime: "2026-08-02T10:00:00Z", customerName: "Dana" });
+      expect(res.status).toBe(402);
+      expect(mockBookAppointmentWithSideEffects).not.toHaveBeenCalled();
+    });
+  });
+
   it("matches a locally-written number against the E.164 one Cartesia dials", async () => {
     // The trap this guards: the owner types their line the way they say it ("055-507-7941") while
     // Cartesia sends "+972555077941". Digits alone are not equal, so the call used to resolve to no
     // business at all — the agent answering a real caller with no idea whose salon it is, and
     // nothing in the logs suggesting a format problem.
-    mockPrisma.business.findMany.mockResolvedValue([{ id: "biz1", voicePhoneNumber: "055-507-7941" }]);
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness({ voicePhoneNumber: "055-507-7941" })]);
     mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ name: "Salon Dana", timezone: "Asia/Jerusalem", address: null, botGreeting: null });
     mockPrisma.businessHours.findMany.mockResolvedValue([]);
     mockPrisma.customer.findMany.mockResolvedValue([]);
@@ -109,7 +189,7 @@ describe("POST /api/voice/context", () => {
   });
 
   it("recognises a caller who saved their own number in local format", async () => {
-    mockPrisma.business.findMany.mockResolvedValue([{ id: "biz1", voicePhoneNumber: "972501111111" }]);
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
     mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ name: "Salon Dana", timezone: "Asia/Jerusalem", address: null, botGreeting: null });
     mockPrisma.businessHours.findMany.mockResolvedValue([]);
     mockPrisma.customer.findMany.mockResolvedValue([{ id: "c1", phone: "0502222222", name: "אורי" }]);
@@ -128,7 +208,7 @@ describe("POST /api/voice/context", () => {
   });
 
   it("surfaces a known caller's upcoming appointment", async () => {
-    mockPrisma.business.findMany.mockResolvedValue([{ id: "biz1", voicePhoneNumber: "972501111111" }]);
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
     mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ name: "Salon Dana", timezone: "Asia/Jerusalem", address: null, botGreeting: null });
     mockPrisma.businessHours.findMany.mockResolvedValue([]);
     mockPrisma.customer.findMany.mockResolvedValue([{ id: "cust1", phone: "972502222222", name: "Yael" }]);
@@ -156,7 +236,7 @@ describe("POST /api/voice/context", () => {
   });
 
   it("includes the fields the agent is asked about: capacity, directions and pricing rules", async () => {
-    mockPrisma.business.findMany.mockResolvedValue([{ id: "biz1", voicePhoneNumber: "972501111111" }]);
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
     mockPrisma.business.findUniqueOrThrow.mockResolvedValue({
       name: "Tzimmer",
       timezone: "Asia/Jerusalem",
@@ -186,7 +266,7 @@ describe("POST /api/voice/context", () => {
   });
 
   it("returns upcoming special periods as plain calendar dates", async () => {
-    mockPrisma.business.findMany.mockResolvedValue([{ id: "biz1", voicePhoneNumber: "972501111111" }]);
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
     mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ name: "Tzimmer", timezone: "Asia/Jerusalem", address: null, botGreeting: null });
     mockPrisma.businessHours.findMany.mockResolvedValue([]);
     mockPrisma.customer.findMany.mockResolvedValue([]);
@@ -231,7 +311,7 @@ describe("POST /api/voice/check-availability", () => {
   });
 
   it("404s for an unknown service and lists the real ones", async () => {
-    mockPrisma.business.findMany.mockResolvedValue([{ id: "biz1", voicePhoneNumber: "972501111111", timezone: "Asia/Jerusalem" }]);
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
     mockPrisma.service.findFirst.mockResolvedValue(null);
     mockPrisma.service.findMany.mockResolvedValue([{ name: "Haircut" }]);
 
@@ -245,7 +325,7 @@ describe("POST /api/voice/check-availability", () => {
   });
 
   it("returns slots with a formatted local time", async () => {
-    mockPrisma.business.findMany.mockResolvedValue([{ id: "biz1", voicePhoneNumber: "972501111111", timezone: "Asia/Jerusalem" }]);
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
     mockPrisma.service.findFirst.mockResolvedValue({ id: "svc1", durationMin: 30 });
     mockFindAvailableSlots.mockResolvedValue([{ startTime: "2026-08-01T10:00:00.000Z", endTime: "2026-08-01T10:30:00.000Z", staffId: null }]);
 
@@ -272,7 +352,7 @@ describe("POST /api/voice/book", () => {
   });
 
   it("books and returns the appointment id", async () => {
-    mockPrisma.business.findMany.mockResolvedValue([{ id: "biz1", voicePhoneNumber: "972501111111", timezone: "Asia/Jerusalem" }]);
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
     mockPrisma.service.findFirst.mockResolvedValue({ id: "svc1", name: "Haircut" });
     mockBookAppointmentWithSideEffects.mockResolvedValue({
       id: "appt1",
@@ -295,7 +375,7 @@ describe("POST /api/voice/book", () => {
   });
 
   it("returns 409 when the slot was taken concurrently", async () => {
-    mockPrisma.business.findMany.mockResolvedValue([{ id: "biz1", voicePhoneNumber: "972501111111", timezone: "Asia/Jerusalem" }]);
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
     mockPrisma.service.findFirst.mockResolvedValue({ id: "svc1", name: "Haircut" });
     const { SlotUnavailableError } = await import("../booking/availability.js");
     mockBookAppointmentWithSideEffects.mockRejectedValue(new SlotUnavailableError());
@@ -322,7 +402,7 @@ describe("POST /api/voice/cancel", () => {
   });
 
   it("cancels a matched appointment", async () => {
-    mockPrisma.business.findMany.mockResolvedValue([{ id: "biz1", voicePhoneNumber: "972501111111", timezone: "Asia/Jerusalem" }]);
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
     mockCancelAppointmentById.mockResolvedValue(undefined);
 
     const res = await request(app)
@@ -336,7 +416,7 @@ describe("POST /api/voice/cancel", () => {
   });
 
   it("404s when the appointment doesn't belong to this business", async () => {
-    mockPrisma.business.findMany.mockResolvedValue([{ id: "biz1", voicePhoneNumber: "972501111111", timezone: "Asia/Jerusalem" }]);
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
     const { AppointmentNotFoundError } = await import("../booking/actions.js");
     mockCancelAppointmentById.mockRejectedValue(new AppointmentNotFoundError());
 
@@ -362,7 +442,7 @@ describe("POST /api/voice/reschedule", () => {
   });
 
   it("reschedules to the new time", async () => {
-    mockPrisma.business.findMany.mockResolvedValue([{ id: "biz1", voicePhoneNumber: "972501111111", timezone: "Asia/Jerusalem" }]);
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
     mockRescheduleAppointmentById.mockResolvedValue({
       startTime: new Date("2026-08-02T10:00:00Z"),
       endTime: new Date("2026-08-02T10:30:00Z"),
@@ -378,7 +458,7 @@ describe("POST /api/voice/reschedule", () => {
   });
 
   it("keeps the original on a slot conflict", async () => {
-    mockPrisma.business.findMany.mockResolvedValue([{ id: "biz1", voicePhoneNumber: "972501111111", timezone: "Asia/Jerusalem" }]);
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
     const { SlotUnavailableError } = await import("../booking/availability.js");
     mockRescheduleAppointmentById.mockRejectedValue(new SlotUnavailableError());
 

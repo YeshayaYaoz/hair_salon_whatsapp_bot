@@ -18,6 +18,13 @@ export function isBusinessType(v: unknown): v is BusinessType {
   return typeof v === "string" && (BUSINESS_TYPES as readonly string[]).includes(v);
 }
 
+/** One day of the seeded opening week. Minutes from midnight, matching BusinessHours. */
+export interface SeedHours {
+  dayOfWeek: number; // 0 = Sunday … 6 = Saturday
+  openMin: number;
+  closeMin: number;
+}
+
 export interface SeedService {
   name: string;
   durationMin: number;
@@ -59,6 +66,17 @@ export interface BusinessTemplate {
   descriptionEn: string;
   presets: TemplatePresets;
   seedServices: SeedService[];
+  /**
+   * A starting week, seeded on first category selection when the business has none.
+   *
+   * Opening hours were the only critical setup step that began completely empty — the owner filled
+   * in seven days by hand before the bot could book anything, while services arrived pre-filled and
+   * merely needed editing. These are a draft to correct, not a claim about this particular salon,
+   * and they follow the Israeli working week: Sunday–Thursday full days, a short Friday, closed
+   * Saturday. Inquiry-mode verticals seed nothing, since they have no slot engine for hours to
+   * constrain.
+   */
+  seedHours: SeedHours[];
   vocabulary: Vocabulary;
 }
 
@@ -90,6 +108,15 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
       { name: "צבע", durationMin: 90, priceCents: 25000, color: "#ec4899" },
       { name: "פן", durationMin: 45, priceCents: 12000, color: "#f59e0b" },
     ],
+    // Salons run late; Friday closes early for Shabbat.
+    seedHours: [
+      { dayOfWeek: 0, openMin: 540, closeMin: 1140 },
+      { dayOfWeek: 1, openMin: 540, closeMin: 1140 },
+      { dayOfWeek: 2, openMin: 540, closeMin: 1140 },
+      { dayOfWeek: 3, openMin: 540, closeMin: 1140 },
+      { dayOfWeek: 4, openMin: 540, closeMin: 1140 },
+      { dayOfWeek: 5, openMin: 540, closeMin: 840 },
+    ],
     vocabulary: { customer: "לקוח", customerPlural: "לקוחות", staff: "ספר", service: "טיפול" },
   },
 
@@ -118,6 +145,14 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
       { name: "תספורת גבר", durationMin: 30, priceCents: 7000, color: "#0ea5e9" },
       { name: "תספורת + זקן", durationMin: 45, priceCents: 10000, color: "#14b8a6" },
       { name: "גילוח מגבת חמה", durationMin: 30, priceCents: 8000, color: "#64748b" },
+    ],
+    seedHours: [
+      { dayOfWeek: 0, openMin: 540, closeMin: 1200 },
+      { dayOfWeek: 1, openMin: 540, closeMin: 1200 },
+      { dayOfWeek: 2, openMin: 540, closeMin: 1200 },
+      { dayOfWeek: 3, openMin: 540, closeMin: 1200 },
+      { dayOfWeek: 4, openMin: 540, closeMin: 1200 },
+      { dayOfWeek: 5, openMin: 540, closeMin: 840 },
     ],
     vocabulary: { customer: "לקוח", customerPlural: "לקוחות", staff: "ברבר", service: "תספורת" },
   },
@@ -149,6 +184,14 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
       { name: "בדיקה", durationMin: 20, priceCents: 25000, color: "#22c55e" },
       { name: "טיפול המשך", durationMin: 45, priceCents: 40000, color: "#6366f1" },
     ],
+    // Clinics keep office hours and generally don't open Friday at all.
+    seedHours: [
+      { dayOfWeek: 0, openMin: 480, closeMin: 1020 },
+      { dayOfWeek: 1, openMin: 480, closeMin: 1020 },
+      { dayOfWeek: 2, openMin: 480, closeMin: 1020 },
+      { dayOfWeek: 3, openMin: 480, closeMin: 1020 },
+      { dayOfWeek: 4, openMin: 480, closeMin: 1020 },
+    ],
     vocabulary: { customer: "מטופל", customerPlural: "מטופלים", staff: "רופא", service: "בדיקה" },
   },
 
@@ -177,6 +220,14 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
       { name: "ניקוי פנים", durationMin: 60, priceCents: 28000, color: "#f472b6" },
       { name: "טיפול לייזר", durationMin: 30, priceCents: 35000, color: "#a855f7" },
       { name: "מניקור/פדיקור", durationMin: 45, priceCents: 12000, color: "#fb7185" },
+    ],
+    seedHours: [
+      { dayOfWeek: 0, openMin: 600, closeMin: 1140 },
+      { dayOfWeek: 1, openMin: 600, closeMin: 1140 },
+      { dayOfWeek: 2, openMin: 600, closeMin: 1140 },
+      { dayOfWeek: 3, openMin: 600, closeMin: 1140 },
+      { dayOfWeek: 4, openMin: 600, closeMin: 1140 },
+      { dayOfWeek: 5, openMin: 540, closeMin: 780 },
     ],
     vocabulary: { customer: "לקוחה", customerPlural: "לקוחות", staff: "קוסמטיקאית", service: "טיפול" },
   },
@@ -207,6 +258,8 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
       { name: "לילה — יחידה משפחתית", durationMin: 1440, priceCents: 130000, color: "#22c55e" },
       { name: "חבילת סוף שבוע (2 לילות)", durationMin: 2880, priceCents: 170000, color: "#f59e0b" },
     ],
+    // Inquiry mode — the bot never books a slot, so there are no hours to constrain.
+    seedHours: [],
     vocabulary: { customer: "אורח", customerPlural: "אורחים", staff: "המארח", service: "יחידת אירוח" },
   },
 };

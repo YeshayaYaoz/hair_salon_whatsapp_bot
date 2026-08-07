@@ -56,6 +56,16 @@ export const STEP_META: Record<string, { he: string; en: string; href: string; w
     whyHe: "הבוט קובע תורים רק בתוך שעות הפעילות",
     whyEn: "The bot only books inside your opening hours",
   },
+  // Only appears for businesses that turned deposits on. Until a provider is connected the bot
+  // treats deposits as off without saying so, so the owner thinks bookings are secured when they
+  // aren't — this is the only screen that surfaces that.
+  payments: {
+    he: "חיבור ספק סליקה",
+    en: "Connect a payment provider",
+    href: "/dashboard/payments",
+    whyHe: "ביקשתם מקדמה על כל תור, אבל בלי ספק סליקה הבוט קובע תורים בלי לגבות אותה",
+    whyEn: "You asked for a deposit on every booking, but without a provider the bot books without collecting it",
+  },
   billing: {
     he: "הפעלת מנוי",
     en: "Activate subscription",

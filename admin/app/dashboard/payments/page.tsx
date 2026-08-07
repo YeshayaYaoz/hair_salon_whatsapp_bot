@@ -5,6 +5,7 @@ import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SavedBadge } from "../../lib/SavedBadge";
 import { SkeletonCard } from "../../lib/Skeleton";
+import { AffiliateOffer } from "../../lib/AffiliateOffer";
 import { readableWithWhiteText } from "../../lib/readableColor";
 
 const PAYMENT_PROVIDERS = ["payplus", "tranzila", "cardcom", "grow"] as const;
@@ -451,6 +452,9 @@ export default function PaymentsPage() {
       {me && (<>
 
       <div className="grid gap-5 lg:grid-cols-2 items-start animate-fade-up stagger-1">
+        <div>
+        {/* Only while the slot is empty — a salon that already has a provider is not shown this. */}
+        {!me?.paymentConnected && <AffiliateOffer kind="payments" businessId={me?.id ?? null} />}
         <ProviderCard
           he={he}
           title={he ? "ספק סליקה" : "Payment provider"}
@@ -474,6 +478,10 @@ export default function PaymentsPage() {
           }}
         />
 
+        </div>
+
+        <div>
+        {!me?.invoiceConnected && <AffiliateOffer kind="invoice" businessId={me?.id ?? null} />}
         <ProviderCard
           he={he}
           title={he ? "ספק חשבוניות" : "Invoice provider"}
@@ -506,6 +514,7 @@ export default function PaymentsPage() {
             await load();
           }}
         />
+        </div>
       </div>
 
       {/* Managed *payment* and managed *invoice* clearing were both intentionally removed: issuing
@@ -516,7 +525,16 @@ export default function PaymentsPage() {
           own merchant/invoicing account above. A real managed offering would require a proper
           Marketplace/Split-Payments contract with per-salon KYC, not a shared-account shortcut. */}
 
-      {me?.paymentConnected && me.paymentProvider && me.paymentProvider !== "tori_managed" && (
+      {/* PayPlus is deliberately excluded: createPaymentLink sends refURL_callback with every
+          transaction (see lib/payments/payplus.ts), so the URL is already delivered per payment and
+          there is nothing to paste. Grow, Tranzila and Cardcom only echo back a reference id, so
+          for them this step is genuinely load-bearing and skipping it fails silently — everything
+          looks connected right up until a customer pays a deposit that never confirms.
+
+          This asymmetry was the actual answer to "can we drop the paste step?": not in general,
+          only where the provider accepts a callback per transaction. Removing it for all four
+          would have quietly broken deposits on three of them. */}
+      {me?.paymentConnected && me.paymentProvider && me.paymentProvider !== "tori_managed" && me.paymentProvider !== "payplus" && (
         <div className="mt-5 bg-white border border-gray-200 rounded-2xl px-5 py-4 animate-fade-up stagger-2">
           <p className="text-xs font-semibold text-gray-700 mb-1.5">
             {he ? "כתובת Webhook — להגדרה בממשק הספק" : "Webhook URL — set this in your provider's dashboard"}
@@ -546,6 +564,19 @@ export default function PaymentsPage() {
                 : "No secret found — disconnect and reconnect your payment provider to generate one."}
             </p>
           )}
+        </div>
+      )}
+
+      {me?.paymentConnected && me.paymentProvider === "payplus" && (
+        <div className="mt-5 rounded-2xl px-5 py-4 animate-fade-up stagger-2" style={{ background: "#F0FDF4", border: "1px solid #BBF7D0" }}>
+          <p className="text-xs font-semibold" style={{ color: "#15803D" }}>
+            {he ? "✓ אין צורך להגדיר Webhook" : "✓ No webhook setup needed"}
+          </p>
+          <p className="text-xs mt-1 leading-relaxed" style={{ color: "#166534" }}>
+            {he
+              ? "PayPlus מקבל את כתובת ההחזרה יחד עם כל בקשת תשלום, כך שאישור מקדמות והפקת קבלות עובדים מיד — בלי להעתיק כלום לממשק שלהם."
+              : "PayPlus receives the callback URL with every payment request, so deposit confirmations and receipts work immediately — nothing to copy into their dashboard."}
+          </p>
         </div>
       )}
       </>)}

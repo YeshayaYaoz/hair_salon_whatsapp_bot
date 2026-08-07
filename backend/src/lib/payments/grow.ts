@@ -1,8 +1,22 @@
 import type { PaymentProvider, PaymentCredentials, CreatePaymentLinkParams, PaymentLinkResult, VerifyResult } from "./types.js";
 
 // Grow (by Meshulam) hosted payment page. apiKey = user id (userId), apiSecret = page/API key.
-// Docs: https://grow.link/api-docs — createPaymentProcess.
-const BASE_URL = "https://sandbox.meshulam.co.il/api/light/server/1.0";
+// Docs: https://grow-il.readme.io — createPaymentProcess.
+//
+// This used to be the sandbox host, hardcoded, with no way to switch — while PayPlus in the
+// sibling file had PAYPLUS_ENV all along. Every salon that connected Grow therefore generated
+// real-looking payment links against Meshulam's sandbox and never collected a shekel, with the
+// dashboard reporting "Connected" the whole time. Production is now the default, so the failure
+// mode of a missing env var is a working integration rather than a silently fake one.
+//
+// GROW_API_BASE_URL exists because the production host is taken from Grow's public docs rather
+// than from a verified live account: if Grow issues a different endpoint, this can be corrected
+// with config instead of a release.
+const BASE_URL =
+  process.env.GROW_API_BASE_URL ??
+  (process.env.GROW_ENV === "sandbox"
+    ? "https://sandbox.meshulam.co.il/api/light/server/1.0"
+    : "https://api.meshulam.co.il/api/light/server/1.0");
 
 export const growProvider: PaymentProvider = {
   async createPaymentLink(creds: PaymentCredentials, params: CreatePaymentLinkParams): Promise<PaymentLinkResult> {

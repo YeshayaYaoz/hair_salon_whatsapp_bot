@@ -6,6 +6,7 @@ import { captureError } from "../lib/errorMonitoring.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { sendWhatsAppMessage } from "./whatsappClient.js";
 import { syncAppointmentToCalendar } from "../lib/googleCalendar.js";
+import { notifyOwner } from "../lib/ownerNotify.js";
 
 export const paymentWebhookRouter = asyncRouter();
 
@@ -162,11 +163,12 @@ paymentWebhookRouter.post("/:provider/:businessId/:webhookSecret", async (req, r
           })
           .catch((err) => console.error("Calendar sync failed:", err));
 
+        const tz = business.timezone || "Asia/Jerusalem";
+        const when = pending.startTime.toLocaleString("he-IL", {
+          timeZone: tz, weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit",
+        });
+
         if (business.whatsappPhoneNumberId && business.whatsappAccessToken) {
-          const tz = business.timezone || "Asia/Jerusalem";
-          const when = pending.startTime.toLocaleString("he-IL", {
-            timeZone: tz, weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit",
-          });
           const accessToken = decryptSecret(business.whatsappAccessToken);
           sendWhatsAppMessage({
             phoneNumberId: business.whatsappPhoneNumberId,
@@ -175,6 +177,19 @@ paymentWebhookRouter.post("/:provider/:businessId/:webhookSecret", async (req, r
             text: `✅ המקדמה התקבלה! התור שלך ל${pending.service.name} ב-${when} אצל ${business.name} מאושר סופית. מחכים לך!`,
           }).catch((err) => console.error("[payments webhook] Deposit confirmation message failed:", err));
         }
+
+        // This is where a deposit booking becomes real, so this is where the owner has to hear
+        // about it. Without this, switching deposits on silently switched new-booking alerts off:
+        // the non-deposit path announces the booking at creation time (claudeBot.ts), but a deposit
+        // booking is only a hold at that point and deliberately stays quiet until the money lands —
+        // and nothing was announcing it when it did.
+        const customerLabel = pending.customer.name
+          ? `${pending.customer.name} (${pending.customer.phone})`
+          : pending.customer.phone;
+        notifyOwner(
+          businessId,
+          `💰 מקדמה שולמה — התור מאושר!\nלקוח: ${customerLabel}\nשירות: ${pending.service.name}\nמועד: ${when}\nסכום: ₪${pending.depositAmountIls ?? event.amountIls ?? "?"}`
+        );
       }
     }
 
