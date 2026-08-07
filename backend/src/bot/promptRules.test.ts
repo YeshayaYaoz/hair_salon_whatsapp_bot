@@ -77,6 +77,36 @@ describe("every rule reaches the prompt", () => {
     expect((await buildSystemPrompt("biz1")).stable).not.toContain(RULES.UNIT_FIT_RULE);
   });
 
+  /**
+   * Occupancy used to be one clause inside a description and got read past. Printed as its own
+   * labelled field it is the thing the model reports to find_units_for_guests, which then does the
+   * comparison — so if this stops rendering, the tool is being called with nothing behind it.
+   */
+  it("prints each unit's occupancy as a field of its own, for overnight businesses only", async () => {
+    const unit = {
+      name: "גפן", description: "יחידה משפחתית", priceCents: 210000, durationMin: 1440,
+      maxGuests: 7, imageUrls: [], linkUrl: null,
+    };
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue(business({ services: [unit] }));
+    expect((await buildSystemPrompt("biz1")).stable).toContain("[עד 7 אורחים]");
+
+    // A salon has no party size to fit, so the label would be noise there.
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue(
+      business({ businessType: "hair_salon", services: [unit] })
+    );
+    expect((await buildSystemPrompt("biz1")).stable).not.toContain("אורחים]");
+  });
+
+  it("says nothing about occupancy for a unit the owner left blank", async () => {
+    // Silence here is what makes the unit come back as capacityUnknown rather than being ruled out.
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue(
+      business({ services: [{ name: "אלון", description: null, priceCents: 250000, durationMin: 1440, maxGuests: null, imageUrls: [], linkUrl: null }] })
+    );
+    const { stable } = await buildSystemPrompt("biz1");
+    expect(stable).toContain("אלון");
+    expect(stable).not.toContain("אורחים]");
+  });
+
   it("includes the placeholder rule only when the owner wrote a greeting", async () => {
     mockPrisma.business.findUniqueOrThrow.mockResolvedValue(business());
     expect((await buildSystemPrompt("biz1")).stable).not.toContain(RULES.PLACEHOLDER_RULE);
