@@ -10,9 +10,14 @@
  * with no agent behind it accepts the call and hangs up immediately, with nothing in our logs
  * because the call never reaches us.
  *
+ * Numbers reach the account one of three ways: provisioned by Cartesia (US only, so useless for an
+ * Israeli salon), imported from Twilio, or imported from a SIP trunk registered against our own
+ * carrier. We use the trunk — it is the only path that puts an Israeli number on an Israeli
+ * carrier's rates. Registering the trunk itself is a one-time operator step; importing each salon's
+ * number afterwards is an API call, which is what this file automates.
+ *
  * Deliberately narrow. This is not a general Cartesia client — it does the one thing onboarding
- * needs, and anything else (provisioning numbers, importing from a carrier) stays manual, because
- * those steps involve a telephony provider and a human decision either way.
+ * needs, and provisioning US numbers, Twilio import, and trunk registration all stay out.
  */
 
 // The same normalization voiceRoutes matches dialled numbers with. This file had its own copy
@@ -86,28 +91,49 @@ export interface AssignResult {
   /** False when the number was already pointed at this agent — nothing was changed. */
   changed: boolean;
   phoneNumberId: string;
+  /** True when the number was absent from the account and was imported over the SIP trunk. */
+  imported?: boolean;
+}
+
+export interface AssignOptions {
+  /**
+   * Shown against the number in Cartesia's dashboard. Passing the salon's name turns an unreadable
+   * list of E.164 strings into something an operator can work with.
+   */
+  label?: string;
+  /**
+   * Whether a number Cartesia has never seen should be imported over our SIP trunk. Defaults to
+   * true, which is right when an owner deliberately saved this number as their voice line.
+   *
+   * Pass false for numbers we inferred rather than were given. Importing one of those bills a line
+   * to our trunk that our carrier does not own, on a guess.
+   */
+  importIfMissing?: boolean;
 }
 
 /**
- * Points a number at the shared voice agent.
+ * Points a number at the shared voice agent, importing it from our SIP trunk first if Cartesia has
+ * never seen it.
  *
  * Matches on the number rather than an id because that is what the owner has in front of them; the
  * id only exists inside Cartesia. Returns changed:false when it was already assigned, so a repeated
  * save is a no-op rather than a redundant write.
- *
- * Throws when the number isn't in the Cartesia account at all — that means it was never imported or
- * provisioned, which is a real setup gap and not something to paper over.
  */
-export async function assignNumberToAgent(phoneNumber: string): Promise<AssignResult> {
+export async function assignNumberToAgent(
+  phoneNumber: string,
+  { label, importIfMissing = true }: AssignOptions = {}
+): Promise<AssignResult> {
   const { apiKey, agentId } = creds();
   const wanted = normalizePhone(phoneNumber);
 
   const list = await call<{ data?: CartesiaPhoneNumber[] }>("/agents/phone-numbers", apiKey);
   const match = (list.data ?? []).find((n) => normalizePhone(n.number) === wanted);
+
   if (!match) {
-    throw new Error(
-      `${phoneNumber} is not in the Cartesia account. Import or provision it there first, then save again.`
-    );
+    if (!importIfMissing) {
+      throw new Error(`+${wanted} is not in the Cartesia account, and was not imported because it was inferred rather than entered.`);
+    }
+    return importAndAssign(wanted, apiKey, agentId, label);
   }
 
   if (match.agent?.id === agentId) return { changed: false, phoneNumberId: match.id };
@@ -118,4 +144,43 @@ export async function assignNumberToAgent(phoneNumber: string): Promise<AssignRe
   });
 
   return { changed: true, phoneNumberId: match.id };
+}
+
+/**
+ * Brings a number Cartesia has never seen onto the account and points it at the agent.
+ *
+ * The agent is set in the import request rather than by a follow-up PATCH. Cartesia accepts
+ * `agent_id` on import, and doing it in two calls would leave a window — however brief — where the
+ * number is live with no agent behind it, which is the exact failure this module exists to prevent.
+ *
+ * Without a registered trunk there is nothing to import from, so this keeps the original error
+ * rather than inventing a fallback: the number really is absent, and saying so is more useful than
+ * failing somewhere further along.
+ */
+async function importAndAssign(
+  normalizedNumber: string,
+  apiKey: string,
+  agentId: string,
+  label?: string
+): Promise<AssignResult> {
+  const providerId = process.env.CARTESIA_SIP_PROVIDER_ID?.trim();
+  if (!providerId) {
+    throw new Error(
+      `+${normalizedNumber} is not in the Cartesia account, and no SIP trunk is configured to import it from ` +
+        `(CARTESIA_SIP_PROVIDER_ID is unset). Import the number in Cartesia first, then save again.`
+    );
+  }
+
+  // Cartesia stores and expects E.164; normalizePhone strips to digits for comparison.
+  const created = await call<CartesiaPhoneNumber>("/agents/phone-numbers", apiKey, {
+    method: "POST",
+    body: JSON.stringify({
+      number: `+${normalizedNumber}`,
+      provider: { id: providerId },
+      agent_id: agentId,
+      ...(label ? { label } : {}),
+    }),
+  });
+
+  return { changed: true, phoneNumberId: created.id, imported: true };
 }

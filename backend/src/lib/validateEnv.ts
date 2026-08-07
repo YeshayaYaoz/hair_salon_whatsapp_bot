@@ -28,6 +28,9 @@ const RECOMMENDED: RequiredVar[] = [
   { name: "GOOGLE_LOGIN_REDIRECT_URI", description: "OAuth callback for \"Sign in with Google\" on the login page (unauthenticated) — must be a separate registered redirect URI from GOOGLE_REDIRECT_URI" },
   { name: "META_APP_ID", description: "same Meta app as WHATSAPP_APP_SECRET — required to exchange the WhatsApp Embedded Signup code for an access token" },
   { name: "CARTESIA_TOOL_SECRET", description: "shared bearer secret Cartesia's voice agent sends when calling POST /api/voice/context — without it, that endpoint rejects every request" },
+  { name: "CARTESIA_API_KEY", description: "lets us call Cartesia's management API to attach a salon's number to the voice agent — without it that step is skipped and the salon's line answers and hangs up" },
+  { name: "CARTESIA_AGENT_ID", description: "the single shared voice agent every salon's number is pointed at — number assignment cannot run without it" },
+  { name: "CARTESIA_SIP_PROVIDER_ID", description: "SIP trunk a salon's Israeli number is imported from (Cartesia provisions US numbers only) — without it every voice number must be imported by hand in Cartesia first" },
   // Silently defaults to http://localhost:3000, so a production deploy without it still sends
   // password-reset and email-verification mail successfully — with links nobody outside the server
   // can open. The failure is invisible until an owner reports the link not working.

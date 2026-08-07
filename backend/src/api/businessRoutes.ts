@@ -890,8 +890,14 @@ businessRouter.put("/me/voice-phone", async (req: AuthedRequest, res) => {
     return res.status(400).json({ error: "מספר הטלפון לא נראה תקין. הזינו מספר מלא, למשל 0501234567." });
   }
 
+  let businessName: string;
   try {
-    await prisma.business.update({ where: { id: req.businessId! }, data: { voicePhoneNumber: normalized } });
+    const updated = await prisma.business.update({
+      where: { id: req.businessId! },
+      data: { voicePhoneNumber: normalized },
+      select: { name: true },
+    });
+    businessName = updated.name;
   } catch (err: any) {
     if (err?.code === "P2002") return res.status(409).json({ error: "This number is already connected to another business" });
     throw err;
@@ -905,8 +911,10 @@ businessRouter.put("/me/voice-phone", async (req: AuthedRequest, res) => {
   // owner configuring their own settings — but they do need to know the line won't answer yet.
   let voiceAgentWarning: string | null = null;
   try {
-    const result = await assignNumberToAgent(normalized);
-    if (result.changed) console.log(`[cartesia] Assigned ${normalized} to the voice agent`);
+    const result = await assignNumberToAgent(normalized, { label: businessName });
+    if (result.changed) {
+      console.log(`[cartesia] ${result.imported ? "Imported and assigned" : "Assigned"} ${normalized} to the voice agent`);
+    }
   } catch (err) {
     if (err instanceof CartesiaNotConfiguredError) {
       // Expected until the operator sets the keys — not worth alarming the owner about.
@@ -1533,8 +1541,14 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
   // reaches us. Attempt it here too. Most salons' WhatsApp line is not in the Cartesia account at
   // all, so this is expected to fail for them — which is why it only logs, and why the number
   // remains a default the owner can correct rather than a promise that voice is live.
+  //
+  // importIfMissing:false because this number was inferred from the WhatsApp connection, not chosen
+  // as a voice line. A Meta Cloud API number generally cannot receive voice calls at all, so
+  // importing it would put a line our carrier does not own onto our trunk, on a guess, for a salon
+  // that never asked for voice.
   if (!existing.voicePhoneNumber && phone.display_phone_number) {
-    assignNumberToAgent(normalizeOwnerPhone(phone.display_phone_number) ?? phone.display_phone_number).catch((err) => {
+    const inferred = normalizeOwnerPhone(phone.display_phone_number) ?? phone.display_phone_number;
+    assignNumberToAgent(inferred, { importIfMissing: false }).catch((err) => {
       if (err instanceof CartesiaNotConfiguredError) return;
       console.warn(`[cartesia] Auto-filled voice number not assigned for ${req.businessId}:`, err instanceof Error ? err.message : err);
     });
