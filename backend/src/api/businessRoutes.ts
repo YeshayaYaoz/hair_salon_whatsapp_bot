@@ -5,7 +5,7 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth, signImpersonationToken, DEFAULT_IMPERSONATION_HOURS, MAX_IMPERSONATION_HOURS, type AuthedRequest } from "../lib/auth.js";
 import { logAdminAction } from "../lib/adminAudit.js";
 import { sendAdminAlertEmail, sendBusinessNoticeEmail } from "../lib/email.js";
-import { assignNumberToAgent, CartesiaNotConfiguredError } from "../lib/cartesiaAdmin.js";
+import { assignNumberToAgent, listHebrewVoices, CartesiaNotConfiguredError } from "../lib/cartesiaAdmin.js";
 import { captureError } from "../lib/errorMonitoring.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import { requireActiveSubscription } from "../lib/subscriptionGate.js";
@@ -642,6 +642,18 @@ const profileSchema = z.object({
   // null resets to the app default rather than pinning 0 — the two are different intentions and
   // the slider needs to be able to express "back to normal".
   aiTemperature: z.number().min(TEMPERATURE_MIN).max(TEMPERATURE_MAX).nullable().optional(),
+  // Cartesia voice for the phone bot. null means "the agent's default voice", which is a real
+  // choice an owner can go back to, so it is nullable rather than merely omittable. Checked against
+  // the live catalogue below — the format alone proves nothing, and an ID that does not resolve
+  // fails during a call, in front of a customer.
+  voiceId: z.string().max(100).nullable().optional(),
+});
+
+// Hebrew voices the phone bot can speak in, for the Bot page's voice picker. Empty when Cartesia is
+// unconfigured or unreachable — the UI says selection is unavailable rather than showing an empty
+// dropdown that looks like the salon has no options.
+businessRouter.get("/me/voice-options", async (_req: AuthedRequest, res) => {
+  res.json({ voices: await listHebrewVoices() });
 });
 
 // Display metadata for the Bot page's provider/model picker — which providers are actually
@@ -709,6 +721,19 @@ businessRouter.put("/me", async (req: AuthedRequest, res) => {
     }
   }
 
+  // An unknown voice ID is not a cosmetic problem: the agent asks Cartesia for a voice that does
+  // not exist and the call fails while a customer is on the line. Cheaper to refuse the save.
+  //
+  // Only when the catalogue is actually available — if Cartesia is unreachable, listHebrewVoices
+  // returns empty, and treating that as "no voice is valid" would block an owner from saving their
+  // settings because of someone else's outage.
+  if (parsed.data.voiceId) {
+    const voices = await listHebrewVoices();
+    if (voices.length && !voices.some((v) => v.id === parsed.data.voiceId)) {
+      return res.status(400).json({ error: "הקול שנבחר אינו זמין. רעננו את הדף ובחרו קול מהרשימה." });
+    }
+  }
+
   await prisma.business.update({ where: { id: req.businessId! }, data });
   res.json({ ok: true });
 });
@@ -761,6 +786,18 @@ businessRouter.get("/me/setup-status", async (req: AuthedRequest, res) => {
   // because that gap is invisible from every other screen.
   const needsPayments = business.depositEnabled && business.depositAmountIls > 0;
 
+  // The voice bot is what Premium is sold on (₪299 against Standard's ₪149), but the only way to
+  // turn it on is a field on the Bot page that nothing points at — so a salon can pay the higher
+  // price for months and never have a working phone line, with no screen ever mentioning it.
+  //
+  // Mirrors the entitlement voiceRoutes enforces (rejectIfNotEntitled): trials get voice so it can
+  // be evaluated before a plan is chosen, and a paid account has to be on the plan that includes it.
+  // Showing this step to a Standard salon would advertise a feature their plan refuses at call time.
+  // Not critical: a salon with no voice number still has a fully working WhatsApp bot.
+  const needsVoice =
+    business.subscriptionStatus === "trial" ||
+    (business.subscriptionStatus === "active" && business.subscriptionPlan === "premium");
+
   const steps = [
     { key: "category", done: Boolean(business.businessTypeChosenAt), critical: false },
     { key: "whatsapp", done: Boolean(business.whatsappAccessToken) && business.whatsappTokenValid, critical: true },
@@ -774,6 +811,7 @@ businessRouter.get("/me/setup-status", async (req: AuthedRequest, res) => {
     ...(needsPayments
       ? [{ key: "payments", done: Boolean(business.paymentProvider && business.paymentApiKey), critical: true }]
       : []),
+    ...(needsVoice ? [{ key: "voice", done: Boolean(business.voicePhoneNumber), critical: false }] : []),
     // Carried over from the older inline checklist on the analytics page when that duplicate was
     // removed — it was the one step this list didn't already cover, and dropping it would have
     // silently lost the nudge for businesses still on a trial.

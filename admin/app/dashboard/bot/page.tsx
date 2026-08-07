@@ -42,6 +42,141 @@ interface AiProvidersResponse {
   temperatureIgnoredBy: string[];
 }
 
+interface VoiceOption {
+  id: string;
+  name: string;
+  description: string | null;
+  gender: "masculine" | "feminine" | "gender_neutral" | null;
+  previewUrl: string | null;
+}
+
+/**
+ * Which voice the phone bot speaks in.
+ *
+ * One shared agent answers for every salon, so without this every business sounds identical. The
+ * choice is grouped by gender because that is the distinction owners actually ask about — a flat
+ * list of voice names makes them audition each one to find out.
+ */
+function VoiceSelect() {
+  const { lang } = useLanguage();
+  const he = lang === "he";
+  const [voices, setVoices] = useState<VoiceOption[] | null>(null); // null = loading
+  const [selected, setSelected] = useState<string>("");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiFetch<{ voices: VoiceOption[] }>("/api/business/me/voice-options")
+      .then((r) => setVoices(r.voices))
+      .catch(() => setVoices([]));
+    apiFetch<{ voiceId?: string | null }>("/api/business/me").then((me) => setSelected(me.voiceId ?? ""));
+  }, []);
+
+  async function save(voiceId: string) {
+    setSaving(true);
+    setError(null);
+    const previous = selected;
+    setSelected(voiceId);
+    try {
+      // "" is the owner choosing the agent's default back, which is a real choice — so it is sent
+      // as an explicit null rather than omitted, which would leave the old voice in place.
+      await apiFetch("/api/business/me", {
+        method: "PUT",
+        body: JSON.stringify({ voiceId: voiceId || null }),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      setSelected(previous);
+      setError(err instanceof Error ? err.message : he ? "השמירה נכשלה" : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const groups: { key: string; labelHe: string; labelEn: string }[] = [
+    { key: "feminine", labelHe: "קול נשי", labelEn: "Female voice" },
+    { key: "masculine", labelHe: "קול גברי", labelEn: "Male voice" },
+    { key: "gender_neutral", labelHe: "קול ניטרלי", labelEn: "Neutral voice" },
+  ];
+  // Voices Cartesia gives no gender for still have to be reachable, or they simply vanish.
+  const ungrouped = (voices ?? []).filter((v) => !groups.some((g) => g.key === v.gender));
+
+  if (voices === null) {
+    return (
+      <div className="mt-4 pt-4 border-t border-gray-200">
+        <SkeletonCard lines={1} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 pt-4 border-t border-gray-200">
+      <label htmlFor="voice-select" className="block text-xs font-medium text-gray-600 mb-1.5">
+        {he ? "קול הבוט" : "Bot voice"}
+      </label>
+      {voices.length === 0 ? (
+        <p className="text-xs text-gray-600">
+          {he
+            ? "בחירת קול אינה זמינה כרגע. הבוט ישתמש בקול ברירת המחדל."
+            : "Voice selection is unavailable right now. The bot will use the default voice."}
+        </p>
+      ) : (
+        <>
+          <div className="flex items-center gap-2 flex-wrap">
+            <select
+              id="voice-select"
+              value={selected}
+              disabled={saving}
+              onChange={(e) => save(e.target.value)}
+              className="flex-1 min-w-[200px] disabled:opacity-50"
+            >
+              <option value="">{he ? "ברירת מחדל" : "Default"}</option>
+              {groups.map((g) => {
+                const inGroup = voices.filter((v) => v.gender === g.key);
+                if (!inGroup.length) return null;
+                return (
+                  <optgroup key={g.key} label={he ? g.labelHe : g.labelEn}>
+                    {inGroup.map((v) => (
+                      <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
+                  </optgroup>
+                );
+              })}
+              {ungrouped.length > 0 && (
+                <optgroup label={he ? "אחר" : "Other"}>
+                  {ungrouped.map((v) => (
+                    <option key={v.id} value={v.id}>{v.name}</option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+            {saved && <SavedBadge text={he ? "נשמר" : "Saved"} />}
+          </div>
+          {/* Only rendered when Cartesia actually has a sample — a play button that does nothing
+              is worse than none at all. */}
+          {(() => {
+            const chosen = voices.find((v) => v.id === selected);
+            if (!chosen?.previewUrl) return null;
+            return (
+              <audio controls src={chosen.previewUrl} className="mt-2 w-full max-w-xs h-8">
+                {he ? "הדפדפן שלך לא תומך בהשמעה." : "Your browser cannot play this sample."}
+              </audio>
+            );
+          })()}
+          <p className="text-xs text-gray-600 mt-2">
+            {he
+              ? "הקול שבו הבוט יענה לשיחות הנכנסות שלך. משפיע רק על שיחות טלפון, לא על וואטסאפ."
+              : "The voice your incoming calls are answered in. Affects phone calls only, not WhatsApp."}
+          </p>
+        </>
+      )}
+      {error && <p className="text-red-600 text-xs mt-2">{error}</p>}
+    </div>
+  );
+}
+
 function VoicePhoneSection() {
   const { lang } = useLanguage();
   const he = lang === "he";
@@ -151,6 +286,7 @@ function VoicePhoneSection() {
         </form>
       )}
       {error && <p className="text-red-600 text-xs mt-2">{error}</p>}
+      <VoiceSelect />
     </div>
   );
 }

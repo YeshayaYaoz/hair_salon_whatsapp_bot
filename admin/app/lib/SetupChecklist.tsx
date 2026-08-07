@@ -66,6 +66,16 @@ export const STEP_META: Record<string, { he: string; en: string; href: string; w
     whyHe: "ביקשתם מקדמה על כל תור, אבל בלי ספק סליקה הבוט קובע תורים בלי לגבות אותה",
     whyEn: "You asked for a deposit on every booking, but without a provider the bot books without collecting it",
   },
+  // Premium only. The voice bot is what the higher price is sold on, but the only way to switch it
+  // on is a field on the Bot page that nothing links to — so a salon can pay for it for months and
+  // never have a working phone line.
+  voice: {
+    he: "חיבור בוט טלפוני",
+    en: "Connect the voice bot",
+    href: "/dashboard/bot",
+    whyHe: "המנוי שלכם כולל מענה לשיחות טלפון, אבל בלי מספר הבוט לא יענה לאף שיחה",
+    whyEn: "Your plan includes answering phone calls, but without a number the bot answers none",
+  },
   billing: {
     he: "הפעלת מנוי",
     en: "Activate subscription",

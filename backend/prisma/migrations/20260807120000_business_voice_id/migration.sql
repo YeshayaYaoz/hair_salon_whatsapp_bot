@@ -1,0 +1,15 @@
+-- The Cartesia voice this salon's phone bot speaks in.
+--
+-- One shared agent answers for every salon, so before this column every caller heard the same voice
+-- regardless of which business they dialled. Cartesia lets the agent change voice per call, so the
+-- shared agent can still sound different per salon — it just needs to be told which voice, and
+-- that is what /api/voice/context now carries.
+--
+-- Nullable with no backfill and no default. NULL means "use the agent's own default voice", which
+-- is exactly the behaviour every existing salon has today, so this migration changes nothing for
+-- anyone until an owner picks a voice.
+--
+-- Not a foreign key and not constrained to a known set: the valid values are Cartesia voice IDs,
+-- which live in their catalogue rather than our database. The write path validates against the
+-- catalogue instead, because a voice ID that does not resolve makes the agent fail mid-call.
+ALTER TABLE "Business" ADD COLUMN "voiceId" TEXT;

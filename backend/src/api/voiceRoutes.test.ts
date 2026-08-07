@@ -104,6 +104,41 @@ describe("POST /api/voice/context", () => {
     expect(res.body.caller.isKnownCustomer).toBe(false);
   });
 
+  // One shared agent answers for every salon, so the voice has to travel per call — otherwise every
+  // business sounds identical no matter what its owner picked.
+  describe("voice selection", () => {
+    function stubContext(businessOverrides: Record<string, unknown>) {
+      mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
+      mockPrisma.business.findUniqueOrThrow.mockResolvedValue({
+        name: "Salon Dana", timezone: "Asia/Jerusalem", address: null, botGreeting: null, ...businessOverrides,
+      });
+      mockPrisma.businessHours.findMany.mockResolvedValue([]);
+      mockPrisma.customer.findMany.mockResolvedValue([]);
+      mockPrisma.service.findMany.mockResolvedValue([]);
+      mockPrisma.faqEntry.findMany.mockResolvedValue([]);
+      mockPrisma.specialPeriod.findMany.mockResolvedValue([]);
+    }
+
+    const post = () =>
+      request(app)
+        .post("/api/voice/context")
+        .set("Authorization", "Bearer test-secret")
+        .send({ calledNumber: "972501111111", callerNumber: "972502222222" });
+
+    it("tells the agent which voice this salon chose", async () => {
+      stubContext({ voiceId: "voice_abc" });
+      const res = await post();
+      expect(res.status).toBe(200);
+      expect(res.body.voiceId).toBe("voice_abc");
+    });
+
+    it("sends null when the salon never picked one, leaving the agent on its own default", async () => {
+      stubContext({ voiceId: null });
+      const res = await post();
+      expect(res.body.voiceId).toBeNull();
+    });
+  });
+
   // Voice is the Premium feature (₪299 against Standard's ₪149) but this router only ever
   // authenticated Cartesia, never the salon — so a Standard business got the whole voice agent by
   // typing a number into a text box, and a cancelled account kept it after its WhatsApp bot had

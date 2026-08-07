@@ -87,6 +87,94 @@ async function call<T>(path: string, apiKey: string, init?: RequestInit): Promis
   return (await res.json()) as T;
 }
 
+/** A voice an owner can pick, reduced to what the dashboard needs to render a choice. */
+export interface VoiceOption {
+  id: string;
+  name: string;
+  description: string | null;
+  /** Cartesia's own presentation label. Null when a voice declares none. */
+  gender: "masculine" | "feminine" | "gender_neutral" | null;
+  /** Short sample the owner can play before committing. Null when Cartesia has none for this voice. */
+  previewUrl: string | null;
+}
+
+interface CartesiaVoice {
+  id: string;
+  name: string;
+  description?: string | null;
+  gender?: string | null;
+  language?: string | null;
+  locales?: { locale: string; is_native: boolean }[] | null;
+  preview_file_url?: string | null;
+}
+
+/**
+ * The catalogue is identical for every salon and changes on Cartesia's release schedule, not ours,
+ * so it is fetched once and reused. Without this, opening the bot settings page would put a
+ * third-party API call on the critical path for every owner, every visit.
+ */
+let voiceCache: { at: number; voices: VoiceOption[] } | null = null;
+const VOICE_CACHE_MS = 60 * 60 * 1000;
+
+function speaksHebrew(voice: CartesiaVoice): boolean {
+  // A voice's `language` is its primary one; `locales` covers the rest. Checked with a prefix rather
+  // than equality because the tags are BCP-47 ("he-IL"), and a region-tagged Hebrew voice is still
+  // a Hebrew voice.
+  if (voice.language?.toLowerCase().startsWith("he")) return true;
+  return (voice.locales ?? []).some((l) => l.locale?.toLowerCase().startsWith("he"));
+}
+
+/**
+ * Hebrew-capable voices an owner can choose between.
+ *
+ * Filtered to Hebrew because these salons speak Hebrew to their customers, and a picker listing
+ * hundreds of English voices buries the handful that would actually work. Returns an empty list
+ * rather than throwing when Cartesia is unconfigured or unreachable — voice selection is optional,
+ * and a settings page that fails to load because a third party is down is a worse outcome than one
+ * that says the choice is unavailable right now.
+ */
+export async function listHebrewVoices(): Promise<VoiceOption[]> {
+  if (voiceCache && Date.now() - voiceCache.at < VOICE_CACHE_MS) return voiceCache.voices;
+
+  let apiKey: string;
+  try {
+    ({ apiKey } = creds());
+  } catch {
+    return [];
+  }
+
+  let voices: VoiceOption[];
+  try {
+    // expand[] is what makes preview_file_url present at all; without it every voice is a name with
+    // no way to hear it before choosing.
+    const res = await call<{ data?: CartesiaVoice[] }>(
+      "/voices?limit=100&expand[]=preview_file_url",
+      apiKey
+    );
+    voices = (res.data ?? []).filter(speaksHebrew).map((v) => ({
+      id: v.id,
+      name: v.name,
+      description: v.description ?? null,
+      gender:
+        v.gender === "masculine" || v.gender === "feminine" || v.gender === "gender_neutral"
+          ? v.gender
+          : null,
+      previewUrl: v.preview_file_url ?? null,
+    }));
+  } catch (err) {
+    console.warn("[cartesia] Could not load the voice catalogue:", err instanceof Error ? err.message : err);
+    return [];
+  }
+
+  voiceCache = { at: Date.now(), voices };
+  return voices;
+}
+
+/** Test seam — the cache would otherwise leak one test's catalogue into the next. */
+export function resetVoiceCache(): void {
+  voiceCache = null;
+}
+
 export interface AssignResult {
   /** False when the number was already pointed at this agent — nothing was changed. */
   changed: boolean;
