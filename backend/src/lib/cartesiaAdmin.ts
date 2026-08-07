@@ -15,6 +15,11 @@
  * those steps involve a telephony provider and a human decision either way.
  */
 
+// The same normalization voiceRoutes matches dialled numbers with. This file had its own copy
+// annotated "Mirrors voiceRoutes" — two definitions of "the same phone number" that have to agree
+// for a call to route, which is exactly the kind of pair that drifts apart unnoticed.
+import { normalizePhone } from "./phone.js";
+
 const BASE_URL = "https://api.cartesia.ai";
 
 /**
@@ -37,12 +42,6 @@ function creds(): { apiKey: string; agentId: string } {
   const agentId = process.env.CARTESIA_AGENT_ID?.trim();
   if (!apiKey || !agentId) throw new CartesiaNotConfiguredError();
   return { apiKey, agentId };
-}
-
-/** Digits only, so "+972 55-507-7941" and "972555077941" compare equal. Mirrors voiceRoutes. */
-function digits(phone: string): string {
-  const only = phone.replace(/\D/g, "");
-  return only.startsWith("0") ? `972${only.slice(1)}` : only;
 }
 
 interface CartesiaPhoneNumber {
@@ -101,10 +100,10 @@ export interface AssignResult {
  */
 export async function assignNumberToAgent(phoneNumber: string): Promise<AssignResult> {
   const { apiKey, agentId } = creds();
-  const wanted = digits(phoneNumber);
+  const wanted = normalizePhone(phoneNumber);
 
   const list = await call<{ data?: CartesiaPhoneNumber[] }>("/agents/phone-numbers", apiKey);
-  const match = (list.data ?? []).find((n) => digits(n.number) === wanted);
+  const match = (list.data ?? []).find((n) => normalizePhone(n.number) === wanted);
   if (!match) {
     throw new Error(
       `${phoneNumber} is not in the Cartesia account. Import or provision it there first, then save again.`

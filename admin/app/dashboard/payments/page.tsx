@@ -42,6 +42,22 @@ const WEBHOOK_LOCATION: Partial<Record<PaymentProviderName, { he: string; en: st
   },
 };
 
+/**
+ * Providers whose credentials we cannot actually check when they are saved.
+ *
+ * Every other adapter verifies by generating a real ₪1 payment link, which fails loudly on bad
+ * keys. Tranzila's payment URL is assembled client-side with no API call, so there is no request a
+ * wrong terminal name could fail — and showing a plain green "Connected" for that is the same lie
+ * as the Grow sandbox host: the dashboard says it works, and the first customer to try paying is
+ * the one who finds out it doesn't.
+ */
+const UNVERIFIABLE_PROVIDERS: Partial<Record<PaymentProviderName, { he: string; en: string }>> = {
+  tranzila: {
+    he: "שמרנו את הפרטים, אבל ל-Tranzila אין דרך לבדוק אותם מראש — הטעות תתגלה רק בתשלום אמיתי ראשון. מומלץ לבצע תשלום בדיקה של ₪1 ולוודא שהוא מופיע בממשק Tranzila.",
+    en: "Saved, but Tranzila gives us no way to check these in advance — a wrong terminal only shows up on the first real payment. Worth running a ₪1 test payment and confirming it appears in Tranzila.",
+  },
+};
+
 const PAYMENT_META: Record<PaymentProviderName, ProviderMeta> = {
   payplus: {
     label: "PayPlus",
@@ -564,6 +580,19 @@ export default function PaymentsPage() {
                 : "No secret found — disconnect and reconnect your payment provider to generate one."}
             </p>
           )}
+        </div>
+      )}
+
+      {me?.paymentConnected && me.paymentProvider && UNVERIFIABLE_PROVIDERS[me.paymentProvider as PaymentProviderName] && (
+        <div className="mt-5 rounded-2xl px-5 py-4 animate-fade-up stagger-2" style={{ background: "#FFFBEB", border: "1px solid #FDE68A" }}>
+          <p className="text-xs font-semibold" style={{ color: "#92400E" }}>
+            {he ? "החיבור נשמר אך לא אומת" : "Saved, but not verified"}
+          </p>
+          <p className="text-xs mt-1 leading-relaxed" style={{ color: "#78350F" }}>
+            {he
+              ? UNVERIFIABLE_PROVIDERS[me.paymentProvider as PaymentProviderName]!.he
+              : UNVERIFIABLE_PROVIDERS[me.paymentProvider as PaymentProviderName]!.en}
+          </p>
         </div>
       )}
 

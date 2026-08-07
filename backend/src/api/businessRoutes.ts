@@ -580,7 +580,7 @@ businessRouter.post("/admin/businesses/:id/whatsapp", requireSuperAdmin, async (
         whatsappPhoneNumberId: parsed.data.phoneNumberId,
         whatsappAccessToken: encryptSecret(parsed.data.accessToken),
         whatsappTokenValid: true,
-        ...(!business.voicePhoneNumber && displayNumber ? { voicePhoneNumber: displayNumber } : {}),
+        ...(!business.voicePhoneNumber && displayNumber ? { voicePhoneNumber: normalizeOwnerPhone(displayNumber) ?? displayNumber } : {}),
       },
     });
   } catch (err: any) {
@@ -880,8 +880,18 @@ businessRouter.put("/me/voice-phone", async (req: AuthedRequest, res) => {
   const parsed = z.object({ voicePhoneNumber: z.string().min(1) }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
+  // Stored normalized, not as typed. voicePhoneNumber is @unique, and that constraint was being
+  // applied to whatever the owner happened to write — so "055-507-7941" and "+972555077941" are
+  // two different strings to Postgres and both could be saved, letting two businesses claim the
+  // same physical line. The read side normalizes both sides when matching a dialled number, so it
+  // would then resolve one call to two candidate salons and pick whichever came back first.
+  const normalized = normalizeOwnerPhone(parsed.data.voicePhoneNumber);
+  if (!normalized) {
+    return res.status(400).json({ error: "מספר הטלפון לא נראה תקין. הזינו מספר מלא, למשל 0501234567." });
+  }
+
   try {
-    await prisma.business.update({ where: { id: req.businessId! }, data: { voicePhoneNumber: parsed.data.voicePhoneNumber } });
+    await prisma.business.update({ where: { id: req.businessId! }, data: { voicePhoneNumber: normalized } });
   } catch (err: any) {
     if (err?.code === "P2002") return res.status(409).json({ error: "This number is already connected to another business" });
     throw err;
@@ -895,8 +905,8 @@ businessRouter.put("/me/voice-phone", async (req: AuthedRequest, res) => {
   // owner configuring their own settings — but they do need to know the line won't answer yet.
   let voiceAgentWarning: string | null = null;
   try {
-    const result = await assignNumberToAgent(parsed.data.voicePhoneNumber);
-    if (result.changed) console.log(`[cartesia] Assigned ${parsed.data.voicePhoneNumber} to the voice agent`);
+    const result = await assignNumberToAgent(normalized);
+    if (result.changed) console.log(`[cartesia] Assigned ${normalized} to the voice agent`);
   } catch (err) {
     if (err instanceof CartesiaNotConfiguredError) {
       // Expected until the operator sets the keys — not worth alarming the owner about.
@@ -1131,7 +1141,9 @@ businessRouter.put("/me/payment-provider", async (req: AuthedRequest, res) => {
   // bookkeeping problem must not fail a connection the salon just completed successfully.
   markAffiliateConversion({ businessId: req.businessId!, provider: parsed.data.provider, kind: "payments" });
 
-  res.json({ ok: true, webhookSecret });
+  // Passed through so the dashboard can say "saved, but we couldn't check it" rather than a flat
+  // "Connected" — see VerifyResult.unverified.
+  res.json({ ok: true, webhookSecret, unverified: verification.unverified ?? false });
 });
 
 businessRouter.delete("/me/payment-provider", async (req: AuthedRequest, res) => {
@@ -1488,7 +1500,7 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
         // Most salons want one number for both channels — default the voice bot to the same number
         // they just connected on WhatsApp, but only the first time: never override a number the
         // owner already set manually via PUT /me/voice-phone.
-        ...(!existing.voicePhoneNumber && phone.display_phone_number ? { voicePhoneNumber: phone.display_phone_number } : {}),
+        ...(!existing.voicePhoneNumber && phone.display_phone_number ? { voicePhoneNumber: normalizeOwnerPhone(phone.display_phone_number) ?? phone.display_phone_number } : {}),
       },
     });
   } catch (err: any) {
@@ -1514,6 +1526,19 @@ businessRouter.post("/me/whatsapp/embedded-signup", async (req: AuthedRequest, r
   // Not awaited: Meta takes ~24h to approve either way, so there is nothing for the owner to wait
   // for — and a template failure must not turn a successful connection into an error.
   submitWhatsAppTemplates(req.businessId!, phone.id, userToken, wabaId ?? null);
+
+  // The auto-filled voice number above skipped agent assignment entirely, which recreates exactly
+  // the failure cartesiaAdmin was written to prevent: a number saved against a salon but pointing
+  // at no agent answers the call and hangs up, with nothing in our logs because the call never
+  // reaches us. Attempt it here too. Most salons' WhatsApp line is not in the Cartesia account at
+  // all, so this is expected to fail for them — which is why it only logs, and why the number
+  // remains a default the owner can correct rather than a promise that voice is live.
+  if (!existing.voicePhoneNumber && phone.display_phone_number) {
+    assignNumberToAgent(normalizeOwnerPhone(phone.display_phone_number) ?? phone.display_phone_number).catch((err) => {
+      if (err instanceof CartesiaNotConfiguredError) return;
+      console.warn(`[cartesia] Auto-filled voice number not assigned for ${req.businessId}:`, err instanceof Error ? err.message : err);
+    });
+  }
 
   res.json({ ok: true, phoneNumber: phone.display_phone_number, subscribed });
 });
