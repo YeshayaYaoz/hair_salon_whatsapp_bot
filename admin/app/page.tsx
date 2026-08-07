@@ -358,7 +358,7 @@ export default function LandingPage() {
         .phone-wa-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
         .phone-wa-info { flex: 1; min-width: 0; }
         .phone-wa-name { font-size: 12.5px; font-weight: 700; color: #111; line-height: 1.2; }
-        .phone-wa-online { font-size: 10px; color: #25D366; font-weight: 500; }
+        .phone-wa-online { font-size: 10px; color: #0F8043; font-weight: 500; }
         .phone-wa-actions { display: flex; align-items: center; gap: 14px; color: #128C7E; font-size: 13px; }
 
         /* Chat area */
@@ -402,8 +402,8 @@ export default function LandingPage() {
           border: 7px solid transparent; border-top-color: #fff; border-right-color: #fff;
           border-radius: 0 2px 0 0;
         }
-        .chat-time { font-size: 9px; color: #aaa; text-align: left; margin-top: 1px; display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
-        .chat-ticks { color: #53BDEB; font-size: 9px; }
+        .chat-time { font-size: 9px; color: #6A6A6A; text-align: left; margin-top: 1px; display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
+        .chat-ticks { color: #2E6F8C; font-size: 9px; }
 
         /* Typing indicator */
         .chat-typing {
@@ -425,8 +425,8 @@ export default function LandingPage() {
 
         /* Input bar */
         .phone-wa-input { background: #F0F0F0; padding: 7px 10px; display: flex; align-items: center; gap: 7px; }
-        .phone-wa-input-box { flex: 1; background: #fff; border-radius: 22px; padding: 7px 12px; font-size: 11px; color: #999; display: flex; align-items: center; gap: 6px; }
-        .phone-wa-input-icon { color: #999; font-size: 13px; }
+        .phone-wa-input-box { flex: 1; background: #fff; border-radius: 22px; padding: 7px 12px; font-size: 11px; color: #747474; display: flex; align-items: center; gap: 6px; }
+        .phone-wa-input-icon { color: #747474; font-size: 13px; }
         .phone-wa-send { width: 34px; height: 34px; border-radius: 50%; background: #128C7E; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 6px rgba(18,140,126,0.35); }
 
         /* Chat animation classes — bubbles pop in with a subtle scale from their tail corner */
@@ -436,7 +436,7 @@ export default function LandingPage() {
         .chat-typing { opacity: 0; transform: translateY(6px) scale(0.92); transition: opacity 0.22s ease, transform 0.22s ease; transform-origin: top left; }
         .chat-bubble.show, .chat-typing.show { opacity: 1; transform: none; }
         /* Header live "typing…" state */
-        .phone-wa-online.is-typing { color: #25D366; }
+        .phone-wa-online.is-typing { color: #0F8043; }
         .phone-wa-online.is-typing::after { content: ''; display: inline-block; width: 3px; height: 3px; border-radius: 50%; background: currentColor; margin-inline-start: 3px; animation: typingDotHeader 1s steps(3) infinite; box-shadow: 5px 0 0 currentColor, 10px 0 0 currentColor; }
         @keyframes typingDotHeader { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
 
@@ -469,11 +469,11 @@ export default function LandingPage() {
         .mock-titlebar { background: #111; padding: 14px 20px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.07); direction: ltr; }
         .mock-dot { width: 11px; height: 11px; border-radius: 50%; }
         .mock-dot.r { background: #FF5F57; } .mock-dot.y { background: #FEBC2E; } .mock-dot.g { background: #28C840; }
-        .mock-url { margin: 0 auto; background: #1E1E1E; border: 1px solid rgba(255,255,255,0.07); border-radius: 6px; padding: 5px 20px; font-size: 11px; color: #666; font-family: 'Courier New', monospace; }
+        .mock-url { margin: 0 auto; background: #1E1E1E; border: 1px solid rgba(255,255,255,0.07); border-radius: 6px; padding: 5px 20px; font-size: 11px; color: #909090; font-family: 'Courier New', monospace; }
         .mock-body { display: grid; grid-template-columns: 220px 1fr; direction: ltr; }
         .mock-sidebar { background: #111; border-right: 1px solid rgba(255,255,255,0.06); padding: 24px 14px; display: flex; flex-direction: column; gap: 3px; }
         .mock-sidebar-header { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.55); letter-spacing: 0.12em; text-transform: uppercase; padding: 0 10px; margin-bottom: 12px; }
-        .mock-nav-item { padding: 9px 14px; border-radius: 8px; font-size: 12.5px; color: #666; cursor: default; display: flex; align-items: center; gap: 10px; transition: background 0.12s; }
+        .mock-nav-item { padding: 9px 14px; border-radius: 8px; font-size: 12.5px; color: #909090; cursor: default; display: flex; align-items: center; gap: 10px; transition: background 0.12s; }
         .mock-nav-item.active { background: rgba(245,158,11,0.12); color: #F59E0B; font-weight: 600; }
         .mock-nav-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
         .mock-main { padding: 32px; }
@@ -488,20 +488,20 @@ export default function LandingPage() {
         .mock-stat-trend.down { color: #EF4444; }
         .mock-stat-n { font-size: 26px; font-weight: 800; color: #fff; letter-spacing: -1px; margin-bottom: 4px; line-height: 1; }
         .mock-stat-n .g { color: #F59E0B; }
-        .mock-stat-l { font-size: 11.5px; color: rgba(255,255,255,0.45); }
+        .mock-stat-l { font-size: 11.5px; color: rgba(255,255,255,0.50); }
         .mock-section-title { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.6); margin-bottom: 12px; letter-spacing: 0.1em; text-transform: uppercase; }
         .mock-appt-list { display: flex; flex-direction: column; gap: 8px; }
         .mock-appt { background: #1E1E1E; border-radius: 10px; padding: 13px 18px; display: flex; align-items: center; gap: 14px; border: 1px solid rgba(255,255,255,0.06); }
         .mock-appt-time { font-size: 12px; color: rgba(255,255,255,0.5); font-family: 'Courier New', monospace; flex-shrink: 0; font-weight: 600; min-width: 38px; }
         .mock-appt-name { font-size: 13px; color: #e8e8e8; flex: 1; font-weight: 500; }
-        .mock-appt-service { font-size: 11px; color: rgba(255,255,255,0.38); }
+        .mock-appt-service { font-size: 11px; color: rgba(255,255,255,0.50); }
         .mock-appt-badge { font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 6px; flex-shrink: 0; }
         .mock-appt-badge.confirmed { background: rgba(37,211,102,0.1); color: #25D366; border: 1px solid rgba(37,211,102,0.2); }
         .mock-appt-badge.pending { background: rgba(245,158,11,0.1); color: #F59E0B; border: 1px solid rgba(245,158,11,0.2); }
 
         /* TRUST BAR */
         .lp-trust { background: #fff; padding: 28px 40px; display: flex; align-items: center; justify-content: center; gap: 32px; flex-wrap: wrap; overflow-x: auto; }
-        .lp-trust-label { font-size: 11px; color: #999; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; }
+        .lp-trust-label { font-size: 11px; color: #747474; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; }
         .lp-trust-items { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         .lp-trust-item { display: flex; align-items: center; gap: 9px; font-size: 13px; color: #222; font-weight: 600; background: #F7F7F7; border: 1px solid #E8E8E8; border-radius: 10px; padding: 8px 16px; transition: border-color 0.15s, box-shadow 0.15s; }
         .lp-trust-item:hover { border-color: #D0D0D0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
@@ -572,19 +572,22 @@ export default function LandingPage() {
         .lp-testi-footer { display: flex; align-items: center; gap: 12px; padding-top: 16px; border-top: 1px solid #E8E8E8; }
         .lp-testi-avatar { width: 38px; height: 38px; border-radius: 50%; font-size: 15px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .lp-testi-name { font-size: 13px; font-weight: 700; color: #111; }
-        .lp-testi-role { font-size: 12px; color: #767676; }
+        .lp-testi-role { font-size: 12px; color: #6B6B6B; }
 
         /* BEFORE/AFTER */
         .lp-ba { background: #0A0A0A; padding: 100px 40px; }
         .lp-ba-inner { max-width: 1080px; margin: 0 auto; }
-        .lp-ba .lp-label { color: #B45309; }
+        .lp-ba .lp-label { color: #D97706; }
         .lp-ba .lp-title { color: #fff; }
         .lp-ba-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 52px; }
         .lp-ba-card { border-radius: 16px; padding: 36px; border: 1px solid transparent; }
         .lp-ba-card.before { background: rgba(239,68,68,0.06); border-color: rgba(239,68,68,0.2); }
         .lp-ba-card.after { background: rgba(37,211,102,0.06); border-color: rgba(37,211,102,0.25); }
         .lp-ba-header { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
-        .lp-ba-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+        /* Holds a single emoji, which paints its own colours — so the color property has no visual effect here.
+           Set explicitly anyway: inherited #111 on this dark band reads as a 1.12:1 failure in the
+           contrast audit, and a permanent false alarm trains people to ignore the report. */
+        .lp-ba-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; color: #F5F5F5; }
         .before .lp-ba-icon { background: rgba(239,68,68,0.12); }
         .after .lp-ba-icon { background: rgba(37,211,102,0.12); }
         .lp-ba-tag { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
@@ -602,10 +605,10 @@ export default function LandingPage() {
         .lp-premium-inner { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
         .lp-premium-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.25); color: #F59E0B; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 20px; margin-bottom: 18px; letter-spacing: 0.08em; text-transform: uppercase; }
         .lp-premium-title { font-size: clamp(28px, 3vw, 42px); font-weight: 800; color: #fff; letter-spacing: -1.5px; line-height: 1.1; margin-bottom: 16px; }
-        .lp-premium-title .amber { color: #B45309; }
+        .lp-premium-title .amber { color: #D97706; }
         .lp-premium-desc { font-size: 16px; color: rgba(255,255,255,0.72); line-height: 1.75; margin-bottom: 28px; }
         .lp-premium-note { display: inline-flex; align-items: center; gap: 8px; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); border-radius: 8px; padding: 10px 16px; font-size: 13px; color: rgba(255,255,255,0.72); margin-bottom: 32px; }
-        .lp-premium-note strong { color: #B45309; }
+        .lp-premium-note strong { color: #D97706; }
         .btn-amber { display: inline-flex; align-items: center; gap: 8px; background: #F59E0B; color: #000; font-size: 14px; font-weight: 700; padding: 12px 24px; border-radius: 9px; text-decoration: none; transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s; box-shadow: 0 4px 16px rgba(245,158,11,0.3); }
         .btn-amber:hover { opacity: 0.88; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(245,158,11,0.4); }
         .voice-card { background: #141414; border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; overflow: hidden; }
@@ -654,7 +657,7 @@ export default function LandingPage() {
         .lp-plan-feat { display: flex; align-items: flex-start; gap: 10px; font-size: 16px; color: #444; line-height: 1.5; }
         .lp-plan.featured .lp-plan-feat { color: rgba(255,255,255,0.82); }
         .lp-plan-feat .check { color: #0F8043; font-size: 13px; flex-shrink: 0; margin-top: 1px; }
-        .lp-plan.featured .lp-plan-feat .check { color: #B45309; }
+        .lp-plan.featured .lp-plan-feat .check { color: #D97706; }
         .lp-plan-btn { display: block; text-align: center; padding: 13px; border-radius: 10px; font-size: 14px; font-weight: 700; text-decoration: none; transition: opacity 0.15s, transform 0.15s; }
         .lp-plan-btn.dark { background: #111; color: #fff; }
         .lp-plan-btn.dark:hover { opacity: 0.8; transform: translateY(-1px); }
@@ -749,7 +752,7 @@ export default function LandingPage() {
         .lp-cta-sub { font-size: 17px; color: #767676; margin-bottom: 36px; }
         .lp-cta-row { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
         .lp-cta-trust { display: flex; align-items: center; justify-content: center; gap: 20px; margin-top: 28px; flex-wrap: wrap; }
-        .lp-cta-trust-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #AAA; }
+        .lp-cta-trust-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #747474; }
 
         /* FOOTER */
         .lp-footer { background: #0A0A0A; padding: 64px 44px 36px; }
@@ -895,10 +898,10 @@ export default function LandingPage() {
         .ht-icon-wrap { width: 36px; height: 36px; border-radius: 10px; background: #F0FFF4; border: 1px solid #BBF7D0; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
         .ht-icon { font-size: 17px; }
         .ht-msg { font-size: 12.5px; font-weight: 700; color: #111; line-height: 1.3; }
-        .ht-sub { font-size: 11px; color: #777; margin-top: 1px; line-height: 1.3; }
+        .ht-sub { font-size: 11px; color: #737373; margin-top: 1px; line-height: 1.3; }
         .ht-live { display: flex; align-items: center; gap: 4px; margin-right: auto; }
         .ht-dot { width: 6px; height: 6px; border-radius: 50%; background: #25D366; animation: pulse-green 2s infinite; flex-shrink: 0; }
-        .ht-live-label { font-size: 9px; font-weight: 700; color: #25D366; letter-spacing: 0.06em; text-transform: uppercase; }
+        .ht-live-label { font-size: 9px; font-weight: 700; color: #0F8043; letter-spacing: 0.06em; text-transform: uppercase; }
 
         /* COMPARISON TABLE */
         .lp-compare { padding: 100px 40px; background: #fff; border-top: 1px solid #EBEBEB; }

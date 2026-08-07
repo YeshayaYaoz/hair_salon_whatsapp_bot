@@ -137,7 +137,7 @@ export function SetupChecklist() {
                 <a
                   href={meta.href}
                   className={`text-sm font-medium ${
-                    step.done ? "text-gray-600 line-through" : "text-[#1B7FA0] hover:underline"
+                    step.done ? "text-gray-600 line-through" : "text-[#197492] hover:underline"
                   }`}
                 >
                   {he ? meta.he : meta.en}

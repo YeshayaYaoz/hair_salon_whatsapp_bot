@@ -817,7 +817,7 @@ function TemperatureSlider({
           <button
             type="button"
             onClick={() => onChange(null)}
-            className="text-xs text-[#1B7FA0] hover:underline shrink-0"
+            className="text-xs text-[#197492] hover:underline shrink-0"
           >
             {he ? "אפס לברירת מחדל" : "Reset to default"}
           </button>

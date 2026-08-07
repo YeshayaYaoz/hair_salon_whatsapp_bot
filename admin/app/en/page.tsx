@@ -326,7 +326,7 @@ export default function LandingPageEN() {
         .phone-wa-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
         .phone-wa-info { flex: 1; }
         .phone-wa-name { font-size: 12.5px; font-weight: 700; color: #111; }
-        .phone-wa-online { font-size: 10px; color: #128C7E; font-weight: 500; }
+        .phone-wa-online { font-size: 10px; color: #118477; font-weight: 500; }
         .phone-wa-actions { display: flex; gap: 12px; margin-left: auto; }
         .phone-wa-bar { background: #fff; padding: 10px 14px; display: flex; align-items: center; gap: 9px; border-bottom: 1px solid #F0F0F0; }
         .phone-wa-back { color: #128C7E; font-size: 18px; font-weight: 300; line-height: 1; flex-shrink: 0; }
@@ -346,8 +346,8 @@ export default function LandingPageEN() {
         .chat-bubble.outgoing { background: #fff; border-radius: 0 8px 8px 8px; align-self: flex-start; color: #111; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
         .chat-bubble.incoming::before { content: ''; position: absolute; top: 0; right: -7px; width: 0; height: 0; border-top: 0px solid transparent; border-left: 8px solid #D9FDD3; border-bottom: 8px solid transparent; }
         .chat-bubble.outgoing::before { content: ''; position: absolute; top: 0; left: -7px; width: 0; height: 0; border-top: 0px solid transparent; border-right: 8px solid #fff; border-bottom: 8px solid transparent; }
-        .chat-time { font-size: 9.5px; color: #999; margin-top: 2px; text-align: right; display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
-        .chat-ticks { color: #53BDEB; font-size: 9px; }
+        .chat-time { font-size: 9.5px; color: #6A6A6A; margin-top: 2px; text-align: right; display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
+        .chat-ticks { color: #2E6F8C; font-size: 9px; }
         .chat-typing { align-self: flex-start; background: #fff; padding: 9px 12px; border-radius: 0 8px 8px 8px; display: flex; gap: 4px; align-items: center; opacity: 0; transform: translateY(6px); transition: opacity 0.3s ease, transform 0.3s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
         .chat-typing.show { opacity: 1; transform: none; }
         .typing-dot { width: 7px; height: 7px; border-radius: 50%; background: #C0C0C0; animation: typing 1.4s infinite ease-in-out; }
@@ -355,8 +355,8 @@ export default function LandingPageEN() {
         .typing-dot:nth-child(3) { animation-delay: 0.4s; }
         @keyframes typing { 0%,60%,100% { transform: translateY(0); opacity: 0.6; } 30% { transform: translateY(-5px); opacity: 1; } }
         .phone-wa-input { background: #F0F0F0; padding: 7px 10px; display: flex; align-items: center; gap: 7px; }
-        .phone-wa-input-box { flex: 1; background: #fff; border-radius: 22px; padding: 7px 12px; font-size: 11px; color: #999; display: flex; align-items: center; gap: 6px; }
-        .phone-wa-input-icon { color: #999; font-size: 13px; }
+        .phone-wa-input-box { flex: 1; background: #fff; border-radius: 22px; padding: 7px 12px; font-size: 11px; color: #747474; display: flex; align-items: center; gap: 6px; }
+        .phone-wa-input-icon { color: #747474; font-size: 13px; }
         .phone-wa-send { width: 34px; height: 34px; border-radius: 50%; background: #128C7E; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 6px rgba(18,140,126,0.35); }
 
         /* Toast */
@@ -372,15 +372,15 @@ export default function LandingPageEN() {
         #hero-toast.ht-out { opacity: 0; transform: translateY(-8px); }
         .ht-icon-wrap { width: 36px; height: 36px; border-radius: 10px; background: #F0FFF4; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
         .ht-msg { font-size: 12.5px; font-weight: 600; color: #111; }
-        .ht-sub { font-size: 11px; color: #767676; margin-top: 2px; }
+        .ht-sub { font-size: 11px; color: #737373; margin-top: 2px; }
         .ht-live { display: flex; align-items: center; gap: 4px; margin-left: auto; }
         .ht-dot { width: 6px; height: 6px; border-radius: 50%; background: #25D366; animation: pulse-green 2s infinite; }
-        .ht-live-label { font-size: 10px; font-weight: 700; color: #25D366; }
+        .ht-live-label { font-size: 10px; font-weight: 700; color: #0F8043; }
 
         /* Trust bar */
         .lp-trust-bar { padding: 28px 40px; border-top: 1px solid #EBEBEB; border-bottom: 1px solid #EBEBEB; }
         .lp-trust-bar-inner { max-width: 1080px; margin: 0 auto; display: flex; align-items: center; gap: 32px; flex-wrap: wrap; justify-content: center; }
-        .lp-trust-label { font-size: 11px; font-weight: 700; color: #767676; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; }
+        .lp-trust-label { font-size: 11px; font-weight: 700; color: #747474; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; }
         .lp-trust-logo { display: flex; align-items: center; gap: 8px; opacity: 0.45; filter: grayscale(1); transition: opacity 0.2s, filter 0.2s; }
         .lp-trust-logo:hover { opacity: 0.7; filter: grayscale(0); }
         .lp-trust-logo-text { font-size: 15px; font-weight: 800; color: #111; letter-spacing: -0.5px; }
@@ -426,7 +426,7 @@ export default function LandingPageEN() {
         .lp-flow-ping.blue { background: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,0.2); }
         @keyframes ping { 0%,100% { transform: scale(1); opacity:1; } 60% { transform: scale(1.5); opacity:0.3; } }
         .lp-flow-label { font-size: 13px; font-weight: 700; color: #111; }
-        .lp-flow-sub { font-size: 11px; color: #767676; text-align: center; }
+        .lp-flow-sub { font-size: 11px; color: #6B6B6B; text-align: center; }
         .lp-flow-arrow { font-size: 20px; color: #DDD; padding: 0 4px; }
 
         /* Steps */
@@ -476,7 +476,7 @@ export default function LandingPageEN() {
         .lp-testi-track:hover { animation-play-state: paused; }
         .lp-testi-card { background: #F9FAFB; border: 1px solid #EBEBEB; border-radius: 16px; padding: 22px 24px; width: 280px; flex-shrink: 0; }
         .lp-testi-quote { font-size: 15px; line-height: 1.65; color: #333; margin-bottom: 14px; }
-        .lp-testi-author { font-size: 12px; font-weight: 600; color: #767676; }
+        .lp-testi-author { font-size: 12px; font-weight: 600; color: #6B6B6B; }
 
         /* 3D mock */
         .lp-3d-wrap { padding: 60px 40px 0; background: #F9FAFB; overflow: hidden; }
@@ -485,11 +485,11 @@ export default function LandingPageEN() {
         .mock-titlebar { background: #111; padding: 14px 20px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.07); direction: ltr; }
         .mock-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
         .mock-dot.r { background: #FF5F57; } .mock-dot.y { background: #FFBD2E; } .mock-dot.g { background: #28CA41; }
-        .mock-url { margin: 0 auto; background: #1E1E1E; border: 1px solid rgba(255,255,255,0.07); border-radius: 6px; padding: 5px 20px; font-size: 11px; color: #666; font-family: 'Courier New', monospace; }
+        .mock-url { margin: 0 auto; background: #1E1E1E; border: 1px solid rgba(255,255,255,0.07); border-radius: 6px; padding: 5px 20px; font-size: 11px; color: #909090; font-family: 'Courier New', monospace; }
         .mock-body { display: grid; grid-template-columns: 220px 1fr; direction: ltr; }
         .mock-sidebar { background: #111; border-right: 1px solid rgba(255,255,255,0.06); padding: 24px 14px; display: flex; flex-direction: column; gap: 3px; }
         .mock-sidebar-header { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.55); letter-spacing: 0.12em; text-transform: uppercase; padding: 0 10px; margin-bottom: 12px; }
-        .mock-nav-item { padding: 9px 14px; border-radius: 8px; font-size: 12.5px; color: #666; cursor: default; display: flex; align-items: center; gap: 10px; }
+        .mock-nav-item { padding: 9px 14px; border-radius: 8px; font-size: 12.5px; color: #909090; cursor: default; display: flex; align-items: center; gap: 10px; }
         .mock-nav-item.active { background: rgba(245,158,11,0.12); color: #F59E0B; font-weight: 600; }
         .mock-nav-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
         .mock-main { padding: 32px; }
@@ -500,14 +500,14 @@ export default function LandingPageEN() {
         .mock-stat { background: #1E1E1E; border-radius: 12px; padding: 20px 22px; border: 1px solid rgba(255,255,255,0.07); }
         .mock-stat-n { font-size: 26px; font-weight: 800; color: #fff; letter-spacing: -1px; margin-bottom: 4px; }
         .mock-stat-n .g { color: #F59E0B; }
-        .mock-stat-l { font-size: 11px; color: #555; }
+        .mock-stat-l { font-size: 11px; color: #A0A0A0; }
         .mock-stat-trend { font-size: 10px; color: #25D366; margin-top: 6px; }
         .mock-section-title { font-size: 12px; font-weight: 600; color: #555; margin-bottom: 12px; letter-spacing: 0.05em; text-transform: uppercase; }
         .mock-appt-list { display: flex; flex-direction: column; gap: 8px; }
         .mock-appt { background: #1E1E1E; border-radius: 10px; padding: 13px 18px; display: flex; align-items: center; gap: 16px; font-size: 12px; border: 1px solid rgba(255,255,255,0.06); }
         .mock-appt-time { color: #F59E0B; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 36px; }
         .mock-appt-name { color: #fff; font-weight: 600; flex: 1; }
-        .mock-appt-service { color: #555; font-size: 11px; }
+        .mock-appt-service { color: #A0A0A0; font-size: 11px; }
         .mock-appt-badge { margin-left: auto; font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 20px; border: 1px solid; }
         .mock-appt-badge.confirmed { background: rgba(37,211,102,0.1); color: #25D366; border-color: rgba(37,211,102,0.2); }
         .mock-appt-badge.pending { background: rgba(245,158,11,0.1); color: #F59E0B; border-color: rgba(245,158,11,0.2); }
@@ -553,7 +553,7 @@ export default function LandingPageEN() {
         .lp-compare-inner { max-width: 900px; margin: 0 auto; overflow-x: auto; }
         .compare-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
         .compare-table th, .compare-table td { padding: 13px 16px; text-align: center; border-bottom: 1px solid #EBEBEB; }
-        .compare-table th { font-size: 12px; font-weight: 700; color: #767676; letter-spacing: 0.04em; }
+        .compare-table th { font-size: 12px; font-weight: 700; color: #6B6B6B; letter-spacing: 0.04em; }
         .compare-table td:first-child, .compare-table th:first-child { text-align: left; color: #333; font-weight: 500; }
         .compare-table th.col-tori { background: #1D4ED8; color: #fff; border-radius: 8px 8px 0 0; }
         .col-tori-cell { background: #EFF6FF; }
@@ -618,7 +618,7 @@ export default function LandingPageEN() {
         .lp-premium-inner { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
         @media (max-width: 800px) { .lp-premium-inner { grid-template-columns: 1fr; } }
         .lp-premium-title { font-size: clamp(28px, 4vw, 44px); font-weight: 900; color: #fff; letter-spacing: -2px; line-height: 1.1; margin-bottom: 20px; }
-        .lp-premium-title .amber { color: #B45309; }
+        .lp-premium-title .amber { color: #D97706; }
         .lp-premium-desc { font-size: 16px; color: rgba(255,255,255,0.55); line-height: 1.7; margin-bottom: 24px; }
         .lp-premium-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.25); color: #F59E0B; font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 20px; }
         .voice-card { background: #141414; border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 28px; }
@@ -1111,7 +1111,7 @@ export default function LandingPageEN() {
         <section className="lp-premium" id="premium">
           <div className="lp-premium-inner">
             <div>
-              <div className="lp-label reveal" style={{ color: "#B45309" }}>Premium</div>
+              <div className="lp-label reveal" style={{ color: "#D97706" }}>Premium</div>
               <div className="lp-premium-title reveal">Phone calls too —<br /><span className="amber">the bot answers.</span></div>
               <div className="lp-premium-desc reveal">A customer calls. An AI agent answers in a natural voice, holds the conversation, books the appointment, and syncs to Google Calendar — without you lifting a finger.</div>
               <div className="lp-premium-badge reveal">
@@ -1300,7 +1300,10 @@ export default function LandingPageEN() {
           <div className="lp-cta-sub">Try free for 14 days — no credit card, no risk.</div>
           <div className="lp-cta-row">
             <a className="btn-green" href="/login">Start Free Now</a>
-            <a className="btn-outline" style={{ color: "rgba(255,255,255,0.6)", borderColor: "rgba(255,255,255,0.15)" }} href="#pricing">See Pricing</a>
+            {/* background must be cleared, not just the colour. .btn-outline sets `background: #fff`,
+                so overriding only `color` left white-on-white text — 1.0:1, an invisible button on
+                the final conversion CTA. Transparent puts it back on the #0A0A0A band at 7.3:1. */}
+            <a className="btn-outline" style={{ background: "transparent", color: "rgba(255,255,255,0.6)", borderColor: "rgba(255,255,255,0.15)" }} href="#pricing">See Pricing</a>
           </div>
           <div className="lp-cta-trust">
             <span className="lp-cta-trust-item">✓ No credit card required</span>

@@ -122,7 +122,7 @@ export default function TermsOfService() {
               customers (names, phone numbers, appointment details, conversation history) collected through the
               bot. You are responsible for having a lawful basis to collect and process this data and for
               honoring any data requests from your customers. Tori acts as your data processor for this purpose,
-              as described in our <Link href="/privacy" className="text-[#1B7FA0] underline underline-offset-2">Privacy Policy</Link>.
+              as described in our <Link href="/privacy" className="text-[#197492] underline underline-offset-2">Privacy Policy</Link>.
             </p>
           </Section>
 
@@ -162,7 +162,7 @@ export default function TermsOfService() {
           </Section>
 
           <Section id="contact" title="15. Contact Us">
-            <p>Questions about these Terms? Reach out at <a href="mailto:y28112000@gmail.com" className="text-[#1B7FA0] underline underline-offset-2 font-medium">y28112000@gmail.com</a>.</p>
+            <p>Questions about these Terms? Reach out at <a href="mailto:y28112000@gmail.com" className="text-[#197492] underline underline-offset-2 font-medium">y28112000@gmail.com</a>.</p>
           </Section>
         </main>
       </div>

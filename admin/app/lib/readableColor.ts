@@ -48,7 +48,16 @@ function tintOverWhite(rgb: { r: number; g: number; b: number }, alpha: number) 
  */
 export function readableWithWhiteText(hex: string, target = 4.5): string {
   const rgb = toRgb(hex);
-  if (!rgb) return hex;
+  if (!rgb) {
+    // Returning the input unchanged is the only thing this can do — but doing it silently is how a
+    // caller ends up believing a colour was made safe when it was not. A translucent
+    // rgba(255,255,255,0.25) badge shipped that way and sat at 3.2:1 against the tab behind it,
+    // because it passed through here untouched and nothing said so.
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(`[readableWithWhiteText] "${hex}" is not 6-digit hex — returned unchanged, contrast NOT guaranteed.`);
+    }
+    return hex;
+  }
   const white = { r: 255, g: 255, b: 255 };
   let cur = rgb;
   for (let i = 0; i < 20; i++) {

@@ -53,7 +53,7 @@ function StatCard({
       <div className="flex items-center justify-between">
         <span
           className="text-xs font-semibold tracking-wide uppercase"
-          style={{ color: "#6B7280", letterSpacing: "0.08em" }}
+          style={{ color: "#4B5563", letterSpacing: "0.08em" }}
         >
           {label}
         </span>
@@ -80,7 +80,7 @@ function StatCard({
       </div>
       <div>
         <p className="text-3xl font-extrabold text-gray-900 tracking-tight leading-none">{value}</p>
-        {sub && <p className="text-xs mt-1.5" style={{ color: "#6B7280" }}>{sub}</p>}
+        {sub && <p className="text-xs mt-1.5" style={{ color: "#4B5563" }}>{sub}</p>}
       </div>
     </div>
   );
@@ -167,7 +167,7 @@ export default function AnalyticsPage() {
       <div className="animate-fade-in">
         <div className="mb-8">
           <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">{t.analyticsTitle}</h1>
-          <p className="text-sm mt-1" style={{ color: "#6B7280" }}>{t.analyticsSubtitle}</p>
+          <p className="text-sm mt-1" style={{ color: "#4B5563" }}>{t.analyticsSubtitle}</p>
         </div>
         <SkeletonCard lines={3} />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-8">
@@ -195,7 +195,7 @@ export default function AnalyticsPage() {
         <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">
           {greetingFor(lang)}{businessName ? `, ${businessName}` : ""} 👋
         </h1>
-        <p className="text-sm mt-1" style={{ color: "#6B7280" }}>
+        <p className="text-sm mt-1" style={{ color: "#4B5563" }}>
           {new Date().toLocaleDateString(lang === "he" ? "he-IL" : "en-US", { weekday: "long", day: "numeric", month: "long" })}
           {" · "}
           {todayAppts.length === 0
@@ -217,7 +217,7 @@ export default function AnalyticsPage() {
         {todayAppts.length === 0 ? (
           <div className="text-center py-8">
             <div className="text-3xl mb-2">🗓️</div>
-            <p className="text-sm" style={{ color: "#6B7280" }}>
+            <p className="text-sm" style={{ color: "#4B5563" }}>
               {lang === "he" ? "אין תורים מתוזמנים להיום" : "No appointments scheduled today"}
             </p>
           </div>
@@ -229,12 +229,12 @@ export default function AnalyticsPage() {
                 className="flex items-center gap-4 px-4 py-3 rounded-xl animate-fade-up"
                 style={{ animationDelay: `${i * 50}ms`, background: "rgba(27,127,160,0.04)", border: "1px solid #EEF1F4" }}
               >
-                <div className="text-sm font-bold tabular-nums shrink-0" style={{ color: "#1B7FA0", minWidth: 52 }}>
+                <div className="text-sm font-bold tabular-nums shrink-0" style={{ color: "#197492", minWidth: 52 }}>
                   {formatTimeInTz(a.startTime, tz)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{a.customer.name || a.customer.phone}</p>
-                  <p className="text-xs truncate" style={{ color: "#6B7280" }}>{a.service.name}</p>
+                  <p className="text-xs truncate" style={{ color: "#4B5563" }}>{a.service.name}</p>
                 </div>
               </div>
             ))}
@@ -295,8 +295,8 @@ export default function AnalyticsPage() {
                 <span
                   className="text-xs font-bold px-2 py-1 rounded-full tabular-nums"
                   style={up
-                    ? { background: "rgba(22,163,74,0.1)", color: "#16A34A" }
-                    : { background: "rgba(220,38,38,0.08)", color: "#DC2626" }}
+                    ? { background: "rgba(22,163,74,0.1)", color: "#136B31" }
+                    : { background: "rgba(220,38,38,0.08)", color: "#B91C1C" }}
                   title={lang === "he" ? "לעומת 7 הימים הקודמים" : "vs. the previous 7 days"}
                 >
                   {up ? "↑" : "↓"} {Math.abs(pct)}%
@@ -344,7 +344,7 @@ export default function AnalyticsPage() {
         >
           <h2 className="text-sm font-semibold text-gray-900 mb-5">{t.topServices}</h2>
           {data.topServices.length === 0 ? (
-            <p className="text-sm" style={{ color: "#6B7280" }}>{t.noBookings}</p>
+            <p className="text-sm" style={{ color: "#4B5563" }}>{t.noBookings}</p>
           ) : (
             <div className="flex flex-col gap-4">
               {data.topServices.map(({ name, count }, i) => {

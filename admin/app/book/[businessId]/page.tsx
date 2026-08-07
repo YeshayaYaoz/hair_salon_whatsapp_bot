@@ -88,14 +88,14 @@ function StepIndicator({ current, labels }: { current: number; labels: readonly 
         return (
           <div key={i} className="flex items-center flex-1 last:flex-none">
             <div className="flex flex-col items-center gap-1 shrink-0">
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-colors ${done ? "bg-[#1B7FA0] text-white" : active ? "bg-[#1B7FA0] text-white ring-4 ring-[#D6F0F8]" : "bg-gray-100 text-gray-400"}`}>
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-colors ${done ? "bg-[#1B7FA0] text-white" : active ? "bg-[#1B7FA0] text-white ring-4 ring-[#D6F0F8]" : "bg-gray-100 text-gray-500"}`}>
                 {done ? (
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                   </svg>
                 ) : i + 1}
               </div>
-              <span className={`text-[10px] font-medium ${active ? "text-[#1B7FA0]" : done ? "text-[#5BB8D4]" : "text-gray-400"}`}>{label}</span>
+              <span className={`text-[10px] font-medium ${active ? "text-[#197492]" : done ? "text-[#5BB8D4]" : "text-gray-500"}`}>{label}</span>
             </div>
             {i < labels.length - 1 && (
               <div className={`flex-1 h-0.5 mx-1 mb-4 ${done ? "bg-[#5BB8D4]" : "bg-gray-200"}`} />
@@ -222,7 +222,7 @@ export default function BookPage() {
       <main className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-[#1B7FA0] border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-400 text-sm">{c.loading}</p>
+          <p className="text-gray-500 text-sm">{c.loading}</p>
         </div>
       </main>
     );
@@ -239,7 +239,7 @@ export default function BookPage() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-gray-900">{info.name}</h1>
-          {info.address && <p className="text-gray-400 text-xs mt-1">{info.address}</p>}
+          {info.address && <p className="text-gray-500 text-xs mt-1">{info.address}</p>}
         </div>
 
         {step !== "done" && <StepIndicator current={STEP_INDEX[step]} labels={c.steps} />}
@@ -256,7 +256,7 @@ export default function BookPage() {
             </div>
             <h2 className="text-gray-900 font-semibold text-lg mb-1">{c.holdTitle}</h2>
             <p className="text-gray-500 text-sm">{booked.service}</p>
-            <p className="text-[#1B7FA0] font-semibold text-sm mt-1">{formatDateTimeInTz(booked.startTime, tz, locale)}</p>
+            <p className="text-[#197492] font-semibold text-sm mt-1">{formatDateTimeInTz(booked.startTime, tz, locale)}</p>
 
             <p className="text-gray-600 text-sm mt-4">
               {c.holdBody} <span className="font-bold text-gray-900">₪{booked.deposit.amountIls}</span>
@@ -291,8 +291,8 @@ export default function BookPage() {
             </div>
             <h2 className="text-gray-900 font-semibold text-lg mb-1">{c.confirmed}</h2>
             <p className="text-gray-500 text-sm">{booked.service}</p>
-            <p className="text-[#1B7FA0] font-semibold text-sm mt-1">{formatDateTimeInTz(booked.startTime, tz, locale)}</p>
-            <p className="text-gray-400 text-xs mt-5">{c.seeYouThen}</p>
+            <p className="text-[#197492] font-semibold text-sm mt-1">{formatDateTimeInTz(booked.startTime, tz, locale)}</p>
+            <p className="text-gray-500 text-xs mt-5">{c.seeYouThen}</p>
           </div>
         )}
 
@@ -309,11 +309,11 @@ export default function BookPage() {
                 >
                   <div>
                     <div className="text-gray-800 text-sm font-medium group-hover:text-[#145F78] transition">{svc.name}</div>
-                    {svc.description && <div className="text-gray-400 text-xs mt-0.5">{svc.description}</div>}
+                    {svc.description && <div className="text-gray-500 text-xs mt-0.5">{svc.description}</div>}
                   </div>
                   <div className="text-end shrink-0 ms-3">
-                    <div className="text-[#1B7FA0] text-sm font-semibold">₪{(svc.priceCents / 100).toFixed(0)}</div>
-                    <div className="text-gray-400 text-xs">{svc.durationMin} {c.minutesShort}</div>
+                    <div className="text-[#197492] text-sm font-semibold">₪{(svc.priceCents / 100).toFixed(0)}</div>
+                    <div className="text-gray-500 text-xs">{svc.durationMin} {c.minutesShort}</div>
                   </div>
                 </button>
               ))}
@@ -324,11 +324,11 @@ export default function BookPage() {
         {/* Date */}
         {step === "date" && service && (
           <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-            <button onClick={() => setStep("service")} className="text-xs text-gray-400 hover:text-gray-600 mb-4 flex items-center gap-1 transition">
+            <button onClick={() => setStep("service")} className="text-xs text-gray-500 hover:text-gray-600 mb-4 flex items-center gap-1 transition">
               <svg className="w-3 h-3 rtl:-scale-x-100" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               {c.back}
             </button>
-            <h2 className="text-sm font-semibold text-gray-900 mb-4">{c.chooseDateFor}<span className="text-[#1B7FA0]">{service.name}</span></h2>
+            <h2 className="text-sm font-semibold text-gray-900 mb-4">{c.chooseDateFor}<span className="text-[#197492]">{service.name}</span></h2>
             <div className="grid grid-cols-4 gap-2">
               {Array.from({ length: 14 }, (_, i) => i + 1).map((offset) => {
                 // Anchored at noon on the same calendar date `isoDate` sends to the API, so the
@@ -341,7 +341,7 @@ export default function BookPage() {
                     onClick={() => pickDate(offset)}
                     className="flex flex-col items-center py-2.5 rounded-xl border border-gray-200 hover:border-[#5BB8D4] hover:bg-[#E0F5FB] transition"
                   >
-                    <span className="text-gray-400 text-xs">{d.toLocaleDateString(locale, { weekday: "short" })}</span>
+                    <span className="text-gray-500 text-xs">{d.toLocaleDateString(locale, { weekday: "short" })}</span>
                     <span className="text-gray-800 font-semibold text-sm">{d.getDate()}</span>
                   </button>
                 );
@@ -353,7 +353,7 @@ export default function BookPage() {
         {/* Slot */}
         {step === "slot" && service && (
           <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-            <button onClick={() => setStep("date")} className="text-xs text-gray-400 hover:text-gray-600 mb-4 flex items-center gap-1 transition">
+            <button onClick={() => setStep("date")} className="text-xs text-gray-500 hover:text-gray-600 mb-4 flex items-center gap-1 transition">
               <svg className="w-3 h-3 rtl:-scale-x-100" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               {c.back}
             </button>
@@ -366,8 +366,8 @@ export default function BookPage() {
               </div>
             ) : slots.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-gray-400 text-sm">{c.noAvailability}</p>
-                <button onClick={() => setStep("date")} className="text-[#1B7FA0] text-xs mt-2 hover:underline">{c.tryAnotherDate}</button>
+                <p className="text-gray-500 text-sm">{c.noAvailability}</p>
+                <button onClick={() => setStep("date")} className="text-[#197492] text-xs mt-2 hover:underline">{c.tryAnotherDate}</button>
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-2">
@@ -388,7 +388,7 @@ export default function BookPage() {
         {/* Details */}
         {step === "details" && slot && (
           <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-            <button onClick={() => setStep("slot")} className="text-xs text-gray-400 hover:text-gray-600 mb-4 flex items-center gap-1 transition">
+            <button onClick={() => setStep("slot")} className="text-xs text-gray-500 hover:text-gray-600 mb-4 flex items-center gap-1 transition">
               <svg className="w-3 h-3 rtl:-scale-x-100" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               {c.back}
             </button>
@@ -423,7 +423,7 @@ export default function BookPage() {
           </div>
         )}
 
-        <p className="text-center text-gray-400 text-[11px] mt-8">{c.poweredBy} <span className="font-semibold text-gray-500">תורי</span></p>
+        <p className="text-center text-gray-500 text-[11px] mt-8">{c.poweredBy} <span className="font-semibold text-gray-500">תורי</span></p>
       </div>
     </main>
   );

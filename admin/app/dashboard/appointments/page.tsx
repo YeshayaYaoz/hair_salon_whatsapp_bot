@@ -383,7 +383,7 @@ function WeekCalendar({
                 }`}
               >
                 <span className={`text-[11px] ${today ? "text-[#145F78] font-semibold" : "text-gray-600"}`}>{t.daysShort[d.getDay()]}</span>
-                <span className={`text-sm font-semibold ${selected ? "text-[#145F78]" : today ? "text-[#1B7FA0]" : "text-gray-700"}`}>{d.getDate()}</span>
+                <span className={`text-sm font-semibold ${selected ? "text-[#145F78]" : today ? "text-[#197492]" : "text-gray-700"}`}>{d.getDate()}</span>
                 {/* A dot rather than a number: at this width a count competes with the date. */}
                 <span className={`w-1.5 h-1.5 rounded-full ${count > 0 ? (selected ? "bg-[#145F78]" : "bg-[#1B7FA0]/50") : "bg-transparent"}`} />
               </button>
@@ -432,7 +432,7 @@ function WeekCalendar({
           return (
             <div key={d.toISOString()} className={`px-1 py-2 text-center border-e border-gray-100 last:border-e-0 ${today ? "bg-[#E0F5FB]" : ""}`}>
               <div className="text-xs text-gray-600">{t.daysShort[d.getDay()]}</div>
-              <div className={`text-sm font-semibold ${today ? "text-[#1B7FA0]" : "text-gray-700"}`}>{d.getDate()}</div>
+              <div className={`text-sm font-semibold ${today ? "text-[#197492]" : "text-gray-700"}`}>{d.getDate()}</div>
             </div>
           );
         })}
@@ -846,7 +846,7 @@ export default function AppointmentsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-[#1B7FA0]/10 text-[#1B7FA0] flex items-center justify-center text-xs font-bold shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-[#1B7FA0]/10 text-[#197492] flex items-center justify-center text-xs font-bold shrink-0">
                             {(a.customer.name ?? "?").trim().charAt(0) || "?"}
                           </div>
                           <div className="min-w-0">
@@ -869,7 +869,7 @@ export default function AppointmentsPage() {
                         <div className="flex items-center justify-end gap-1">
                           {a.status === "confirmed" && (
                             <a href={googleCalendarUrl(a)} target="_blank" rel="noopener noreferrer" title="Add to Google Calendar"
-                              className="text-gray-600 hover:text-[#1B7FA0] transition px-1.5 py-1 rounded hover:bg-[#E0F5FB]">
+                              className="text-gray-600 hover:text-[#197492] transition px-1.5 py-1 rounded hover:bg-[#E0F5FB]">
                               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                               </svg>

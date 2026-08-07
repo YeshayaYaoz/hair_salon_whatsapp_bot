@@ -132,7 +132,7 @@ export default function PrivacyPolicy() {
           <Section id="google-api" title="6. Google API Services User Data Policy (Limited Use)">
             <p>
               Tori's use and transfer of information received from Google APIs adheres to the{" "}
-              <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noreferrer" className="text-[#1B7FA0] underline underline-offset-2">
+              <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noreferrer" className="text-[#197492] underline underline-offset-2">
                 Google API Services User Data Policy
               </a>, including the Limited Use requirements.
             </p>
@@ -188,7 +188,7 @@ export default function PrivacyPolicy() {
           </Section>
 
           <Section id="contact" title="14. Contact Us">
-            <p>Questions about this policy or your data? Reach out at <a href="mailto:y28112000@gmail.com" className="text-[#1B7FA0] underline underline-offset-2 font-medium">y28112000@gmail.com</a>.</p>
+            <p>Questions about this policy or your data? Reach out at <a href="mailto:y28112000@gmail.com" className="text-[#197492] underline underline-offset-2 font-medium">y28112000@gmail.com</a>.</p>
           </Section>
         </main>
       </div>

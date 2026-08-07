@@ -462,7 +462,7 @@ export default function WhatsAppPage() {
               <button
                 onClick={sendTestMessage}
                 disabled={testing}
-                className="text-xs text-[#1B7FA0] hover:text-[#2A9BBF] disabled:opacity-50 transition font-medium"
+                className="text-xs text-[#197492] hover:text-[#2A9BBF] disabled:opacity-50 transition font-medium"
                 title={lang === "he" ? "שולח הודעת בדיקה אמיתית למספר ההתראות שלך" : "Sends a real test message to your notification phone"}
               >
                 {testing ? "..." : (lang === "he" ? "שלח הודעת בדיקה" : "Send test message")}
