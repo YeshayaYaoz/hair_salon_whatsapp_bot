@@ -377,6 +377,16 @@ export default function BotPage() {
               <p className="text-xs font-semibold text-gray-800">{t.greetingButtonTitle}</p>
               <p className="text-xs text-gray-600 mt-1">{t.greetingButtonHint}</p>
             </div>
+            {/* WhatsApp allows one interactive attachment per message, and the webhook prefers quick
+                replies — so with any configured, this button is filled in, saved, and then never
+                sent. Silent from the owner's side, which is exactly why it is said here. */}
+            {(fields.quickReplies?.length ?? 0) > 0 && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2.5">
+                {he
+                  ? "הכפתור הזה לא יישלח כרגע: וואטסאפ מאפשר סוג כפתורים אחד בלבד בכל הודעה, ולכפתורי התשובה המהירה שלמעלה יש עדיפות. כדי להשתמש בכפתור הקישור — מחקו את כפתורי התשובה המהירה. אפשר להשאיר את הקישור עצמו בטקסט הברכה."
+                  : "This button won't be sent right now: WhatsApp allows only one kind of button per message, and the quick replies above take precedence. To use the link button, remove the quick replies. The link itself can stay in the greeting text."}
+              </div>
+            )}
             <div className="grid sm:grid-cols-2 gap-3">
               <Field label={t.greetingButtonLabel}>
                 <input
