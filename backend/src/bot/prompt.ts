@@ -76,7 +76,11 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
       const extras = [s.description, s.imageUrls.length ? `יש ${s.imageUrls.length} תמונות` : null, s.linkUrl ? `מידע נוסף: ${s.linkUrl}` : null]
         .filter(Boolean)
         .join(" — ");
-      return `• ${s.name}: ₪${(s.priceCents / 100).toFixed(0)} (${formatDuration(s.durationMin, isOvernight)})${extras ? ` — ${extras}` : ""}`;
+      // Occupancy printed as its own labelled field rather than left inside the prose. Buried in a
+      // description it was one clause among several and got read past: a party of six was offered a
+      // three-person unit. Only for overnight verticals, where a "service" is a unit people sleep in.
+      const guests = isOvernight && s.maxGuests ? ` [עד ${s.maxGuests} אורחים]` : "";
+      return `• ${s.name}: ₪${(s.priceCents / 100).toFixed(0)} (${formatDuration(s.durationMin, isOvernight)})${guests}${extras ? ` — ${extras}` : ""}`;
     })
     .join("\n") || "לא הוגדרו שירותים עדיין.";
 

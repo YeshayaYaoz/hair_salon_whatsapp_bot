@@ -28,6 +28,7 @@ interface Service {
   durationMin: number;
   color?: string;
   capacity?: number;
+  maxGuests?: number | null;
   imageUrls?: string[];
   linkUrl?: string;
 }
@@ -39,6 +40,7 @@ interface EditState {
   duration: string;
   color: string;
   capacity: string;
+  maxGuests: string;
   imageUrls: string[];
   linkUrl: string;
 }
@@ -57,12 +59,13 @@ export default function ServicesPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editState, setEditState] = useState<EditState>({ name: "", description: "", price: "", duration: "", color: COLORS[0].hex, capacity: "1", imageUrls: [], linkUrl: "" });
+  const [editState, setEditState] = useState<EditState>({ name: "", description: "", price: "", duration: "", color: COLORS[0].hex, capacity: "1", maxGuests: "", imageUrls: [], linkUrl: "" });
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [newDuration, setNewDuration] = useState("");
   const [newCapacity, setNewCapacity] = useState("1");
+  const [newMaxGuests, setNewMaxGuests] = useState("");
   const [newColor, setNewColor] = useState(COLORS[0].hex);
   const [newImageUrls, setNewImageUrls] = useState<string[]>([]);
   // Files chosen before the service exists. Uploaded right after it's created — see addService.
@@ -98,6 +101,7 @@ export default function ServicesPage() {
       duration: toDurationInput(s.durationMin),
       color: s.color ?? COLORS[0].hex,
       capacity: String(s.capacity ?? 1),
+      maxGuests: s.maxGuests != null ? String(s.maxGuests) : "",
       imageUrls: s.imageUrls ?? [],
       linkUrl: s.linkUrl ?? "",
     });
@@ -115,6 +119,7 @@ export default function ServicesPage() {
           durationMin: fromDurationInput(editState.duration),
           color: editState.color,
           capacity: Math.max(1, Number(editState.capacity) || 1),
+          maxGuests: editState.maxGuests.trim() ? Math.max(1, Number(editState.maxGuests)) : null,
           imageUrls: editState.imageUrls.map((u) => u.trim()).filter(Boolean),
           linkUrl: editState.linkUrl || undefined,
         }),
@@ -142,6 +147,7 @@ export default function ServicesPage() {
           durationMin: fromDurationInput(newDuration),
           color: newColor,
           capacity: Math.max(1, Number(newCapacity) || 1),
+          maxGuests: newMaxGuests.trim() ? Math.max(1, Number(newMaxGuests)) : null,
           imageUrls: newImageUrls.map((u) => u.trim()).filter(Boolean),
           linkUrl: newLinkUrl || undefined,
         }),
@@ -482,6 +488,19 @@ export default function ServicesPage() {
                     <input value={editState.price} onChange={(e) => setEditState((p) => ({ ...p, price: e.target.value }))} placeholder={t.price} type="number" className="w-24 text-sm" />
                     <input value={editState.duration} onChange={(e) => setEditState((p) => ({ ...p, duration: e.target.value }))} placeholder={durationLabel} type="number" min="1" className="w-28 text-sm" />
                     <input value={editState.capacity} onChange={(e) => setEditState((p) => ({ ...p, capacity: e.target.value }))} placeholder={t.capacity} title={t.capacityHint} type="number" min="1" className="w-24 text-sm" />
+                    {/* Blank is a real answer — "not stated" — and the bot says so rather than
+                        ruling the unit in or out on a number nobody gave it. */}
+                    {overnight && (
+                      <input
+                        value={editState.maxGuests}
+                        onChange={(e) => setEditState((p) => ({ ...p, maxGuests: e.target.value }))}
+                        placeholder={t.maxGuests}
+                        title={t.maxGuestsHint}
+                        type="number"
+                        min="1"
+                        className="w-28 text-sm"
+                      />
+                    )}
                   </div>
                   {/* The bot reads this out to customers, so it can run to several lines — a
                       single-line input hid everything past the first few words while writing it. */}
@@ -582,6 +601,9 @@ export default function ServicesPage() {
             <input placeholder={t.price} type="number" step="1" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} required className="w-28" />
             <input placeholder={durationLabel} type="number" min="1" value={newDuration} onChange={(e) => setNewDuration(e.target.value)} required className="w-32" />
             <input placeholder={t.capacity} title={t.capacityHint} type="number" min="1" value={newCapacity} onChange={(e) => setNewCapacity(e.target.value)} className="w-28" />
+            {overnight && (
+              <input placeholder={t.maxGuests} title={t.maxGuestsHint} type="number" min="1" value={newMaxGuests} onChange={(e) => setNewMaxGuests(e.target.value)} className="w-32" />
+            )}
           </div>
           <AutoTextarea
             value={newDescription}

@@ -1665,6 +1665,9 @@ const serviceSchema = z.object({
   durationMin: z.number().int().positive(),
   color: z.string().optional(),
   capacity: z.number().int().min(1).max(500).optional(), // >1 = group class; omitted keeps default 1
+  // People the unit sleeps — overnight verticals only, and a different question from capacity above.
+  // Nullable on purpose: clearing it means "not stated", which the bot reports rather than guessing.
+  maxGuests: z.number().int().min(1).max(100).nullable().optional(),
   // WhatsApp fetches these URLs itself, so they must be publicly reachable http(s) links —
   // rejecting anything else here beats the bot silently failing to deliver a photo later.
   // Capped at 10: WhatsApp sends one image per message, and a longer burst reads as spam.

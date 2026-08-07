@@ -290,6 +290,14 @@ model Service {
   // (every existing service). >1 = a group class (yoga/fitness) where the slot holds multiple
   // attendees up to this capacity. Kept as a plain per-service count so the 1:1 path is unchanged.
   capacity        Int             @default(1)
+  // How many PEOPLE the unit sleeps — a different question from capacity above, which is how many
+  // separate bookings share one slot (correctly 1 for a whole rented unit). Overnight verticals
+  // only. Null means the owner hasn't said, and nothing may invent a number in its place.
+  //
+  // Existed only as prose inside description ("מתאים עד 7 אורחים"), which left the model to parse a
+  // sentence, total a party across adults/children/infants, and compare — it offered a family of
+  // six a three-person unit, and before that pushed a family of five into the ten-person one.
+  maxGuests       Int?
   // Optional visual/reference links shown alongside the listing — most useful for verticals like
   // B&B where a "service" is really a rentable unit customers want to see photos of before asking.
   // Plain URLs (an image link, or a page with more photos/details) rather than hosted uploads —

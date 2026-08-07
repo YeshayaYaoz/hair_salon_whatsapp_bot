@@ -92,15 +92,18 @@ export const PRICING_RULE = `מחירים: מסור אך ורק מחירים ש�
  * was factually wrong; the model simply had no instruction to prefer the smaller one, and the
  * result reads to the customer as being upsold ₪900 a night by the business's own bot.
  *
- * Occupancy limits live in each unit's free-text description (Service.capacity is the group-class
- * "bookings per slot" count — for a B&B unit that is correctly 1, and is not the guest limit), so
- * the last line matters: the model must not infer a limit that was never written down.
+ * Stated as "call the tool" rather than "compare the numbers" because the comparing version failed
+ * twice in production. The model has to total a party across adults/children/infants and weigh it
+ * against every unit, and a wrong answer looks completely normal — the unit is real, the price is
+ * right, and nothing downstream can tell it was the wrong unit. find_units_for_guests does the
+ * comparison in code against Service.maxGuests and hands back an ordered answer.
  */
 export const UNIT_FIT_RULE = `התאמת יחידה למספר האורחים:
-• ספור את כל הנפשות שהלקוח מנה, כולל ילדים ותינוקות. הספירה היא פנימית — אל תציג אותה כחשבון ואל תחזור עליה ללקוח.
-• הצע קודם את היחידה הזולה ביותר שמתאימה למספר הזה. יחידה גדולה ויקרה יותר מוצעת רק כתוספת ואחריה, לעולם לא במקומה.
-• אם כמה יחידות מתאימות — הצג אותן מהזולה ליקרה ותן ללקוח לבחור. אל תבחר עבורו את היקרה.
-• מספר האורחים המרבי מופיע בתיאור היחידה. אם לא כתוב — אל תנחש ואל תסיק ממחיר או מגודל; אמור שבעל העסק יאשר את ההתאמה.`;
+• ברגע שידוע לך כמה אנשים מגיעים — קרא ל-find_units_for_guests עם המספר הכולל, כולל ילדים ותינוקות, לפני שאתה נוקב בשם יחידה או במחיר. אל תחליט בעצמך איזו יחידה מתאימה ואל תסיק זאת מהתיאורים.
+• הספירה עצמה פנימית: אל תציג אותה כחשבון ואל תחזור עליה ללקוח.
+• הצע את recommended שחזר מהכלי. מה שב-alsoFit מוצע רק כאפשרות נוספת אחריו, לעולם לא במקומו. מה שב-tooSmall לא מוצע בכלל, גם אם הלקוח שאל עליו בשמו — אמור בפשטות שהיחידה קטנה מדי למספר האורחים שלכם.
+• יחידה שמופיעה ב-capacityUnknown לא נפסלת ולא מאושרת: אמור שההתאמה שלה תיבדק מול בעל העסק. אל תנחש את הקיבולת שלה ממחיר, מגודל או מניסוח התיאור.
+• אם לא נשאלת ועדיין לא ידוע כמה אנשים מגיעים — שאל, בשאלה קצרה אחת.`;
 
 /** Photos are delivered as real WhatsApp images by the webhook; URLs must never reach the text. */
 export const PHOTOS_RULE = `כשלקוח מבקש לראות תמונות — קרא ל-send_photos עם שם השירות, והן יישלחו כתמונות אמיתיות. אל תדביק כתובות של תמונות בטקסט. אם לשירות יש "מידע נוסף" — שלח את הקישור הזה כשרלוונטי.`;
