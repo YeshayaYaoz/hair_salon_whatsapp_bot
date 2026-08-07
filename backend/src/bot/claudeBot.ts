@@ -226,6 +226,9 @@ export interface BotResult {
   /** True when this reply opened the conversation — nothing had been said before it. Lets the
    * webhook dress the first message up (greeting button) without guessing. */
   isFirstReply?: boolean;
+  /** The owner's greeting, to send as its own message before `text`. Set only when this opens a
+   * conversation and the greeting has no unfilled [placeholders] — see handleIncomingMessage. */
+  greetingText?: string;
 }
 
 /**
@@ -959,13 +962,31 @@ export function opensNewConversation(history: Turn[], now: Date = new Date()): b
 }
 
 export async function handleIncomingMessage(businessId: string, customerPhone: string, messageText: string): Promise<BotResult> {
-  const system = await buildSystemPrompt(businessId, customerPhone);
   const history = await getHistory(businessId, customerPhone);
   // Read this now, not at the return. conversationStore caches turns and hands back the array
   // itself, and appendTurn below pushes into that same array — so by the end of this function
   // `history` always holds the two turns we just wrote, and `length === 0` is never true. The
   // greeting button and quick replies are gated on this flag, which is why neither ever appeared.
   const isFirstReply = opensNewConversation(history);
+
+  /**
+   * The owner's greeting, sent verbatim as its own message ahead of the reply.
+   *
+   * Folded into the reply it was paraphrased, shortened, or dropped entirely once the model had an
+   * actual question to answer — a new customer asking about prices got straight pricing and never
+   * saw the welcome the owner wrote. As a separate message it goes out exactly as written.
+   *
+   * Not sent when it still contains a [placeholder]: those are instructions to the model to fill in
+   * ("[פירוט של כל הצימרים]"), and sending the text raw would put the brackets in front of a real
+   * customer. Those greetings keep the old behaviour, where the model composes them into the reply.
+   */
+  const greetingRow = isFirstReply
+    ? await prisma.business.findUnique({ where: { id: businessId }, select: { botGreeting: true } })
+    : null;
+  const rawGreeting = greetingRow?.botGreeting?.trim();
+  const greetingText = rawGreeting && !/\[[^\]]+\]/.test(rawGreeting) ? rawGreeting : undefined;
+
+  const system = await buildSystemPrompt(businessId, customerPhone, Boolean(greetingText));
 
   // "inquiry" businesses (e.g. B&B) have no live booking engine — the bot answers info and hands
   // booking intent to the owner, so it gets a reduced tool set with no slot/booking tools.
@@ -1156,5 +1177,6 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     offeredSlots: lastOfferedSlots.value,
     photos: lastPhotos.value,
     isFirstReply,
+    greetingText,
   };
 }

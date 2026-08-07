@@ -39,7 +39,13 @@ function formatDateRange(start: Date, end: Date): string {
   return fmt(start) === fmt(end) ? fmt(start) : `${fmt(start)} עד ${fmt(end)}`;
 }
 
-export async function buildSystemPrompt(businessId: string, customerPhone?: string): Promise<SystemPrompt> {
+export async function buildSystemPrompt(
+  businessId: string,
+  customerPhone?: string,
+  /** True when the owner's greeting is going out as its own message just before this reply, so the
+   *  model must not open with one of its own — see BotResult.greetingText. */
+  greetingSentSeparately = false
+): Promise<SystemPrompt> {
   const [business, customer] = await Promise.all([
     prisma.business.findUniqueOrThrow({
       where: { id: businessId },
@@ -110,9 +116,13 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
   // "[כתובת האתר]" — expecting them to be substituted. They can't be substituted deterministically
   // (each owner invents their own wording), so PLACEHOLDER_RULE explains what they mean and, more
   // importantly, what to do when there is nothing to fill one in with.
-  const greeting = business.botGreeting
-    ? `\nברכה ראשונה (השתמש בה בפתיחת שיחה חדשה):\n${business.botGreeting}\n${PLACEHOLDER_RULE}\n`
-    : "";
+  const greeting = greetingSentSeparately
+    // Already sent verbatim as its own message. Leaving the text in would get it half-repeated at
+    // the top of this reply, and the customer would read the same welcome twice in a row.
+    ? "\nהודעת פתיחה כבר נשלחה ללקוח בהודעה נפרדת, רגע לפני זו. אל תברך, אל תציג את העסק ואל תפתח ב\"שלום\" או ב\"ברוכים הבאים\" — ענה ישירות ולעניין להודעה שהלקוח כתב.\n"
+    : business.botGreeting
+      ? `\nברכה ראשונה (השתמש בה בפתיחת שיחה חדשה):\n${business.botGreeting}\n${PLACEHOLDER_RULE}\n`
+      : "";
 
   let crmNote = "";
   if (customer?.appointments.length) {
