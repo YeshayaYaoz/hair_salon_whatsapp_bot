@@ -36,7 +36,7 @@ const VOCAB_OVERRIDES: Record<string, Record<Lang, [string, string][]>> = {
       // appears next to "תור" in the base dict here.
       ["תור חדש", "הזמנה חדשה"],
       ["תור רגיל", "הזמנה רגילה"],
-      // "שירות" (service) → "יחידה" (unit) — a B&B's "service" is a rentable cabin/unit, not a
+      // "שירות" (service) → "יחידה" (unit) — a B&B's "service" is a rentable suite/unit, not a
       // treatment. Plural and phrase-level entries first, same reasoning as the תור/הזמנה block.
       ["השירותים הכי מבוקשים", "היחידות הכי מבוקשות"],
       ["הוסיפו שירותים", "הוסיפו יחידות"],

@@ -182,6 +182,32 @@ const requestBookingCallbackTool: GenericTool = {
   },
 };
 
+/**
+ * Picks the units that hold a given party, in code.
+ *
+ * Two separate conversations went wrong on this: a family of five was steered to the ten-guest unit
+ * at ₪3,000 while the seven-guest one at ₪2,100 went unmentioned, and a party of six was offered a
+ * unit that sleeps three. The instruction to prefer the cheapest unit that fits was already in the
+ * prompt both times. It kept failing because it asked the model to do arithmetic on numbers it had
+ * to first extract from prose, and a wrong answer there is invisible — every unit named is real and
+ * the price quoted is correct, so nothing downstream can catch it.
+ *
+ * So the model reports the headcount and the comparison happens here. It still writes the reply;
+ * it just no longer decides what fits.
+ */
+const unitsForGuestsTool: GenericTool = {
+  name: "find_units_for_guests",
+  description:
+    "Given how many people are coming, returns the units that can hold them, cheapest first. Call this before naming or pricing any unit once you know the party size — do not work out which unit fits on your own. Count every person including children and infants.",
+  input_schema: {
+    type: "object",
+    properties: {
+      guestCount: { type: "number", description: "Total people, including children and babies." },
+    },
+    required: ["guestCount"],
+  },
+};
+
 // Inquiry mode exposes only info + handoff tools — no check_availability/book_appointment/etc.,
 // since there is no live booking engine for these verticals.
 const inquiryTools: GenericTool[] = [
@@ -200,6 +226,9 @@ export interface BotResult {
   /** True when this reply opened the conversation — nothing had been said before it. Lets the
    * webhook dress the first message up (greeting button) without guessing. */
   isFirstReply?: boolean;
+  /** The owner's greeting, to send as its own message before `text`. Set only when this opens a
+   * conversation and the greeting has no unfilled [placeholders] — see handleIncomingMessage. */
+  greetingText?: string;
 }
 
 /**
@@ -705,6 +734,39 @@ export async function runTool(
     return JSON.stringify({ addedToWaitlist: true, service: service.name });
   }
 
+  if (name === "find_units_for_guests") {
+    const guests = Math.round(Number(input.guestCount));
+    if (!Number.isFinite(guests) || guests < 1) {
+      return JSON.stringify({ error: "guestCount must be a positive number of people." });
+    }
+    const units = await prisma.service.findMany({
+      where: { businessId },
+      orderBy: { priceCents: "asc" },
+      select: { name: true, priceCents: true, maxGuests: true },
+    });
+    const priced = (u: { name: string; priceCents: number }) => ({ name: u.name, priceIls: u.priceCents / 100 });
+
+    const fits = units.filter((u) => u.maxGuests != null && u.maxGuests >= guests);
+    const tooSmall = units.filter((u) => u.maxGuests != null && u.maxGuests < guests);
+    // A unit with no occupancy set is genuinely unknown, not "unlimited" and not "excluded" —
+    // reported separately so the reply can defer to the owner instead of silently ruling it out.
+    const unknown = units.filter((u) => u.maxGuests == null);
+
+    return JSON.stringify({
+      guestCount: guests,
+      // Already sorted by price, so the head is the cheapest that fits — the thing to offer first.
+      recommended: fits[0] ? priced(fits[0]) : null,
+      alsoFit: fits.slice(1).map(priced),
+      tooSmall: tooSmall.map((u) => u.name),
+      capacityUnknown: unknown.map((u) => u.name),
+      note: fits.length === 0
+        ? (unknown.length > 0
+          ? "No unit with a stated capacity fits this party. Do NOT rule out the units under capacityUnknown — say their suitability has to be confirmed with the owner."
+          : "No unit fits this party. Say so plainly and offer to pass the request to the owner.")
+        : "Offer `recommended` first. Mention `alsoFit` only as further options, never instead of it. Never offer anything from `tooSmall`.",
+    });
+  }
+
   if (name === "save_customer_name") {
     const given = (input.customerName as string | undefined)?.trim();
     if (!given) return JSON.stringify({ error: "No name was provided — do not call this without one." });
@@ -900,7 +962,6 @@ export function opensNewConversation(history: Turn[], now: Date = new Date()): b
 }
 
 export async function handleIncomingMessage(businessId: string, customerPhone: string, messageText: string): Promise<BotResult> {
-  const system = await buildSystemPrompt(businessId, customerPhone);
   const history = await getHistory(businessId, customerPhone);
   // Read this now, not at the return. conversationStore caches turns and hands back the array
   // itself, and appendTurn below pushes into that same array — so by the end of this function
@@ -908,13 +969,35 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   // greeting button and quick replies are gated on this flag, which is why neither ever appeared.
   const isFirstReply = opensNewConversation(history);
 
+  /**
+   * The owner's greeting, sent verbatim as its own message ahead of the reply.
+   *
+   * Folded into the reply it was paraphrased, shortened, or dropped entirely once the model had an
+   * actual question to answer — a new customer asking about prices got straight pricing and never
+   * saw the welcome the owner wrote. As a separate message it goes out exactly as written.
+   *
+   * Not sent when it still contains a [placeholder]: those are instructions to the model to fill in
+   * ("[פירוט של כל הצימרים]"), and sending the text raw would put the brackets in front of a real
+   * customer. Those greetings keep the old behaviour, where the model composes them into the reply.
+   */
+  const greetingRow = isFirstReply
+    ? await prisma.business.findUnique({ where: { id: businessId }, select: { botGreeting: true } })
+    : null;
+  const rawGreeting = greetingRow?.botGreeting?.trim();
+  const greetingText = rawGreeting && !/\[[^\]]+\]/.test(rawGreeting) ? rawGreeting : undefined;
+
+  const system = await buildSystemPrompt(businessId, customerPhone, Boolean(greetingText));
+
   // "inquiry" businesses (e.g. B&B) have no live booking engine — the bot answers info and hands
   // booking intent to the owner, so it gets a reduced tool set with no slot/booking tools.
   const biz = await prisma.business.findUniqueOrThrow({
     where: { id: businessId },
-    select: { bookingModel: true, aiProvider: true, aiModel: true, timezone: true, aiTemperature: true },
+    select: { bookingModel: true, businessType: true, aiProvider: true, aiModel: true, timezone: true, aiTemperature: true },
   });
-  const activeTools = biz.bookingModel === "inquiry" ? inquiryTools : tools;
+  const baseTools = biz.bookingModel === "inquiry" ? inquiryTools : tools;
+  // Only where a "service" is something people sleep in. A salon has no party size to fit, and the
+  // tool would be one more thing to weigh on every call for no benefit.
+  const activeTools = biz.businessType === "bnb" ? [...baseTools, unitsForGuestsTool] : baseTools;
 
   const turns: GenericTurn[] = [
     ...history.map((t: Turn) => ({ role: t.role, text: stampIfStale(t, biz.timezone) }) as GenericTurn),
@@ -1094,5 +1177,6 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     offeredSlots: lastOfferedSlots.value,
     photos: lastPhotos.value,
     isFirstReply,
+    greetingText,
   };
 }

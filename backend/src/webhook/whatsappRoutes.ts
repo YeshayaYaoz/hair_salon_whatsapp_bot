@@ -343,7 +343,7 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
     // canned replies and interactive UI pieces.
     const lang: "he" | "en" = detectLang(textToProcess);
 
-    const { text: reply, offeredSlots, photos, isFirstReply } = await handleIncomingMessage(business.id, customerPhone, textToProcess);
+    const { text: reply, offeredSlots, photos, isFirstReply, greetingText } = await handleIncomingMessage(business.id, customerPhone, textToProcess);
 
     // A greeting with a button turns the first thing a customer sees into something they can act
     // on, instead of a wall of text with a URL they have to notice, select and paste. Only on the
@@ -352,10 +352,39 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
       isFirstReply && business.greetingButtonText && business.greetingButtonUrl
         ? { text: business.greetingButtonText, url: business.greetingButtonUrl }
         : null;
-    // WhatsApp allows one interactive type per message, so these two can't both be attached.
-    // Quick replies win: keeping the customer answering inside the chat is worth more than sending
-    // them to a website, and the website link is usually also in the greeting text.
     const quickReplies = isFirstReply && business.quickReplies.length > 0 ? business.quickReplies : null;
+
+    /**
+     * A new customer gets the owner's welcome as its own message, then the answer to what they
+     * actually asked.
+     *
+     * Folded into one reply the welcome was paraphrased, trimmed or dropped outright the moment the
+     * model had a real question in front of it — someone opening with "how much for the weekend?"
+     * got straight pricing and never saw it. Sent separately it goes out exactly as written.
+     *
+     * It also ends the fight over the one interactive slot. WhatsApp allows a single button type
+     * per message, so the link button and the quick replies could never both be attached, and the
+     * link button silently lost every time. Across two messages each takes one: the link sits under
+     * the greeting, where the owner put it, and the quick replies sit under the answer, which is
+     * where there is something to reply to.
+     */
+    if (greetingText) {
+      try {
+        if (greetingButton) {
+          await sendWhatsAppCtaUrl({
+            phoneNumberId, accessToken, to: customerPhone,
+            body: greetingText, buttonText: greetingButton.text, url: greetingButton.url,
+          });
+        } else {
+          await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: greetingText });
+        }
+      } catch (greetErr) {
+        // The answer below matters more than the welcome — losing the greeting is a worse first
+        // impression, but losing the reply is a broken bot.
+        console.error("[whatsapp] Greeting message failed, continuing with the reply:", greetErr);
+        captureError(greetErr, { businessId: business.id, customerPhone, kind: "greetingMessage" });
+      }
+    }
 
     if (offeredSlots && offeredSlots.length > 0) {
       await sendWhatsAppList({
@@ -375,7 +404,7 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
         captureError(btnErr, { businessId: business.id, customerPhone, kind: "quickReplies" });
         await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: reply });
       }
-    } else if (greetingButton) {
+    } else if (greetingButton && !greetingText) {
       try {
         await sendWhatsAppCtaUrl({
           phoneNumberId,

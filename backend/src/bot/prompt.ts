@@ -39,7 +39,13 @@ function formatDateRange(start: Date, end: Date): string {
   return fmt(start) === fmt(end) ? fmt(start) : `${fmt(start)} עד ${fmt(end)}`;
 }
 
-export async function buildSystemPrompt(businessId: string, customerPhone?: string): Promise<SystemPrompt> {
+export async function buildSystemPrompt(
+  businessId: string,
+  customerPhone?: string,
+  /** True when the owner's greeting is going out as its own message just before this reply, so the
+   *  model must not open with one of its own — see BotResult.greetingText. */
+  greetingSentSeparately = false
+): Promise<SystemPrompt> {
   const [business, customer] = await Promise.all([
     prisma.business.findUniqueOrThrow({
       where: { id: businessId },
@@ -76,7 +82,11 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
       const extras = [s.description, s.imageUrls.length ? `יש ${s.imageUrls.length} תמונות` : null, s.linkUrl ? `מידע נוסף: ${s.linkUrl}` : null]
         .filter(Boolean)
         .join(" — ");
-      return `• ${s.name}: ₪${(s.priceCents / 100).toFixed(0)} (${formatDuration(s.durationMin, isOvernight)})${extras ? ` — ${extras}` : ""}`;
+      // Occupancy printed as its own labelled field rather than left inside the prose. Buried in a
+      // description it was one clause among several and got read past: a party of six was offered a
+      // three-person unit. Only for overnight verticals, where a "service" is a unit people sleep in.
+      const guests = isOvernight && s.maxGuests ? ` [עד ${s.maxGuests} אורחים]` : "";
+      return `• ${s.name}: ₪${(s.priceCents / 100).toFixed(0)} (${formatDuration(s.durationMin, isOvernight)})${guests}${extras ? ` — ${extras}` : ""}`;
     })
     .join("\n") || "לא הוגדרו שירותים עדיין.";
 
@@ -106,9 +116,13 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
   // "[כתובת האתר]" — expecting them to be substituted. They can't be substituted deterministically
   // (each owner invents their own wording), so PLACEHOLDER_RULE explains what they mean and, more
   // importantly, what to do when there is nothing to fill one in with.
-  const greeting = business.botGreeting
-    ? `\nברכה ראשונה (השתמש בה בפתיחת שיחה חדשה):\n${business.botGreeting}\n${PLACEHOLDER_RULE}\n`
-    : "";
+  const greeting = greetingSentSeparately
+    // Already sent verbatim as its own message. Leaving the text in would get it half-repeated at
+    // the top of this reply, and the customer would read the same welcome twice in a row.
+    ? "\nהודעת פתיחה כבר נשלחה ללקוח בהודעה נפרדת, רגע לפני זו. אל תברך, אל תציג את העסק ואל תפתח ב\"שלום\" או ב\"ברוכים הבאים\" — ענה ישירות ולעניין להודעה שהלקוח כתב.\n"
+    : business.botGreeting
+      ? `\nברכה ראשונה (השתמש בה בפתיחת שיחה חדשה):\n${business.botGreeting}\n${PLACEHOLDER_RULE}\n`
+      : "";
 
   let crmNote = "";
   if (customer?.appointments.length) {
@@ -187,7 +201,10 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
   const vocabNote = isBusinessType(business.businessType)
     ? (() => {
         const v = TEMPLATES[business.businessType as keyof typeof TEMPLATES].vocabulary;
-        return `\nמינוח לעסק זה: פנה אל מי שמזמין כ"${v.customer}" (רבים: "${v.customerPlural}"), התייחס לאיש/אשת הצוות כ"${v.staff}", ולשירות/פעולה כ"${v.service}". השתמש במונחים האלה באופן טבעי.\n`;
+        // The English line matters as much as the Hebrew one: a reply to an English-speaking
+        // customer is composed in English from scratch, so the Hebrew terms above never reach it and
+        // the model translates on its own. A B&B's "צימר" went out to guests as "cabin".
+        return `\nמינוח לעסק זה: פנה אל מי שמזמין כ"${v.customer}" (רבים: "${v.customerPlural}"), התייחס לאיש/אשת הצוות כ"${v.staff}", ולשירות/פעולה כ"${v.service}". השתמש במונחים האלה באופן טבעי.\nכשאתה עונה באנגלית, אלה המילים המקבילות — ורק הן: "${v.customerEn}" (רבים: "${v.customerPluralEn}"), "${v.staffEn}", "${v.serviceEn}". אל תתרגם את המונחים בעצמך ואל תבחר מילה נרדפת.\n`;
       })()
     : "";
 

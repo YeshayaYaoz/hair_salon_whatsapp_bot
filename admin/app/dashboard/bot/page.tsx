@@ -291,6 +291,18 @@ function VoicePhoneSection() {
   );
 }
 
+type BotTab = "personality" | "ai" | "policy" | "automated" | "voice";
+
+/** Order is the order an owner sets things up in: how it talks, what runs it, what it may say,
+ *  what it sends unprompted, and finally the phone line most salons never turn on. */
+const TABS: { key: BotTab; he: string; en: string }[] = [
+  { key: "personality", he: "אישיות ופתיחה", en: "Personality" },
+  { key: "ai", he: "מנוע AI", en: "AI engine" },
+  { key: "policy", he: "מדיניות", en: "Policy" },
+  { key: "automated", he: "הודעות אוטומטיות", en: "Automated" },
+  { key: "voice", he: "בוט טלפוני", en: "Voice bot" },
+];
+
 export default function BotPage() {
   const { t, lang } = useLanguage();
   const he = lang === "he";
@@ -311,6 +323,7 @@ export default function BotPage() {
   const [aiProviders, setAiProviders] = useState<AiProviderMeta[] | null>(null);
   const [tempMeta, setTempMeta] = useState<{ default: number; min: number; max: number }>({ default: 0.2, min: 0, max: 1 });
   const [tempIgnoredBy, setTempIgnoredBy] = useState<string[]>([]);
+  const [tab, setTab] = useState<BotTab>("personality");
 
   useEffect(() => {
     apiFetch<BotProfile & { bookingModel?: string; botEnabled?: boolean }>("/api/business/me").then((me) => {
@@ -431,7 +444,35 @@ export default function BotPage() {
         </button>
       </div>
 
-      <form onSubmit={save}>
+      {/* Five settings groups stacked in one column meant the page opened on a wall of inputs and
+          the thing you came to change was somewhere below the fold. They are unrelated to each
+          other — how the bot writes, which model runs it, the policy texts, the automated sends,
+          the phone line — so showing one at a time costs nothing and makes the choice the first
+          thing on the page. Field state lives in `fields` above, so switching keeps unsaved edits
+          and Save still writes every group at once. */}
+      <nav aria-label={t.sectionTabsLabel} className="mb-5 -mx-4 px-4 md:mx-0 md:px-0 overflow-x-auto">
+        <div className="inline-flex gap-1 p-1 rounded-xl" style={{ background: "#EAEFF3" }}>
+          {TABS.map((tb) => (
+            <button
+              key={tb.key}
+              type="button"
+              onClick={() => setTab(tb.key)}
+              aria-current={tab === tb.key ? "true" : undefined}
+              className="whitespace-nowrap px-3.5 py-2 rounded-lg text-[13px] font-semibold transition"
+              style={
+                tab === tb.key
+                  ? { background: "#FFFFFF", color: "#136B87", boxShadow: "0 1px 2px rgba(15,29,42,0.10)" }
+                  : { color: "#4B5563" }
+              }
+            >
+              {he ? tb.he : tb.en}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      <form onSubmit={save} hidden={tab === "voice"}>
+        {tab === "personality" && (
         <Section title={t.botPersonalityTitle} description={t.botPersonalityDesc}>
           <Field label={t.greeting} hint={t.greetingHint}>
             <textarea
@@ -472,6 +513,16 @@ export default function BotPage() {
               <p className="text-xs font-semibold text-gray-800">{t.greetingButtonTitle}</p>
               <p className="text-xs text-gray-600 mt-1">{t.greetingButtonHint}</p>
             </div>
+            {/* WhatsApp allows one interactive attachment per message, and the webhook prefers quick
+                replies — so with any configured, this button is filled in, saved, and then never
+                sent. Silent from the owner's side, which is exactly why it is said here. */}
+            {(fields.quickReplies?.length ?? 0) > 0 && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2.5">
+                {he
+                  ? "הכפתור הזה לא יישלח כרגע: וואטסאפ מאפשר סוג כפתורים אחד בלבד בכל הודעה, ולכפתורי התשובה המהירה שלמעלה יש עדיפות. כדי להשתמש בכפתור הקישור — מחקו את כפתורי התשובה המהירה. אפשר להשאיר את הקישור עצמו בטקסט הברכה."
+                  : "This button won't be sent right now: WhatsApp allows only one kind of button per message, and the quick replies above take precedence. To use the link button, remove the quick replies. The link itself can stay in the greeting text."}
+              </div>
+            )}
             <div className="grid sm:grid-cols-2 gap-3">
               <Field label={t.greetingButtonLabel}>
                 <input
@@ -505,6 +556,9 @@ export default function BotPage() {
           </Field>
         </Section>
 
+        )}
+
+        {tab === "ai" && (
         <Section
           title={he ? "מנוע ה-AI" : "AI engine"}
           description={he ? "איזה מודל שפה עונה ללקוחות שלכם בוואטסאפ" : "Which language model answers your customers on WhatsApp"}
@@ -568,6 +622,9 @@ export default function BotPage() {
           />
         </Section>
 
+        )}
+
+        {tab === "policy" && (
         <Section
           title={he ? "מדיניות ותמריצים" : "Policy & incentives"}
           description={he ? "טקסטים שהבוט משתמש בהם בשיחות עם לקוחות" : "Text the bot uses in customer conversations"}
@@ -651,6 +708,9 @@ export default function BotPage() {
           )}
         </Section>
 
+        )}
+
+        {tab === "automated" && (
         <Section title={t.automatedMessages} description={t.automatedMessagesDesc}>
           <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2.5">
             {t.templateWarning}
@@ -669,6 +729,8 @@ export default function BotPage() {
           </label>
         </Section>
 
+        )}
+
         <div className="flex items-center gap-3 mt-2">
           <button
             type="submit"
@@ -682,7 +744,7 @@ export default function BotPage() {
         </div>
       </form>
 
-      <VoicePhoneSection />
+      {tab === "voice" && <VoicePhoneSection />}
     </div>
   );
 }

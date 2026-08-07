@@ -31,6 +31,39 @@ describe("normalizeOwnerPhone", () => {
     expect(normalizeOwnerPhone("05012345")).toBeNull(); // truncated
   });
 
+  /**
+   * The country used to be guessed from the digits, which got two entries wrong. The dropdown
+   * beside the field now says which country it is, and these pin what that changed.
+   */
+  describe("with a country chosen in the dashboard", () => {
+    it("qualifies a bare national number that would otherwise be stored undeliverable", () => {
+      // No trunk zero and no country code: this used to pass validation on length alone and save
+      // as "555077941", a number that can never be delivered to.
+      expect(normalizeOwnerPhone("555077941")).toBe("972555077941");
+      expect(normalizeOwnerPhone("7700900123", "44")).toBe("447700900123");
+    });
+
+    it("stops forcing 972 onto a foreign number written with its own trunk zero", () => {
+      // "07700 900123" is how a UK owner writes their own line; the old rule read that 0 as Israeli.
+      expect(normalizeOwnerPhone("07700 900123", "44")).toBe("447700900123");
+      expect(normalizeOwnerPhone("0501234567", "972")).toBe("972501234567");
+    });
+
+    it("does not double the country code on a number that already carries it", () => {
+      expect(normalizeOwnerPhone("972501234567", "972")).toBe("972501234567");
+      expect(normalizeOwnerPhone("447700900123", "44")).toBe("447700900123");
+    });
+
+    it("lets an explicit + override the dropdown", () => {
+      // Someone who typed the country themselves meant it, whatever the select happens to show.
+      expect(normalizeOwnerPhone("+44 7700 900123", "972")).toBe("447700900123");
+    });
+
+    it("still defaults to Israel when no country is passed", () => {
+      expect(normalizeOwnerPhone("0501234567")).toBe("972501234567");
+    });
+  });
+
   it("accepts a foreign number rather than assuming everyone is in Israel", () => {
     // An owner may legitimately take alerts on a number abroad; rejecting it would be worse than
     // accepting an unusual one, since the send itself is what proves reachability either way.

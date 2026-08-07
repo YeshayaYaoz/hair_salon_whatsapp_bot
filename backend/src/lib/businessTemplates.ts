@@ -38,6 +38,14 @@ export interface Vocabulary {
   customerPlural: string;
   staff: string; // e.g. "מטפל" / "רופא"
   service: string; // e.g. "טיפול" / "בדיקה"
+  // The same words for a customer writing in English. Without these the model picks its own
+  // translation each time, and picked badly: a B&B's "צימר" went out to guests as "cabin", which
+  // reads as a wooden hut in a forest rather than the suite it is. The Hebrew terms above never
+  // constrained the English reply, because the reply is composed in English from scratch.
+  customerEn: string;
+  customerPluralEn: string;
+  staffEn: string;
+  serviceEn: string;
 }
 
 /** Field presets applied when a category is chosen. Strings only overwrite empty fields; the
@@ -117,7 +125,7 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
       { dayOfWeek: 4, openMin: 540, closeMin: 1140 },
       { dayOfWeek: 5, openMin: 540, closeMin: 840 },
     ],
-    vocabulary: { customer: "לקוח", customerPlural: "לקוחות", staff: "ספר", service: "טיפול" },
+    vocabulary: { customer: "לקוח", customerPlural: "לקוחות", staff: "ספר", service: "טיפול", customerEn: "client", customerPluralEn: "clients", staffEn: "stylist", serviceEn: "treatment" },
   },
 
   barber: {
@@ -154,7 +162,7 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
       { dayOfWeek: 4, openMin: 540, closeMin: 1200 },
       { dayOfWeek: 5, openMin: 540, closeMin: 840 },
     ],
-    vocabulary: { customer: "לקוח", customerPlural: "לקוחות", staff: "ברבר", service: "תספורת" },
+    vocabulary: { customer: "לקוח", customerPlural: "לקוחות", staff: "ברבר", service: "תספורת", customerEn: "client", customerPluralEn: "clients", staffEn: "barber", serviceEn: "haircut" },
   },
 
   clinic: {
@@ -192,7 +200,7 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
       { dayOfWeek: 3, openMin: 480, closeMin: 1020 },
       { dayOfWeek: 4, openMin: 480, closeMin: 1020 },
     ],
-    vocabulary: { customer: "מטופל", customerPlural: "מטופלים", staff: "רופא", service: "בדיקה" },
+    vocabulary: { customer: "מטופל", customerPlural: "מטופלים", staff: "רופא", service: "בדיקה", customerEn: "patient", customerPluralEn: "patients", staffEn: "doctor", serviceEn: "appointment" },
   },
 
   aesthetics: {
@@ -229,7 +237,7 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
       { dayOfWeek: 4, openMin: 600, closeMin: 1140 },
       { dayOfWeek: 5, openMin: 540, closeMin: 780 },
     ],
-    vocabulary: { customer: "לקוחה", customerPlural: "לקוחות", staff: "קוסמטיקאית", service: "טיפול" },
+    vocabulary: { customer: "לקוחה", customerPlural: "לקוחות", staff: "קוסמטיקאית", service: "טיפול", customerEn: "client", customerPluralEn: "clients", staffEn: "beautician", serviceEn: "treatment" },
   },
 
   bnb: {
@@ -260,7 +268,7 @@ export const TEMPLATES: Record<BusinessType, BusinessTemplate> = {
     ],
     // Inquiry mode — the bot never books a slot, so there are no hours to constrain.
     seedHours: [],
-    vocabulary: { customer: "אורח", customerPlural: "אורחים", staff: "המארח", service: "יחידת אירוח" },
+    vocabulary: { customer: "אורח", customerPlural: "אורחים", staff: "המארח", service: "יחידת אירוח", customerEn: "guest", customerPluralEn: "guests", staffEn: "the host", serviceEn: "suite" },
   },
 };
 

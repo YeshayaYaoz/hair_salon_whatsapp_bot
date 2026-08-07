@@ -7,6 +7,7 @@ import { SkeletonBlock, SkeletonRow } from "../../lib/Skeleton";
 import { EmptyState } from "../../lib/EmptyState";
 import { formatPhone } from "../../lib/formatPhone";
 import { useDialog } from "../../lib/useDialog";
+import { DIAL_CODES, dialCodeOf, localPartOf } from "../../lib/dialCodes";
 
 interface Customer {
   id: string;
@@ -57,9 +58,11 @@ interface Message {
 }
 
 function ConversationPanel({
-  customer, onClose, onNotesSaved, onPausedChanged,
+  customer, onClose, onNotesSaved, onPausedChanged, onDetailsSaved,
 }: {
-  customer: Customer; onClose: () => void; onNotesSaved: (notes: string) => void; onPausedChanged: (paused: boolean) => void;
+  customer: Customer; onClose: () => void; onNotesSaved: (notes: string) => void;
+  onPausedChanged: (paused: boolean) => void;
+  onDetailsSaved: (details: { name: string | null; phone: string }) => void;
 }) {
   const { t, lang } = useLanguage();
   const he = lang === "he";
@@ -77,6 +80,37 @@ function ConversationPanel({
   const [togglingPause, setTogglingPause] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetDone, setResetDone] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editName, setEditName] = useState(customer.name ?? "");
+  const [editPhone, setEditPhone] = useState(localPartOf(customer.phone));
+  const [editDial, setEditDial] = useState(dialCodeOf(customer.phone));
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  /**
+   * Corrects the name or the number.
+   *
+   * The name is whatever the customer happened to tell the bot — often a first name, a nickname, or
+   * nothing — and it is what the owner reads in every list and alert. The phone is the identity, so
+   * the server refuses a number already used by another customer and carries the transcript across
+   * when it changes; nothing here should attempt either locally.
+   */
+  async function saveEdit() {
+    setSavingEdit(true);
+    setEditError(null);
+    try {
+      const updated = await apiFetch<{ name: string | null; phone: string }>(
+        `/api/business/customers/${customer.id}`,
+        { method: "PATCH", body: JSON.stringify({ name: editName, phone: editPhone, dialCode: editDial }) }
+      );
+      onDetailsSaved(updated);
+      setEditOpen(false);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : (he ? "השמירה נכשלה" : "Couldn't save"));
+    } finally {
+      setSavingEdit(false);
+    }
+  }
 
   /** Makes the bot treat the next incoming message as the start of a new conversation. The
    * transcript below is untouched — that's the whole point of it being separate from deleting. */
@@ -204,7 +238,17 @@ function ConversationPanel({
             </div>
             <div className="min-w-0">
               <div className="text-sm font-semibold text-gray-900 truncate">{customer.name?.trim() || formatPhone(customer.phone)}</div>
-              <div className="text-xs text-gray-600 font-mono" dir="ltr">{formatPhone(customer.phone)}</div>
+              <button
+                onClick={() => { setEditOpen((v) => !v); setEditError(null); }}
+                className="text-xs text-gray-600 font-mono hover:text-[#145F78] transition flex items-center gap-1"
+                dir="ltr"
+                title={he ? "עריכת פרטי הלקוח" : "Edit customer details"}
+              >
+                <span>{formatPhone(customer.phone)}</span>
+                <svg className="w-3 h-3 shrink-0 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </button>
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -233,6 +277,42 @@ function ConversationPanel({
             </button>
           </div>
         </div>
+
+        {editOpen && (
+          <div className="px-5 py-3 border-b border-gray-100 shrink-0 bg-gray-50/70 flex flex-col gap-2">
+            <input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder={he ? "שם הלקוח" : "Customer name"}
+              className="w-full text-sm"
+            />
+            <div className="flex gap-2">
+              <select value={editDial} onChange={(e) => setEditDial(e.target.value)} className="w-32 shrink-0 text-sm" dir="ltr">
+                {DIAL_CODES.map((c) => <option key={c.code} value={c.code}>+{c.code}</option>)}
+              </select>
+              <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} className="w-full text-sm" dir="ltr" />
+            </div>
+            {editError && <p className="text-xs text-red-600">{editError}</p>}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={saveEdit}
+                disabled={savingEdit}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#1B7FA0] text-white hover:bg-[#2A9BBF] disabled:opacity-50"
+              >
+                {savingEdit ? (he ? "שומר…" : "Saving…") : (he ? "שמירה" : "Save")}
+              </button>
+              <button
+                onClick={() => { setEditOpen(false); setEditError(null); setEditName(customer.name ?? ""); setEditPhone(localPartOf(customer.phone)); setEditDial(dialCodeOf(customer.phone)); }}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg text-gray-600 hover:bg-gray-100"
+              >
+                {he ? "ביטול" : "Cancel"}
+              </button>
+              <span className="text-[11px] text-gray-500 ms-auto">
+                {he ? "שינוי מספר מעביר גם את היסטוריית השיחה" : "Changing the number moves the transcript too"}
+              </span>
+            </div>
+          </div>
+        )}
 
         {botPaused && (
           <div className="flex items-center justify-between gap-3 px-5 py-2.5 border-b border-amber-200 shrink-0 bg-amber-50">
@@ -469,6 +549,12 @@ export default function CustomersPage() {
           onPausedChanged={(botPaused) => {
             setCustomers((prev) => prev.map((c) => (c.id === open.id ? { ...c, botPaused } : c)));
             setOpen((prev) => (prev ? { ...prev, botPaused } : prev));
+          }}
+          onDetailsSaved={({ name, phone }) => {
+            // The server normalizes the number, so take what it stored rather than what was typed.
+            const patch = { name: name ?? undefined, phone };
+            setCustomers((prev) => prev.map((c) => (c.id === open.id ? { ...c, ...patch } : c)));
+            setOpen((prev) => (prev ? { ...prev, ...patch } : prev));
           }}
         />
       )}

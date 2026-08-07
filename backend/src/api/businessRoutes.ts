@@ -616,6 +616,9 @@ const profileSchema = z.object({
   address: z.string().optional(),
   timezone: z.string().optional(),
   notificationPhone: z.string().optional(),
+  // Country dialling code chosen beside the number. Consumed when normalizing and then dropped —
+  // see the PUT handler for why it is not a column.
+  notificationPhoneDialCode: z.string().max(6).optional(),
   botGreeting: z.string().optional(),
   // Both or neither: WhatsApp rejects a cta_url message missing either half, and a half-configured
   // button would silently fall back to plain text with no hint as to why.
@@ -691,6 +694,8 @@ businessRouter.put("/me", async (req: AuthedRequest, res) => {
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const data: Record<string, unknown> = { ...parsed.data };
+  // Input, not a column — this object is handed to Prisma as-is, which rejects unknown fields.
+  delete data.notificationPhoneDialCode;
 
   // The notification phone used to be stored exactly as typed, with no validation of any kind —
   // and it is the channel every owner alert and human handoff depends on. Normalizing it means
@@ -703,7 +708,10 @@ businessRouter.put("/me", async (req: AuthedRequest, res) => {
       data.notificationPhone = null;
       data.notificationPhoneVerifiedAt = null;
     } else {
-      const normalized = normalizeOwnerPhone(raw);
+      // Not persisted: the stored number is fully qualified, so the country is already in it and a
+      // second column could only drift out of step with it. The dashboard re-derives the dropdown
+      // from the saved number on load.
+      const normalized = normalizeOwnerPhone(raw, parsed.data.notificationPhoneDialCode);
       if (!normalized) {
         return res.status(400).json({
           error: "מספר הטלפון להתראות לא נראה תקין. הזינו מספר מלא, למשל 0501234567.",
@@ -1709,6 +1717,9 @@ const serviceSchema = z.object({
   durationMin: z.number().int().positive(),
   color: z.string().optional(),
   capacity: z.number().int().min(1).max(500).optional(), // >1 = group class; omitted keeps default 1
+  // People the unit sleeps — overnight verticals only, and a different question from capacity above.
+  // Nullable on purpose: clearing it means "not stated", which the bot reports rather than guessing.
+  maxGuests: z.number().int().min(1).max(100).nullable().optional(),
   // WhatsApp fetches these URLs itself, so they must be publicly reachable http(s) links —
   // rejecting anything else here beats the bot silently failing to deliver a photo later.
   // Capped at 10: WhatsApp sends one image per message, and a longer burst reads as spam.
@@ -2194,6 +2205,74 @@ businessRouter.post("/customers/:id/message", async (req: AuthedRequest, res) =>
   }
 
   res.json({ ok: true, botPaused: true });
+});
+
+/**
+ * Edit a customer's details by hand.
+ *
+ * The name arrives from whatever the customer told the bot, so it is often a first name, a nickname
+ * or nothing at all — and it is what the owner reads in every list and alert. Until now there was no
+ * way to correct it short of the customer restating it in conversation.
+ *
+ * The phone is editable because it is the identity, which is exactly why it is guarded: it is the
+ * key the conversation, the appointments and every future WhatsApp message hang off, and two rows
+ * sharing one number would split a thread in half. Normalized through the same path as the owner's
+ * own number so "050…" and "+972 50…" cannot become two different customers.
+ */
+businessRouter.patch("/customers/:id", async (req: AuthedRequest, res) => {
+  const parsed = z
+    .object({
+      name: z.string().max(120).nullable().optional(),
+      phone: z.string().max(30).optional(),
+      dialCode: z.string().max(6).optional(),
+    })
+    .safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const customer = await prisma.customer.findFirst({ where: { id: req.params.id, businessId: req.businessId! } });
+  if (!customer) return res.status(404).json({ error: "Not found" });
+
+  const data: { name?: string | null; phone?: string } = {};
+
+  if (parsed.data.name !== undefined) {
+    const name = parsed.data.name?.trim();
+    data.name = name ? name : null; // blank clears it back to "no name", rather than storing ""
+  }
+
+  if (parsed.data.phone !== undefined) {
+    const normalized = normalizeOwnerPhone(parsed.data.phone, parsed.data.dialCode);
+    if (!normalized) {
+      return res.status(400).json({ error: "מספר הטלפון לא נראה תקין. הזינו מספר מלא, למשל 0501234567." });
+    }
+    if (normalized !== customer.phone) {
+      const clash = await prisma.customer.findFirst({
+        where: { businessId: req.businessId!, phone: normalized, id: { not: customer.id } },
+        select: { id: true, name: true },
+      });
+      if (clash) {
+        return res.status(409).json({
+          error: `המספר הזה כבר שייך ללקוח אחר${clash.name ? ` (${clash.name})` : ""}. אחדו את הכרטיסים במקום להזין אותו פעמיים.`,
+        });
+      }
+      data.phone = normalized;
+    }
+  }
+
+  const updated = await prisma.customer.update({ where: { id: customer.id }, data });
+
+  // Conversations are keyed by phone rather than by customer id, so a corrected number leaves the
+  // whole transcript behind under the old one — the panel would open empty, and the bot would keep
+  // answering against history it could no longer see. Carry the messages across with the customer.
+  if (data.phone && data.phone !== customer.phone) {
+    await prisma.conversationMessage.updateMany({
+      where: { businessId: req.businessId!, phone: customer.phone },
+      data: { phone: data.phone },
+    });
+    forgetCachedHistory(req.businessId!, customer.phone);
+    forgetCachedHistory(req.businessId!, data.phone);
+  }
+
+  res.json({ id: updated.id, name: updated.name, phone: updated.phone });
 });
 
 businessRouter.patch("/customers/:id/bot-paused", async (req: AuthedRequest, res) => {

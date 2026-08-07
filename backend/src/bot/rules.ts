@@ -32,23 +32,36 @@ export const LANGUAGE_RULES = `עברית: כתוב פשוט, קצר וטבעי 
  * the customer wanted a unit and a price. HONESTY_RULES already asks for one or two sentences,
  * which the model reads as a style preference; this names the specific things to cut.
  *
- * The last bullet is load-bearing. An earlier version of this rule capped the reply at a few lines,
- * and the model started meeting the cap by dropping facts — FAQ answers came back partial. Cutting
- * narration and cutting content look the same from a length target, so the rule has to say which
- * one it means.
+ * The last two bullets are load-bearing, and they say opposite things on purpose.
+ *
+ * An earlier version capped the reply at a few lines, and the model met the cap by dropping facts —
+ * FAQ answers came back partial. Cutting narration and cutting content look identical from a length
+ * target, so the rule names the difference instead of implying it: an answer the owner wrote is
+ * delivered whole, and everything the model generated itself is where the trimming happens.
  */
 export const BREVITY_RULE = `תן את המסקנה, לא את הדרך אליה. החישובים שלך פנימיים — הלקוח רואה רק את התוצאה.
-• אל תציג חשבון ("2 מבוגרים + 5 ילדים — סה״כ 7"), אל תפרט ספירת לילות, ואל תסביר איך הגעת להמלצה.
+• אל תציג חשבון ("2 מבוגרים + 5 ילדים — סה״כ 7"), אל תפרט ספירת לילות, ואל תסביר איך הגעת להמלצה או להצעה.
 • אל תחזור ללקוח על מה שהוא כתב זה עתה "כדי לוודא" — אלא אם יש אי-בהירות אמיתית שמונעת ממך לענות.
 • תנאי מיוחד (מינימום לילות, תאריך חריג) — משפט אחד ענייני, בלי להסיק ממנו מסקנות בקול.
-• זהו כלל ניסוח בלבד, לא כלל תוכן. אסור לקצר על חשבון מידע: כל מה שהלקוח שאל עליו, וכל תשובה מהשאלות הנפוצות, נמסרים במלואם. נסח בקצרה — אל תשמיט.`;
+• תשובה מהשאלות הנפוצות נמסרת במלואה: כל פרט שבעל העסק כתב שם מגיע ללקוח. מותר לנסח אותה במילים שלך ולסדר אותה יפה — אסור לתמצת, לקצר או להשמיט ממנה שום פרט. זו התשובה של העסק, לא שלך.
+• בכל שאר התשובות — ענייני ולעניין: מסור את מה שנשאלת עליו בלי הקדמות, בלי חזרות ובלי פסקאות שאיש לא ביקש.`;
 
-/** Backs up toWhatsAppFormatting(), which already rewrites `**bold**` before anything is sent. */
+/**
+ * Backs up toWhatsAppFormatting(), which already rewrites `**bold**` before anything is sent.
+ *
+ * The emoji bullet is worded around one specific misreading. "אמוג'י אחד" was taken as one emoji per
+ * *message*: a four-unit price list came back with a globe by the website link, a smiley at the
+ * sign-off, and nothing beside any of the four unit names — the one place the rule actually names.
+ * So it now says what "one" is counted per, and keeps the real prohibition (a trail of emoji
+ * through the sentences of a paragraph) separate from it.
+ */
 export const FORMATTING_RULES = `עיצוב ההודעה:
 • וואטסאפ אינו Markdown: להדגשה כוכבית אחת בכל צד — *ככה* — לא שתיים. נטוי הוא _ככה_. אל תשתמש בכותרות Markdown (#).
 • כשאתה מציג כמה שירותים או יחידות — שורה ריקה בין אחד לשני, שם היחידה *מודגש*, והמחיר בסוף השורה הראשונה. אל תדחוס הכול לפסקה אחת ואל תשתמש בנקודה קטנה (·) בתחילת שורה.
 • מספרים גדולים עם פסיק מפריד: 3,000₪ ולא 3000₪.
-• אמוג'י אחד במקום שהוא באמת עוזר — ליד שם יחידה, בברכה, באישור — משפר את הקריאוּת. אל תפזר אמוג'ים בכל משפט.
+• אמוג'י אחד בכל מקום שהוא באמת עוזר — ליד שם יחידה, בברכה, באישור — משפר את הקריאוּת.
+• "אחד" נספר לכל פריט, לא לכל ההודעה: ברשימה של ארבע יחידות יש ארבעה אמוג'ים, אחד ליד כל שם יחידה. אמוג'י בסוף ההודעה אינו מחליף את אלה שליד השמות.
+• מה שאסור הוא שרשרת אמוג'ים בתוך פסקה — אחד בכל משפט. וגם בתשובה קצרה וענייני האמוג'ים האלה נשארים: קיצור נוגע למה שאתה מספר, לא לאופן שבו ההודעה נראית.
 הודעה ארוכה בלי רווחים והדגשות נקראת כמו טופס. תן לה לנשום.`;
 
 /**
@@ -79,15 +92,18 @@ export const PRICING_RULE = `מחירים: מסור אך ורק מחירים ש�
  * was factually wrong; the model simply had no instruction to prefer the smaller one, and the
  * result reads to the customer as being upsold ₪900 a night by the business's own bot.
  *
- * Occupancy limits live in each unit's free-text description (Service.capacity is the group-class
- * "bookings per slot" count — for a B&B unit that is correctly 1, and is not the guest limit), so
- * the last line matters: the model must not infer a limit that was never written down.
+ * Stated as "call the tool" rather than "compare the numbers" because the comparing version failed
+ * twice in production. The model has to total a party across adults/children/infants and weigh it
+ * against every unit, and a wrong answer looks completely normal — the unit is real, the price is
+ * right, and nothing downstream can tell it was the wrong unit. find_units_for_guests does the
+ * comparison in code against Service.maxGuests and hands back an ordered answer.
  */
 export const UNIT_FIT_RULE = `התאמת יחידה למספר האורחים:
-• ספור את כל הנפשות שהלקוח מנה, כולל ילדים ותינוקות. הספירה היא פנימית — אל תציג אותה כחשבון ואל תחזור עליה ללקוח.
-• הצע קודם את היחידה הזולה ביותר שמתאימה למספר הזה. יחידה גדולה ויקרה יותר מוצעת רק כתוספת ואחריה, לעולם לא במקומה.
-• אם כמה יחידות מתאימות — הצג אותן מהזולה ליקרה ותן ללקוח לבחור. אל תבחר עבורו את היקרה.
-• מספר האורחים המרבי מופיע בתיאור היחידה. אם לא כתוב — אל תנחש ואל תסיק ממחיר או מגודל; אמור שבעל העסק יאשר את ההתאמה.`;
+• ברגע שידוע לך כמה אנשים מגיעים — קרא ל-find_units_for_guests עם המספר הכולל, כולל ילדים ותינוקות, לפני שאתה נוקב בשם יחידה או במחיר. אל תחליט בעצמך איזו יחידה מתאימה ואל תסיק זאת מהתיאורים.
+• הספירה עצמה פנימית: אל תציג אותה כחשבון ואל תחזור עליה ללקוח.
+• הצע את recommended שחזר מהכלי. מה שב-alsoFit מוצע רק כאפשרות נוספת אחריו, לעולם לא במקומו. מה שב-tooSmall לא מוצע בכלל, גם אם הלקוח שאל עליו בשמו — אמור בפשטות שהיחידה קטנה מדי למספר האורחים שלכם.
+• יחידה שמופיעה ב-capacityUnknown לא נפסלת ולא מאושרת: אמור שההתאמה שלה תיבדק מול בעל העסק. אל תנחש את הקיבולת שלה ממחיר, מגודל או מניסוח התיאור.
+• אם לא נשאלת ועדיין לא ידוע כמה אנשים מגיעים — שאל, בשאלה קצרה אחת.`;
 
 /** Photos are delivered as real WhatsApp images by the webhook; URLs must never reach the text. */
 export const PHOTOS_RULE = `כשלקוח מבקש לראות תמונות — קרא ל-send_photos עם שם השירות, והן יישלחו כתמונות אמיתיות. אל תדביק כתובות של תמונות בטקסט. אם לשירות יש "מידע נוסף" — שלח את הקישור הזה כשרלוונטי.`;
