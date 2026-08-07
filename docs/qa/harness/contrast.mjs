@@ -115,6 +115,44 @@ async function getToken() {
 }
 
 const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
+/**
+ * Drives every reveal animation to its end state before anything is sampled.
+ *
+ * A fixed wait is not enough on its own. Reveals here are scroll-triggered, so an element below the
+ * fold has not started animating when the timer expires — it is sampled at its *initial* opacity,
+ * and the audit reports a colour the page never actually paints. That is not a hypothetical: it
+ * invented failures for the payment provider badges, whose real contrast is 5:1, by measuring them
+ * at 75% opacity mid-fade.
+ *
+ * So: scroll the whole page to trigger everything, then wait for the animations themselves to
+ * finish rather than guessing at a duration. Infinite ones (pulsing dots, pings) are skipped —
+ * their `finished` promise never resolves, and awaiting it would hang the run forever.
+ */
+async function settleAnimations(page) {
+  await page.evaluate(async () => {
+    const step = Math.max(window.innerHeight - 100, 200);
+    for (let y = 0; y < document.body.scrollHeight; y += step) {
+      window.scrollTo(0, y);
+      await new Promise((r) => setTimeout(r, 120));
+    }
+    window.scrollTo(0, 0);
+    await new Promise((r) => setTimeout(r, 200));
+
+    const finite = document.getAnimations().filter((a) => {
+      try {
+        return a.effect?.getTiming?.().iterations !== Infinity;
+      } catch {
+        return false;
+      }
+    });
+    // Bounded: a stuck animation must not hold the whole audit open.
+    await Promise.race([
+      Promise.all(finite.map((a) => a.finished.catch(() => {}))),
+      new Promise((r) => setTimeout(r, 3000)),
+    ]);
+  });
+}
+
 const token = await getToken();
 const all = {};
 
@@ -128,6 +166,7 @@ for (const route of ROUTES) {
   try {
     await page.goto(BASE + route, { waitUntil: "networkidle", timeout: 40000 });
     await page.waitForTimeout(2600);
+    await settleAnimations(page);
     all[route] = await page.evaluate(AUDIT);
   } catch (e) {
     all[route] = [{ error: String(e).slice(0, 120) }];

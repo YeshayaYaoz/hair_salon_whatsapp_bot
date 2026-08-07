@@ -42,7 +42,7 @@ function CustomerIdentity({ customer, he }: { customer: Customer; he: boolean })
       </div>
       {name
         ? <span className="text-gray-700 font-medium truncate">{name}</span>
-        : <span className="text-gray-400 truncate">{he ? "ללא שם" : "No name"}</span>}
+        : <span className="text-gray-500 truncate">{he ? "ללא שם" : "No name"}</span>}
       {customer.botPaused && (
         <span title={he ? "בניהול ידני" : "Manually handled"} className="text-sm shrink-0">🙋</span>
       )}
@@ -600,7 +600,7 @@ export default function CustomersPage() {
       </div>
 
       <div className="flex items-center gap-2.5 mb-4 px-4 py-2.5 rounded-lg bg-[#1B7FA0]/8 border border-[#1B7FA0]/20 animate-fade-up stagger-1">
-        <svg className="w-4 h-4 text-[#1B7FA0] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-4 h-4 text-[#197492] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.9 9.9 0 01-4.29-.98L3 20l1.3-3.9C3.47 15.03 3 13.57 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
         </svg>
         <p className="text-xs text-[#145F78] font-medium">{t.customersHint}</p>
@@ -668,7 +668,7 @@ export default function CustomersPage() {
                   <td className="px-4 py-3 text-end w-px whitespace-nowrap">
                     <button
                       onClick={(e) => { e.stopPropagation(); setOpen(c); }}
-                      className="row-action text-xs text-[#1B7FA0] hover:text-white bg-[#1B7FA0]/10 hover:bg-[#1B7FA0] transition border border-[#1B7FA0]/30 px-3 py-1.5 rounded-lg gap-1.5 font-medium"
+                      className="row-action text-xs text-[#197492] hover:text-white bg-[#1B7FA0]/10 hover:bg-[#1B7FA0] transition border border-[#1B7FA0]/30 px-3 py-1.5 rounded-lg gap-1.5 font-medium"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.9 9.9 0 01-4.29-.98L3 20l1.3-3.9C3.47 15.03 3 13.57 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />

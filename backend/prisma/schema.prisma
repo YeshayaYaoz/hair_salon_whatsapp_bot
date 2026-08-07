@@ -72,9 +72,15 @@ model Business {
   // exposes it only via a short-lived URL, so a copy of our own is what makes it displayable.
   whatsappProfilePictureUrl String?
   whatsappPhoneNumberId     String?   @unique
-  // Cartesia-provisioned phone number for the voice bot, one per salon — same 1:1 routing model as
-  // whatsappPhoneNumberId: the number Cartesia's tool call reports as "called" identifies the salon.
+  // Phone number for the voice bot, one per salon — same 1:1 routing model as whatsappPhoneNumberId:
+  // the number Cartesia's tool call reports as "called" identifies the salon. One shared agent
+  // serves every salon, and an agent may hold many numbers, so this stays 1:1 without needing an
+  // agent per business.
   voicePhoneNumber          String?   @unique
+  // Cartesia voice the agent speaks in for this salon, chosen by the owner. Null means the agent's
+  // own default — which is what every salon got before this existed, so leaving it unset changes
+  // nothing. The agent applies it per call, so one shared agent can still sound different per salon.
+  voiceId                   String?
   whatsappAccessToken       String? // encrypted at rest
   whatsappTokenValid        Boolean   @default(true) // set false when Meta rejects the token (expired/revoked)
   // Captured directly off the Embedded Signup postMessage event at connect time. Re-deriving this

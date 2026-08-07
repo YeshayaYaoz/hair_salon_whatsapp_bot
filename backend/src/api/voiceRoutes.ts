@@ -119,6 +119,7 @@ voiceRouter.post("/context", async (req, res) => {
       select: {
         name: true, timezone: true, address: true, botGreeting: true, botPersonality: true,
         cancellationPolicy: true, businessType: true, bookingModel: true, availabilityInfo: true, notificationPhone: true,
+        voiceId: true,
         // Same three the WhatsApp prompt already has. Without them the agent is asked questions it
         // structurally cannot answer — "how many people fit", "how do I get there", "what about a
         // 3-night stay" — and an agent with no data and a caller waiting tends to invent one.
@@ -175,6 +176,11 @@ voiceRouter.post("/context", async (req, res) => {
     pricingNotes: full.pricingNotes,
     greeting: full.botGreeting,
     personality: full.botPersonality,
+    // The voice this salon chose. One shared agent answers for every business, so without this each
+    // one sounds identical; the agent applies it per call (AgentUpdateCall) after reading this
+    // response. Null means the agent keeps its own default, which is what every salon had before
+    // the setting existed.
+    voiceId: full.voiceId,
     cancellationPolicy: full.cancellationPolicy,
     // Date-only strings: the agent reads these out loud and compares them to what the caller asks
     // for, so a timezone-bearing timestamp would be both wrong to speak and easy to misread.

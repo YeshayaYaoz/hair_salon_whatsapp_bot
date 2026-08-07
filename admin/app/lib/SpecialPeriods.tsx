@@ -224,7 +224,7 @@ export function SpecialPeriods() {
                 key={ex}
                 type="button"
                 onClick={() => setQuery(ex)}
-                className="text-xs text-[#1B7FA0] bg-[#E0F5FB] hover:bg-[#c9edf7] px-2.5 py-1 rounded-full transition"
+                className="text-xs text-[#197492] bg-[#E0F5FB] hover:bg-[#c9edf7] px-2.5 py-1 rounded-full transition"
               >
                 {ex}
               </button>
@@ -310,7 +310,7 @@ export function SpecialPeriods() {
           <button
             type="submit"
             disabled={saving || !description.trim()}
-            className="bg-white border border-[#1B7FA0] text-[#1B7FA0] hover:bg-[#E0F5FB] disabled:opacity-50 text-sm font-semibold px-4 py-2 rounded-lg transition"
+            className="bg-white border border-[#1B7FA0] text-[#197492] hover:bg-[#E0F5FB] disabled:opacity-50 text-sm font-semibold px-4 py-2 rounded-lg transition"
           >
             {he ? "הוסף" : "Add"}
           </button>

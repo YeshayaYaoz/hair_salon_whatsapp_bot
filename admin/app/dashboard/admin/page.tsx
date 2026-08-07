@@ -82,7 +82,7 @@ function monthlyRevenueIls(b: AdminBusiness): number {
 const STATUS_COLORS: Record<string, string> = {
   trial: "bg-amber-50 text-amber-700 border-amber-200",
   active: "bg-green-50 text-green-700 border-green-200",
-  past_due: "bg-red-50 text-red-600 border-red-200",
+  past_due: "bg-red-50 text-red-700 border-red-200",
   canceled: "bg-gray-100 text-gray-600 border-gray-200",
 };
 
@@ -174,7 +174,7 @@ function BusinessCard({ b, he, onOpen, fmtDate }: {
           <div className="text-gray-600 text-xs flex items-center gap-1 mt-0.5 truncate" dir="ltr">
             {b.email}
             {!b.emailVerifiedAt && (
-              <span title={he ? "האימייל לא אומת" : "Email unverified"} className="text-amber-600 shrink-0">⚠</span>
+              <span title={he ? "האימייל לא אומת" : "Email unverified"} className="text-amber-700 shrink-0">⚠</span>
             )}
           </div>
         </div>
@@ -544,14 +544,14 @@ export default function AdminBusinessesPage() {
                   </li>
                 )}
                 {noPaymentConnected.length > 0 && (
-                  <li className="text-amber-600">
+                  <li className="text-amber-700">
                     {he
                       ? `${noPaymentConnected.length} בלי סליקה מחוברת — לא יכולים להציע מקדמות`
                       : `${noPaymentConnected.length} without a payment provider connected — can't offer deposits`}
                   </li>
                 )}
                 {incompleteSetup.length > 0 && (
-                  <li className="text-amber-600">
+                  <li className="text-amber-700">
                     {he
                       ? `${incompleteSetup.length} לא סיימו את ההגדרה — שווה לדחוף`
                       : `${incompleteSetup.length} haven't finished setup — worth nudging`}
@@ -619,7 +619,7 @@ export default function AdminBusinessesPage() {
                       {/* An unverified address means email outreach silently never lands, so it's
                           flagged right next to the address rather than in a separate column. */}
                       {!b.emailVerifiedAt && (
-                        <span title={he ? "האימייל לא אומת — הודעות אליו עלולות לא להגיע" : "Email unverified — messages may not arrive"} className="text-amber-600">⚠</span>
+                        <span title={he ? "האימייל לא אומת — הודעות אליו עלולות לא להגיע" : "Email unverified — messages may not arrive"} className="text-amber-700">⚠</span>
                       )}
                     </div>
                   </td>
@@ -630,7 +630,7 @@ export default function AdminBusinessesPage() {
                       <div className="flex items-center gap-2" dir="ltr">
                         <a
                           href={`tel:${b.notificationPhone}`}
-                          className="text-[#1B7FA0] hover:underline tabular-nums text-xs font-medium"
+                          className="text-[#197492] hover:underline tabular-nums text-xs font-medium"
                         >
                           {b.notificationPhone}
                         </a>
@@ -640,7 +640,7 @@ export default function AdminBusinessesPage() {
                           rel="noopener noreferrer"
                           aria-label={he ? "פתיחת וואטסאפ" : "Open WhatsApp"}
                           title={he ? "פתיחת וואטסאפ" : "Open WhatsApp"}
-                          className="text-green-600 hover:text-green-700 text-sm leading-none"
+                          className="text-green-700 hover:text-green-700 text-sm leading-none"
                         >
                           ⌾
                         </a>
@@ -719,14 +719,14 @@ export default function AdminBusinessesPage() {
                   <span className="text-gray-600">{drilldown.email}</span>
                   {drilldown.notificationPhone ? (
                     <>
-                      <a href={`tel:${drilldown.notificationPhone}`} className="text-[#1B7FA0] hover:underline font-medium tabular-nums">
+                      <a href={`tel:${drilldown.notificationPhone}`} className="text-[#197492] hover:underline font-medium tabular-nums">
                         📞 {drilldown.notificationPhone}
                       </a>
                       <a
                         href={`https://wa.me/${drilldown.notificationPhone.replace(/\D/g, "")}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-green-600 hover:underline font-medium"
+                        className="text-green-700 hover:underline font-medium"
                       >
                         WhatsApp
                       </a>
@@ -828,7 +828,7 @@ export default function AdminBusinessesPage() {
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs text-gray-600">
                     {he ? "וואטסאפ" : "WhatsApp"}:{" "}
-                    <span className={drilldown.whatsappConnected ? "text-green-600 font-medium" : "text-gray-600"}>
+                    <span className={drilldown.whatsappConnected ? "text-green-700 font-medium" : "text-gray-600"}>
                       {drilldown.whatsappConnected
                         ? (drilldown.whatsappTokenValid ? (he ? "מחובר" : "connected") : (he ? "נותק" : "broken"))
                         : (he ? "לא מחובר" : "not connected")}
@@ -877,7 +877,7 @@ export default function AdminBusinessesPage() {
                         : tokenInfo.error
                           ? <span className="text-red-600">{tokenInfo.error}</span>
                           : tokenInfo.neverExpires
-                            ? <span className="text-green-600 font-medium">{he ? "טוקן קבוע — לא פג" : "Permanent — never expires"}</span>
+                            ? <span className="text-green-700 font-medium">{he ? "טוקן קבוע — לא פג" : "Permanent — never expires"}</span>
                             : <span>{he ? "פג בתאריך " : "Expires "}{new Date(tokenInfo.expiresAt!).toLocaleDateString()}</span>}
                     </span>
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -1225,7 +1225,7 @@ function MrrSparkline({ snapshots, he }: { snapshots: MrrSnapshot[]; he: boolean
     <div>
       <div className="flex items-baseline gap-2 mb-2">
         <span className="text-lg font-bold text-gray-900 tabular-nums">₪{last.mrrIls.toLocaleString()}</span>
-        <span className={`text-xs font-semibold ${deltaPct >= 0 ? "text-green-600" : "text-red-600"}`}>
+        <span className={`text-xs font-semibold ${deltaPct >= 0 ? "text-green-700" : "text-red-600"}`}>
           {deltaPct >= 0 ? "▲" : "▼"} {Math.abs(deltaPct)}% {he ? `לאורך ${snapshots.length} ימים` : `over ${snapshots.length}d`}
         </span>
       </div>

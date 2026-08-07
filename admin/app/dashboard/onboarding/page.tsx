@@ -73,7 +73,7 @@ export default function OnboardingPage() {
           <p className="text-gray-500 text-xs mt-1">{loadError}</p>
           <button
             onClick={() => { setLoadError(null); location.reload(); }}
-            className="mt-4 text-sm font-medium text-[#1B7FA0] hover:text-[#145F78] px-3 py-1.5 rounded-lg hover:bg-[#E0F5FB] transition"
+            className="mt-4 text-sm font-medium text-[#197492] hover:text-[#145F78] px-3 py-1.5 rounded-lg hover:bg-[#E0F5FB] transition"
           >
             {he ? "נסו שוב" : "Try again"}
           </button>

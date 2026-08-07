@@ -348,7 +348,7 @@ export default function ServicesPage() {
               htmlFor={inputId}
               className={`inline-flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg border transition cursor-pointer ${
                 busy ? "opacity-50 pointer-events-none" : ""
-              } border-[#1B7FA0] text-[#1B7FA0] bg-white hover:bg-[#E0F5FB]`}
+              } border-[#1B7FA0] text-[#197492] bg-white hover:bg-[#E0F5FB]`}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5V18a2 2 0 002 2h14a2 2 0 002-2v-1.5M12 3v13m0-13l-4 4m4-4l4 4" />
@@ -370,7 +370,7 @@ export default function ServicesPage() {
             <button
               type="button"
               onClick={() => setShowLinkInput((v) => !v)}
-              className="text-xs text-gray-600 hover:text-[#1B7FA0] underline underline-offset-2"
+              className="text-xs text-gray-600 hover:text-[#197492] underline underline-offset-2"
             >
               {t.orPasteLink}
             </button>
@@ -401,7 +401,7 @@ export default function ServicesPage() {
         )}
 
         {!serviceId && (pending?.length ?? 0) > 0 && (
-          <p className="text-xs text-[#1B7FA0]">{t.photosQueued(pending!.length)}</p>
+          <p className="text-xs text-[#197492]">{t.photosQueued(pending!.length)}</p>
         )}
         {uploadError && <p className="text-xs text-red-600">{uploadError}</p>}
         <p className="text-xs text-gray-600">{t.photosHint}</p>
@@ -464,7 +464,7 @@ export default function ServicesPage() {
             <p className="text-gray-500 text-xs mt-1">{loadError}</p>
             <button
               onClick={() => { setLoadError(null); setLoaded(false); load().catch((e) => { setLoadError(e instanceof Error ? e.message : String(e)); setLoaded(true); }); }}
-              className="mt-4 text-sm font-medium text-[#1B7FA0] hover:text-[#145F78] px-3 py-1.5 rounded-lg hover:bg-[#E0F5FB] transition"
+              className="mt-4 text-sm font-medium text-[#197492] hover:text-[#145F78] px-3 py-1.5 rounded-lg hover:bg-[#E0F5FB] transition"
             >
               {t.retry}
             </button>
@@ -555,7 +555,7 @@ export default function ServicesPage() {
                     <div className="text-gray-800 font-medium text-sm flex items-center gap-1.5">
                       {s.name}
                       {s.linkUrl && (
-                        <a href={s.linkUrl} target="_blank" rel="noopener noreferrer" className="text-[#1B7FA0] hover:text-[#145F78]" title={s.linkUrl}>
+                        <a href={s.linkUrl} target="_blank" rel="noopener noreferrer" className="text-[#197492] hover:text-[#145F78]" title={s.linkUrl}>
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                           </svg>
@@ -582,7 +582,7 @@ export default function ServicesPage() {
                     {overnight ? `${toDurationInput(s.durationMin)} ${t.nightsAbbrev}` : `${s.durationMin}′`}
                   </span>
                   <div className="flex gap-1 shrink-0">
-                    <button onClick={() => startEdit(s)} className="row-action text-xs text-gray-600 hover:text-[#1B7FA0] transition px-2 py-1 rounded hover:bg-[#E0F5FB]">{t.edit}</button>
+                    <button onClick={() => startEdit(s)} className="row-action text-xs text-gray-600 hover:text-[#197492] transition px-2 py-1 rounded hover:bg-[#E0F5FB]">{t.edit}</button>
                     <button onClick={() => remove(s.id)} className="row-action text-xs text-gray-600 hover:text-red-600 transition px-2 py-1 rounded hover:bg-red-50">{t.delete}</button>
                   </div>
                 </div>

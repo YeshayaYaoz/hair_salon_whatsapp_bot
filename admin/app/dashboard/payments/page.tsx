@@ -288,7 +288,12 @@ function ProviderCard<T extends string>({
               }`}
               style={selected === p ? { backgroundColor: readableWithWhiteText(meta[p].color) } : undefined}
             >
-              <ProviderIcon color={selected === p ? "rgba(255,255,255,0.25)" : meta[p].color} monogram={meta[p].monogram} size="sm" />
+              {/* A translucent WHITE badge used to sit here on the selected tab. It composited to
+                  3.2:1 against the brand colour behind it, and readableWithWhiteText could not
+                  correct it — that helper only parses hex, so an rgba() value passed straight
+                  through its guard untouched. Darkening instead of lightening keeps the badge
+                  visibly inset while taking white text to 6.9:1 at worst. */}
+              <ProviderIcon color={selected === p ? "rgba(0,0,0,0.2)" : meta[p].color} monogram={meta[p].monogram} size="sm" />
               {meta[p].label}
               {connectedProvider === p && connected && " ✓"}
             </button>
@@ -315,7 +320,7 @@ function ProviderCard<T extends string>({
         )}
 
         {requirementNote ? (
-          <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3.5 py-2.5 mb-1">{requirementNote}</p>
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3.5 py-2.5 mb-1">{requirementNote}</p>
         ) : needsCredentials ? (
           <form onSubmit={submit} className="flex flex-col gap-3">
             <div className="grid sm:grid-cols-2 gap-3">
@@ -574,7 +579,7 @@ export default function PaymentsPage() {
               )}
             </>
           ) : (
-            <p className="text-xs text-amber-600">
+            <p className="text-xs text-amber-700">
               {he
                 ? "לא נמצא מפתח סודי — נתק וחבר מחדש את ספק הסליקה כדי ליצור אחד."
                 : "No secret found — disconnect and reconnect your payment provider to generate one."}

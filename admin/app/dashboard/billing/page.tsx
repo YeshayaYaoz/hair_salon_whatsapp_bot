@@ -104,7 +104,7 @@ function SavingsSummary({
       </p>
 
       <div className="bg-[#1B7FA0]/10 border border-[#1B7FA0]/30 rounded-lg p-5 text-center">
-        <div className="text-3xl font-extrabold text-[#1B7FA0] tabular-nums">₪{netSavings.toLocaleString()}</div>
+        <div className="text-3xl font-extrabold text-[#197492] tabular-nums">₪{netSavings.toLocaleString()}</div>
         <div className="text-xs text-gray-600 mt-1 font-medium">
           {he ? `חיסכון נטו החודש (אחרי עלות המנוי ₪${planPrice})` : `Net savings this month (after the ₪${planPrice} subscription)`}
         </div>
@@ -327,7 +327,7 @@ export default function BillingPage() {
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-semibold text-gray-900">{info?.label}</span>
                 {trialDaysLeft !== null && (
-                  <span className="text-xs font-medium text-amber-600">
+                  <span className="text-xs font-medium text-amber-700">
                     {lang === "he" ? `· ${trialDaysLeft} ימים נותרו` : `· ${trialDaysLeft} days left`}
                   </span>
                 )}
@@ -357,7 +357,7 @@ export default function BillingPage() {
                   </div>
                 </div>
                 {loyaltyDiscountIls > 0 ? (
-                  <p className="text-xs font-medium text-green-600 mt-0.5">
+                  <p className="text-xs font-medium text-green-700 mt-0.5">
                     🎁 {lang === "he" ? "הנחת נאמנות מוחלת אוטומטית" : "Loyalty discount applied automatically"}
                   </p>
                 ) : (
@@ -413,7 +413,7 @@ export default function BillingPage() {
                     <span className="text-sm text-gray-600">{lang === "he" ? "/חודש" : "/month"}</span>
                   </div>
                   {p === plan && loyaltyDiscountIls > 0 && (
-                    <p className="text-xs font-medium text-green-600 mb-2">
+                    <p className="text-xs font-medium text-green-700 mb-2">
                       🎁 {lang === "he" ? "הנחת נאמנות מוחלת אוטומטית" : "Loyalty discount applied automatically"}
                     </p>
                   )}
@@ -421,14 +421,14 @@ export default function BillingPage() {
                   <ul className="flex flex-col gap-2 my-4">
                     {sharedFeatures.map((f) => (
                       <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
-                        <svg className="w-4 h-4 text-[#1B7FA0] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <svg className="w-4 h-4 text-[#197492] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
                         {f}
                       </li>
                     ))}
                     <li className="flex items-center gap-2 text-sm text-gray-900 font-medium">
-                      <svg className="w-4 h-4 text-[#1B7FA0] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <svg className="w-4 h-4 text-[#197492] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                       {lang === "he"
@@ -437,10 +437,10 @@ export default function BillingPage() {
                     </li>
                     {p === "premium" && (
                       <li className="flex items-center gap-2 text-sm text-gray-600">
-                        <span className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-amber-500">🔜</span>
+                        <span className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-amber-700">🔜</span>
                         <span>
                           {lang === "he" ? "מענה טלפוני חכם ב-AI" : "AI phone-call answering"}
-                          <span className="ms-1.5 text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-1.5 py-0.5 align-middle">
+                          <span className="ms-1.5 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-1.5 py-0.5 align-middle">
                             {lang === "he" ? "בקרוב" : "SOON"}
                           </span>
                         </span>
@@ -538,7 +538,7 @@ export default function BillingPage() {
                 <button
                   onClick={switchToAnnual}
                   disabled={annualLoading}
-                  className="bg-white hover:bg-gray-50 disabled:opacity-50 text-[#1B7FA0] text-sm font-bold px-4 py-2 rounded-lg transition"
+                  className="bg-white hover:bg-gray-50 disabled:opacity-50 text-[#197492] text-sm font-bold px-4 py-2 rounded-lg transition"
                 >
                   {annualLoading ? t.redirecting : (lang === "he" ? "עבור למנוי שנתי" : "Switch to annual")}
                 </button>
@@ -553,7 +553,7 @@ export default function BillingPage() {
                 <span className="w-8 h-8 rounded-lg bg-[#1B7FA0]/10 flex items-center justify-center text-base flex-shrink-0">💳</span>
                 <h2 className="text-sm font-semibold text-gray-900">{lang === "he" ? "ארנק הודעות" : "Message wallet"}</h2>
               </div>
-              <span className={`text-sm font-bold tabular-nums ${walletBalanceAgorot < 0 ? "text-red-600" : "text-[#1B7FA0]"}`}>
+              <span className={`text-sm font-bold tabular-nums ${walletBalanceAgorot < 0 ? "text-red-600" : "text-[#197492]"}`}>
                 ₪{(walletBalanceAgorot / 100).toFixed(2)}
               </span>
             </div>

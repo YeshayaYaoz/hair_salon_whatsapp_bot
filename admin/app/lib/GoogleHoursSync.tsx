@@ -124,7 +124,7 @@ export function GoogleHoursSync({ onApplied }: { onApplied: () => void }) {
         <div className="mt-3 text-sm bg-red-50 border border-red-200 text-red-800 rounded-lg px-3 py-2">
           <p>{error}</p>
           {needsConnect && (
-            <button onClick={connect} className="mt-2 text-sm font-semibold text-[#1B7FA0] hover:underline">
+            <button onClick={connect} className="mt-2 text-sm font-semibold text-[#197492] hover:underline">
               {he ? "חבר את חשבון Google" : "Connect Google account"}
             </button>
           )}

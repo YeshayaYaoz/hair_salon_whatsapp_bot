@@ -136,7 +136,7 @@ export default function FaqPage() {
                   <div className="flex gap-1 shrink-0">
                     <button
                       onClick={() => startEdit(entry)}
-                      className="row-action text-xs text-gray-600 hover:text-[#1B7FA0] transition px-2 py-1 rounded hover:bg-[#E0F5FB]"
+                      className="row-action text-xs text-gray-600 hover:text-[#197492] transition px-2 py-1 rounded hover:bg-[#E0F5FB]"
                     >
                       {t.edit}
                     </button>

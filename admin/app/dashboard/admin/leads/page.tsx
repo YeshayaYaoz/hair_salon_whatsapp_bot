@@ -1228,7 +1228,7 @@ function OutreachPanel({ leadId }: { leadId: string }) {
                   >
                     {pick(APPROVAL_LABELS, m.approvalStatus, he)}
                   </span>
-                  {m.sentAt && <span className="text-green-600">✓ נשלח {new Date(m.sentAt).toLocaleDateString("he-IL")}</span>}
+                  {m.sentAt && <span className="text-green-700">✓ נשלח {new Date(m.sentAt).toLocaleDateString("he-IL")}</span>}
                 </div>
                 {!m.sentAt && editingId !== m.id && (
                   <button onClick={() => startEdit(m)} className="text-[11px] text-gray-600 hover:text-gray-700">עריכה</button>

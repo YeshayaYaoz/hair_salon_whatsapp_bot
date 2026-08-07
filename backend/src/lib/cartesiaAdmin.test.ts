@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { assignNumberToAgent, CartesiaNotConfiguredError } from "./cartesiaAdmin.js";
+import { assignNumberToAgent, listHebrewVoices, resetVoiceCache, CartesiaNotConfiguredError } from "./cartesiaAdmin.js";
 
 /**
  * What this guards: a number with no agent behind it accepts the call and hangs up immediately.
@@ -72,10 +72,70 @@ describe("assignNumberToAgent", () => {
     expect(result.changed).toBe(true);
   });
 
-  it("says plainly when the number is not in the Cartesia account", async () => {
+  it("says plainly when the number is absent and no trunk is configured to import it from", async () => {
+    delete process.env.CARTESIA_SIP_PROVIDER_ID;
     mockFetch(() => ({ body: { data: [] } }));
     // Silently succeeding here would leave a salon with a line that never answers.
     await expect(assignNumberToAgent("+972500000000")).rejects.toThrow(/not in the Cartesia account/);
+  });
+
+  describe("when the number is absent and a SIP trunk is configured", () => {
+    beforeEach(() => {
+      process.env.CARTESIA_SIP_PROVIDER_ID = "ata_trunk";
+    });
+
+    function mockEmptyThenImport() {
+      mockFetch((url, init) =>
+        init.method === "POST"
+          ? { body: { id: "ap_new", number: "+972500000000", agent: { id: "agent_tori", name: "Tori" } } }
+          : { body: { data: [] } }
+      );
+    }
+
+    it("imports the number over the trunk instead of failing onboarding", async () => {
+      mockEmptyThenImport();
+      const result = await assignNumberToAgent("+972500000000", { label: "מספרת רונית" });
+
+      expect(result).toEqual({ changed: true, phoneNumberId: "ap_new", imported: true });
+      const post = requests.find((r) => r.method === "POST")!;
+      expect(post.url).toContain("/agents/phone-numbers");
+      expect(post.body).toMatchObject({
+        number: "+972500000000",
+        provider: { id: "ata_trunk" },
+        label: "מספרת רונית",
+      });
+    });
+
+    it("assigns the agent in the import request, not a follow-up call", async () => {
+      // Two calls would leave a window where the number is live with no agent behind it — a caller
+      // in that window hears the line answer and hang up, which is the failure this module exists
+      // to prevent.
+      mockEmptyThenImport();
+      await assignNumberToAgent("+972500000000");
+
+      const post = requests.find((r) => r.method === "POST")!;
+      expect(post.body).toMatchObject({ agent_id: "agent_tori" });
+      expect(requests.filter((r) => r.method === "PATCH")).toHaveLength(0);
+    });
+
+    it("sends E.164, not the digits used for matching", async () => {
+      mockEmptyThenImport();
+      await assignNumberToAgent("050-000-0000");
+
+      const post = requests.find((r) => r.method === "POST")!;
+      expect((post.body as { number: string }).number).toBe("+972500000000");
+    });
+
+    it("refuses to import a number that was inferred rather than entered", async () => {
+      // The WhatsApp connect flow guesses a voice number from the Meta line. That number is usually
+      // not voice-capable, and importing it would put a line our carrier does not own onto our
+      // trunk on a guess.
+      mockFetch(() => ({ body: { data: [] } }));
+      await expect(
+        assignNumberToAgent("+972500000000", { importIfMissing: false })
+      ).rejects.toThrow(/inferred rather than entered/);
+      expect(requests.filter((r) => r.method === "POST")).toHaveLength(0);
+    });
   });
 
   it("sends the pinned API version — omitting it changes the error format we parse", async () => {
@@ -93,5 +153,64 @@ describe("assignNumberToAgent", () => {
   it("throws a distinguishable error when not configured, so it can be logged and not shown", async () => {
     delete process.env.CARTESIA_API_KEY;
     await expect(assignNumberToAgent("+972555077941")).rejects.toThrow(CartesiaNotConfiguredError);
+  });
+
+  /**
+   * One shared agent answers for every salon, so the voice is the only thing that makes two
+   * businesses sound different. The catalogue this picks from is Cartesia's, not ours.
+   */
+  describe("listHebrewVoices", () => {
+    const catalogue = {
+      data: [
+        { id: "v_he", name: "Noa", language: "he", gender: "feminine", preview_file_url: "https://s/1.wav" },
+        { id: "v_he_regional", name: "Yossi", language: "en", gender: "masculine", locales: [{ locale: "he-IL", is_native: false }] },
+        { id: "v_en", name: "Sarah", language: "en", gender: "feminine", locales: [{ locale: "en-US", is_native: true }] },
+      ],
+    };
+
+    beforeEach(() => {
+      resetVoiceCache();
+    });
+
+    it("keeps only the voices that can actually speak Hebrew", async () => {
+      mockFetch(() => ({ body: catalogue }));
+      const voices = await listHebrewVoices();
+      expect(voices.map((v) => v.id)).toEqual(["v_he", "v_he_regional"]);
+    });
+
+    it("counts a region-tagged locale as Hebrew", async () => {
+      // The tags are BCP-47, so an exact "he" match would drop every he-IL voice.
+      mockFetch(() => ({ body: catalogue }));
+      const voices = await listHebrewVoices();
+      expect(voices.some((v) => v.id === "v_he_regional")).toBe(true);
+    });
+
+    it("asks for preview URLs, without which the picker cannot play a sample", async () => {
+      mockFetch(() => ({ body: catalogue }));
+      await listHebrewVoices();
+      expect(requests[0].url).toContain("expand[]=preview_file_url");
+      expect(await listHebrewVoices().then((v) => v[0].previewUrl)).toBe("https://s/1.wav");
+    });
+
+    it("fetches the catalogue once and reuses it", async () => {
+      // Otherwise every visit to the bot settings page puts a third-party call on the critical path.
+      mockFetch(() => ({ body: catalogue }));
+      await listHebrewVoices();
+      await listHebrewVoices();
+      expect(requests).toHaveLength(1);
+    });
+
+    it("degrades to no choices rather than breaking the settings page", async () => {
+      // Voice selection is optional; a settings page that fails to load because Cartesia is down is
+      // a worse outcome than one that says the choice is unavailable.
+      mockFetch(() => ({ status: 500, body: { message: "boom" } }));
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      await expect(listHebrewVoices()).resolves.toEqual([]);
+    });
+
+    it("returns nothing rather than throwing when Cartesia is not configured", async () => {
+      delete process.env.CARTESIA_API_KEY;
+      await expect(listHebrewVoices()).resolves.toEqual([]);
+    });
   });
 });
