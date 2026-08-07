@@ -126,6 +126,12 @@ const tools: GenericTool[] = [
     },
   },
   {
+    name: "get_payment_link",
+    description:
+      "Return the deposit payment link for this customer's appointment that is still awaiting payment. Use whenever the customer asks to pay, says they lost or can't open the link, or asks how much they owe. Do NOT call book_appointment for this — they already have a held slot.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
     name: "request_human_followup",
     description: "Alert the salon owner to follow up with this customer. Use for complaints, complex requests, or anything the bot cannot handle.",
     input_schema: {
@@ -252,7 +258,10 @@ async function resolveStaffId(businessId: string, staffName: string | undefined)
   return { error: JSON.stringify({ error: "Unknown staff member", availableStaff: all.map((s) => s.name) }) };
 }
 
-async function runTool(
+// Exported for tests, following normalizeServiceName above. The tool bodies are where the money
+// decisions live — deposits, cancellations, payment links — and driving the whole model loop to
+// reach them would test the provider adapter far more than the behaviour under test.
+export async function runTool(
   businessId: string,
   customerPhone: string,
   name: string,
@@ -462,12 +471,68 @@ async function runTool(
     });
   }
 
+  /**
+   * "Can I pay?" had no tool behind it.
+   *
+   * The model's only option was book_appointment, which finds the slot already held and answers as
+   * if something went wrong — a real customer typed "אפשר לשלם?" right after booking and was told
+   * their slot had just been taken. The alreadyBooked branch was patched to re-surface the link,
+   * but only if the model happened to route there, and only for that exact service and time.
+   *
+   * This asks the real question instead: does this customer have an unpaid hold, and what is its
+   * link. No new link is minted — the provider already issued one against this appointment id, and
+   * a second would leave two live payment pages for one slot.
+   */
+  if (name === "get_payment_link") {
+    const biz = await prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { timezone: true } });
+    const tz = biz.timezone || "Asia/Jerusalem";
+    const pending = await prisma.appointment.findFirst({
+      where: {
+        businessId,
+        customer: { phone: customerPhone },
+        status: "pending_payment",
+        depositStatus: "pending",
+        startTime: { gte: new Date() },
+      },
+      orderBy: { startTime: "asc" },
+      include: { service: true },
+    });
+
+    if (!pending) {
+      return JSON.stringify({
+        error:
+          "This customer has no appointment awaiting payment. If they think they booked, use list_my_appointments to check what they actually have before saying anything about payment.",
+      });
+    }
+    if (!pending.depositPaymentUrl) {
+      return JSON.stringify({
+        error:
+          "The hold exists but no payment link was ever generated for it. Apologize, and use request_human_followup so the business can sort it out — do not invent a link or an amount.",
+      });
+    }
+
+    // Same shape book_appointment returns, so the model describes a held slot the same way here as
+    // it did when the hold was created.
+    const heDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+    const { dayOfWeek } = instantPartsInTz(pending.startTime, tz);
+    return JSON.stringify({
+      paymentUrl: pending.depositPaymentUrl,
+      depositAmountIls: pending.depositAmountIls,
+      serviceName: pending.service.name,
+      dayOfWeek: `יום ${heDays[dayOfWeek]}`,
+      localTime: pending.startTime.toLocaleTimeString("he-IL", { timeZone: tz, hour: "2-digit", minute: "2-digit" }),
+      // The hold is the thing that expires, so the deadline is the useful part of the answer.
+      expiresAt: pending.depositExpiresAt,
+    });
+  }
+
   if (name === "cancel_appointment") {
     const biz = await prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { timezone: true } });
-    const target = parseBookingTime(input.startTime as string, biz.timezone || "Asia/Jerusalem");
+    const tz = biz.timezone || "Asia/Jerusalem";
+    const target = parseBookingTime(input.startTime as string, tz);
     const appointment = await prisma.appointment.findFirst({
       where: { businessId, status: "confirmed", customer: { phone: customerPhone }, startTime: target },
-      include: { service: true },
+      include: { service: true, customer: true },
     });
     if (!appointment) return JSON.stringify({ error: "No matching appointment found" });
     await prisma.appointment.update({ where: { id: appointment.id }, data: { status: "cancelled" } });
@@ -478,7 +543,41 @@ async function runTool(
     notifyWaitlist(businessId, appointment.serviceId, appointment.service.name, appointment.startTime).catch((err) =>
       console.error("[waitlist] Notification failed:", err)
     );
-    return JSON.stringify({ cancelled: true });
+
+    // The owner was told when this booking was made and is told when a deposit lands, but nothing
+    // told them it had been cancelled — so a salon learned its 3pm was free only by looking. That
+    // is the slot they could still sell, and the customer they might want to call.
+    const depositPaid = appointment.depositStatus === "paid";
+    const customerLabel = appointment.customer.name
+      ? `${appointment.customer.name} (${appointment.customer.phone})`
+      : appointment.customer.phone;
+    const when = appointment.startTime.toLocaleString("he-IL", {
+      timeZone: tz, weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit",
+    });
+    notifyOwner(
+      businessId,
+      `❌ תור בוטל\nלקוח: ${customerLabel}\nשירות: ${appointment.service.name}\nמועד: ${when}` +
+        // Money already taken is the part the owner has to decide about, so it cannot be a
+        // footnote. We deliberately do not refund automatically: the salon's cancellation policy
+        // is its own, and quietly refunding — or quietly keeping — would both be decisions we
+        // don't get to make on their behalf.
+        (depositPaid ? `\n\n⚠️ שולמה מקדמה של ₪${appointment.depositAmountIls ?? "?"} — יש להחליט לגבי החזר לפי מדיניות הביטולים שלכם.` : "")
+    );
+
+    return JSON.stringify({
+      cancelled: true,
+      // Surfaced so the reply can be honest about the money instead of silently ignoring it. The
+      // model is told to acknowledge it and point at the business, not to promise a refund — the
+      // policy is the salon's and the bot has no way to issue one.
+      ...(depositPaid
+        ? {
+            depositPaid: true,
+            depositAmountIls: appointment.depositAmountIls,
+            refundGuidance:
+              "A deposit was already paid for this appointment. Acknowledge it, tell the customer the business will be in touch about it according to their cancellation policy, and do NOT promise a refund or a specific amount.",
+          }
+        : {}),
+    });
   }
 
   if (name === "reschedule_appointment") {
@@ -535,6 +634,17 @@ async function runTool(
           if (eventId) return prisma.appointment.update({ where: { id: appointment.id }, data: { calendarEventId: eventId } });
         })
         .catch((err) => console.error("Calendar sync failed:", err));
+
+      // A move is two facts the owner needs — a slot freed and a slot taken — and neither was
+      // being sent. Reported as one message rather than a cancel plus a book, because that is what
+      // actually happened and two alerts would read as two separate customers.
+      const movedLabel = customerName ? `${customerName} (${customerPhone})` : customerPhone;
+      const fmt = (d: Date) =>
+        d.toLocaleString("he-IL", { timeZone: tz, weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+      notifyOwner(
+        businessId,
+        `🔄 תור הוזז\nלקוח: ${movedLabel}\nשירות: ${service.name}\nמ: ${fmt(existing.startTime)}\nל: ${fmt(appointment.startTime)}`
+      );
 
       return JSON.stringify({ rescheduled: true, startTime: appointment.startTime, endTime: appointment.endTime });
     } catch (err) {
