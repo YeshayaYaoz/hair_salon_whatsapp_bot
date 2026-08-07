@@ -6,6 +6,7 @@ import { useLanguage } from "../../lib/LanguageContext";
 import { SavedBadge } from "../../lib/SavedBadge";
 import { SkeletonCard } from "../../lib/Skeleton";
 import { Toggle, Section, Field } from "../../lib/SettingsControls";
+import { DIAL_CODES, DEFAULT_DIAL_CODE, dialCodeOf } from "../../lib/dialCodes";
 
 interface BusinessProfile {
   name: string;
@@ -170,6 +171,9 @@ export default function SettingsPage() {
   // the change is actually saved, and re-saving the same number keeps its verification.
   const [savedNotificationPhone, setSavedNotificationPhone] = useState<string | null>(null);
   const [notificationPhoneVerifiedAt, setNotificationPhoneVerifiedAt] = useState<string | null>(null);
+  // Derived from the saved number rather than stored separately — the number is already fully
+  // qualified, and a second stored copy of the country could only drift out of step with it.
+  const [dialCode, setDialCode] = useState(DEFAULT_DIAL_CODE);
   const notificationPhoneVerified =
     Boolean(notificationPhoneVerifiedAt) && fields.notificationPhone?.trim() === (savedNotificationPhone ?? "");
 
@@ -177,6 +181,7 @@ export default function SettingsPage() {
     apiFetch<BusinessProfile & { emailVerifiedAt?: string | null; notificationPhoneVerifiedAt?: string | null }>("/api/business/me").then((me) => {
       setSavedNotificationPhone(me.notificationPhone ?? "");
       setNotificationPhoneVerifiedAt(me.notificationPhoneVerifiedAt ?? null);
+      setDialCode(dialCodeOf(me.notificationPhone));
       setFields({
         name: me.name,
         address: me.address ?? "",
@@ -210,6 +215,7 @@ export default function SettingsPage() {
           address: fields.address,
           timezone: fields.timezone,
           notificationPhone: fields.notificationPhone,
+          notificationPhoneDialCode: dialCode,
           googleMapsUrl: fields.googleMapsUrl,
           depositEnabled: fields.depositEnabled,
           depositAmountIls: fields.depositAmountIls,
@@ -225,6 +231,7 @@ export default function SettingsPage() {
       setFields((f) => ({ ...f, notificationPhone: me.notificationPhone ?? "" }));
       setSavedNotificationPhone(me.notificationPhone ?? "");
       setNotificationPhoneVerifiedAt(me.notificationPhoneVerifiedAt ?? null);
+      setDialCode(dialCodeOf(me.notificationPhone));
 
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -281,12 +288,31 @@ export default function SettingsPage() {
             </div>
           )}
           <Field label={t.notifPhone} hint={t.notifPhoneHint}>
-            <input
-              placeholder="972501234567"
-              value={fields.notificationPhone}
-              onChange={(e) => set("notificationPhone", e.target.value)}
-              className="w-full"
-            />
+            {/* The country is chosen, not inferred. Guessing it from the digits meant a bare
+                national number was stored with no country code and could never be delivered, and a
+                foreign number written with its own trunk zero had 972 forced onto it. */}
+            <div className="flex gap-2">
+              <select
+                value={dialCode}
+                onChange={(e) => setDialCode(e.target.value)}
+                aria-label={lang === "he" ? "קידומת מדינה" : "Country code"}
+                className="w-40 shrink-0"
+                dir="ltr"
+              >
+                {DIAL_CODES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    +{c.code} {lang === "he" ? c.he : c.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                placeholder={dialCode === "972" ? "0501234567" : "501234567"}
+                value={fields.notificationPhone}
+                onChange={(e) => set("notificationPhone", e.target.value)}
+                className="w-full"
+                dir="ltr"
+              />
+            </div>
           </Field>
           {/* A number that was typed is not a number that works, and the difference is invisible
               until the day a customer is promised a callback that never comes. Verified means a

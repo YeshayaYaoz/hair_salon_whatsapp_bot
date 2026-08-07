@@ -616,6 +616,9 @@ const profileSchema = z.object({
   address: z.string().optional(),
   timezone: z.string().optional(),
   notificationPhone: z.string().optional(),
+  // Country dialling code chosen beside the number. Consumed when normalizing and then dropped —
+  // see the PUT handler for why it is not a column.
+  notificationPhoneDialCode: z.string().max(6).optional(),
   botGreeting: z.string().optional(),
   // Both or neither: WhatsApp rejects a cta_url message missing either half, and a half-configured
   // button would silently fall back to plain text with no hint as to why.
@@ -679,6 +682,8 @@ businessRouter.put("/me", async (req: AuthedRequest, res) => {
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const data: Record<string, unknown> = { ...parsed.data };
+  // Input, not a column — this object is handed to Prisma as-is, which rejects unknown fields.
+  delete data.notificationPhoneDialCode;
 
   // The notification phone used to be stored exactly as typed, with no validation of any kind —
   // and it is the channel every owner alert and human handoff depends on. Normalizing it means
@@ -691,7 +696,10 @@ businessRouter.put("/me", async (req: AuthedRequest, res) => {
       data.notificationPhone = null;
       data.notificationPhoneVerifiedAt = null;
     } else {
-      const normalized = normalizeOwnerPhone(raw);
+      // Not persisted: the stored number is fully qualified, so the country is already in it and a
+      // second column could only drift out of step with it. The dashboard re-derives the dropdown
+      // from the saved number on load.
+      const normalized = normalizeOwnerPhone(raw, parsed.data.notificationPhoneDialCode);
       if (!normalized) {
         return res.status(400).json({
           error: "מספר הטלפון להתראות לא נראה תקין. הזינו מספר מלא, למשל 0501234567.",
