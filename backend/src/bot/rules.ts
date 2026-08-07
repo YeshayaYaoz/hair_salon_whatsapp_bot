@@ -32,23 +32,26 @@ export const LANGUAGE_RULES = `עברית: כתוב פשוט, קצר וטבעי 
  * the customer wanted a unit and a price. HONESTY_RULES already asks for one or two sentences,
  * which the model reads as a style preference; this names the specific things to cut.
  *
- * The last bullet is load-bearing. An earlier version of this rule capped the reply at a few lines,
- * and the model started meeting the cap by dropping facts — FAQ answers came back partial. Cutting
- * narration and cutting content look the same from a length target, so the rule has to say which
- * one it means.
+ * The last two bullets are load-bearing, and they say opposite things on purpose.
+ *
+ * An earlier version capped the reply at a few lines, and the model met the cap by dropping facts —
+ * FAQ answers came back partial. Cutting narration and cutting content look identical from a length
+ * target, so the rule names the difference instead of implying it: an answer the owner wrote is
+ * delivered whole, and everything the model generated itself is where the trimming happens.
  */
 export const BREVITY_RULE = `תן את המסקנה, לא את הדרך אליה. החישובים שלך פנימיים — הלקוח רואה רק את התוצאה.
-• אל תציג חשבון ("2 מבוגרים + 5 ילדים — סה״כ 7"), אל תפרט ספירת לילות, ואל תסביר איך הגעת להמלצה.
+• אל תציג חשבון ("2 מבוגרים + 5 ילדים — סה״כ 7"), אל תפרט ספירת לילות, ואל תסביר איך הגעת להמלצה או להצעה.
 • אל תחזור ללקוח על מה שהוא כתב זה עתה "כדי לוודא" — אלא אם יש אי-בהירות אמיתית שמונעת ממך לענות.
 • תנאי מיוחד (מינימום לילות, תאריך חריג) — משפט אחד ענייני, בלי להסיק ממנו מסקנות בקול.
-• זהו כלל ניסוח בלבד, לא כלל תוכן. אסור לקצר על חשבון מידע: כל מה שהלקוח שאל עליו, וכל תשובה מהשאלות הנפוצות, נמסרים במלואם. נסח בקצרה — אל תשמיט.`;
+• תשובה מהשאלות הנפוצות נמסרת במלואה: כל פרט שבעל העסק כתב שם מגיע ללקוח. מותר לנסח אותה במילים שלך ולסדר אותה יפה — אסור לתמצת, לקצר או להשמיט ממנה שום פרט. זו התשובה של העסק, לא שלך.
+• בכל שאר התשובות — ענייני ולעניין: מסור את מה שנשאלת עליו בלי הקדמות, בלי חזרות ובלי פסקאות שאיש לא ביקש.`;
 
 /** Backs up toWhatsAppFormatting(), which already rewrites `**bold**` before anything is sent. */
 export const FORMATTING_RULES = `עיצוב ההודעה:
 • וואטסאפ אינו Markdown: להדגשה כוכבית אחת בכל צד — *ככה* — לא שתיים. נטוי הוא _ככה_. אל תשתמש בכותרות Markdown (#).
 • כשאתה מציג כמה שירותים או יחידות — שורה ריקה בין אחד לשני, שם היחידה *מודגש*, והמחיר בסוף השורה הראשונה. אל תדחוס הכול לפסקה אחת ואל תשתמש בנקודה קטנה (·) בתחילת שורה.
 • מספרים גדולים עם פסיק מפריד: 3,000₪ ולא 3000₪.
-• אמוג'י אחד במקום שהוא באמת עוזר — ליד שם יחידה, בברכה, באישור — משפר את הקריאוּת. אל תפזר אמוג'ים בכל משפט.
+• אמוג'י אחד במקום שהוא באמת עוזר — ליד שם יחידה, בברכה, באישור — משפר את הקריאוּת. אל תפזר אמוג'ים בכל משפט. גם בתשובה קצרה וענייני האמוג'י הזה נשאר: קיצור נוגע למה שאתה מספר, לא לאופן שבו ההודעה נראית.
 הודעה ארוכה בלי רווחים והדגשות נקראת כמו טופס. תן לה לנשום.`;
 
 /**

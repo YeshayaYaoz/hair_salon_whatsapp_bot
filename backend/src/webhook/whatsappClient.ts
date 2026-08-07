@@ -55,6 +55,27 @@ export async function sendWhatsAppTemplate(
   });
 }
 
+/**
+ * Trims to one of WhatsApp's limits without cutting a character in half.
+ *
+ * slice() counts UTF-16 code units and an emoji is two of them, so a body that lands exactly on one
+ * gets split into a lone surrogate — which renders as the replacement glyph, on the greeting that
+ * is often a customer's first contact. Iterating the string yields whole code points instead.
+ *
+ * The trailing strip handles the other half of the problem: a joined emoji (family, flags) is several
+ * code points glued by ZWJ or a variation selector, and stopping mid-sequence leaves a joiner with
+ * nothing left to join to.
+ */
+export function trimToLimit(text: string, max: number): string {
+  if (text.length <= max) return text;
+  let out = "";
+  for (const char of text) {
+    if (out.length + char.length > max) break;
+    out += char;
+  }
+  return out.replace(/[\u200d\ufe0f]+$/u, "");
+}
+
 export async function sendWhatsAppMessage(params: SendCommon & { text: string }) {
   await send(params, {
     type: "text",
@@ -90,11 +111,11 @@ export async function sendWhatsAppCtaUrl(
     type: "interactive",
     interactive: {
       type: "cta_url",
-      body: { text: params.body.slice(0, 1024) },
-      ...(params.footer ? { footer: { text: params.footer.slice(0, 60) } } : {}),
+      body: { text: trimToLimit(params.body, 1024) },
+      ...(params.footer ? { footer: { text: trimToLimit(params.footer, 60) } } : {}),
       action: {
         name: "cta_url",
-        parameters: { display_text: params.buttonText.slice(0, 20), url: params.url },
+        parameters: { display_text: trimToLimit(params.buttonText, 20), url: params.url },
       },
     },
   });
@@ -114,13 +135,13 @@ export async function sendWhatsAppCtaUrl(
 export async function sendWhatsAppButtons(
   params: SendCommon & { body: string; buttons: string[]; footer?: string }
 ) {
-  const titles = params.buttons.map((b) => b.trim().slice(0, 20)).filter(Boolean).slice(0, 3);
+  const titles = params.buttons.map((b) => trimToLimit(b.trim(), 20)).filter(Boolean).slice(0, 3);
   await send(params, {
     type: "interactive",
     interactive: {
       type: "button",
-      body: { text: params.body.slice(0, 1024) },
-      ...(params.footer ? { footer: { text: params.footer.slice(0, 60) } } : {}),
+      body: { text: trimToLimit(params.body, 1024) },
+      ...(params.footer ? { footer: { text: trimToLimit(params.footer, 60) } } : {}),
       action: {
         // The id comes back on the reply; the title is what the customer sees and what we treat as
         // their message, so using the title as the id keeps the two from drifting apart.
@@ -146,8 +167,8 @@ export async function sendWhatsAppList(
       type: "list",
       body: { text: params.bodyText },
       action: {
-        button: params.buttonText.slice(0, 20),
-        sections: [{ title: (params.sectionTitle ?? "מועדים פנויים").slice(0, 24), rows: params.rows.slice(0, 10) }],
+        button: trimToLimit(params.buttonText, 20),
+        sections: [{ title: trimToLimit(params.sectionTitle ?? "מועדים פנויים", 24), rows: params.rows.slice(0, 10) }],
       },
     },
   });
