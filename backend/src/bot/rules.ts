@@ -46,12 +46,22 @@ export const BREVITY_RULE = `תן את המסקנה, לא את הדרך אליה
 • תשובה מהשאלות הנפוצות נמסרת במלואה: כל פרט שבעל העסק כתב שם מגיע ללקוח. מותר לנסח אותה במילים שלך ולסדר אותה יפה — אסור לתמצת, לקצר או להשמיט ממנה שום פרט. זו התשובה של העסק, לא שלך.
 • בכל שאר התשובות — ענייני ולעניין: מסור את מה שנשאלת עליו בלי הקדמות, בלי חזרות ובלי פסקאות שאיש לא ביקש.`;
 
-/** Backs up toWhatsAppFormatting(), which already rewrites `**bold**` before anything is sent. */
+/**
+ * Backs up toWhatsAppFormatting(), which already rewrites `**bold**` before anything is sent.
+ *
+ * The emoji bullet is worded around one specific misreading. "אמוג'י אחד" was taken as one emoji per
+ * *message*: a four-unit price list came back with a globe by the website link, a smiley at the
+ * sign-off, and nothing beside any of the four unit names — the one place the rule actually names.
+ * So it now says what "one" is counted per, and keeps the real prohibition (a trail of emoji
+ * through the sentences of a paragraph) separate from it.
+ */
 export const FORMATTING_RULES = `עיצוב ההודעה:
 • וואטסאפ אינו Markdown: להדגשה כוכבית אחת בכל צד — *ככה* — לא שתיים. נטוי הוא _ככה_. אל תשתמש בכותרות Markdown (#).
 • כשאתה מציג כמה שירותים או יחידות — שורה ריקה בין אחד לשני, שם היחידה *מודגש*, והמחיר בסוף השורה הראשונה. אל תדחוס הכול לפסקה אחת ואל תשתמש בנקודה קטנה (·) בתחילת שורה.
 • מספרים גדולים עם פסיק מפריד: 3,000₪ ולא 3000₪.
-• אמוג'י אחד במקום שהוא באמת עוזר — ליד שם יחידה, בברכה, באישור — משפר את הקריאוּת. אל תפזר אמוג'ים בכל משפט. גם בתשובה קצרה וענייני האמוג'י הזה נשאר: קיצור נוגע למה שאתה מספר, לא לאופן שבו ההודעה נראית.
+• אמוג'י אחד בכל מקום שהוא באמת עוזר — ליד שם יחידה, בברכה, באישור — משפר את הקריאוּת.
+• "אחד" נספר לכל פריט, לא לכל ההודעה: ברשימה של ארבע יחידות יש ארבעה אמוג'ים, אחד ליד כל שם יחידה. אמוג'י בסוף ההודעה אינו מחליף את אלה שליד השמות.
+• מה שאסור הוא שרשרת אמוג'ים בתוך פסקה — אחד בכל משפט. וגם בתשובה קצרה וענייני האמוג'ים האלה נשארים: קיצור נוגע למה שאתה מספר, לא לאופן שבו ההודעה נראית.
 הודעה ארוכה בלי רווחים והדגשות נקראת כמו טופס. תן לה לנשום.`;
 
 /**
