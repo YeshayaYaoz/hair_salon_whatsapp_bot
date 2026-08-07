@@ -2155,6 +2155,74 @@ businessRouter.post("/customers/:id/message", async (req: AuthedRequest, res) =>
   res.json({ ok: true, botPaused: true });
 });
 
+/**
+ * Edit a customer's details by hand.
+ *
+ * The name arrives from whatever the customer told the bot, so it is often a first name, a nickname
+ * or nothing at all — and it is what the owner reads in every list and alert. Until now there was no
+ * way to correct it short of the customer restating it in conversation.
+ *
+ * The phone is editable because it is the identity, which is exactly why it is guarded: it is the
+ * key the conversation, the appointments and every future WhatsApp message hang off, and two rows
+ * sharing one number would split a thread in half. Normalized through the same path as the owner's
+ * own number so "050…" and "+972 50…" cannot become two different customers.
+ */
+businessRouter.patch("/customers/:id", async (req: AuthedRequest, res) => {
+  const parsed = z
+    .object({
+      name: z.string().max(120).nullable().optional(),
+      phone: z.string().max(30).optional(),
+      dialCode: z.string().max(6).optional(),
+    })
+    .safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const customer = await prisma.customer.findFirst({ where: { id: req.params.id, businessId: req.businessId! } });
+  if (!customer) return res.status(404).json({ error: "Not found" });
+
+  const data: { name?: string | null; phone?: string } = {};
+
+  if (parsed.data.name !== undefined) {
+    const name = parsed.data.name?.trim();
+    data.name = name ? name : null; // blank clears it back to "no name", rather than storing ""
+  }
+
+  if (parsed.data.phone !== undefined) {
+    const normalized = normalizeOwnerPhone(parsed.data.phone, parsed.data.dialCode);
+    if (!normalized) {
+      return res.status(400).json({ error: "מספר הטלפון לא נראה תקין. הזינו מספר מלא, למשל 0501234567." });
+    }
+    if (normalized !== customer.phone) {
+      const clash = await prisma.customer.findFirst({
+        where: { businessId: req.businessId!, phone: normalized, id: { not: customer.id } },
+        select: { id: true, name: true },
+      });
+      if (clash) {
+        return res.status(409).json({
+          error: `המספר הזה כבר שייך ללקוח אחר${clash.name ? ` (${clash.name})` : ""}. אחדו את הכרטיסים במקום להזין אותו פעמיים.`,
+        });
+      }
+      data.phone = normalized;
+    }
+  }
+
+  const updated = await prisma.customer.update({ where: { id: customer.id }, data });
+
+  // Conversations are keyed by phone rather than by customer id, so a corrected number leaves the
+  // whole transcript behind under the old one — the panel would open empty, and the bot would keep
+  // answering against history it could no longer see. Carry the messages across with the customer.
+  if (data.phone && data.phone !== customer.phone) {
+    await prisma.conversationMessage.updateMany({
+      where: { businessId: req.businessId!, phone: customer.phone },
+      data: { phone: data.phone },
+    });
+    forgetCachedHistory(req.businessId!, customer.phone);
+    forgetCachedHistory(req.businessId!, data.phone);
+  }
+
+  res.json({ id: updated.id, name: updated.name, phone: updated.phone });
+});
+
 businessRouter.patch("/customers/:id/bot-paused", async (req: AuthedRequest, res) => {
   const parsed = z.object({ paused: z.boolean() }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
