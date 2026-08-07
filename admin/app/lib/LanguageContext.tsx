@@ -75,20 +75,67 @@ const VOCAB_OVERRIDES: Record<string, Record<Lang, [string, string][]>> = {
   },
 };
 
-function applyVocab<T>(node: T, pairs: [string, string][]): T {
+const HEBREW_RANGE = "\\u0590-\\u05FF";
+/** One-letter particles (ב/ה/ו/כ/ל/מ/ש) that glue directly onto the front of a Hebrew noun. */
+const HEBREW_PREFIXES = "בהוכלמש";
+
+/**
+ * Names that legitimately start with a target word and must survive the pass untouched.
+ *
+ * "תורי" is the product itself — no morphological rule can tell the brand from "תור" plus a suffix,
+ * so it is masked out of the substitution entirely rather than reasoned about. Without this,
+ * "המנוי שלכם בתורי" reached B&B owners as "המנוי שלכם בהזמנהי".
+ */
+const PROTECTED_TERMS: { term: string; match: RegExp }[] = [
+  // Only when the word ends there: "בתורי," is the brand, while "תורים" is just "תור" pluralised
+  // and must still become "הזמנות".
+  { term: "תורי", match: /תורי(?![֐-׿])/gu },
+];
+
+/**
+ * One substitution, compiled to respect word starts.
+ *
+ * These were plain substring replacements, which is what makes "ללקוח" → "לאורח" work without
+ * listing every inflection — Hebrew prefixes attach to the noun with no space. The cost is that a
+ * target also matches inside unrelated words: "תור" sits inside "כפתור" (button), and the WhatsApp
+ * settings page rendered "כפהזמנה", "כפהזמנהי" and "טקסט הכפהזמנה" to real owners.
+ *
+ * So anchor the match to a word start followed by any stacked prefixes. In "כפתור" the "תור" is
+ * preceded by "פ", which is not a prefix letter, so it no longer matches — while "התור", "ללקוחות"
+ * and "כשלקוח" still do. Non-Hebrew targets keep a plain word boundary.
+ */
+function compileVocab(pairs: [string, string][]): ((s: string) => string)[] {
+  return pairs.map(([from, to]) => {
+    const escaped = from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (!/^[֐-׿]/.test(from)) {
+      const re = new RegExp(`\\b${escaped}`, "gu");
+      return (s: string) => s.replace(re, to);
+    }
+    const re = new RegExp(`(^|[^${HEBREW_RANGE}])([${HEBREW_PREFIXES}]{0,3})${escaped}`, "gu");
+    return (s: string) => s.replace(re, (_m, boundary: string, prefix: string) => `${boundary}${prefix}${to}`);
+  });
+}
+
+export function applyVocab<T>(node: T, rewrites: ((s: string) => string)[]): T {
   if (typeof node === "string") {
+    // Mask protected names, run the substitutions, put them back. The sentinel uses NUL, which
+    // never appears in a translation string, so it cannot itself be rewritten.
     let v: string = node;
-    for (const [from, to] of pairs) v = v.split(from).join(to);
+    PROTECTED_TERMS.forEach(({ match }, i) => { v = v.replace(match, `\u0000${i}\u0000`); });
+    for (const rewrite of rewrites) v = rewrite(v);
+    PROTECTED_TERMS.forEach(({ term }, i) => { v = v.split(`\u0000${i}\u0000`).join(term); });
     return v as T;
   }
-  if (Array.isArray(node)) return node.map((item) => applyVocab(item, pairs)) as T;
+  if (Array.isArray(node)) return node.map((item) => applyVocab(item, rewrites)) as T;
   if (node && typeof node === "object") {
     const out: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(node)) out[key] = applyVocab(value, pairs);
+    for (const [key, value] of Object.entries(node)) out[key] = applyVocab(value, rewrites);
     return out as T;
   }
   return node;
 }
+
+export { compileVocab, VOCAB_OVERRIDES };
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>("he");
@@ -119,7 +166,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const t = useMemo(() => {
     const base = translations[lang];
     const overrides = businessType ? VOCAB_OVERRIDES[businessType]?.[lang] : undefined;
-    return overrides ? applyVocab(base, overrides) : base;
+    return overrides ? applyVocab(base, compileVocab(overrides)) : base;
   }, [lang, businessType]);
 
   return (

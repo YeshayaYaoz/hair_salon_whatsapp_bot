@@ -4,11 +4,13 @@ import { instantPartsInTz, zonedDateParts, dayOfWeekForDate } from "../lib/timez
 import { TEMPLATES, isBusinessType } from "../lib/businessTemplates.js";
 import {
   LANGUAGE_RULES,
+  BREVITY_RULE,
   FORMATTING_RULES,
   CALENDAR_RULES,
   CONVERSATION_AGE_RULE,
   PRICING_RULE,
   PHOTOS_RULE,
+  UNIT_FIT_RULE,
   PLACEHOLDER_RULE,
   HONESTY_RULES,
   slotBookingSection,
@@ -212,10 +214,12 @@ export async function buildSystemPrompt(businessId: string, customerPhone?: stri
 ${dateTable}
 ${HONESTY_RULES}
 ${LANGUAGE_RULES}
+${BREVITY_RULE}
 ${FORMATTING_RULES}
 ${CALENDAR_RULES}
 ${CONVERSATION_AGE_RULE}
 ${PHOTOS_RULE}
+${isOvernight ? `${UNIT_FIT_RULE}\n` : ""}
 ${cancellationNote}${pricingNote}${specialPeriodsText}${vocabNote}${personalityNote}${greeting}${crmNote}
 שירותים ומחירים:
 ${servicesText}

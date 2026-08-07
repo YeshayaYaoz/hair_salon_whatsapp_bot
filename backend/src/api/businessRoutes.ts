@@ -2,9 +2,10 @@ import { asyncRouter } from "../lib/asyncRouter.js";
 import crypto from "crypto";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
-import { requireAuth, signImpersonationToken, type AuthedRequest } from "../lib/auth.js";
+import { requireAuth, signImpersonationToken, DEFAULT_IMPERSONATION_HOURS, MAX_IMPERSONATION_HOURS, type AuthedRequest } from "../lib/auth.js";
 import { logAdminAction } from "../lib/adminAudit.js";
 import { sendAdminAlertEmail, sendBusinessNoticeEmail } from "../lib/email.js";
+import { assignNumberToAgent, CartesiaNotConfiguredError } from "../lib/cartesiaAdmin.js";
 import { captureError } from "../lib/errorMonitoring.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import { requireActiveSubscription } from "../lib/subscriptionGate.js";
@@ -21,12 +22,12 @@ import { reminderTemplate, reviewTemplate, REMINDER_TEMPLATE_BODY, REVIEW_TEMPLA
 import { notifyWaitlist, waitlistOfferText } from "../lib/waitlist.js";
 import { AFFILIATE_PROVIDERS, AFFILIATE_KINDS, recordAffiliateClick, markAffiliateConversion } from "../lib/affiliates.js";
 import { normalizeOwnerPhone } from "../lib/phone.js";
-import { appendTurn } from "../bot/conversationStore.js";
+import { appendTurn, forgetCachedHistory, forgetAllCachedHistory } from "../bot/conversationStore.js";
 import { createAppointment, OutsideBusinessHoursError, SlotUnavailableError } from "../booking/availability.js";
 import { parseBookingTime } from "../lib/timezone.js";
 import { getJobStatuses } from "../lib/jobStatus.js";
 import { listTemplates, BUSINESS_TYPES } from "../lib/businessTemplates.js";
-import { AI_PROVIDER_KEYS } from "../bot/providers/index.js";
+import { AI_PROVIDER_SELECTION_KEYS } from "../bot/providers/index.js";
 import { DEFAULT_TEMPERATURE, TEMPERATURE_MIN, TEMPERATURE_MAX } from "../bot/providers/types.js";
 import { anthropicRejectsTemperature } from "../bot/providers/anthropicProvider.js";
 import { applyTemplate } from "../lib/applyTemplate.js";
@@ -297,6 +298,93 @@ businessRouter.post("/admin/businesses/:id/unblock", requireSuperAdmin, async (r
   res.json({ ok: true });
 });
 
+/**
+ * Trade a salon's WhatsApp token for a long-lived one, and report when it expires.
+ *
+ * Embedded Signup hands back whatever Meta issues at the end of the flow, and it is stored as-is.
+ * A short-lived token dies in a couple of hours, and the failure is silent from the owner's side:
+ * the health job flips whatsappTokenValid and their bot simply stops answering, with a reconnect
+ * as the only remedy. Exchanging it for the 60-day version is one Graph call, but it needs the app
+ * secret, so it cannot happen anywhere but the server.
+ *
+ * GET reports expiry without changing anything, so the operator can look before acting — Meta
+ * reports expires_at 0 for tokens that never expire, which is reported as such rather than as
+ * "expired in 1970".
+ */
+async function tokenExpiry(token: string): Promise<{ expiresAt: string | null; neverExpires: boolean; scopes?: string[] }> {
+  const appId = process.env.META_APP_ID;
+  const appSecret = process.env.WHATSAPP_APP_SECRET;
+  if (!appId || !appSecret) throw new Error("META_APP_ID/WHATSAPP_APP_SECRET not configured");
+
+  // App access token (app_id|app_secret) rather than the token inspecting itself: a token that has
+  // already expired cannot authenticate its own debug call, which is exactly when we need to look.
+  const url = `https://graph.facebook.com/v23.0/debug_token?input_token=${encodeURIComponent(token)}&access_token=${encodeURIComponent(`${appId}|${appSecret}`)}`;
+  const data = (await (await fetch(url)).json()) as any;
+  if (data?.error) throw new Error(data.error.message ?? "debug_token failed");
+
+  const expiresAt = data?.data?.expires_at as number | undefined;
+  if (!expiresAt) return { expiresAt: null, neverExpires: true, scopes: data?.data?.scopes };
+  return { expiresAt: new Date(expiresAt * 1000).toISOString(), neverExpires: false, scopes: data?.data?.scopes };
+}
+
+businessRouter.get("/admin/businesses/:id/whatsapp-token", requireSuperAdmin, async (req: AuthedRequest, res) => {
+  const business = await prisma.business.findUnique({
+    where: { id: req.params.id },
+    select: { whatsappAccessToken: true, whatsappTokenValid: true },
+  });
+  if (!business?.whatsappAccessToken) return res.status(400).json({ error: "This business has no WhatsApp token" });
+
+  try {
+    const info = await tokenExpiry(decryptSecret(business.whatsappAccessToken));
+    res.json({ ...info, tokenValid: business.whatsappTokenValid });
+  } catch (err) {
+    res.status(502).json({ error: err instanceof Error ? err.message : "Could not read token" });
+  }
+});
+
+businessRouter.post("/admin/businesses/:id/whatsapp-token/extend", requireSuperAdmin, async (req: AuthedRequest, res) => {
+  const business = await prisma.business.findUnique({
+    where: { id: req.params.id },
+    select: { id: true, name: true, whatsappAccessToken: true },
+  });
+  if (!business?.whatsappAccessToken) return res.status(400).json({ error: "This business has no WhatsApp token" });
+
+  const appId = process.env.META_APP_ID;
+  const appSecret = process.env.WHATSAPP_APP_SECRET;
+  if (!appId || !appSecret) return res.status(500).json({ error: "META_APP_ID/WHATSAPP_APP_SECRET not configured" });
+
+  try {
+    const current = decryptSecret(business.whatsappAccessToken);
+    const url =
+      `https://graph.facebook.com/v23.0/oauth/access_token?grant_type=fb_exchange_token` +
+      `&client_id=${encodeURIComponent(appId)}&client_secret=${encodeURIComponent(appSecret)}` +
+      `&fb_exchange_token=${encodeURIComponent(current)}`;
+    const data = (await (await fetch(url)).json()) as any;
+    if (data?.error || !data?.access_token) {
+      console.error("[admin] Token exchange failed:", JSON.stringify(data));
+      return res.status(502).json({ error: data?.error?.message ?? "Meta returned no access_token" });
+    }
+
+    // Only overwrite once Meta has actually handed back a replacement — a failed exchange must
+    // leave the working token in place, since it is the only thing keeping the bot answering.
+    await prisma.business.update({
+      where: { id: business.id },
+      data: { whatsappAccessToken: encryptSecret(data.access_token as string), whatsappTokenValid: true },
+    });
+    await logAdminAction({
+      actorEmail: process.env.SUPER_ADMIN_EMAIL!,
+      action: "extend_whatsapp_token",
+      targetBusinessId: business.id,
+      targetBusinessName: business.name,
+    });
+
+    const info = await tokenExpiry(data.access_token as string).catch(() => null);
+    res.json({ ok: true, ...(info ?? {}) });
+  } catch (err) {
+    res.status(502).json({ error: err instanceof Error ? err.message : "Exchange failed" });
+  }
+});
+
 // Manually set a business's plan/subscription — for comping an account, a sales-negotiated
 // upgrade, or fixing a stuck billing state. Setting subscriptionStatus to "active" here does NOT
 // create a PayPlus recurring token — it just marks the account as paid, same as a successful
@@ -385,13 +473,19 @@ businessRouter.post("/admin/businesses/:id/impersonate", requireSuperAdmin, asyn
   const business = await prisma.business.findUnique({ where: { id: req.params.id }, select: { id: true, name: true } });
   if (!business) return res.status(404).json({ error: "Not found" });
 
+  // Optional: the panel offers a few lengths. signImpersonationToken clamps it either way, so a
+  // hand-crafted request can't mint a longer-lived credential than the ceiling.
+  const hours = z.number().int().positive().max(MAX_IMPERSONATION_HOURS).optional().safeParse(req.body?.hours);
+
   const adminEmail = process.env.SUPER_ADMIN_EMAIL!;
-  const token = signImpersonationToken(business.id, adminEmail);
+  const token = signImpersonationToken(business.id, adminEmail, hours.success ? hours.data : undefined);
   await logAdminAction({
     actorEmail: adminEmail,
     action: "impersonate",
     targetBusinessId: business.id,
     targetBusinessName: business.name,
+    // Recorded so the trail shows how long the operator held access, not just that they took over.
+    details: `${hours.success && hours.data ? hours.data : DEFAULT_IMPERSONATION_HOURS}h`,
   });
   res.json({ token });
 });
@@ -543,7 +637,7 @@ const profileSchema = z.object({
   availabilityInfo: z.string().max(600).optional(),
   pricingNotes: z.string().max(600).optional(),
   availabilitySuggestionsEnabled: z.boolean().optional(),
-  aiProvider: z.enum(AI_PROVIDER_KEYS).optional(),
+  aiProvider: z.enum(AI_PROVIDER_SELECTION_KEYS).optional(),
   aiModel: z.string().max(100).nullable().optional(),
   // null resets to the app default rather than pinning 0 — the two are different intentions and
   // the slider needs to be able to express "back to normal".
@@ -556,6 +650,15 @@ const profileSchema = z.object({
 businessRouter.get("/me/ai-providers", async (_req: AuthedRequest, res) => {
   res.json({
     providers: [
+      // Meta-choice, not a real backend: picks Claude or DeepSeek per message by complexity (see
+      // chooseTier in claudeBot.ts). Needs both configured — if DeepSeek's key is missing, "auto"
+      // would silently mean "always Claude", which isn't what the label promises.
+      {
+        key: "auto",
+        label: "אוטומטי (Claude ↔ DeepSeek)",
+        configured: Boolean(process.env.ANTHROPIC_API_KEY) && Boolean(process.env.DEEPSEEK_API_KEY),
+        defaultModels: [],
+      },
       { key: "anthropic", label: "Claude (Anthropic)", configured: Boolean(process.env.ANTHROPIC_API_KEY), defaultModels: ["claude-haiku-4-5-20251001", "claude-sonnet-5"] },
       { key: "openai", label: "OpenAI (GPT)", configured: Boolean(process.env.OPENAI_API_KEY), defaultModels: ["gpt-4o-mini", "gpt-4o"] },
       // deepseek-reasoner is intentionally not offered — it does not support function calling,
@@ -783,7 +886,30 @@ businessRouter.put("/me/voice-phone", async (req: AuthedRequest, res) => {
     if (err?.code === "P2002") return res.status(409).json({ error: "This number is already connected to another business" });
     throw err;
   }
-  res.json({ ok: true });
+
+  // Point the number at the shared voice agent in Cartesia. Skipping this is the one step that
+  // breaks a new salon's line invisibly: a number with no agent behind it answers and hangs up
+  // immediately, and the call never reaches us so nothing appears in our logs.
+  //
+  // Reported, never fatal. The number is saved either way, and a Cartesia outage must not stop an
+  // owner configuring their own settings — but they do need to know the line won't answer yet.
+  let voiceAgentWarning: string | null = null;
+  try {
+    const result = await assignNumberToAgent(parsed.data.voicePhoneNumber);
+    if (result.changed) console.log(`[cartesia] Assigned ${parsed.data.voicePhoneNumber} to the voice agent`);
+  } catch (err) {
+    if (err instanceof CartesiaNotConfiguredError) {
+      // Expected until the operator sets the keys — not worth alarming the owner about.
+      console.warn("[cartesia] Skipping number assignment:", err.message);
+    } else {
+      console.error("[cartesia] Failed to assign number to the voice agent:", err);
+      captureError(err, { businessId: req.businessId, kind: "cartesiaAssign" });
+      voiceAgentWarning =
+        "המספר נשמר, אך לא הצלחנו לחבר אותו לבוט הקולי אצל הספק. שיחות נכנסות לא ייענו עד שזה יטופל.";
+    }
+  }
+
+  res.json({ ok: true, ...(voiceAgentWarning ? { warning: voiceAgentWarning } : {}) });
 });
 
 businessRouter.delete("/me/voice-phone", async (req: AuthedRequest, res) => {
@@ -2005,6 +2131,45 @@ businessRouter.patch("/customers/:id/bot-paused", async (req: AuthedRequest, res
     data: { botPaused: parsed.data.paused, botPausedAt: parsed.data.paused ? new Date() : null },
   });
   res.json({ botPaused: updated.botPaused });
+});
+
+/**
+ * Start a fresh conversation with this customer without losing the transcript.
+ *
+ * Moves a marker rather than deleting rows: the bot reads nothing written before this instant, so
+ * the next incoming message is treated as an opening one (greeting, buttons, no stale context),
+ * while the dashboard still shows every message that was ever exchanged. Deleting was the only
+ * existing way to achieve this, and it destroyed the record the owner may need later.
+ */
+businessRouter.post("/customers/:id/reset-conversation", async (req: AuthedRequest, res) => {
+  const customer = await prisma.customer.findFirst({ where: { id: req.params.id, businessId: req.businessId! } });
+  if (!customer) return res.status(404).json({ error: "Not found" });
+
+  await prisma.customer.update({
+    where: { id: customer.id },
+    data: { conversationResetAt: new Date() },
+  });
+  // Without this the cached turns keep being served and the reset looks like it did nothing.
+  forgetCachedHistory(req.businessId!, customer.phone);
+
+  res.json({ ok: true });
+});
+
+/**
+ * The same reset, for every thread at once — after changing services, prices or the greeting, when
+ * the alternative is opening each conversation in turn.
+ *
+ * Still marker-only: no transcript is deleted. Customers with no conversation are updated too,
+ * which is harmless (there is nothing before the marker to hide).
+ */
+businessRouter.post("/conversations/reset-all", async (req: AuthedRequest, res) => {
+  const { count } = await prisma.customer.updateMany({
+    where: { businessId: req.businessId! },
+    data: { conversationResetAt: new Date() },
+  });
+  forgetAllCachedHistory(req.businessId!);
+
+  res.json({ ok: true, count });
 });
 
 // --- Waitlist ---

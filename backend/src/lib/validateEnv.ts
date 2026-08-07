@@ -54,6 +54,8 @@ const RECOMMENDED: RequiredVar[] = [
   { name: "SUPER_ADMIN_EMAIL", description: "your account email — unlocks the /dashboard/admin businesses list" },
   { name: "RESEND_API_KEY", description: "transactional emails (welcome, password reset)" },
   { name: "OPENAI_API_KEY", description: "two uses: voice-note transcription in the WhatsApp bot (Whisper), and the optional OpenAI provider choice on the Bot settings page" },
+  { name: "CARTESIA_API_KEY", description: "Cartesia management API key — lets the dashboard point a salon's voice number at the shared agent. Without it that assignment is manual, and a number with no agent answers the call and hangs up immediately" },
+  { name: "CARTESIA_AGENT_ID", description: "the one voice agent every salon shares — per-salon behaviour comes from /api/voice/context at call time, not from separate agents" },
   { name: "GOOGLE_PLACES_API_KEY", description: "Lead Finder business discovery (Google Places API) — discovery fails with a clear error if unset" },
   { name: "WHATSAPP_REMINDER_TEMPLATE", description: "approved template name for appointment reminders — without it, reminders to customers outside the 24h window are not delivered" },
   { name: "WHATSAPP_REVIEW_TEMPLATE", description: "approved template name for post-visit review requests — without it, review requests outside the 24h window are not delivered" },

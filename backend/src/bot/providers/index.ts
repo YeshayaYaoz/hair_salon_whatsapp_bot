@@ -33,6 +33,13 @@ const PROVIDERS: Record<string, AiProvider> = {
 
 export const AI_PROVIDER_KEYS = ["anthropic", "openai", "deepseek"] as const;
 
+// "auto" is not a real backend (it's not in PROVIDERS/getAiProvider below) — claudeBot.ts resolves
+// it to "anthropic" or "deepseek" per message based on chooseTier. It's a valid value to store on
+// Business.aiProvider and to offer in the dashboard, which is why it's a separate list rather than
+// a fourth entry in AI_PROVIDER_KEYS — code that iterates AI_PROVIDER_KEYS to actually call a
+// provider (e.g. scripts/compare-providers.ts) would break if "auto" were mixed in there.
+export const AI_PROVIDER_SELECTION_KEYS = ["auto", ...AI_PROVIDER_KEYS] as const;
+
 export function isAiProviderKey(v: unknown): v is string {
   return typeof v === "string" && v in PROVIDERS;
 }

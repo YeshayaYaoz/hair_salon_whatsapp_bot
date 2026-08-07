@@ -338,6 +338,10 @@ model Customer {
   notes               String? // free-text staff note about this customer, shown next to their conversation
   botPaused           Boolean         @default(false) // true once the owner sends a manual message — bot goes silent on this thread until resumed
   botPausedAt         DateTime?
+  // Owner pressed "start a fresh conversation". The bot stops reading anything written before this
+  // instant, so the next message opens a new thread (greeting, buttons, no stale context) — while
+  // ConversationMessage rows are left untouched, so the transcript stays complete in the dashboard.
+  conversationResetAt DateTime?
   appointments        Appointment[]
   waitlistEntries     WaitlistEntry[]
 

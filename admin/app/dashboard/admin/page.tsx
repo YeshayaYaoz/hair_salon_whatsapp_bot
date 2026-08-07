@@ -262,6 +262,12 @@ export default function AdminBusinessesPage() {
   const [waPhoneId, setWaPhoneId] = useState("");
   const [waToken, setWaToken] = useState("");
   const [showWaForm, setShowWaForm] = useState(false);
+  /** Result of the last token check/extend for the open drilldown. null = not looked at yet. */
+  const [tokenInfo, setTokenInfo] = useState<{ expiresAt?: string | null; neverExpires?: boolean; error?: string } | null>(null);
+  const [tokenBusy, setTokenBusy] = useState(false);
+  /** How long a takeover session lasts. Kept across drilldowns — it's an operator preference for
+   * the task at hand, not a property of the salon being opened. Server clamps it regardless. */
+  const [takeoverHours, setTakeoverHours] = useState(8);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [mrrHistory, setMrrHistory] = useState<MrrSnapshot[] | null>(null);
@@ -288,6 +294,7 @@ export default function AdminBusinessesPage() {
     setWaPhoneId("");
     setWaToken("");
     setShowWaForm(false);
+    setTokenInfo(null); // otherwise the previous salon's expiry shows under this one's name
     setActionError(null);
     setBizAuditLog(null);
     apiFetch<AuditLogEntry[]>(`/api/business/admin/audit-log?businessId=${b.id}`)
@@ -313,7 +320,10 @@ export default function AdminBusinessesPage() {
     setActionBusy(true);
     setActionError(null);
     try {
-      const { token } = await apiFetch<{ token: string }>(`/api/business/admin/businesses/${b.id}/impersonate`, { method: "POST" });
+      const { token } = await apiFetch<{ token: string }>(`/api/business/admin/businesses/${b.id}/impersonate`, {
+        method: "POST",
+        body: JSON.stringify({ hours: takeoverHours }),
+      });
       startImpersonation(token);
       // Full reload, not router.push — see reloadAs. Client-side navigation would keep this
       // admin page's state and every cached fetch made as the admin.
@@ -777,6 +787,16 @@ export default function AdminBusinessesPage() {
                 >
                   {he ? "👁️ צפה כעסק זה" : "👁️ View as this business"}
                 </button>
+                <select
+                  value={takeoverHours}
+                  onChange={(e) => setTakeoverHours(Number(e.target.value))}
+                  title={he ? "משך הגישה עד שתצטרך להיכנס מחדש" : "How long the session lasts before you have to re-enter"}
+                  className="text-xs py-1.5"
+                >
+                  <option value={1}>{he ? "שעה" : "1 hour"}</option>
+                  <option value={8}>{he ? "8 שעות" : "8 hours"}</option>
+                  <option value={24}>{he ? "24 שעות" : "24 hours"}</option>
+                </select>
               </div>
               <div className="flex items-center gap-2">
                 <input
@@ -844,6 +864,59 @@ export default function AdminBusinessesPage() {
                     >
                       {actionBusy ? (he ? "מאמת…" : "Verifying…") : (he ? "אמת וחבר" : "Verify & connect")}
                     </button>
+                  </div>
+                )}
+
+                {/* Token lifetime. Embedded Signup can hand back a short-lived token, which dies in
+                    hours and takes the bot down silently — this trades it for the 60-day one. */}
+                {drilldown.whatsappConnected && (
+                  <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-gray-100">
+                    <span className="text-[11px] text-gray-600">
+                      {tokenInfo === null
+                        ? (he ? "תוקף הטוקן: לא נבדק" : "Token expiry: not checked")
+                        : tokenInfo.error
+                          ? <span className="text-red-600">{tokenInfo.error}</span>
+                          : tokenInfo.neverExpires
+                            ? <span className="text-green-600 font-medium">{he ? "טוקן קבוע — לא פג" : "Permanent — never expires"}</span>
+                            : <span>{he ? "פג בתאריך " : "Expires "}{new Date(tokenInfo.expiresAt!).toLocaleDateString()}</span>}
+                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        disabled={tokenBusy}
+                        onClick={async () => {
+                          setTokenBusy(true);
+                          try {
+                            setTokenInfo(await apiFetch(`/api/business/admin/businesses/${drilldown.id}/whatsapp-token`));
+                          } catch (e: any) {
+                            setTokenInfo({ error: e?.message ?? (he ? "בדיקה נכשלה" : "Check failed") });
+                          } finally {
+                            setTokenBusy(false);
+                          }
+                        }}
+                        className="text-xs font-medium px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        {he ? "בדוק" : "Check"}
+                      </button>
+                      <button
+                        disabled={tokenBusy}
+                        onClick={async () => {
+                          if (!confirm(he
+                            ? "להאריך את הטוקן ל-60 יום? הטוקן הנוכחי יוחלף. אם ההחלפה נכשלת הטוקן הקיים נשאר כמו שהוא."
+                            : "Extend this token to 60 days? The current token is replaced. If the exchange fails the existing token is left untouched.")) return;
+                          setTokenBusy(true);
+                          try {
+                            setTokenInfo(await apiFetch(`/api/business/admin/businesses/${drilldown.id}/whatsapp-token/extend`, { method: "POST" }));
+                          } catch (e: any) {
+                            setTokenInfo({ error: e?.message ?? (he ? "ההארכה נכשלה" : "Extend failed") });
+                          } finally {
+                            setTokenBusy(false);
+                          }
+                        }}
+                        className="text-xs font-medium px-2.5 py-1.5 rounded-lg bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-50"
+                      >
+                        {tokenBusy ? "…" : (he ? "הארך ל-60 יום" : "Extend to 60d")}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

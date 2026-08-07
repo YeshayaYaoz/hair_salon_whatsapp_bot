@@ -2,7 +2,7 @@ import { prisma } from "./prisma.js";
 
 export async function logAdminAction(params: {
   actorEmail: string;
-  action: "block" | "unblock" | "set_plan" | "delete" | "impersonate" | "connect_whatsapp";
+  action: "block" | "unblock" | "set_plan" | "delete" | "impersonate" | "connect_whatsapp" | "extend_whatsapp_token";
   targetBusinessId: string;
   targetBusinessName: string;
   details?: string;

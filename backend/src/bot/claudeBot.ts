@@ -17,23 +17,26 @@ import { getAiProvider, ProviderCallError, type GenericTool, type GenericTurn } 
 // bot/providers/ for the Anthropic/OpenAI/DeepSeek adapters.
 
 /**
- * Every customer-facing reply uses the smart tier.
+ * Routes only unambiguous, content-free acknowledgements to the cheap tier — everything else,
+ * including anything that could touch booking logic, stays on the smart tier.
  *
- * This used to default to the cheap tier (Haiku) for everything — the previous "simple message"
- * regex was dead code, since both branches returned "cheap". That produced a steady trickle of
- * invented Hebrew words in real conversations ("יתאשר" instead of "יאשר", "משתניים" — literally
- * "variables" — instead of "מהשתיים"), which no amount of prompt wording fixed, because it's a
- * model-capability limit rather than an instruction-following one: Hebrew morphology is simply
- * weaker on the small model.
+ * This used to just return "smart" unconditionally: an earlier "simple message" heuristic sent
+ * short messages to Haiku and produced a steady trickle of invented Hebrew words in real
+ * conversations ("יתאשר" instead of "יאשר", "משתניים" — literally "variables" — instead of
+ * "מהשתיים"). That's a model-capability limit on Hebrew morphology, not something prompt wording
+ * fixes, so the fix isn't a smarter classifier — it's a stricter one: only route messages where a
+ * wrong word literally cannot matter, because there's nothing to say beyond "acknowledged".
  *
- * The tradeoff is lopsided. Measured spend was well under ₪1/month per business at Haiku rates,
- * so the smart tier costs a few extra agorot a month — while malformed Hebrew is visible to the
- * business's own customers and makes the business look unprofessional. Quality wins.
- *
- * hadToolError is kept as a parameter (rather than dropped) because the escalation path in the
- * tool loop still calls this, and a future cheap tier for non-Hebrew businesses would want it.
+ * hadToolError forces "smart" outright — a tool that just failed needs the model that can actually
+ * reason about the retry, not the one being evaluated for cost.
  */
-function chooseTier(_messageText: string, _hadToolError: boolean): "cheap" | "smart" {
+const SIMPLE_MESSAGE_RE =
+  /^(hi|hey|hello|thanks|thank you|ok|okay|k|yes|no|sure|great|cool|byy?e|goodbye|היי|הי|שלום|ביי|תודה|תודה רבה|מעולה|סבבה|בסדר|בסדר גמור|כן|לא|אוקיי|אוקי|יאללה|נהדר|יופי|וואו|תודה!)[!.,?׃…\s]*$/iu;
+
+function chooseTier(messageText: string, hadToolError: boolean): "cheap" | "smart" {
+  if (hadToolError) return "smart";
+  const trimmed = messageText.trim();
+  if (trimmed.length > 0 && trimmed.length <= 20 && SIMPLE_MESSAGE_RE.test(trimmed)) return "cheap";
   return "smart";
 }
 
@@ -134,6 +137,27 @@ const tools: GenericTool[] = [
       required: ["reason"],
     },
   },
+  /**
+   * Records a name the moment it is mentioned, independently of any booking.
+   *
+   * Everywhere else a name gets written is the tail end of a completed action — book_appointment,
+   * or request_booking_callback. Neither necessarily happens: a guest asks about prices and photos,
+   * says who they are, and leaves. The name was in the transcript and nowhere else, so the
+   * customers list showed a page of nameless rows for a business that had been talking to people
+   * by name all week. Worst in inquiry mode, where there is no booking call to fall back on.
+   */
+  {
+    name: "save_customer_name",
+    description:
+      "Record the customer's name as soon as they give it, whether or not they are booking. Call this the first time a name is mentioned in the conversation. Do not call it again unless they correct their name, and never guess a name they did not state.",
+    input_schema: {
+      type: "object",
+      properties: {
+        customerName: { type: "string", description: "The name exactly as the customer gave it." },
+      },
+      required: ["customerName"],
+    },
+  },
 ];
 
 // Tool used only in "inquiry" booking mode (e.g. B&B): instead of booking a slot, the bot collects
@@ -156,6 +180,7 @@ const requestBookingCallbackTool: GenericTool = {
 // since there is no live booking engine for these verticals.
 const inquiryTools: GenericTool[] = [
   requestBookingCallbackTool,
+  tools.find((t) => t.name === "save_customer_name")!,
   // A guest asking to see the unit is the single most common request in this mode.
   tools.find((t) => t.name === "send_photos")!,
   tools.find((t) => t.name === "request_human_followup")!,
@@ -538,8 +563,23 @@ async function runTool(
     return JSON.stringify({ addedToWaitlist: true, service: service.name });
   }
 
+  if (name === "save_customer_name") {
+    const given = (input.customerName as string | undefined)?.trim();
+    if (!given) return JSON.stringify({ error: "No name was provided — do not call this without one." });
+    await saveCustomerName(businessId, customerPhone, given);
+    // Nothing for the customer to be told: they just said their name, and reading it back is the
+    // narration BREVITY_RULE exists to stop.
+    return JSON.stringify({ saved: true });
+  }
+
   if (name === "request_booking_callback") {
-    const label = (input.customerName as string | undefined) ?? customerPhone;
+    const givenName = (input.customerName as string | undefined)?.trim();
+    // Inquiry businesses never call book_appointment, and that is the only other place a name is
+    // written — so for a B&B the name the customer just gave went into the owner's alert and was
+    // then thrown away, leaving every guest nameless in the dashboard forever.
+    if (givenName) await saveCustomerName(businessId, customerPhone, givenName);
+
+    const label = givenName ?? customerPhone;
     const notified = await notifyOwner(
       businessId,
       `📞 בקשת הזמנה חדשה — יש לחזור ללקוח!\nלקוח: ${label}\nטלפון לחזרה: ${customerPhone}\nוואטסאפ: https://wa.me/${customerPhone.replace(/\D/g, "")}\nפרטים: ${input.details}`
@@ -684,11 +724,47 @@ function stampIfStale(turn: Turn, timezone: string | null): string {
   return `[נכתב ב-${turnDay}] ${turn.content}`;
 }
 
+/**
+ * Upsert, because someone who has only ever asked questions may have no Customer row yet — and in
+ * inquiry mode that is most of them, since no booking ever creates one.
+ */
+async function saveCustomerName(businessId: string, phone: string, name: string): Promise<void> {
+  await prisma.customer.upsert({
+    where: { businessId_phone: { businessId, phone } },
+    update: { name },
+    create: { businessId, phone, name },
+  });
+}
+
 const AI_UNAVAILABLE_HE = "מצטער, הבוט אינו זמין כרגע. נסה שוב בעוד כמה דקות, או צור קשר ישיר עם העסק.";
+
+/**
+ * A thread counts as a new conversation once it has been quiet for this long.
+ *
+ * Matches WhatsApp's own 24-hour session window, which is the boundary the customer already feels:
+ * past it they are starting a conversation, not continuing one. Keying the greeting off "this
+ * number has never written before" instead meant a returning customer saw the opening message and
+ * its buttons exactly once in their life, and the owner could never see them again while testing.
+ */
+const NEW_CONVERSATION_GAP_MS = 24 * 60 * 60 * 1000;
+
+/** Whether this incoming message opens a conversation rather than continuing one. Exported for
+ * testing: it decides whether the greeting button and quick replies are attached. */
+export function opensNewConversation(history: Turn[], now: Date = new Date()): boolean {
+  const last = history[history.length - 1];
+  if (!last) return true; // nothing said before — either genuinely new, or reset by the owner
+  if (!last.at) return false; // undated turn: assume mid-conversation rather than re-greet
+  return now.getTime() - last.at.getTime() > NEW_CONVERSATION_GAP_MS;
+}
 
 export async function handleIncomingMessage(businessId: string, customerPhone: string, messageText: string): Promise<BotResult> {
   const system = await buildSystemPrompt(businessId, customerPhone);
   const history = await getHistory(businessId, customerPhone);
+  // Read this now, not at the return. conversationStore caches turns and hands back the array
+  // itself, and appendTurn below pushes into that same array — so by the end of this function
+  // `history` always holds the two turns we just wrote, and `length === 0` is never true. The
+  // greeting button and quick replies are gated on this flag, which is why neither ever appeared.
+  const isFirstReply = opensNewConversation(history);
 
   // "inquiry" businesses (e.g. B&B) have no live booking engine — the bot answers info and hands
   // booking intent to the owner, so it gets a reduced tool set with no slot/booking tools.
@@ -697,7 +773,6 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     select: { bookingModel: true, aiProvider: true, aiModel: true, timezone: true, aiTemperature: true },
   });
   const activeTools = biz.bookingModel === "inquiry" ? inquiryTools : tools;
-  const provider = getAiProvider(biz.aiProvider);
 
   const turns: GenericTurn[] = [
     ...history.map((t: Turn) => ({ role: t.role, text: stampIfStale(t, biz.timezone) }) as GenericTurn),
@@ -712,7 +787,17 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   // reply when the underlying tool call actually errored out (e.g. slot taken in the meantime).
   let unconfirmedBookingFailure: string | null = null;
   let tier = chooseTier(messageText, false);
-  let model = provider.resolveModel(tier, biz.aiModel);
+
+  // "auto" is a meta-choice, not a real backend: it picks Claude or DeepSeek per-message from the
+  // same tier the chosen provider then uses to pick its own cheap/smart model — so a business set
+  // to "auto" gets DeepSeek only for the same narrow class of message that would get Haiku under
+  // "Claude, auto model", and Claude Sonnet for everything else. modelOverride is dropped for
+  // "auto" because a pinned model id from one provider is meaningless once the provider itself is
+  // decided per-message.
+  const isMetaAuto = biz.aiProvider === "auto";
+  const modelOverride = isMetaAuto ? null : biz.aiModel;
+  let provider = getAiProvider(isMetaAuto ? (tier === "cheap" ? "deepseek" : "anthropic") : biz.aiProvider);
+  let model = provider.resolveModel(tier, modelOverride);
 
   console.log(`[bot] provider=${provider.key} model=${model} business=${businessId} phone=${customerPhone} msg="${messageText.slice(0, 80)}"`);
 
@@ -733,27 +818,35 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   try {
     response = await call(model);
   } catch (err) {
-    // Fall back to the cheap tier before giving up. The smart tier used to be unreachable (the old
-    // chooseTier returned "cheap" on every path), so making it the default put every reply behind a
-    // model that had never actually served production traffic — and anything account-level, like the
-    // model not being enabled on this API key, then took the bot down completely rather than
-    // degrading it. A worse reply beats no reply.
-    const fallbackModel = provider.resolveModel("cheap", biz.aiModel);
-    const canFallBack = fallbackModel !== model;
+    // A worse reply beats no reply. In "auto" mode the other backend is a different account and
+    // API surface entirely, so a failure (key revoked, model disabled, outage) is worth retrying
+    // there rather than assuming the whole request is doomed. Outside "auto", the only fallback
+    // available is this same provider's cheap tier — which does nothing if a model override pins
+    // both tiers to the same id, or if the failure is account-level rather than model-level.
+    let fallbackProvider = provider;
+    let fallbackModel: string;
+    if (isMetaAuto) {
+      fallbackProvider = getAiProvider(provider.key === "anthropic" ? "deepseek" : "anthropic");
+      fallbackModel = fallbackProvider.resolveModel(tier, null);
+    } else {
+      fallbackModel = provider.resolveModel("cheap", modelOverride);
+    }
+    const canFallBack = isMetaAuto ? true : fallbackModel !== model;
     console.error(
-      `[bot] ${provider.key} call failed on ${model}${canFallBack ? ` — falling back to ${fallbackModel}` : ""}:`,
+      `[bot] ${provider.key} call failed on ${model}${canFallBack ? ` — falling back to ${fallbackProvider.key}/${fallbackModel}` : ""}:`,
       err instanceof ProviderCallError ? err.message : err
     );
     captureError(err, { businessId, customerPhone, model, provider: provider.key });
 
     if (!canFallBack) return { text: AI_UNAVAILABLE_HE };
     try {
+      provider = fallbackProvider;
       model = fallbackModel;
-      tier = "cheap";
+      if (!isMetaAuto) tier = "cheap";
       response = await call(model);
     } catch (fallbackErr) {
-      console.error(`[bot] fallback to ${model} also failed:`, fallbackErr instanceof ProviderCallError ? fallbackErr.message : fallbackErr);
-      captureError(fallbackErr, { businessId, customerPhone, model, provider: provider.key, phase: "cheap fallback" });
+      console.error(`[bot] fallback to ${provider.key}/${model} also failed:`, fallbackErr instanceof ProviderCallError ? fallbackErr.message : fallbackErr);
+      captureError(fallbackErr, { businessId, customerPhone, model, provider: provider.key, phase: "fallback" });
       return { text: AI_UNAVAILABLE_HE };
     }
   }
@@ -775,15 +868,16 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
       console.log(`[bot] tool=${tc.name} result=${result.slice(0, 200)}`);
 
       // If a tool returned an error and we're still on the cheap tier, escalate for the retry —
-      // but only if the business hasn't pinned a specific model override, in which case there's
-      // no cheap/smart pair to escalate between. Currently inert: chooseTier always returns
-      // "smart" (see its comment), so there's nothing to escalate from. Kept because it's the
-      // correct behavior the moment any cheap tier is reintroduced.
-      if (result.includes('"error"') && tier === "cheap" && !biz.aiModel) {
+      // but only if the business hasn't pinned a specific model override, in which case there's no
+      // cheap/smart pair to escalate between. In "auto" mode, cheap tier means the request went to
+      // DeepSeek, so escalating means switching provider too, not just picking a different model
+      // from the same one.
+      if (result.includes('"error"') && tier === "cheap" && !modelOverride) {
         hadToolError = true;
         tier = "smart";
-        model = provider.resolveModel(tier, biz.aiModel);
-        console.log(`[bot] tool error detected — escalating to ${model}`);
+        if (isMetaAuto) provider = getAiProvider("anthropic");
+        model = provider.resolveModel(tier, modelOverride);
+        console.log(`[bot] tool error detected — escalating to ${provider.key}/${model}`);
       }
 
       if (tc.name === "book_appointment" || tc.name === "reschedule_appointment") {
@@ -857,6 +951,6 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     text: replyText,
     offeredSlots: lastOfferedSlots.value,
     photos: lastPhotos.value,
-    isFirstReply: history.length === 0,
+    isFirstReply,
   };
 }

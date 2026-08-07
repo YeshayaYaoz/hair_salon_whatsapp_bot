@@ -50,6 +50,7 @@ describe("every rule reaches the prompt", () => {
   const ALWAYS_PRESENT = [
     ["HONESTY_RULES", RULES.HONESTY_RULES],
     ["LANGUAGE_RULES", RULES.LANGUAGE_RULES],
+    ["BREVITY_RULE", RULES.BREVITY_RULE],
     ["FORMATTING_RULES", RULES.FORMATTING_RULES],
     ["CALENDAR_RULES", RULES.CALENDAR_RULES],
     ["CONVERSATION_AGE_RULE", RULES.CONVERSATION_AGE_RULE],
@@ -61,6 +62,19 @@ describe("every rule reaches the prompt", () => {
     mockPrisma.business.findUniqueOrThrow.mockResolvedValue(business());
     const { stable } = await buildSystemPrompt("biz1");
     expect(stable).toContain(rule);
+  });
+
+  /**
+   * Guards a real conversation: a family of five was offered the 10-guest unit at ₪3,000 and never
+   * shown the 7-guest one at ₪2,100 until they named it themselves. Only overnight businesses rent
+   * units with guest limits, so a salon must not carry this rule as noise.
+   */
+  it("includes the unit-fit rule for overnight businesses only", async () => {
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue(business());
+    expect((await buildSystemPrompt("biz1")).stable).toContain(RULES.UNIT_FIT_RULE);
+
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue(business({ businessType: "hair_salon" }));
+    expect((await buildSystemPrompt("biz1")).stable).not.toContain(RULES.UNIT_FIT_RULE);
   });
 
   it("includes the placeholder rule only when the owner wrote a greeting", async () => {
@@ -91,6 +105,18 @@ describe("booking section is chosen by booking model", () => {
     expect(stable).not.toContain("book_appointment");
     // Opening hours are meaningless for an overnight rental and would otherwise render empty.
     expect(stable).not.toContain("שעות פעילות:");
+  });
+
+  /**
+   * Inquiry businesses have no booking call to hang name collection off, so without an explicit
+   * instruction the bot would chat with a guest by name and still leave the row nameless — which
+   * is what a real B&B's customers list looked like.
+   */
+  it("tells inquiry businesses to ask for a name and to record it outside of booking", async () => {
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue(business({ bookingModel: "inquiry" }));
+    const { stable } = await buildSystemPrompt("biz1");
+    expect(stable).toContain("save_customer_name");
+    expect(stable).toContain("גם אם אינו מזמין");
   });
 });
 
