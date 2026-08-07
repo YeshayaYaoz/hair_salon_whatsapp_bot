@@ -72,12 +72,12 @@ const tools: GenericTool[] = [
   },
   {
     name: "list_my_appointments",
-    description: "List this customer's upcoming confirmed appointments.",
+    description: "List this customer's upcoming appointments, including any still held awaiting a deposit (awaitingPayment:true).",
     input_schema: { type: "object", properties: {} },
   },
   {
     name: "cancel_appointment",
-    description: "Cancel one of this customer's upcoming appointments.",
+    description: "Cancel one of this customer's upcoming appointments. Works for a slot still held awaiting a deposit as well as a confirmed booking.",
     input_schema: {
       type: "object",
       properties: {
@@ -461,13 +461,33 @@ export async function runTool(
   }
 
   if (name === "list_my_appointments") {
+    // Holds are included, not just confirmed bookings. A customer who booked somewhere that takes
+    // deposits has a real appointment as far as they are concerned — the slot is theirs and the
+    // clock is running — but filtering to "confirmed" meant asking "what do I have booked?"
+    // answered "nothing", which reads as their booking having failed.
     const appointments = await prisma.appointment.findMany({
-      where: { businessId, status: "confirmed", customer: { phone: customerPhone }, startTime: { gte: new Date() } },
+      where: {
+        businessId,
+        status: { in: ["confirmed", "pending_payment"] },
+        customer: { phone: customerPhone },
+        startTime: { gte: new Date() },
+      },
       include: { service: true },
       orderBy: { startTime: "asc" },
     });
     return JSON.stringify({
-      appointments: appointments.map((a) => ({ service: a.service.name, startTime: a.startTime })),
+      appointments: appointments.map((a) => ({
+        service: a.service.name,
+        startTime: a.startTime,
+        ...(a.status === "pending_payment"
+          ? {
+              awaitingPayment: true,
+              depositAmountIls: a.depositAmountIls,
+              holdExpiresAt: a.depositExpiresAt,
+              note: "Held, not confirmed — the deposit is still unpaid and the slot is released when the hold expires. Use get_payment_link if they want to pay now.",
+            }
+          : {}),
+      })),
     });
   }
 
@@ -530,8 +550,16 @@ export async function runTool(
     const biz = await prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { timezone: true } });
     const tz = biz.timezone || "Asia/Jerusalem";
     const target = parseBookingTime(input.startTime as string, tz);
+    // A hold is cancellable too. It was not, so a customer who changed their mind before paying had
+    // no way to say so — the slot stayed blocked for the whole hold window and the salon kept
+    // waiting on a deposit that was never coming.
     const appointment = await prisma.appointment.findFirst({
-      where: { businessId, status: "confirmed", customer: { phone: customerPhone }, startTime: target },
+      where: {
+        businessId,
+        status: { in: ["confirmed", "pending_payment"] },
+        customer: { phone: customerPhone },
+        startTime: target,
+      },
       include: { service: true, customer: true },
     });
     if (!appointment) return JSON.stringify({ error: "No matching appointment found" });
@@ -547,6 +575,10 @@ export async function runTool(
     // The owner was told when this booking was made and is told when a deposit lands, but nothing
     // told them it had been cancelled — so a salon learned its 3pm was free only by looking. That
     // is the slot they could still sell, and the customer they might want to call.
+    //
+    // Unpaid holds are the exception: nothing announces a hold when it is created, so announcing
+    // its cancellation would report the disappearance of something the owner never knew existed.
+    const wasHold = appointment.status === "pending_payment";
     const depositPaid = appointment.depositStatus === "paid";
     const customerLabel = appointment.customer.name
       ? `${appointment.customer.name} (${appointment.customer.phone})`
@@ -554,7 +586,7 @@ export async function runTool(
     const when = appointment.startTime.toLocaleString("he-IL", {
       timeZone: tz, weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit",
     });
-    notifyOwner(
+    if (!wasHold) notifyOwner(
       businessId,
       `❌ תור בוטל\nלקוח: ${customerLabel}\nשירות: ${appointment.service.name}\nמועד: ${when}` +
         // Money already taken is the part the owner has to decide about, so it cannot be a

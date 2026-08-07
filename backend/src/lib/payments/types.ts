@@ -36,6 +36,16 @@ export interface PaymentLinkResult {
 export interface VerifyResult {
   valid: boolean;
   error?: string;
+  /**
+   * True when we accepted the credentials without being able to prove they work.
+   *
+   * Most adapters verify by generating a real ₪1 payment link, which fails loudly on bad keys.
+   * Tranzila cannot: its payment URL is assembled client-side with no API call, so there is
+   * nothing to call and nothing to reject. Reporting that as a plain "Connected" is the same class
+   * of lie as the Grow sandbox host — the dashboard says it works, and the first customer to try
+   * paying is the one who discovers it doesn't. Callers surface this to the owner instead.
+   */
+  unverified?: boolean;
 }
 
 /** Uniform surface every Israeli payment/clearing provider adapter implements. Each business

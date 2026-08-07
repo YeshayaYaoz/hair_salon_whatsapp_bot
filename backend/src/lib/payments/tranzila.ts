@@ -30,6 +30,10 @@ export const tranzilaProvider: PaymentProvider = {
   // surface once a customer actually tries to pay; flagged for the same reason in the UI copy.
   async verifyCredentials(creds: PaymentCredentials): Promise<VerifyResult> {
     if (!creds.apiKey.trim()) return { valid: false, error: "Terminal name is required" };
-    return { valid: true };
+    // Nothing further can be checked here. createPaymentLink above assembles a URL rather than
+    // calling an API, so there is no request that a wrong terminal name would fail. Rather than
+    // guess at what Tranzila serves for a bad terminal — and risk rejecting valid ones — this
+    // reports honestly that the check did not happen, and the owner is told so.
+    return { valid: true, unverified: true };
   },
 };

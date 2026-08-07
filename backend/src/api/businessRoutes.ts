@@ -1141,7 +1141,9 @@ businessRouter.put("/me/payment-provider", async (req: AuthedRequest, res) => {
   // bookkeeping problem must not fail a connection the salon just completed successfully.
   markAffiliateConversion({ businessId: req.businessId!, provider: parsed.data.provider, kind: "payments" });
 
-  res.json({ ok: true, webhookSecret });
+  // Passed through so the dashboard can say "saved, but we couldn't check it" rather than a flat
+  // "Connected" — see VerifyResult.unverified.
+  res.json({ ok: true, webhookSecret, unverified: verification.unverified ?? false });
 });
 
 businessRouter.delete("/me/payment-provider", async (req: AuthedRequest, res) => {
