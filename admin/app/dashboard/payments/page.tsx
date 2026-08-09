@@ -205,13 +205,19 @@ function ProviderCard<T extends string>({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
-  // Collapsed once connected. A finished setup is not something the owner needs to look at again,
-  // and leaving the credential form open invites re-entering keys that are already working — or
-  // worse, letting a password manager autofill over them.
+  /**
+   * Collapsed until asked for, connected or not.
+   *
+   * Connected, a finished setup is not something to look at again, and an open credential form
+   * invites re-entering working keys or letting a password manager autofill over them. Unconnected
+   * it used to stay open permanently, so the page led with two provider pickers, two instruction
+   * boxes and five empty credential fields — most of a screen of forms for a decision most salons
+   * make once, or never. The status pill says which state you are in; the form is one click away.
+   */
   const [expanded, setExpanded] = useState(false);
 
   const info = meta[selected];
-  const showBody = !connected || expanded;
+  const showBody = expanded;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -238,19 +244,33 @@ function ProviderCard<T extends string>({
         </div>
         <ConnectedPill connected={connected} he={he} />
         {saved && <SavedBadge text={he ? "נשמר" : "Saved"} />}
-        {connected && (
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="text-xs font-medium text-gray-500 hover:text-gray-700 transition shrink-0"
-            aria-expanded={expanded}
-          >
-            {expanded ? (he ? "סגירה" : "Close") : (he ? "שינוי" : "Change")}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="text-xs font-medium text-gray-500 hover:text-gray-700 transition shrink-0"
+          aria-expanded={expanded}
+        >
+          {expanded
+            ? (he ? "סגירה" : "Close")
+            : connected
+              ? (he ? "שינוי" : "Change")
+              : (he ? "חיבור" : "Connect")}
+        </button>
       </div>
 
-      {!showBody && (
+      {!showBody && !connected && (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="w-full text-start px-5 py-3.5 text-xs text-gray-600 hover:bg-gray-50 transition"
+        >
+          {he
+            ? "עוד לא חובר. לחצו „חיבור” כדי לבחור ספק ולהזין מפתחות."
+            : "Not connected yet. Use \u201cConnect\u201d to pick a provider and enter keys."}
+        </button>
+      )}
+
+      {!showBody && connected && (
         <div className="px-5 py-3.5 flex items-center gap-3 flex-wrap">
           <p className="text-xs text-gray-600 flex-1 min-w-0">
             {he
