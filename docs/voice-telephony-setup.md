@@ -44,10 +44,15 @@ Requirements, in order of how likely they are to disqualify someone:
   prefer those; UDP is what most carriers send by default and is worth testing before assuming it
   is refused.
 
-**Zadarma** fits on paper: `+972` at $0 connection and $2–3/month, and an *External Server → SIP
-URI* setting whose documentation says calls are *"transferred without registration"*. Their own
-guidance — *"allow incoming calls from Zadarma IP-addresses"* — maps onto Cartesia's inbound
-allowlist. Untested end to end at the time of writing.
+**Zadarma works** — confirmed against a live Cartesia account, not just on paper. `+972` numbers at
+$0 connection and $2–3/month, forwarded via *External Server → SIP URI*, with their published
+signalling ranges in the trunk's `allowed_addresses`. The trunk registers, numbers import, and
+**one agent holds several numbers at once**.
+
+That last part is worth recording, because the published Cartesia TypeScript SDK claims otherwise:
+its `listPhoneNumbers` docstring says *"you can only have one phone number per agent"*. That is
+stale. The prose docs say *"an agent can have multiple numbers route to it"*, and a live account
+confirms it. Do not size the architecture off that comment.
 
 ### 2. Register the trunk (one time)
 
@@ -57,9 +62,11 @@ npx tsx scripts/cartesia-trunk-setup.ts --label "Zadarma" --numbers +972XXXXXXXX
 ```
 
 Cartesia refuses an inbound trunk with no access control, and so does the script. `--numbers` is the
-easiest for a first number: it needs nothing from the carrier, whereas an IP allowlist means
-chasing their signalling ranges — and on the LiveKit backend Cartesia runs on, `allowed_addresses`
-has to be enabled per project by support.
+quickest if you have nothing else; `--addresses` with the carrier's signalling ranges is the better
+end state, because it keeps working as you add numbers instead of needing the allowlist edited each
+time. Zadarma publishes its ranges on the SIP URI page in the account, and `allowed_addresses` has
+been confirmed working on a live Cartesia account — LiveKit's own docs say that field needs per-
+project enablement, but Cartesia evidently handles that for you.
 
 Put the printed id in `CARTESIA_SIP_PROVIDER_ID`. Without it, `assignNumberToAgent` keeps its old
 behaviour and fails with a message telling you to import the number by hand — which is accurate,
