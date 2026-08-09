@@ -24,6 +24,22 @@ model is never asked for something it cannot know.
 The same handler sets the salon's chosen **voice** (`voiceId` from `/context`) via
 `PreCallResult.config.tts.voice_id`, so the very first word is already in the right voice.
 
+### `PreCallResult.metadata` does not reach the agent
+
+Observed on a live call: whatever `pre_call_handler` returns as metadata is discarded, and the
+websocket start message carries Cartesia's own instead —
+
+```
+'metadata': {'agent_id': 'agent_…', 'template': 'user_code'}
+```
+
+`config` **is** honoured (the voice applies), only `metadata` is replaced. So the context is handed
+over in-process through `_PENDING`, keyed by `call_id`, and `get_agent` re-fetches when it finds
+nothing there — which also covers the two hops landing on different replicas. Nothing about the
+salon depends on that round trip any more; the dialled number on `CallRequest` is enough on its own.
+
+This is what made every call open with `שלום, הגעתם ל` and no business name.
+
 ## Deploying
 
 The agent is code that runs during calls, so Cartesia has to reach it somehow. There are three

@@ -18,6 +18,11 @@ So the fetch happens in `pre_call_handler`, before the agent exists. By the time
 already know the salon, its greeting, and its voice. The model cannot get this wrong because it is
 never asked to.
 
+The result is handed to `get_agent` in-process rather than through `PreCallResult.metadata`:
+Cartesia replaces that metadata with its own before the agent sees it, so anything put there is
+lost. `get_agent` re-fetches if the handover is missing, which makes the salon depend only on the
+dialled number that is on every `CallRequest`.
+
 ## Deploy
 
     cd voice-agent && cartesia deploy
@@ -61,7 +66,12 @@ UNREACHABLE_HE = (
 async def _post(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
     """One place that knows how to talk to Tori, so auth and timeouts cannot drift apart."""
     if not TORI_API_URL:
-        raise RuntimeError("TORI_API_URL is not set")
+        raise RuntimeError("TORI_API_URL is not set — run: cartesia env set TORI_API_URL=https://…")
+    # Without this, the header is the bare string "Bearer " and httpx refuses to send it at all:
+    # `LocalProtocolError: Illegal header value b'Bearer '`, five frames deep in httpcore, which
+    # reads like a network fault rather than an unset variable. Say what it actually is.
+    if not TOOL_SECRET:
+        raise RuntimeError("CARTESIA_TOOL_SECRET is not set — run: cartesia env set CARTESIA_TOOL_SECRET=…")
     async with httpx.AsyncClient(timeout=10.0) as client:
         res = await client.post(
             f"{TORI_API_URL}{path}",
@@ -97,53 +107,80 @@ def caller_number(call_request: CallRequest) -> str:
     return raw
 
 
-async def pre_call_handler(call_request: CallRequest) -> Optional[PreCallResult]:
+async def resolve_context(call_request: CallRequest) -> Dict[str, Any]:
     """
-    Resolves the salon and its voice before the agent is built.
+    Asks Tori who this call is for. Returns `{"context": {...}}` or `{"error": "<spoken sentence>"}`.
 
-    Returning None would reject the call with a 403, which the caller hears as a line that answers
-    and dies. Every failure here instead produces a call that connects and explains itself — the
-    backend's own 402/404 messages are written to be spoken, so they are carried through as-is.
+    Never raises and never returns nothing: a caller must always hear a sentence, so every failure
+    becomes one. The backend's own 402/404 bodies are already written to be read aloud.
     """
-    # First line of the call in the logs, and the one that says whether this code is serving at all.
-    # An agent whose console prompt answered instead prints nothing here.
-    logger.info("pre_call_handler: to=%r from=%r call_id=%r", call_request.to, call_request.from_, call_request.call_id)
-
-    status, body = 0, {}
     try:
         status, body = await _post(
             "/api/voice/context",
             {"calledNumber": call_request.to, "callerNumber": caller_number(call_request)},
         )
-    except Exception as err:  # network, DNS, timeout
+    except Exception:  # network, DNS, timeout, malformed auth header
         logger.exception("context fetch failed for %s", call_request.to)
-        return PreCallResult(metadata={"tori_error": UNREACHABLE_HE}, config={"tts": {"language": LANGUAGE}})
+        return {"error": UNREACHABLE_HE}
 
     if status != 200:
-        # 404 = no salon on this number, 402 = subscription/plan. Both already carry a sentence
-        # meant to be read out; falling back only if one somehow does not.
+        # 404 = no salon on this number, 402 = subscription/plan. Both carry a spoken sentence;
+        # falling back only if one somehow does not.
         logger.warning("context %s for %s: %s", status, call_request.to, body)
-        return PreCallResult(
-            metadata={"tori_error": body.get("error") or UNREACHABLE_HE},
-            config={"tts": {"language": LANGUAGE}},
-        )
+        return {"error": body.get("error") or UNREACHABLE_HE}
 
-    # A 200 that carries no business name is not a context. Letting it through builds an agent whose
+    # A 200 without a business name is not a context. Letting it through builds an agent whose
     # greeting is "שלום, הגעתם ל" and whose prompt lists no services — a bot that sounds like it is
     # working while knowing nothing, which is the hardest failure to diagnose from a phone call.
     if not body.get("businessName"):
         logger.error("context 200 for %s but no businessName; keys=%s", call_request.to, sorted(body))
-        return PreCallResult(metadata={"tori_error": UNREACHABLE_HE}, config={"tts": {"language": LANGUAGE}})
+        return {"error": UNREACHABLE_HE}
 
     logger.info("context resolved for %s: %s", call_request.to, body.get("businessName"))
+    return {"context": body}
+
+
+# Cartesia does not give PreCallResult.metadata back to the agent. A real call's websocket start
+# message carries Cartesia's own metadata instead — {'agent_id': …, 'template': 'user_code'} — so
+# anything pre_call_handler puts there is dropped, and get_agent saw an empty salon on every call.
+# The context is therefore handed over in-process, keyed by call_id. get_agent re-fetches if it is
+# missing, which covers the case where the two hops land on different replicas.
+_PENDING: Dict[str, Dict[str, Any]] = {}
+_PENDING_MAX = 256
+
+
+def _remember(call_id: str, resolved: Dict[str, Any]) -> None:
+    if len(_PENDING) >= _PENDING_MAX:
+        # A call whose websocket never arrived. Dropping the oldest keeps this from growing without
+        # bound in a process that stays up for weeks.
+        _PENDING.pop(next(iter(_PENDING)), None)
+    _PENDING[call_id] = resolved
+
+
+async def pre_call_handler(call_request: CallRequest) -> Optional[PreCallResult]:
+    """
+    Resolves the salon and its voice before the agent is built.
+
+    Returning None would reject the call with a 403, which the caller hears as a line that answers
+    and dies. Every failure here instead produces a call that connects and explains itself.
+    """
+    # First line of the call in the logs, and the one that says whether this code is serving at all.
+    # An agent whose console prompt answered instead prints nothing here.
+    logger.info("pre_call_handler: to=%r from=%r call_id=%r", call_request.to, call_request.from_, call_request.call_id)
+
+    resolved = await resolve_context(call_request)
+    _remember(call_request.call_id, resolved)
 
     tts: Dict[str, Any] = {"language": LANGUAGE}
     # The salon's own voice, chosen in the dashboard. Null means "whatever the agent is set to",
-    # which is exactly the behaviour before the setting existed — so it is simply left out.
-    if body.get("voiceId"):
-        tts["voice_id"] = body["voiceId"]
+    # which is exactly the behaviour before the setting existed — so it is simply left out. Unlike
+    # metadata, config *is* honoured: the voice applied here is the one the first word is spoken in.
+    voice_id = (resolved.get("context") or {}).get("voiceId")
+    if voice_id:
+        tts["voice_id"] = voice_id
 
-    return PreCallResult(metadata={"tori_context": body}, config={"tts": tts})
+    # Still sent, in case Cartesia starts echoing it back; get_agent prefers it when present.
+    return PreCallResult(metadata={"tori": resolved}, config={"tts": tts})
 
 
 def _fmt_services(ctx: Dict[str, Any]) -> str:
@@ -253,35 +290,27 @@ def build_prompt(ctx: Dict[str, Any], caller_known: bool = True) -> str:
 async def get_agent(env: AgentEnv, call_request: CallRequest):
     meta = call_request.metadata or {}
 
+    # Cartesia's metadata first (it does not currently carry ours), then the in-process handover,
+    # then a fresh fetch. The last of those is what makes this correct rather than merely lucky:
+    # the dialled number is on call_request, so nothing here depends on the earlier hop surviving.
+    resolved = meta.get("tori") or _PENDING.pop(call_request.call_id, None)
+    if resolved is None:
+        logger.warning("context not handed over for %s; fetching again", call_request.call_id)
+        resolved = await resolve_context(call_request)
+
     # Nothing to work with — say the one sentence we have and stop. Better than a bot improvising
     # about a business it knows nothing about.
-    if meta.get("tori_error"):
+    if resolved.get("error"):
         return LlmAgent(
             model=MODEL,
             api_key=MODEL_API_KEY,
             config=LlmConfig(
                 system_prompt="עני במשפט אחד בלבד, בדיוק את ההודעה שניתנה לך, ואל תוסיפי דבר.",
-                introduction=meta["tori_error"],
+                introduction=resolved["error"],
             ),
         )
 
-    salon: Dict[str, Any] = meta.get("tori_context") or {}
-
-    # pre_call_handler always sets one of the two keys, so an empty context here means its result
-    # never made it back — the metadata the /chats response returns is echoed to us on the websocket
-    # start message, and that round trip is the part outside this file. Say the fallback rather than
-    # improvise about a business we know nothing about.
-    if not salon:
-        logger.error("no tori_context in metadata (keys=%s); pre-call result did not survive", sorted(meta))
-        return LlmAgent(
-            model=MODEL,
-            api_key=MODEL_API_KEY,
-            config=LlmConfig(
-                system_prompt="עני במשפט אחד בלבד, בדיוק את ההודעה שניתנה לך, ואל תוסיפי דבר.",
-                introduction=UNREACHABLE_HE,
-            ),
-        )
-
+    salon: Dict[str, Any] = resolved["context"]
     called = call_request.to
     caller_num = caller_number(call_request)
     caller_known = caller_num != "unknown"
