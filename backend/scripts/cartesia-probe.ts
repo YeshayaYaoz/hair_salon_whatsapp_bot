@@ -23,6 +23,7 @@ const API_VERSION = "2026-03-01";
 
 const apiKey = process.env.CARTESIA_API_KEY?.trim();
 const agentId = process.env.CARTESIA_AGENT_ID?.trim();
+const trunkId = process.env.CARTESIA_SIP_PROVIDER_ID?.trim();
 
 if (!apiKey) {
   console.error("CARTESIA_API_KEY is not set in this environment — nothing to probe.");
@@ -122,7 +123,17 @@ async function main(): Promise<void> {
       console.log("  None linked — only Cartesia-provisioned US numbers are available on this account.");
     }
     for (const p of providerList) {
-      console.log(`    - ${p.id} type=${p.type} label=${p.label ?? "(none)"}`);
+      const configured = p.id === trunkId ? "  ← CARTESIA_SIP_PROVIDER_ID" : "";
+      console.log(`    - ${p.id} type=${p.type} label=${p.label ?? "(none)"}${configured}`);
+    }
+    // A provider id that names nothing is the failure an owner meets as a confusing error partway
+    // through onboarding, at the moment they save their number. Cheaper to catch it here.
+    if (trunkId && !providerList.some((p) => p.id === trunkId)) {
+      console.log(`  ⚠ CARTESIA_SIP_PROVIDER_ID is set to ${trunkId}, which is not one of the above.`);
+      console.log("    Importing a salon's number will fail against it.");
+    }
+    if (!trunkId && providerList.length) {
+      console.log("  ⚠ CARTESIA_SIP_PROVIDER_ID is unset, so numbers must be imported by hand first.");
     }
   } else {
     console.log(`  ${brief(providers.body)}`);
