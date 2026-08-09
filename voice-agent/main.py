@@ -349,6 +349,9 @@ FORMS = {
         "known": "המתקשר מוכר: {name}. פני אליו בשמו.",
         "no_booking": "את לא סוגרת הזמנות. את נותנת מידע ומעבירה את השיחה לבעל העסק כשהמתקשר רוצה להזמין.",
         "transfer": "השתמשי בכלי transfer_to_owner כדי להעביר.",
+        "transfer_say": "מעבירה אותך לבעל העסק, רגע אחד.",
+        "can_transfer": "אם המתקשר מבקש לדבר עם אדם, עם בעל העסק או עם מישהו אחר — אל תתווכחי. השתמשי ב-transfer_to_owner.",
+        "no_transfer": "אין מספר להעברת שיחות. אם מבקשים לדבר עם מישהו — אמרי שתעבירי הודעה, ובקשי שם ומספר טלפון.",
         "booking": "השתמשי ב-check_availability כדי לראות זמנים פנויים, ואז ב-book_appointment.",
         "no_invent": "אל תמציאי זמנים ואל תאשרי תור שלא חזר מ-book_appointment.",
         "verbatim": "העבירי ל-startTime בדיוק את המחרוזת שהתקבלה מ-check_availability.",
@@ -374,6 +377,9 @@ FORMS = {
         "known": "המתקשר מוכר: {name}. פנה אליו בשמו.",
         "no_booking": "אתה לא סוגר הזמנות. אתה נותן מידע ומעביר את השיחה לבעל העסק כשהמתקשר רוצה להזמין.",
         "transfer": "השתמש בכלי transfer_to_owner כדי להעביר.",
+        "transfer_say": "מעביר אותך לבעל העסק, רגע אחד.",
+        "can_transfer": "אם המתקשר מבקש לדבר עם אדם, עם בעל העסק או עם מישהו אחר — אל תתווכח. השתמש ב-transfer_to_owner.",
+        "no_transfer": "אין מספר להעברת שיחות. אם מבקשים לדבר עם מישהו — אמור שתעביר הודעה, ובקש שם ומספר טלפון.",
         "booking": "השתמש ב-check_availability כדי לראות זמנים פנויים, ואז ב-book_appointment.",
         "no_invent": "אל תמציא זמנים ואל תאשר תור שלא חזר מ-book_appointment.",
         "verbatim": "העבר ל-startTime בדיוק את המחרוזת שהתקבלה מ-check_availability.",
@@ -455,6 +461,9 @@ def build_prompt(ctx: Dict[str, Any], caller_known: bool = True) -> str:
         parts += ["", "## חשוב", f["no_booking"], f["transfer"]]
     else:
         parts += ["", "## קביעת תורים", f["booking"], f["no_invent"], f["verbatim"]]
+        # A caller who asks for a person is not a booking request, and the agent used to have no
+        # answer for it at all — the tool existed only for inquiry businesses.
+        parts.append(f["can_transfer"] if ctx.get("ownerTransferNumber") else f["no_transfer"])
         if not caller_known:
             # Only when the number really is missing. Asking a caller for a number we already have
             # is the same self-inflicted wound as asking which number they dialled.
@@ -487,6 +496,7 @@ async def get_agent(env: AgentEnv, call_request: CallRequest):
         )
 
     salon: Dict[str, Any] = resolved["context"]
+    f = FORMS.get(salon.get("voiceGender") or "", FORMS["feminine"])
     called = call_request.to
     caller_num = caller_number(call_request)
     caller_known = caller_num != "unknown"
@@ -587,25 +597,26 @@ async def get_agent(env: AgentEnv, call_request: CallRequest):
             return f"לא הצלחתי להעביר את התור: {body.get('error', '')}"
         return "התור הועבר."
 
-    tools = []
-    if salon.get("bookingModel") == "inquiry":
-        # Inquiry businesses close bookings by voice with the owner; the agent's job ends at the
-        # handover. ownerTransferNumber is only populated for them.
-        transfer_to = salon.get("ownerTransferNumber")
-        if transfer_to:
-            from line.events import AgentSendText, AgentTransferCall
+    # Inquiry businesses close bookings by voice with the owner, so the handover *is* the job.
+    # Everyone else books here — but "let me talk to a person" is the most ordinary request a caller
+    # makes, and an agent that cannot honour it just talks past them. Both get the tool.
+    tools = [] if salon.get("bookingModel") == "inquiry" else [
+        check_availability, book_appointment, cancel_appointment, reschedule_appointment
+    ]
 
-            # No decorator: the SDK branches per yielded value at runtime — raw values feed back to
-            # the model, OutputEvent instances go straight to the caller. @passthrough_tool is
-            # documented for this but its own docstring calls it legacy and identical to loopback.
-            async def transfer_to_owner(ctx):
-                """מעביר את השיחה לבעל העסק."""
-                yield AgentSendText(text="מעבירה אותך לבעל העסק, רגע אחד.")
-                yield AgentTransferCall(target_phone_number=transfer_to)
+    transfer_to = salon.get("ownerTransferNumber")
+    if transfer_to:
+        from line.events import AgentSendText, AgentTransferCall
 
-            tools.append(transfer_to_owner)
-    else:
-        tools = [check_availability, book_appointment, cancel_appointment, reschedule_appointment]
+        # No decorator: the SDK branches per yielded value at runtime — raw values feed back to
+        # the model, OutputEvent instances go straight to the caller. @passthrough_tool is
+        # documented for this but its own docstring calls it legacy and identical to loopback.
+        async def transfer_to_owner(ctx):
+            """מעביר את השיחה לבעל העסק."""
+            yield AgentSendText(text=f["transfer_say"])
+            yield AgentTransferCall(target_phone_number=transfer_to)
+
+        tools.append(transfer_to_owner)
 
     return LlmAgent(
         model=MODEL,

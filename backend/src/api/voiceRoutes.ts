@@ -182,7 +182,11 @@ voiceRouter.post("/context", async (req, res) => {
     // transfers the call to ownerTransferNumber — bookings close only human-to-human.
     bookingModel: full.bookingModel,
     availabilityInfo: full.availabilityInfo,
-    ownerTransferNumber: full.bookingModel === "inquiry" ? full.notificationPhone : null,
+    /** Where "אפשר לדבר עם מישהו?" goes. Sent for every business, not just inquiry ones: a caller
+     * asking for a person is the most ordinary request there is, and a salon whose agent could not
+     * honour it simply talked past them. Inquiry businesses additionally *depend* on it, since
+     * that is the only way they close a booking at all. */
+    ownerTransferNumber: full.notificationPhone,
     timezone: full.timezone,
     address: full.address,
     googleMapsUrl: full.googleMapsUrl,

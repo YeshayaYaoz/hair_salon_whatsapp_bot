@@ -297,5 +297,35 @@ async def main_():
     assert "2026-08-12T09:00:00Z" in out and "2026-08-12T11:45:00Z" in out, out
     print("18 slot times are spoken, while startTime stays verbatim for booking         OK")
 
+    # --- 9. "let me talk to a person" ------------------------------------------------
+    # The most ordinary request a caller makes, and a booking business had no tool for it: the
+    # transfer existed only for inquiry businesses, so a salon's agent simply talked past them.
+    STATE.update(status=200, body=dict(SALON, ownerTransferNumber="+972500000000"), seen=[])
+    pre = await main.pre_call_handler(req())
+    agent = await main.get_agent(None, req(meta=pre.metadata))
+    names = sorted(getattr(t, "__name__", None) or getattr(t, "name", str(t)) for t in agent._tools)
+    assert "transfer_to_owner" in names and "book_appointment" in names, names
+    assert "transfer_to_owner" in agent._config.system_prompt, agent._config.system_prompt
+
+    # A business with no number to transfer to must say so, not promise a handover it cannot do.
+    STATE.update(status=200, body=dict(SALON, ownerTransferNumber=None), seen=[])
+    pre = await main.pre_call_handler(req())
+    agent = await main.get_agent(None, req(meta=pre.metadata))
+    names = sorted(getattr(t, "__name__", None) or getattr(t, "name", str(t)) for t in agent._tools)
+    assert "transfer_to_owner" not in names, names
+    assert "אין מספר להעברת שיחות" in agent._config.system_prompt
+    print("19 a booking business can hand the caller to a person, or say it cannot      OK")
+
+    # The handover sentence is spoken aloud, so it inflects like everything else.
+    STATE.update(status=200, body=dict(SALON, voiceGender="masculine",
+                                       ownerTransferNumber="+972500000000"), seen=[])
+    pre = await main.pre_call_handler(req())
+    agent = await main.get_agent(None, req(meta=pre.metadata))
+    tool = next(t for t in agent._tools if (getattr(t, "__name__", None) or getattr(t, "name", "")) == "transfer_to_owner")
+    said = [e async for e in tool(None)]
+    assert getattr(said[0], "text", "") == "מעביר אותך לבעל העסק, רגע אחד.", said[0]
+    assert getattr(said[-1], "target_phone_number", None) == "+972500000000", said[-1]
+    print("20 the handover sentence follows the voice's gender too                      OK")
+
 asyncio.run(main_())
 print("\nALL CHECKS PASSED")
