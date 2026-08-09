@@ -29,27 +29,18 @@ The same handler sets the salon's chosen **voice** (`voiceId` from `/context`) v
 The agent is code that runs during calls, so Cartesia has to reach it somehow. There are three
 ways, and the choice is really "who hosts it".
 
-### Self-hosted on Railway (recommended)
+**Latency decides this, and it favours managed hosting.** The agent sits on the hot path of every
+single turn — caller speaks, Cartesia transcribes, *the agent* produces the reply, Cartesia speaks
+it. It does not call this repo's backend every turn: `/context` is fetched once before the
+conversation starts, and the booking tools fire only when the model uses them. So the link that
+matters per turn is agent↔Cartesia, not agent↔backend.
 
-Cartesia calls your server instead of hosting the code itself. Deploy this directory as its own
-Railway service — `main.py` already serves the FastAPI app on `$PORT`, which is all the `Procfile`
-does — then point the agent at it by setting `self_hosted_deployment_url`:
+A managed deployment is built into **US, EU and APAC simultaneously** and each call is routed to a
+near region (call records carry `deployment_region`). Self-hosting puts the agent in exactly one
+place — fine if that place is near the caller and near Cartesia, an added round trip on every turn
+if it is not. Railway defaulting to a US region while the callers are Israeli would be the bad case.
 
-```bash
-curl -X PATCH https://api.cartesia.ai/agents/$CARTESIA_AGENT_ID \
-  -H "Authorization: Bearer $CARTESIA_API_KEY" \
-  -H "Cartesia-Version: 2026-03-01" \
-  -H "Content-Type: application/json" \
-  -d '{"self_hosted_deployment_url": "https://tori-voice-agent.up.railway.app"}'
-```
-
-(`cartesia connect --url …` does the same thing from the CLI.)
-
-Why this one: no CLI, no OS problem, no new integration to authorize, and the agent ends up on the
-same platform and network as the backend it calls on every single turn. The trade is that uptime
-and cold starts become yours rather than Cartesia's.
-
-### Managed, via a linked GitHub repository
+### Managed, via a linked GitHub repository (recommended)
 
 Link this repository to the agent in the Cartesia console and set its root directory to
 `voice-agent`. Each push to the linked branch builds a deployment. Cartesia builds the venv from
@@ -67,6 +58,27 @@ curl -fsSL https://cartesia.sh | sh
 cartesia auth login          # paste an API key from play.cartesia.ai/keys
 cd voice-agent && cartesia init && cartesia deploy
 ```
+
+### Self-hosted
+
+Cartesia calls your server instead of hosting the code itself. Deploy this directory as its own
+Railway service — `main.py` already serves the FastAPI app on `$PORT`, which is all the `Procfile`
+does — then point the agent at it by setting `self_hosted_deployment_url`:
+
+```bash
+curl -X PATCH https://api.cartesia.ai/agents/$CARTESIA_AGENT_ID \
+  -H "Authorization: Bearer $CARTESIA_API_KEY" \
+  -H "Cartesia-Version: 2026-03-01" \
+  -H "Content-Type: application/json" \
+  -d '{"self_hosted_deployment_url": "https://tori-voice-agent.up.railway.app"}'
+```
+
+(`cartesia connect --url …` does the same thing from the CLI.)
+
+Use this when the managed routes are unavailable, or when you want the agent's uptime and rollout
+under your own control — accepting single-region latency and cold starts in exchange. Cartesia's own
+docs frame managed as the way to deploy *low-latency* agents, so treat this as the deliberate
+trade rather than the default.
 
 ## Environment
 
