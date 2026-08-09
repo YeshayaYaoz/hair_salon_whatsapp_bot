@@ -24,13 +24,24 @@ model is never asked for something it cannot know.
 The same handler sets the salon's chosen **voice** (`voiceId` from `/context`) via
 `PreCallResult.config.tts.voice_id`, so the very first word is already in the right voice.
 
-## Setup
+## Deploying
+
+Two routes. **On Windows, use the second** — Cartesia's installer (`curl -fsSL https://cartesia.sh | sh`)
+detects only Darwin and Linux and exits with "Unsupported operating system" on anything else.
+
+**CLI (macOS / Linux / WSL):**
 
 ```bash
-cd voice-agent
-pip install -r requirements.txt
-cartesia deploy
+curl -fsSL https://cartesia.sh | sh
+cartesia auth login          # paste an API key from play.cartesia.ai/keys
+cd voice-agent && cartesia init && cartesia deploy
 ```
+
+**Linked GitHub repository (no CLI, any OS):** in the Cartesia console, link this repository to the
+agent and set its root directory to `voice-agent`. Each push to the linked branch then builds a
+deployment. Cartesia builds the venv from `pyproject.toml`, loads `main.py`, instantiates the
+FastAPI app and health-checks it before sending traffic — which is why `pyproject.toml` declares the
+interpreter range rather than leaving it to their default.
 
 | Variable | Purpose |
 |---|---|
