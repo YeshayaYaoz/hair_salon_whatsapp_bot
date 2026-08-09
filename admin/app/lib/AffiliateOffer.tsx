@@ -64,6 +64,7 @@ export function AffiliateOffer({ kind, businessId }: { kind: AffiliateKind; busi
   const { lang } = useLanguage();
   const he = lang === "he";
   const [going, setGoing] = useState(false);
+  const [open, setOpen] = useState(false);
   const c = COPY[kind][he ? "he" : "en"];
 
   // Without a businessId there is no attribution to pass, and an unattributed referral is worth
@@ -85,18 +86,35 @@ export function AffiliateOffer({ kind, businessId }: { kind: AffiliateKind; busi
   }
 
   return (
-    <div className="rounded-xl p-4 mb-4" style={{ background: "#F0F7FF", border: "1px solid #C7DDF5" }}>
-      <div className="flex items-start gap-3">
+    /* One line by default, opening to the full pitch. It used to render at full height above each
+       provider card, so the payments page led with two blocks of sales copy before the settings
+       the owner actually came for. The offer still has to be visible — a salon with no provider
+       cannot take deposits at all — so it keeps a permanent line rather than hiding behind a
+       toggle, and the affiliate disclosure stays with the link either way. */
+    <div className="rounded-xl px-4 py-3 mb-4" style={{ background: "#F0F7FF", border: "1px solid #C7DDF5" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full flex items-center gap-2.5 text-start"
+      >
         <span
-          className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white"
+          className="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold text-white"
           style={{ background: "#0F62FE" }}
           aria-hidden
         >
           PP
         </span>
+        <h3 className="text-xs font-bold flex-1 min-w-0" style={{ color: "#0B3B7A" }}>{c.title}</h3>
+        <span className="text-[11px] font-semibold shrink-0" style={{ color: "#0F62FE" }}>
+          {open ? (he ? "סגירה" : "Close") : (he ? "פרטים" : "Details")}
+        </span>
+      </button>
+
+      {open && (
+      <div className="flex items-start gap-3 mt-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-bold" style={{ color: "#0B3B7A" }}>{c.title}</h3>
-          <p className="text-xs mt-1 leading-relaxed" style={{ color: "#1F3D63" }}>{c.body}</p>
+          <p className="text-xs leading-relaxed" style={{ color: "#1F3D63" }}>{c.body}</p>
           <a
             href={affiliateUrl(kind, businessId)}
             target="_blank"
@@ -119,6 +137,7 @@ export function AffiliateOffer({ kind, businessId }: { kind: AffiliateKind; busi
           </p>
         </div>
       </div>
+      )}
     </div>
   );
 }
