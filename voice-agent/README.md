@@ -26,10 +26,41 @@ The same handler sets the salon's chosen **voice** (`voiceId` from `/context`) v
 
 ## Deploying
 
-Two routes. **On Windows, use the second** — Cartesia's installer (`curl -fsSL https://cartesia.sh | sh`)
-detects only Darwin and Linux and exits with "Unsupported operating system" on anything else.
+The agent is code that runs during calls, so Cartesia has to reach it somehow. There are three
+ways, and the choice is really "who hosts it".
 
-**CLI (macOS / Linux / WSL):**
+### Self-hosted on Railway (recommended)
+
+Cartesia calls your server instead of hosting the code itself. Deploy this directory as its own
+Railway service — `main.py` already serves the FastAPI app on `$PORT`, which is all the `Procfile`
+does — then point the agent at it by setting `self_hosted_deployment_url`:
+
+```bash
+curl -X PATCH https://api.cartesia.ai/agents/$CARTESIA_AGENT_ID \
+  -H "Authorization: Bearer $CARTESIA_API_KEY" \
+  -H "Cartesia-Version: 2026-03-01" \
+  -H "Content-Type: application/json" \
+  -d '{"self_hosted_deployment_url": "https://tori-voice-agent.up.railway.app"}'
+```
+
+(`cartesia connect --url …` does the same thing from the CLI.)
+
+Why this one: no CLI, no OS problem, no new integration to authorize, and the agent ends up on the
+same platform and network as the backend it calls on every single turn. The trade is that uptime
+and cold starts become yours rather than Cartesia's.
+
+### Managed, via a linked GitHub repository
+
+Link this repository to the agent in the Cartesia console and set its root directory to
+`voice-agent`. Each push to the linked branch builds a deployment. Cartesia builds the venv from
+`pyproject.toml`, loads `main.py`, instantiates the FastAPI app and health-checks it before sending
+traffic — which is why `pyproject.toml` declares the interpreter range rather than leaving it to
+their default.
+
+### Managed, via the CLI — **not available on Windows**
+
+Cartesia's installer detects only Darwin and Linux and exits with "Unsupported operating system"
+otherwise, so this route needs WSL or Git Bash on Windows.
 
 ```bash
 curl -fsSL https://cartesia.sh | sh
@@ -37,11 +68,10 @@ cartesia auth login          # paste an API key from play.cartesia.ai/keys
 cd voice-agent && cartesia init && cartesia deploy
 ```
 
-**Linked GitHub repository (no CLI, any OS):** in the Cartesia console, link this repository to the
-agent and set its root directory to `voice-agent`. Each push to the linked branch then builds a
-deployment. Cartesia builds the venv from `pyproject.toml`, loads `main.py`, instantiates the
-FastAPI app and health-checks it before sending traffic — which is why `pyproject.toml` declares the
-interpreter range rather than leaving it to their default.
+## Environment
+
+Set these wherever the agent ends up running — Railway service variables when self-hosted, or
+`cartesia env set …` for a managed deployment.
 
 | Variable | Purpose |
 |---|---|
