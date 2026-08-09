@@ -74,7 +74,28 @@ interface Provider {
   label?: string | null;
 }
 
+function buildInbound(): Record<string, unknown> {
+  const inbound: Record<string, unknown> = {
+    // "allowed" rather than "required": SRTP has to be enabled on the carrier side too, and
+    // requiring it before that is done rejects every call with nothing to show why.
+    media_encryption: "allowed",
+  };
+  if (numbers.length) inbound.allowed_numbers = numbers;
+  if (addresses.length) inbound.allowed_addresses = addresses;
+  if (username && password) inbound.credentials = { username, password };
+  return inbound;
+}
+
 async function main(): Promise<void> {
+  // Before any network call: a dry run that needs connectivity is not a dry run, and the first
+  // thing anyone wants to see is the payload that would hit their account.
+  if (process.argv.includes("--dry-run")) {
+    console.log("POST /agents/phone-numbers/providers");
+    console.log(JSON.stringify({ type: "sip_trunk", label, inbound: buildInbound() }, null, 2));
+    console.log("\n--dry-run: nothing was sent.");
+    return;
+  }
+
   // Listed first because each carrier account should be linked once. Creating a second trunk for the
   // same carrier splits numbers across two providers, and the one in CARTESIA_SIP_PROVIDER_ID is
   // then only half the story.
@@ -92,21 +113,12 @@ async function main(): Promise<void> {
     console.log("");
   }
 
-  const inbound: Record<string, unknown> = {
-    // "allowed" rather than "required": SRTP has to be enabled on the carrier side too, and
-    // requiring it before that is done rejects every call with nothing to show why.
-    media_encryption: "allowed",
-  };
-  if (numbers.length) inbound.allowed_numbers = numbers;
-  if (addresses.length) inbound.allowed_addresses = addresses;
-  if (username && password) inbound.credentials = { username, password };
-
+  // Inbound only. Outbound (the agent placing calls) needs the carrier's own SIP endpoint and
+  // credentials, and nothing in the product dials out yet — configuring it now would be guessing at
+  // settings no code uses.
   const created = await call<Provider>("/agents/phone-numbers/providers", {
     method: "POST",
-    // Inbound only. Outbound (the agent placing calls) needs the carrier's own SIP endpoint and
-    // credentials, and nothing in the product dials out yet — configuring it now would be guessing
-    // at settings no code uses.
-    body: JSON.stringify({ type: "sip_trunk", label, inbound }),
+    body: JSON.stringify({ type: "sip_trunk", label, inbound: buildInbound() }),
   });
 
   console.log(`Created ${created.type} provider "${created.label}"`);
