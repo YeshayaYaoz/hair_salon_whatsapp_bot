@@ -6,8 +6,8 @@ import { prisma } from "./prisma.js";
  * In-conversation replies are deliberately unmetered — blocking one mid-booking would break the
  * product — which left per-business AI spend with no ceiling at all (see aiCostAlerts.ts, which
  * only tells the operator after the fact). This is the one bound that can be placed on it without
- * costing a real customer a real answer: no genuine booking conversation runs to a hundred messages
- * in a day, so anything past that is a loop, a bored teenager, or something automated.
+ * costing a real customer a real answer: no genuine booking conversation needs a hundred replies in
+ * a day, so anything past that is a loop, a bored teenager, or something automated.
  *
  * The cap is per customer rather than per business on purpose. A busy salon legitimately talks to
  * hundreds of people a day, and a business-wide cap would cut the whole line off because one thread
@@ -33,13 +33,22 @@ export interface CapStatus {
 }
 
 /**
- * How many messages this customer has sent in the window, and whether that is past the cap.
+ * How many replies this customer has had in the window, and whether that is past the cap.
  *
- * Counts the customer's own messages rather than the bot's replies: it is what they send that
- * drives the cost, and counting replies would let a customer who sends fifty messages while the
- * bot is muted resume with a clean slate.
+ * Counts replies rather than incoming messages because replies are the thing being paid for: an
+ * inbound message that never reaches the model costs nothing, while every reply is output tokens
+ * plus a send. It also means a customer firing off twenty messages in a row consumes one reply,
+ * not twenty.
  *
- * Called before the message is persisted, so `count` excludes the one being handled now — hence
+ * Manual messages the owner sends from the dashboard are stored as assistant turns too, so they
+ * count here. In practice that barely matters — sending one pauses the bot on that thread anyway,
+ * so the two limits never apply at once — but a thread the owner has answered by hand a great deal
+ * will reach the cap sooner if they later resume the bot.
+ *
+ * The cap notice itself is sent directly rather than appended as a turn, so it cannot inflate the
+ * count that produced it.
+ *
+ * Called before this turn is persisted, so `count` excludes the reply about to be written — hence
  * the >= comparisons rather than >.
  */
 export async function checkDailyCap(businessId: string, customerPhone: string): Promise<CapStatus> {
@@ -47,7 +56,7 @@ export async function checkDailyCap(businessId: string, customerPhone: string): 
     where: {
       businessId,
       phone: customerPhone,
-      role: "user",
+      role: "assistant",
       createdAt: { gte: new Date(Date.now() - WINDOW_MS) },
     },
   });
