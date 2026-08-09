@@ -183,6 +183,100 @@ async def pre_call_handler(call_request: CallRequest) -> Optional[PreCallResult]
     return PreCallResult(metadata={"tori": resolved}, config={"tts": tts})
 
 
+# Hebrew numbers agree in gender with what they count, and the model cannot know which noun a bare
+# digit belongs to: "2 לילות" is read as שתיים or שניים depending on the guess, and only שני is
+# right. So anything read aloud is written as words here, where the noun is known.
+#
+# Standalone forms. 1 and 2 are special before a noun (שני לילות, שתי שעות) and are handled at the
+# call sites, which know the noun.
+_ONES_M = ["", "אחד", "שניים", "שלושה", "ארבעה", "חמישה", "שישה", "שבעה", "שמונה", "תשעה", "עשרה"]
+_ONES_F = ["", "אחת", "שתיים", "שלוש", "ארבע", "חמש", "שש", "שבע", "שמונה", "תשע", "עשר"]
+_TEENS_M = ["עשרה", "אחד עשר", "שנים עשר", "שלושה עשר", "ארבעה עשר", "חמישה עשר",
+            "שישה עשר", "שבעה עשר", "שמונה עשר", "תשעה עשר"]
+_TEENS_F = ["עשר", "אחת עשרה", "שתים עשרה", "שלוש עשרה", "ארבע עשרה", "חמש עשרה",
+            "שש עשרה", "שבע עשרה", "שמונה עשרה", "תשע עשרה"]
+_TENS = ["", "עשר", "עשרים", "שלושים", "ארבעים", "חמישים", "שישים", "שבעים", "שמונים", "תשעים"]
+
+
+def _he_num(n: int, feminine: bool = False) -> str:
+    """1–99 in words. Outside that range the digits are returned and the prompt's rule covers it."""
+    if not 1 <= n <= 99:
+        return str(n)
+    ones, teens = (_ONES_F, _TEENS_F) if feminine else (_ONES_M, _TEENS_M)
+    if n <= 10:
+        return ones[n]
+    if n < 20:
+        return teens[n - 10]
+    tens, rest = divmod(n, 10)
+    return _TENS[tens] if not rest else f"{_TENS[tens]} ו{ones[rest]}"
+
+
+HE_MONTHS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני",
+             "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"]
+
+
+def _fmt_date(iso: str) -> str:
+    """`2026-08-12` → `שנים עשר באוגוסט`. Unparseable input is passed through untouched."""
+    try:
+        y, m, d = (int(x) for x in str(iso)[:10].split("-"))
+        return f"{_he_num(d)} ב{HE_MONTHS[m - 1]}"
+    except Exception:
+        return str(iso)
+
+
+def _fmt_clock(minutes: int) -> str:
+    """
+    Minutes past midnight as someone says a time: `540` → `תשע בבוקר`.
+
+    שעה is feminine, so the hour takes the feminine forms — תשע, not תשעה.
+    """
+    h, mm = divmod(minutes % (24 * 60), 60)
+    if h < 5:
+        part = "בלילה"
+    elif h < 12:
+        part = "בבוקר"
+    elif h < 17:
+        part = "בצהריים"
+    elif h < 21:
+        part = "בערב"
+    else:
+        part = "בלילה"
+    # Quarters have their own forms and are what appointment slots actually land on: 8:45 is
+    # "רבע לתשע", never "שמונה וארבעים וחמש".
+    if mm == 45:
+        return f"רבע ל{_he_num((h + 1) % 12 or 12, feminine=True)} {part}"
+    spoken = _he_num(h % 12 or 12, feminine=True)
+    if mm == 30:
+        spoken += " וחצי"
+    elif mm == 15:
+        spoken += " ורבע"
+    elif mm:
+        spoken += f" ו{_he_num(mm, feminine=True)}"
+    return f"{spoken} {part}"
+
+
+def _spoken_clock(hhmm: str) -> str:
+    """`14:30` → `שתיים וחצי בצהריים`. Anything unparseable is left alone rather than mangled."""
+    try:
+        h, m = (int(x) for x in str(hhmm).split(":")[:2])
+    except Exception:
+        return str(hhmm)
+    return _fmt_clock(h * 60 + m)
+
+
+def _fmt_datetime(iso: str) -> str:
+    """`2026-08-12T09:00:00Z` → `שנים עשר באוגוסט בשעה תשע בבוקר`, never read out as-is."""
+    text = str(iso)
+    if "T" not in text:
+        return _fmt_date(text)
+    date_part, time_part = text.split("T", 1)
+    try:
+        h, m = int(time_part[:2]), int(time_part[3:5])
+    except Exception:
+        return _fmt_date(date_part)
+    return f"{_fmt_date(date_part)} בשעה {_fmt_clock(h * 60 + m)}"
+
+
 def _fmt_duration(minutes: int) -> str:
     """
     A duration as someone would say it on the phone.
@@ -193,15 +287,18 @@ def _fmt_duration(minutes: int) -> str:
     """
     if minutes % 1440 == 0:
         nights = minutes // 1440
-        return "לילה אחד" if nights == 1 else f"{nights} לילות"
+        # לילה is masculine, and 2 takes the construct form: שני לילות, not שניים לילות.
+        return {1: "לילה אחד", 2: "שני לילות"}.get(nights, f"{_he_num(nights)} לילות")
     if minutes < 60:
-        return f"{minutes} דקות"
+        return f"{_he_num(minutes, feminine=True)} דקות"
     hours, rest = divmod(minutes, 60)
+    # שעה is feminine; 2 hours is the dual שעתיים rather than a counted form.
+    whole = {1: "שעה", 2: "שעתיים"}.get(hours, f"{_he_num(hours, feminine=True)} שעות")
     if rest == 30:
-        return "שעה וחצי" if hours == 1 else f"{hours} שעות וחצי"
+        return f"{whole} וחצי"
     if rest:
-        return f"{hours} שעות ו-{rest} דקות" if hours > 1 else f"שעה ו-{rest} דקות"
-    return {1: "שעה", 2: "שעתיים"}.get(hours, f"{hours} שעות")
+        return f"{whole} ו{_he_num(rest, feminine=True)} דקות"
+    return whole
 
 
 def _fmt_services(ctx: Dict[str, Any]) -> str:
@@ -213,7 +310,7 @@ def _fmt_services(ctx: Dict[str, Any]) -> str:
         if s.get("durationMin"):
             bits.append(_fmt_duration(int(s["durationMin"])))
         if s.get("capacity"):
-            bits.append(f"עד {s['capacity']} אורחים")
+            bits.append(f"עד {_he_num(int(s['capacity']))} אורחים")
         if s.get("description"):
             bits.append(str(s["description"]))
         lines.append(" — ".join(str(b) for b in bits if b))
@@ -228,7 +325,7 @@ def _fmt_hours(ctx: Dict[str, Any]) -> str:
     for h in ctx.get("hours") or []:
         day = DAYS_HE[h["dayOfWeek"] % 7]
         o, c = h["openMin"], h["closeMin"]
-        out.append(f"- {day}: {o // 60:02d}:{o % 60:02d}–{c // 60:02d}:{c % 60:02d}")
+        out.append(f"- {day}: מ{_fmt_clock(o)} עד {_fmt_clock(c)}")
     return "\n".join(out) if out else "(שעות לא הוגדרו)"
 
 
@@ -256,6 +353,14 @@ FORMS = {
         "no_invent": "אל תמציאי זמנים ואל תאשרי תור שלא חזר מ-book_appointment.",
         "verbatim": "העבירי ל-startTime בדיוק את המחרוזת שהתקבלה מ-check_availability.",
         "ask_phone": "לפני שאת קובעת תור, שאלי את המתקשר מה מספר הטלפון שלו והעבירי אותו ב-caller_phone.",
+        "rules": [
+            'מספרים אמרי במילים ולא כספרות: "מאה ועשרים שקל".',
+            'שעות אמרי כמו בדיבור: "מתשע בבוקר עד שש בערב".',
+            "אל תקראי רשימות שלמות. הציעי שתיים או שלוש אפשרויות ותני לאדם לבחור.",
+            'ביטויים קבועים נאמרים בדיוק כפי שהם: "ברוך הבא", "תודה רבה", "יום טוב". אל תמציאי גרסה משלך.',
+            'אם את לא בטוחה במגדר של המתקשר — נסחי את המשפט בלי פנייה מגדרית: "אפשר לקבוע ליום שלישי".',
+            'אל תשתמשי בצורות עם לוכסן ("מעוניין/ת") — הן נשמעות רע בדיבור.',
+        ],
     },
     "masculine": {
         "answers": "אתה עונה לשיחות טלפון של",
@@ -273,20 +378,16 @@ FORMS = {
         "no_invent": "אל תמציא זמנים ואל תאשר תור שלא חזר מ-book_appointment.",
         "verbatim": "העבר ל-startTime בדיוק את המחרוזת שהתקבלה מ-check_availability.",
         "ask_phone": "לפני שאתה קובע תור, שאל את המתקשר מה מספר הטלפון שלו והעבר אותו ב-caller_phone.",
+        "rules": [
+            'מספרים אמור במילים ולא כספרות: "מאה ועשרים שקל".',
+            'שעות אמור כמו בדיבור: "מתשע בבוקר עד שש בערב".',
+            "אל תקרא רשימות שלמות. הצע שתיים או שלוש אפשרויות ותן לאדם לבחור.",
+            'ביטויים קבועים נאמרים בדיוק כפי שהם: "ברוך הבא", "תודה רבה", "יום טוב". אל תמציא גרסה משלך.',
+            'אם אתה לא בטוח במגדר של המתקשר — נסח את המשפט בלי פנייה מגדרית: "אפשר לקבוע ליום שלישי".',
+            'אל תשתמש בצורות עם לוכסן ("מעוניין/ת") — הן נשמעות רע בדיבור.',
+        ],
     },
 }
-
-# Said aloud rather than read, so the shapes the data is stored in have to be spoken differently.
-# These are the same rules for every business — only the data above them changes.
-SPEECH_RULES = [
-    'מספרים אמור במילים ולא כספרות: "מאה ועשרים שקל", לא "120".',
-    'שעות אמור כמו בדיבור: "מתשע בבוקר עד שש בערב", לא "09:00-18:00".',
-    "אל תקרא רשימות שלמות. הצע שתיים או שלוש אפשרויות ותן לאדם לבחור.",
-    "ביטויים קבועים נאמרים בדיוק כפי שהם: \"ברוך הבא\", \"תודה רבה\", \"יום טוב\". אל תמציא גרסה משלך.",
-    "אם אינך בטוח במגדר של המתקשר — נסח את המשפט בלי פנייה מגדרית: \"אפשר לקבוע ליום שלישי\".",
-    'אל תשתמש בצורות עם לוכסן ("מעוניין/ת") — הן נשמעות רע בדיבור.',
-]
-
 
 def build_prompt(ctx: Dict[str, Any], caller_known: bool = True) -> str:
     """
@@ -315,7 +416,7 @@ def build_prompt(ctx: Dict[str, Any], caller_known: bool = True) -> str:
         f["brief"],
         f["interrupted"],
         f["unclear"],
-        *SPEECH_RULES,
+        *f["rules"],
         "",
         "## שירותים ומחירים",
         _fmt_services(ctx),
@@ -331,7 +432,7 @@ def build_prompt(ctx: Dict[str, Any], caller_known: bool = True) -> str:
     if ctx.get("specialPeriods"):
         parts += ["", "## תאריכים מיוחדים"]
         for p in ctx["specialPeriods"]:
-            parts.append(f"- {p.get('label')}: {p.get('startDate')} עד {p.get('endDate')}. {p.get('description') or ''}")
+            parts.append(f"- {p.get('label')}: מ{_fmt_date(p.get('startDate'))} עד {_fmt_date(p.get('endDate'))}. {p.get('description') or ''}")
     if ctx.get("cancellationPolicy"):
         parts += ["", "## מדיניות ביטול", str(ctx["cancellationPolicy"])]
     if ctx.get("faq"):
@@ -347,7 +448,7 @@ def build_prompt(ctx: Dict[str, Any], caller_known: bool = True) -> str:
         parts += ["", f["known"].format(name=caller.get("name"))]
         appt = caller.get("upcomingAppointment")
         if appt:
-            parts.append(f"יש לו כבר תור ל{appt.get('serviceName')} בתאריך {appt.get('startTime')}.")
+            parts.append(f"יש לו כבר תור ל{appt.get('serviceName')} ב{_fmt_datetime(appt.get('startTime'))}.")
 
     if inquiry:
         # The B&B model closes bookings human-to-human. Saying otherwise invents a confirmation.
@@ -411,8 +512,12 @@ async def get_agent(env: AgentEnv, call_request: CallRequest):
         slots = body.get("slots") or []
         if not slots:
             return "אין זמנים פנויים בתאריך הזה."
-        # localTime is what to say out loud; startTime is what book_appointment needs back verbatim.
-        return "\n".join(f"{s['localTime']} (startTime={s['startTime']})" for s in slots[:12])
+        # localTime is what to say out loud, so it is spelled out here rather than left as "14:30"
+        # for the model to read digit by digit. startTime stays exactly as received — book_appointment
+        # sends it back verbatim and the backend parses it.
+        return "\n".join(
+            f"{_spoken_clock(s['localTime'])} (startTime={s['startTime']})" for s in slots[:12]
+        )
 
     async def book_appointment(
         ctx,

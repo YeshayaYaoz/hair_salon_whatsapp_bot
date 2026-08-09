@@ -114,7 +114,7 @@ async def main_():
     _, payload, _ = STATE["seen"][0]
     assert payload["calledNumber"] == "+972555077941", payload
     assert "service_name" not in str(payload)
-    assert "12:00" in out and "2026-08-12T09:00:00Z" in out
+    assert "שתים עשרה בצהריים" in out and "2026-08-12T09:00:00Z" in out, out
     print("8 tools carry the dialled number themselves; caller is never asked          OK")
 
     STATE.update(status=409, body={"error": "Slot no longer available"}, seen=[])
@@ -204,12 +204,16 @@ async def main_():
     assert "אתה עונה" in p and "אני בודק" in p, p[:300]
     assert "את עונה" not in p and "אני בודקת" not in p, p[:300]
     assert "השתמש ב-check_availability" in p and "השתמשי" not in p, p[:600]
+    # The speech rules are imperatives too, and were the easiest place to leave one gender behind.
+    assert "אמור במילים" in p and "אל תקרא רשימות" in p, p
+    assert "אמרי במילים" not in p and "אל תקראי" not in p, p
 
     STATE.update(status=200, body=dict(SALON, voiceGender="feminine"), seen=[])
     pre = await main.pre_call_handler(req())
     p = (await main.get_agent(None, req(meta=pre.metadata)))._config.system_prompt
     assert "את עונה" in p and "אני בודקת" in p, p[:300]
     assert "אתה עונה" not in p, p[:300]
+    assert "אמרי במילים" in p and "אמור במילים" not in p, p
 
     # gender_neutral and "no voice chosen" both keep what every salon heard before the setting.
     for unknown in (None, "gender_neutral"):
@@ -220,14 +224,34 @@ async def main_():
     print("15 the agent's grammar follows the chosen voice's gender                     OK")
 
     # --- 8. data shaped for a calendar, spoken to a person ----------------------------
-    assert main._fmt_duration(1440) == "לילה אחד", main._fmt_duration(1440)
-    assert main._fmt_duration(2880) == "2 לילות"
-    assert main._fmt_duration(45) == "45 דקות"
+    # Hebrew numbers agree in gender with the noun they count, and a bare digit gives the model
+    # nothing to agree with: "2 לילות" comes out שתיים or שניים at random, and only שני is right.
+    assert main._he_num(2) == "שניים" and main._he_num(2, feminine=True) == "שתיים"
+    assert main._he_num(21) == "עשרים ואחד" and main._he_num(21, feminine=True) == "עשרים ואחת"
+    assert main._he_num(150) == "150"          # out of range: the prompt's rule covers it
+
+    assert main._fmt_duration(1440) == "לילה אחד"
+    assert main._fmt_duration(2880) == "שני לילות"      # לילה is masculine, and 2 is construct
+    assert main._fmt_duration(4320) == "שלושה לילות"
+    assert main._fmt_duration(45) == "ארבעים וחמש דקות"
     assert main._fmt_duration(60) == "שעה"
     assert main._fmt_duration(90) == "שעה וחצי"
-    assert main._fmt_duration(120) == "שעתיים"
-    assert main._fmt_duration(150) == "2 שעות וחצי"
-    assert main._fmt_duration(75) == "שעה ו-15 דקות"
+    assert main._fmt_duration(120) == "שעתיים"          # dual, not a counted form
+    assert main._fmt_duration(150) == "שעתיים וחצי"
+    assert main._fmt_duration(180) == "שלוש שעות"       # שעה is feminine — שלוש, not שלושה
+    assert main._fmt_duration(75) == "שעה וחמש עשרה דקות"
+
+    assert main._fmt_clock(540) == "תשע בבוקר"
+    assert main._fmt_clock(1080) == "שש בערב"
+    assert main._fmt_clock(0) == "שתים עשרה בלילה"
+    assert main._spoken_clock("14:30") == "שתיים וחצי בצהריים"
+    assert main._spoken_clock("08:15") == "שמונה ורבע בבוקר"
+    assert main._spoken_clock("08:45") == "רבע לתשע בבוקר"
+    assert main._spoken_clock("nonsense") == "nonsense"  # never mangle what it cannot parse
+
+    # ISO dates and timestamps were going into the prompt raw, for the agent to read aloud.
+    assert main._fmt_date("2026-08-12") == "שנים עשר באוגוסט"
+    assert main._fmt_datetime("2026-08-12T09:00:00Z") == "שנים עשר באוגוסט בשעה תשע בבוקר"
 
     ZIMMER = dict(SALON, bookingModel="inquiry", ownerTransferNumber="+972500000000",
                   services=[{"name": "יחידת הרים", "priceIls": 1800, "durationMin": 1440,
@@ -236,8 +260,42 @@ async def main_():
     pre = await main.pre_call_handler(req())
     p = (await main.get_agent(None, req(meta=pre.metadata)))._config.system_prompt
     assert "לילה אחד" in p and "1440" not in p, p
+    assert "ארבעה אורחים" in p and "4 אורחים" not in p, p   # אורח is masculine
     assert "במילים ולא כספרות" in p          # the model is told to say numbers, not read them
     print("16 an overnight stay is one night, never 1440 minutes                        OK")
+
+    # Everything else the prompt carries that a person has to hear, not read.
+    STATE.update(status=200, body=dict(
+        SALON,
+        hours=[{"dayOfWeek": 0, "openMin": 540, "closeMin": 1080}],
+        specialPeriods=[{"label": "סוכות", "startDate": "2026-09-25", "endDate": "2026-10-02",
+                         "description": "מינימום שני לילות"}],
+        caller={"isKnownCustomer": True, "name": "דנה",
+                "upcomingAppointment": {"id": "a1", "serviceName": "צבע",
+                                        "startTime": "2026-08-12T09:00:00Z", "staffName": None}},
+    ), seen=[])
+    pre = await main.pre_call_handler(req())
+    p = (await main.get_agent(None, req(meta=pre.metadata)))._config.system_prompt
+    assert "- ראשון: מתשע בבוקר עד שש בערב" in p, p
+    assert "09:00" not in p and "18:00" not in p, p
+    assert "עשרים וחמישה בספטמבר" in p and "2026-09-25" not in p, p
+    assert "שנים עשר באוגוסט בשעה תשע בבוקר" in p, p
+    assert "2026-08-12T09:00:00Z" not in p, p    # was handed to the agent to read out loud
+    print("17 no ISO dates, timestamps or clock digits survive into the prompt          OK")
+
+    # Slot times are spoken; the startTime string must survive untouched for book_appointment.
+    STATE.update(status=200, body=SALON, seen=[])
+    pre = await main.pre_call_handler(req())
+    agent = await main.get_agent(None, req(meta=pre.metadata))
+    tool = next(t for t in agent._tools if (getattr(t, "__name__", None) or getattr(t, "name", "")) == "check_availability")
+    STATE.update(status=200, body={"slots": [
+        {"startTime": "2026-08-12T09:00:00Z", "localTime": "12:00", "staffId": None},
+        {"startTime": "2026-08-12T11:45:00Z", "localTime": "14:45", "staffId": None},
+    ]}, seen=[])
+    out = await tool(None, service_name="תספורת אישה", date="2026-08-12")
+    assert "שתים עשרה בצהריים" in out and "רבע לשלוש בצהריים" in out, out
+    assert "2026-08-12T09:00:00Z" in out and "2026-08-12T11:45:00Z" in out, out
+    print("18 slot times are spoken, while startTime stays verbatim for booking         OK")
 
 asyncio.run(main_())
 print("\nALL CHECKS PASSED")
