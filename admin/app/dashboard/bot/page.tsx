@@ -413,23 +413,30 @@ export default function BotPage() {
 
       {/* Master on/off switch, kept above the settings form: when the bot is off none of the
           settings below have any effect, so the owner should see that state first. */}
+      {/* One row rather than a stacked block: the status is two short lines, and stacking them left
+          the button alone at the far edge of a wide screen with the width of the page empty between
+          them. Laid out inline, the description fills that space instead of sitting under the title.
+          The dot is an element rather than an emoji in the string, so it matches the status dots
+          elsewhere in the dashboard and does not inherit the text colour. */}
       <div
-        className={`rounded-xl border p-4 mb-5 flex items-center gap-4 ${
+        className={`rounded-xl border px-4 py-3 mb-5 flex items-center gap-3 flex-wrap ${
           botEnabled ? "bg-white border-gray-200" : "bg-amber-50 border-amber-300"
         }`}
       >
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-gray-900">
-            {botEnabled
-              ? (he ? "🟢 הבוט פעיל" : "🟢 Bot is active")
-              : (he ? "⏸️ הבוט מושהה" : "⏸️ Bot is paused")}
-          </p>
-          <p className="text-xs text-gray-600 mt-0.5">
-            {botEnabled
-              ? (he ? "הבוט עונה ללקוחות בוואטסאפ ומקבל תורים." : "The bot answers customers on WhatsApp and takes bookings.")
-              : (he ? "הבוט לא עונה לאף לקוח. ההודעות עדיין נשמרות ותוכל לענות ידנית." : "The bot answers no one. Messages are still saved so you can reply manually.")}
-          </p>
-        </div>
+        <span
+          className={`w-2 h-2 rounded-full shrink-0 ${botEnabled ? "bg-green-500" : "bg-amber-500"}`}
+          aria-hidden
+        />
+        <p className="text-sm font-semibold text-gray-900 shrink-0">
+          {botEnabled
+            ? (he ? "הבוט פעיל" : "Bot is active")
+            : (he ? "הבוט מושהה" : "Bot is paused")}
+        </p>
+        <p className="text-xs text-gray-600 flex-1 min-w-[12rem]">
+          {botEnabled
+            ? (he ? "הבוט עונה ללקוחות בוואטסאפ ומקבל תורים." : "The bot answers customers on WhatsApp and takes bookings.")
+            : (he ? "הבוט לא עונה לאף לקוח. ההודעות עדיין נשמרות ותוכל לענות ידנית." : "The bot answers no one. Messages are still saved so you can reply manually.")}
+        </p>
         <button
           type="button"
           onClick={toggleBot}
