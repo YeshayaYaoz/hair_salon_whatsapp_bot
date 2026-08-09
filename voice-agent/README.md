@@ -40,24 +40,25 @@ near region (call records carry `deployment_region`). Self-hosting puts the agen
 place — fine if that place is near the caller and near Cartesia, an added round trip on every turn
 if it is not. Railway defaulting to a US region while the callers are Israeli would be the bad case.
 
-### Managed, via a linked GitHub repository (recommended)
-
-Link this repository to the agent in the Cartesia console and set its root directory to
-`voice-agent`. Each push to the linked branch builds a deployment. Cartesia builds the venv from
-`pyproject.toml`, loads `main.py`, instantiates the FastAPI app and health-checks it before sending
-traffic — which is why `pyproject.toml` declares the interpreter range rather than leaving it to
-their default.
-
-### Managed, via the CLI — **not available on Windows**
-
-Cartesia's installer detects only Darwin and Linux and exits with "Unsupported operating system"
-otherwise, so this route needs WSL or Git Bash on Windows.
+### Managed, via the CLI (recommended)
 
 ```bash
 curl -fsSL https://cartesia.sh | sh
 cartesia auth login          # paste an API key from play.cartesia.ai/keys
 cd voice-agent && cartesia init && cartesia deploy
 ```
+
+**On Windows this needs WSL, not Git Bash.** The installer switches on `uname -s` and accepts only
+`Darwin*` or `Linux*`; Git Bash reports `MINGW64_NT-…` and falls to "Unsupported operating system".
+WSL reports `Linux` and works.
+
+### Managed, via a linked GitHub repository
+
+Cartesia's deployment docs mention this in one sentence — *"Use `cartesia deploy` or push to a
+linked GitHub repository"* — and document it nowhere else in 715KB of documentation. The agent
+object carries `git_repository` and `git_deploy_branch` fields, so the capability exists server-side,
+but there is no published way to set them and no console page for it at the time of writing. Treat
+it as unavailable unless Cartesia support says otherwise.
 
 ### Self-hosted
 
