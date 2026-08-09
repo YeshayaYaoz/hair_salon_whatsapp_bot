@@ -8,6 +8,7 @@ import { TEMPLATES, isBusinessType } from "../lib/businessTemplates.js";
 // Shared with the owner-notification phone: the same "typed by a human vs formatted by a
 // machine" mismatch this was written for applies wherever those two meet. See lib/phone.ts.
 import { normalizePhone } from "../lib/phone.js";
+import { listHebrewVoices } from "../lib/cartesiaAdmin.js";
 
 export const voiceRouter = asyncRouter();
 
@@ -99,6 +100,20 @@ voiceRouter.use(requireCartesiaAuth);
 // belongs to, and whether the caller is an existing customer with an upcoming appointment, so the
 // agent can open with something like "Hi Dana, calling about your appointment tomorrow?" instead of
 // a blind generic greeting.
+/**
+ * The gender of the voice this business chose, or null if it cannot be determined.
+ *
+ * listHebrewVoices caches for an hour and returns [] when the catalogue is unreachable, so this
+ * costs nothing per call and degrades to "unknown" rather than failing the call — a voice agent
+ * that cannot answer the phone is far worse than one using the wrong verb form.
+ */
+async function voiceGenderFor(voiceId: string | null): Promise<"masculine" | "feminine" | null> {
+  if (!voiceId) return null;
+  const voice = (await listHebrewVoices()).find((v) => v.id === voiceId);
+  // gender_neutral gives us nothing to inflect with, so it is treated the same as unknown.
+  return voice?.gender === "masculine" || voice?.gender === "feminine" ? voice.gender : null;
+}
+
 voiceRouter.post("/context", async (req, res) => {
   const parsed = z.object({ calledNumber: z.string().min(1), callerNumber: z.string().min(1) }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "calledNumber and callerNumber are required" });
@@ -181,6 +196,11 @@ voiceRouter.post("/context", async (req, res) => {
     // response. Null means the agent keeps its own default, which is what every salon had before
     // the setting existed.
     voiceId: full.voiceId,
+    /** Which gender the agent should speak about *itself* in. A feminine voice saying "אני מעביר"
+     * is jarring in a way an English agent never is, because Hebrew marks gender on every verb.
+     * Derived from the Cartesia catalogue rather than stored, so it always matches the voice
+     * actually playing; null (no key, unknown voice, gender_neutral) leaves the agent's default. */
+    voiceGender: await voiceGenderFor(full.voiceId),
     cancellationPolicy: full.cancellationPolicy,
     // Date-only strings: the agent reads these out loud and compares them to what the caller asks
     // for, so a timezone-bearing timestamp would be both wrong to speak and easy to misread.

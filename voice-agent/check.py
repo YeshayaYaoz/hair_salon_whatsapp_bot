@@ -195,5 +195,49 @@ async def main_():
     assert payload["callerNumber"] == "+972533391353", payload
     print("14 with a caller ID the number is never asked for                           OK")
 
+    # --- 7. the voice and the grammar have to agree -----------------------------------
+    # Hebrew inflects every verb for gender, so a masculine voice reading feminine forms is not a
+    # style mismatch — it is wrong, and audible in the first sentence.
+    STATE.update(status=200, body=dict(SALON, voiceGender="masculine"), seen=[])
+    pre = await main.pre_call_handler(req())
+    p = (await main.get_agent(None, req(meta=pre.metadata)))._config.system_prompt
+    assert "אתה עונה" in p and "אני בודק" in p, p[:300]
+    assert "את עונה" not in p and "אני בודקת" not in p, p[:300]
+    assert "השתמש ב-check_availability" in p and "השתמשי" not in p, p[:600]
+
+    STATE.update(status=200, body=dict(SALON, voiceGender="feminine"), seen=[])
+    pre = await main.pre_call_handler(req())
+    p = (await main.get_agent(None, req(meta=pre.metadata)))._config.system_prompt
+    assert "את עונה" in p and "אני בודקת" in p, p[:300]
+    assert "אתה עונה" not in p, p[:300]
+
+    # gender_neutral and "no voice chosen" both keep what every salon heard before the setting.
+    for unknown in (None, "gender_neutral"):
+        STATE.update(status=200, body=dict(SALON, voiceGender=unknown), seen=[])
+        pre = await main.pre_call_handler(req())
+        p = (await main.get_agent(None, req(meta=pre.metadata)))._config.system_prompt
+        assert "את עונה" in p, unknown
+    print("15 the agent's grammar follows the chosen voice's gender                     OK")
+
+    # --- 8. data shaped for a calendar, spoken to a person ----------------------------
+    assert main._fmt_duration(1440) == "לילה אחד", main._fmt_duration(1440)
+    assert main._fmt_duration(2880) == "2 לילות"
+    assert main._fmt_duration(45) == "45 דקות"
+    assert main._fmt_duration(60) == "שעה"
+    assert main._fmt_duration(90) == "שעה וחצי"
+    assert main._fmt_duration(120) == "שעתיים"
+    assert main._fmt_duration(150) == "2 שעות וחצי"
+    assert main._fmt_duration(75) == "שעה ו-15 דקות"
+
+    ZIMMER = dict(SALON, bookingModel="inquiry", ownerTransferNumber="+972500000000",
+                  services=[{"name": "יחידת הרים", "priceIls": 1800, "durationMin": 1440,
+                             "description": None, "capacity": 4}])
+    STATE.update(status=200, body=ZIMMER, seen=[])
+    pre = await main.pre_call_handler(req())
+    p = (await main.get_agent(None, req(meta=pre.metadata)))._config.system_prompt
+    assert "לילה אחד" in p and "1440" not in p, p
+    assert "במילים ולא כספרות" in p          # the model is told to say numbers, not read them
+    print("16 an overnight stay is one night, never 1440 minutes                        OK")
+
 asyncio.run(main_())
 print("\nALL CHECKS PASSED")
