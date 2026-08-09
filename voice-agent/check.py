@@ -123,5 +123,54 @@ async def main_():
     assert "נתפס" in out, out
     print("9 booking a taken slot returns a recoverable instruction, not a crash       OK")
 
+    # --- 6. the silent failures: a bot that sounds fine and knows nothing --------------
+    # Both of these previously produced a working-sounding agent greeting "שלום, הגעתם ל" with an
+    # empty service list — indistinguishable over the phone from a stock template answering.
+    STATE.update(status=200, body={"bookingModel": "slot"}, seen=[])
+    pre = await main.pre_call_handler(req())
+    assert "tori_context" not in pre.metadata, pre.metadata
+    assert "מצטערת" in pre.metadata["tori_error"], pre.metadata
+    print("10 a 200 with no businessName is a failure, not an anonymous salon          OK")
+
+    agent = await main.get_agent(None, req(meta={}))
+    assert agent._config.introduction == main.UNREACHABLE_HE, agent._config.introduction
+    assert not agent._tools, agent._tools
+    print("11 metadata lost in transit: apology, never an improvised booking bot       OK")
+
+    # The SDK hands pre_call_handler "unknown" as the caller on the /chats path; /context still
+    # has to be called, because the dialled number alone is what identifies the salon.
+    STATE.update(status=200, body=SALON, seen=[])
+    pre = await main.pre_call_handler(req(frm="unknown"))
+    _, payload, _ = STATE["seen"][0]
+    assert payload == {"calledNumber": "+972555077941", "callerNumber": "unknown"}, payload
+    assert pre.metadata["tori_context"]["businessName"] == SALON["businessName"]
+    print("12 an unknown caller number still resolves the salon                        OK")
+
+    # A booking must never be filed under the string "unknown" — the salon could not call that
+    # customer back and the confirmation would go nowhere.
+    agent = await main.get_agent(None, req(frm="unknown", meta=pre.metadata))
+    assert "caller_phone" in agent._config.system_prompt, agent._config.system_prompt
+    book = next(t for t in agent._tools if (getattr(t, "__name__", None) or getattr(t, "name", "")) == "book_appointment")
+    STATE.update(status=200, body={"booked": True}, seen=[])
+    out = await book(None, service_name="תספורת אישה", start_time="2026-08-12T09:00:00Z")
+    assert not STATE["seen"], "booked without a real phone number"
+    assert "מספר הטלפון" in out, out
+    out = await book(None, service_name="תספורת אישה", start_time="2026-08-12T09:00:00Z", caller_phone="0501234567")
+    _, payload, _ = STATE["seen"][0]
+    assert payload["callerNumber"] == "0501234567", payload
+    print("13 no caller ID: the agent asks for the number instead of filing 'unknown'  OK")
+
+    # ...and with a real caller ID it must not ask, which is the failure this whole file exists for.
+    STATE.update(status=200, body=SALON, seen=[])
+    pre = await main.pre_call_handler(req())
+    agent = await main.get_agent(None, req(meta=pre.metadata))
+    assert "caller_phone" not in agent._config.system_prompt, agent._config.system_prompt
+    book = next(t for t in agent._tools if (getattr(t, "__name__", None) or getattr(t, "name", "")) == "book_appointment")
+    STATE.update(status=200, body={"booked": True}, seen=[])
+    await book(None, service_name="תספורת אישה", start_time="2026-08-12T09:00:00Z")
+    _, payload, _ = STATE["seen"][0]
+    assert payload["callerNumber"] == "+972533391353", payload
+    print("14 with a caller ID the number is never asked for                           OK")
+
 asyncio.run(main_())
 print("\nALL CHECKS PASSED")
