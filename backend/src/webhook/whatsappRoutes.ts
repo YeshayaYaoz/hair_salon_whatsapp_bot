@@ -5,6 +5,8 @@ import { resolveBusinessByPhoneNumberId } from "../tenants/resolve.js";
 import { sendWhatsAppMessage, sendWhatsAppList, sendWhatsAppImage, sendWhatsAppCtaUrl, sendWhatsAppButtons, WhatsAppAuthError, type ListRow } from "./whatsappClient.js";
 import { sendWhatsAppTokenExpiredEmail } from "../lib/email.js";
 import { handleIncomingMessage } from "../bot/claudeBot.js";
+import { checkDailyCap } from "../lib/dailyMessageCap.js";
+import { notifyOwner } from "../lib/ownerNotify.js";
 import { clearHistory, appendTurn } from "../bot/conversationStore.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { hasActiveSubscription } from "../lib/subscriptionGate.js";
@@ -288,6 +290,39 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
         : extracted.kind === "reset" ? "[בקשת איפוס שיחה]"
         : "[הודעה]";
       await appendTurn(business.id, customerPhone, { role: "user", content: preview });
+      return;
+    }
+
+    /**
+     * Daily ceiling per customer.
+     *
+     * Checked here rather than inside the bot so a capped thread costs nothing: no prompt is built
+     * and no model is called. The message is still persisted, so the owner sees the whole thread —
+     * including whatever was being sent a hundred times — when they open the conversation.
+     *
+     * The customer is told once, at the moment they cross, and then the line goes quiet for them.
+     * Saying it on every subsequent message would be its own send loop.
+     */
+    const cap = await checkDailyCap(business.id, customerPhone);
+    if (cap.exceeded) {
+      const preview = extracted.kind === "text" ? extracted.text : "[הודעה]";
+      await appendTurn(business.id, customerPhone, { role: "user", content: preview });
+      console.warn(`[bot] daily cap reached for ${customerPhone} at ${business.id} (${cap.count} messages) — staying silent`);
+
+      if (cap.justCrossed) {
+        const notice = detectLang(preview) === "he"
+          ? "קיבלנו הרבה הודעות מהמספר הזה היום, אז אני עוצר כאן. אפשר להמשיך מאוחר יותר, או לפנות ישירות לבעל העסק."
+          : "We've had a lot of messages from this number today, so I'll stop here. We can continue later, or you can contact the business directly.";
+        await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: notice }).catch((err) => {
+          console.error("[bot] failed to send the daily-cap notice:", err);
+        });
+        // Worth an owner alert: a thread hitting this is either a real customer in trouble or
+        // something abusive, and both are things a person should look at.
+        await notifyOwner(
+          business.id,
+          `⚠️ מספר ${customerPhone} שלח מעל ${cap.count} הודעות ב-24 השעות האחרונות. הבוט הפסיק לענות לו. כדאי להציץ בשיחה.`
+        ).catch(() => {});
+      }
       return;
     }
 
