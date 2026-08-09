@@ -169,10 +169,33 @@ connects and dies.
 salon on this number) already carries a sentence written to be spoken aloud; it is passed through
 verbatim as the introduction. Only an unreachable backend falls back to a generic apology.
 
-## Not verified here
+## Verified on a live call
 
-This has not been deployed or exercised against a live call — it is written against the endpoint
-contracts in `backend/src/api/voiceRoutes.ts` and the Line SDK's own types (`cartesia-line` 0.2.16:
-`CallRequest.to` / `.from_`, `PreCallResult`, `LlmConfig`). Treat the first deploy as the test, and
-check the transcript afterwards: `GET /agents/calls?agent_id=…` shows whether tools were called or
-the model narrated them instead.
+Deployed to `dialogue-partner` and answered a real call to `+972555077941` speaking the business's
+own greeting and data.
+
+Getting there took six deploys that all changed nothing, because four separate problems produced one
+identical symptom — a bot that answered in Hebrew and greeted with `שלום, הגעתם ל`, no business name.
+Each is worth knowing before wiring the next number:
+
+1. **`CARTESIA_TOOL_SECRET` was unset**, making the auth header the bare string `Bearer `. httpx
+   refuses to send that: `LocalProtocolError: Illegal header value b'Bearer '`, raised five frames
+   deep in httpcore and easily misread as a network fault. `_post` now names the missing variable.
+2. **`PreCallResult.metadata` never reached the agent** (see above). This one survived every fix to
+   the others, because the context could not arrive no matter what `/context` returned.
+3. **`cartesia env set` requires `--agent-id`.** Without it the CLI reports *"No agent linked.
+   Initializing project…"*, writes a `cartesia.toml` into whatever directory you are standing in,
+   and tries to deploy that — from the repo root that means a 386 MB upload of `node_modules`,
+   which the server rejects. Always run it from `voice-agent/`, always pass `--agent-id`.
+4. **A `git pull` that aborted on local changes.** Windows checkouts show most of the repo as
+   modified via `core.autocrlf`, `pull` refuses to overwrite them, and `cartesia deploy` cheerfully
+   ships the unchanged files. A deploy succeeding says nothing about which code it packaged.
+
+The lesson that would have saved the evening: **the per-call runtime logs answer in one look what a
+phone call cannot answer at all.** Console → agent → Calls → the call → logs. `pre_call_handler`
+logs on entry, so its absence means this code did not serve the call, and everything after it says
+where the context went. Reach for that before forming a theory.
+
+Two shell notes for Windows/WSL: secrets containing `!` need `set +H` and single quotes or bash
+history expansion eats them (`-bash: !w2: event not found`), and the CLI has **no `env ls`** — only
+`set` and `rm`, so a variable can only be confirmed by behaviour.
