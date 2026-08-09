@@ -112,6 +112,24 @@ and the linked providers — and warns about the two failures that are otherwise
 
 Then dial the number. That is the only test that proves the media path, not just the signalling.
 
+### When the call connects but the agent is wrong
+
+Do not diagnose this from the phone call. A bot that answers in Hebrew and knows nothing about the
+business has at least four distinct causes that sound identical to a caller, and we spent six
+deploys distinguishing them by ear before looking in the right place.
+
+**Go straight to the per-call runtime logs**: console → the agent → Calls → the call → logs. They
+show the websocket start message, every tool invocation, and any traceback from our code. The first
+line to look for is
+
+```
+pre_call_handler: to='+972…' from=… call_id=…
+```
+
+Absent, and `voice-agent/main.py` did not serve that call — check which agent the number is on.
+Present, and the next lines say exactly where the context went. `voice-agent/README.md` lists the
+four causes and what each looks like in that log.
+
 ## Cost
 
 | | Number | Per minute |
