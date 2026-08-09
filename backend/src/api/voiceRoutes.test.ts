@@ -141,6 +141,18 @@ describe("POST /api/voice/context", () => {
       expect(res.body.voiceId).toBeNull();
     });
 
+    // "אפשר לדבר עם מישהו?" is the most ordinary thing a caller asks. This used to be sent only for
+    // inquiry businesses, so a salon's agent had no number to transfer to and talked past them.
+    it.each([["slot"], ["inquiry"]])("gives a %s business somewhere to transfer a caller", async (bookingModel) => {
+      stubContext({ bookingModel, notificationPhone: "972500000000" });
+      expect((await post()).body.ownerTransferNumber).toBe("972500000000");
+    });
+
+    it("sends null when the owner never gave a notification phone", async () => {
+      stubContext({ bookingModel: "slot", notificationPhone: null });
+      expect((await post()).body.ownerTransferNumber).toBeNull();
+    });
+
     // Hebrew inflects every verb for gender, so the agent has to know which one its own voice is
     // before it can say "אני בודקת" rather than "אני בודק". Derived from Cartesia's catalogue so it
     // cannot drift from the voice actually playing.

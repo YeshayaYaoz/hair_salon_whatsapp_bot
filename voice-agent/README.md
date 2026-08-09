@@ -118,6 +118,12 @@ The matching model provider key (e.g. `ANTHROPIC_API_KEY`) is needed too.
   businesses close bookings human-to-human — the backend refuses booking calls from them outright
   (`rejectIfInquiry`), so an agent that tried would only produce errors mid-call.
 
+`transfer_to_owner` is available to **both**. It was originally built for inquiry businesses only,
+which left a salon's agent with no answer to *"אפשר לדבר עם מישהו?"* — the most ordinary request a
+caller makes. `/context` now returns `ownerTransferNumber` for every business rather than only
+inquiry ones. Where the owner never set a notification phone the tool is absent, and the prompt
+tells the agent to take a name and number instead of promising a handover it cannot perform.
+
 The dialled and caller numbers are **closed over, not tool parameters**. The model cannot mistype
 them, invent them, or ask for them.
 
