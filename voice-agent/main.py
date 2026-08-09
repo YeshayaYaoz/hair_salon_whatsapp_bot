@@ -183,6 +183,27 @@ async def pre_call_handler(call_request: CallRequest) -> Optional[PreCallResult]
     return PreCallResult(metadata={"tori": resolved}, config={"tts": tts})
 
 
+def _fmt_duration(minutes: int) -> str:
+    """
+    A duration as someone would say it on the phone.
+
+    The database stores minutes because that is what the calendar needs. Read out, that turns an
+    overnight stay into "אלף ארבע מאות וארבעים דקות" — a number no guest has ever used for one
+    night. The unit has to change with the size, the way speech does.
+    """
+    if minutes % 1440 == 0:
+        nights = minutes // 1440
+        return "לילה אחד" if nights == 1 else f"{nights} לילות"
+    if minutes < 60:
+        return f"{minutes} דקות"
+    hours, rest = divmod(minutes, 60)
+    if rest == 30:
+        return "שעה וחצי" if hours == 1 else f"{hours} שעות וחצי"
+    if rest:
+        return f"{hours} שעות ו-{rest} דקות" if hours > 1 else f"שעה ו-{rest} דקות"
+    return {1: "שעה", 2: "שעתיים"}.get(hours, f"{hours} שעות")
+
+
 def _fmt_services(ctx: Dict[str, Any]) -> str:
     lines = []
     for s in ctx.get("services") or []:
@@ -190,7 +211,7 @@ def _fmt_services(ctx: Dict[str, Any]) -> str:
         if s.get("priceIls") is not None:
             bits.append(f"{s['priceIls']} ש\"ח")
         if s.get("durationMin"):
-            bits.append(f"{s['durationMin']} דקות")
+            bits.append(_fmt_duration(int(s["durationMin"])))
         if s.get("capacity"):
             bits.append(f"עד {s['capacity']} אורחים")
         if s.get("description"):
@@ -211,22 +232,90 @@ def _fmt_hours(ctx: Dict[str, Any]) -> str:
     return "\n".join(out) if out else "(שעות לא הוגדרו)"
 
 
+# Hebrew marks gender on every verb, so an agent cannot be written once and voiced either way. A
+# feminine voice saying "אני מעביר אותך" is wrong in a way that has no English equivalent — it is not
+# a style choice, it is a grammatical error the caller hears immediately.
+#
+# The forms are written out per gender rather than derived by substitution: Hebrew inflection is not
+# a suffix swap (שתקי/שתוק, פני/פנה, אמרי/אמור), and a rule that "usually" conjugates correctly would
+# produce invented words on the exceptions.
+FORMS = {
+    "feminine": {
+        "answers": "את עונה לשיחות טלפון של",
+        "speaks": "את מדברת, לא כותבת: משפטים קצרים, בלי רשימות, בלי סימני פיסוק מיוחדים.",
+        "address": "פני ל{who} בגוף שני, בעברית, בטון חם ומקצועי.",
+        "self": 'כשאת מדברת על עצמך — בלשון נקבה: "אני בודקת", "אני מעבירה", "אני לא בטוחה".',
+        "brief": "תשובה אחת — שני משפטים לכל היותר. אחר כך עצרי ותני לאדם לדבר.",
+        "interrupted": "אם קטעו אותך — שתקי מיד והקשיבי.",
+        "unclear": "אם לא הבנת מה נאמר, בקשי לחזור על זה. אל תנחשי.",
+        "as_written": "אמרי אותם כפי שהם. אל תחשבי סכומים בעצמך.",
+        "known": "המתקשר מוכר: {name}. פני אליו בשמו.",
+        "no_booking": "את לא סוגרת הזמנות. את נותנת מידע ומעבירה את השיחה לבעל העסק כשהמתקשר רוצה להזמין.",
+        "transfer": "השתמשי בכלי transfer_to_owner כדי להעביר.",
+        "booking": "השתמשי ב-check_availability כדי לראות זמנים פנויים, ואז ב-book_appointment.",
+        "no_invent": "אל תמציאי זמנים ואל תאשרי תור שלא חזר מ-book_appointment.",
+        "verbatim": "העבירי ל-startTime בדיוק את המחרוזת שהתקבלה מ-check_availability.",
+        "ask_phone": "לפני שאת קובעת תור, שאלי את המתקשר מה מספר הטלפון שלו והעבירי אותו ב-caller_phone.",
+    },
+    "masculine": {
+        "answers": "אתה עונה לשיחות טלפון של",
+        "speaks": "אתה מדבר, לא כותב: משפטים קצרים, בלי רשימות, בלי סימני פיסוק מיוחדים.",
+        "address": "פנה ל{who} בגוף שני, בעברית, בטון חם ומקצועי.",
+        "self": 'כשאתה מדבר על עצמך — בלשון זכר: "אני בודק", "אני מעביר", "אני לא בטוח".',
+        "brief": "תשובה אחת — שני משפטים לכל היותר. אחר כך עצור ותן לאדם לדבר.",
+        "interrupted": "אם קטעו אותך — שתוק מיד והקשב.",
+        "unclear": "אם לא הבנת מה נאמר, בקש לחזור על זה. אל תנחש.",
+        "as_written": "אמור אותם כפי שהם. אל תחשב סכומים בעצמך.",
+        "known": "המתקשר מוכר: {name}. פנה אליו בשמו.",
+        "no_booking": "אתה לא סוגר הזמנות. אתה נותן מידע ומעביר את השיחה לבעל העסק כשהמתקשר רוצה להזמין.",
+        "transfer": "השתמש בכלי transfer_to_owner כדי להעביר.",
+        "booking": "השתמש ב-check_availability כדי לראות זמנים פנויים, ואז ב-book_appointment.",
+        "no_invent": "אל תמציא זמנים ואל תאשר תור שלא חזר מ-book_appointment.",
+        "verbatim": "העבר ל-startTime בדיוק את המחרוזת שהתקבלה מ-check_availability.",
+        "ask_phone": "לפני שאתה קובע תור, שאל את המתקשר מה מספר הטלפון שלו והעבר אותו ב-caller_phone.",
+    },
+}
+
+# Said aloud rather than read, so the shapes the data is stored in have to be spoken differently.
+# These are the same rules for every business — only the data above them changes.
+SPEECH_RULES = [
+    'מספרים אמור במילים ולא כספרות: "מאה ועשרים שקל", לא "120".',
+    'שעות אמור כמו בדיבור: "מתשע בבוקר עד שש בערב", לא "09:00-18:00".',
+    "אל תקרא רשימות שלמות. הצע שתיים או שלוש אפשרויות ותן לאדם לבחור.",
+    "ביטויים קבועים נאמרים בדיוק כפי שהם: \"ברוך הבא\", \"תודה רבה\", \"יום טוב\". אל תמציא גרסה משלך.",
+    "אם אינך בטוח במגדר של המתקשר — נסח את המשפט בלי פנייה מגדרית: \"אפשר לקבוע ליום שלישי\".",
+    'אל תשתמש בצורות עם לוכסן ("מעוניין/ת") — הן נשמעות רע בדיבור.',
+]
+
+
 def build_prompt(ctx: Dict[str, Any], caller_known: bool = True) -> str:
     """
     The salon's data, rendered into the prompt rather than left for the model to ask about.
 
     Prices, hours and policy are stated verbatim and never computed: a voice agent that does
     arithmetic on a price list will eventually quote a total the salon does not honour.
+
+    The agent speaks about itself in the gender of the voice the salon chose (`voiceGender` from
+    /context, resolved from Cartesia's own catalogue). Unknown or gender-neutral keeps the feminine
+    forms, which is what every salon heard before the setting existed.
     """
     vocab = ctx.get("vocabulary") or {}
     customer_word = vocab.get("customerHe") or "לקוח"
     inquiry = ctx.get("bookingModel") == "inquiry"
     caller = ctx.get("caller") or {}
+    f = FORMS.get(ctx.get("voiceGender") or "", FORMS["feminine"])
 
     parts = [
-        f'את עונה לשיחות טלפון של "{ctx.get("businessName", "")}".',
-        "את מדברת, לא כותבת: משפטים קצרים, בלי רשימות, בלי סימני פיסוק מיוחדים.",
-        f"פני ל{customer_word} בגוף שני, בעברית, בטון חם ומקצועי.",
+        f'{f["answers"]} "{ctx.get("businessName", "")}".',
+        f["speaks"],
+        f["address"].format(who=customer_word),
+        f["self"],
+        "",
+        "## איך מדברים בטלפון",
+        f["brief"],
+        f["interrupted"],
+        f["unclear"],
+        *SPEECH_RULES,
         "",
         "## שירותים ומחירים",
         _fmt_services(ctx),
@@ -236,8 +325,7 @@ def build_prompt(ctx: Dict[str, Any], caller_known: bool = True) -> str:
     ]
 
     if ctx.get("pricingNotes"):
-        parts += ["", "## כללי תמחור", str(ctx["pricingNotes"]),
-                  "אמרי אותם כפי שהם. אל תחשבי סכומים בעצמך."]
+        parts += ["", "## כללי תמחור", str(ctx["pricingNotes"]), f["as_written"]]
     if ctx.get("availabilityInfo"):
         parts += ["", "## זמינות", str(ctx["availabilityInfo"])]
     if ctx.get("specialPeriods"):
@@ -248,41 +336,28 @@ def build_prompt(ctx: Dict[str, Any], caller_known: bool = True) -> str:
         parts += ["", "## מדיניות ביטול", str(ctx["cancellationPolicy"])]
     if ctx.get("faq"):
         parts += ["", "## שאלות נפוצות"]
-        for f in ctx["faq"]:
-            parts.append(f"- {f.get('question')} → {f.get('answer')}")
+        for q in ctx["faq"]:
+            parts.append(f"- {q.get('question')} → {q.get('answer')}")
     if ctx.get("address"):
         parts += ["", f"## כתובת\n{ctx['address']}"]
     if ctx.get("personality"):
         parts += ["", "## סגנון", str(ctx["personality"])]
 
     if caller.get("isKnownCustomer"):
-        parts += ["", f"המתקשר מוכר: {caller.get('name')}. פני אליו בשמו."]
+        parts += ["", f["known"].format(name=caller.get("name"))]
         appt = caller.get("upcomingAppointment")
         if appt:
             parts.append(f"יש לו כבר תור ל{appt.get('serviceName')} בתאריך {appt.get('startTime')}.")
 
     if inquiry:
         # The B&B model closes bookings human-to-human. Saying otherwise invents a confirmation.
-        parts += [
-            "",
-            "## חשוב",
-            "את לא סוגרת הזמנות. את נותנת מידע ומעבירה את השיחה לבעל העסק כשהמתקשר רוצה להזמין.",
-            "השתמשי בכלי transfer_to_owner כדי להעביר.",
-        ]
+        parts += ["", "## חשוב", f["no_booking"], f["transfer"]]
     else:
-        parts += [
-            "",
-            "## קביעת תורים",
-            "השתמשי ב-check_availability כדי לראות זמנים פנויים, ואז ב-book_appointment.",
-            "אל תמציאי זמנים ואל תאשרי תור שלא חזר מ-book_appointment.",
-            "העבירי ל-startTime בדיוק את המחרוזת שהתקבלה מ-check_availability.",
-        ]
+        parts += ["", "## קביעת תורים", f["booking"], f["no_invent"], f["verbatim"]]
         if not caller_known:
             # Only when the number really is missing. Asking a caller for a number we already have
             # is the same self-inflicted wound as asking which number they dialled.
-            parts.append(
-                "לפני שאת קובעת תור, שאלי את המתקשר מה מספר הטלפון שלו והעבירי אותו ב-caller_phone."
-            )
+            parts.append(f["ask_phone"])
 
     return "\n".join(parts)
 
