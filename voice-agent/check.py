@@ -95,12 +95,12 @@ async def main_():
 
     STATE.update(status=404, body={"error": "No salon configured for this number"}, seen=[])
     pre = await main.pre_call_handler(req())
-    assert pre is not None and pre.metadata.get("tori_error")
+    assert pre is not None and pre.metadata["tori"].get("error")
     print("6 404 unknown number: answers rather than dropping                          OK")
 
     main.TORI_API_URL = "http://127.0.0.1:9"   # nothing listening (module const, not env)
     pre = await main.pre_call_handler(req())
-    assert pre is not None and "מצטערת" in pre.metadata["tori_error"]
+    assert pre is not None and "מצטערת" in pre.metadata["tori"]["error"]
     print("7 backend unreachable: generic spoken apology, not silence                  OK")
     main.TORI_API_URL = "http://127.0.0.1:877"
 
@@ -128,14 +128,37 @@ async def main_():
     # empty service list — indistinguishable over the phone from a stock template answering.
     STATE.update(status=200, body={"bookingModel": "slot"}, seen=[])
     pre = await main.pre_call_handler(req())
-    assert "tori_context" not in pre.metadata, pre.metadata
-    assert "מצטערת" in pre.metadata["tori_error"], pre.metadata
+    assert "context" not in pre.metadata["tori"], pre.metadata
+    assert "מצטערת" in pre.metadata["tori"]["error"], pre.metadata
     print("10 a 200 with no businessName is a failure, not an anonymous salon          OK")
 
-    agent = await main.get_agent(None, req(meta={}))
-    assert agent._config.introduction == main.UNREACHABLE_HE, agent._config.introduction
+    # What a real call actually looks like: Cartesia replaces PreCallResult.metadata with its own
+    # {'agent_id': …, 'template': 'user_code'}, so nothing pre_call_handler set arrives. This is the
+    # failure that made every call greet with "שלום, הגעתם ל".
+    CARTESIA_META = {"agent_id": "agent_aqnpeguixt5FNv71XngV1V", "template": "user_code"}
+    STATE.update(status=200, body=SALON, seen=[])
+    pre = await main.pre_call_handler(req())
+    agent = await main.get_agent(None, req(meta=CARTESIA_META))
+    assert agent._config.introduction == SALON["greeting"], agent._config.introduction
+    assert "תספורת אישה" in agent._config.system_prompt
+    print("11 Cartesia's own metadata: the salon still arrives, via the handover        OK")
+
+    # And if even the handover is missed — the two hops landing on different replicas — the dialled
+    # number on call_request is enough to fetch it again. Nothing depends on the earlier hop.
+    main._PENDING.clear()
+    STATE.update(status=200, body=SALON, seen=[])
+    agent = await main.get_agent(None, req(meta=CARTESIA_META))
+    assert agent._config.introduction == SALON["greeting"], agent._config.introduction
+    assert STATE["seen"] and STATE["seen"][0][0] == "/api/voice/context", STATE["seen"]
+    print("11b handover missed entirely: get_agent re-fetches rather than improvising   OK")
+
+    # A backend that is down at that point still has to produce a spoken sentence.
+    main._PENDING.clear()
+    STATE.update(status=404, body={"error": "No salon configured for this number"}, seen=[])
+    agent = await main.get_agent(None, req(meta=CARTESIA_META))
+    assert agent._config.introduction == "No salon configured for this number"
     assert not agent._tools, agent._tools
-    print("11 metadata lost in transit: apology, never an improvised booking bot       OK")
+    print("11c re-fetch that fails: apology, never an improvised booking bot            OK")
 
     # The SDK hands pre_call_handler "unknown" as the caller on the /chats path; /context still
     # has to be called, because the dialled number alone is what identifies the salon.
@@ -143,7 +166,7 @@ async def main_():
     pre = await main.pre_call_handler(req(frm="unknown"))
     _, payload, _ = STATE["seen"][0]
     assert payload == {"calledNumber": "+972555077941", "callerNumber": "unknown"}, payload
-    assert pre.metadata["tori_context"]["businessName"] == SALON["businessName"]
+    assert pre.metadata["tori"]["context"]["businessName"] == SALON["businessName"]
     print("12 an unknown caller number still resolves the salon                        OK")
 
     # A booking must never be filed under the string "unknown" — the salon could not call that
