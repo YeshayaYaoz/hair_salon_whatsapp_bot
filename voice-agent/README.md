@@ -160,6 +160,39 @@ salons ask on every call, unlike "which number did you dial". With a real caller
 is asked and the number stays closed over. `caller_number()` logs a warning either way, so this does
 not get re-diagnosed as our bug.
 
+## Everything in the prompt is written to be heard
+
+The database stores what a calendar needs. Read out, those shapes are wrong in ways that are obvious
+on the phone and invisible on screen, so the prompt is rendered in spoken Hebrew before the model
+ever sees it.
+
+**Numbers agree in gender with what they count, and a bare digit gives the model nothing to agree
+with.** `2 לילות` came out שתיים or שניים depending on the guess; only שני is right. `_he_num`
+carries 1–99 in both genders, and the call sites know the noun — לילה is masculine (שני לילות),
+שעה is feminine (שתי שעות, and 2 is really the dual שעתיים). Above 99 it falls back to digits and
+the prompt's own rule covers it, which is why a ₪1,800 price is still written `1800`.
+
+| Stored | Spoken |
+|---|---|
+| `durationMin: 1440` | לילה אחד |
+| `durationMin: 150` | שעתיים וחצי |
+| `capacity: 4` | עד ארבעה אורחים |
+| `openMin: 540, closeMin: 825` | מתשע בבוקר עד רבע לשתיים בצהריים |
+| `startDate: "2026-09-25"` | עשרים וחמישה בספטמבר |
+| `startTime: "2026-08-12T09:00:00Z"` | שנים עשר באוגוסט בשעה תשע בבוקר |
+
+That last row was going into the prompt raw, for the agent to read a UTC timestamp aloud to a
+customer about their own appointment.
+
+`check_availability` is the one place both forms are needed: the time is spoken (`רבע לשלוש
+בצהריים`) while `startTime` stays byte-identical, because `book_appointment` hands it straight back
+to the backend.
+
+**The rules are gendered too.** They are imperatives — אמור/אמרי, אל תקרא/אל תקראי — so they live
+inside `FORMS` rather than beside it. Keeping them in one shared list is exactly how a masculine
+instruction ends up in a feminine agent's prompt; that happened once here and checks 15 and 17 now
+assert against it in both directions.
+
 ## Failure behaviour
 
 Every failure still answers the phone and says one sentence. A caller must never hear a line that
