@@ -105,6 +105,45 @@ The matching model provider key (e.g. `ANTHROPIC_API_KEY`) is needed too.
 The dialled and caller numbers are **closed over, not tool parameters**. The model cannot mistype
 them, invent them, or ask for them.
 
+## Telling "wrong agent" from "wrong context"
+
+A bot that answers, speaks Hebrew, and knows nothing about the business has two very different
+causes, and over the phone they sound identical:
+
+1. **A different agent took the call** — the number is attached to an agent that isn't this
+   deployment, so its console-configured prompt answered and none of this code ran.
+2. **The context did not arrive** — this code ran and `/context` gave it nothing.
+
+The agent's logs separate them in one line. `pre_call_handler` logs `pre_call_handler: to=… from=…`
+on entry (`main.py:100`) before doing anything else. **No such line on a call means cause 1** — check
+`GET /agents/phone-numbers` for which agent the number points at. If the line is there, the next one
+says which way the fetch went: `context resolved for … : <name>`, or a `context 404/402 …` warning,
+or `context 200 … but no businessName`.
+
+Neither cause can produce a plausible-sounding empty bot any more. Both `/context` returning a body
+with no `businessName` and `tori_context` missing from the metadata now speak the fallback sentence
+instead of building an agent that greets with `שלום, הגעתם ל` and an empty price list.
+
+### The caller number is lost on this path
+
+`cartesia-line` 0.2.16 gives `pre_call_handler` the literal string `"unknown"` instead of the
+caller's number, whoever dialled. `CallRequest.from_` is declared `Field(alias="from")` — the name
+the harness puts on the wire, as its own `StartInput` model confirms — but
+`VoiceAgentApp.create_chat_session` builds the request with `body.get("from_", "unknown")`, reading
+the field name rather than the alias. The websocket path (`_call_request_from_start_data`) uses the
+alias correctly; only the HTTP `/chats` path is affected, which is exactly where this runs.
+
+Two consequences. Returning customers are not recognised by name — unavoidable, since the lookup key
+is the number itself. And bookings would have been filed under the customer phone `"unknown"`:
+`/api/voice/book` passes `callerNumber` straight through to `customerPhone`, so the salon would end
+up with an appointment it cannot call back and a confirmation message sent nowhere.
+
+So when the caller ID is missing — and only then — `book_appointment` takes a `caller_phone`
+parameter and the prompt tells the agent to ask for the number before booking. That is a question
+salons ask on every call, unlike "which number did you dial". With a real caller ID present, nothing
+is asked and the number stays closed over. `caller_number()` logs a warning either way, so this does
+not get re-diagnosed as our bug.
+
 ## Failure behaviour
 
 Every failure still answers the phone and says one sentence. A caller must never hear a line that

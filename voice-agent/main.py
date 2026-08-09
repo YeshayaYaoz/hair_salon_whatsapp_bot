@@ -75,6 +75,28 @@ async def _post(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]
     return res.status_code, body
 
 
+def caller_number(call_request: CallRequest) -> str:
+    """
+    The caller's number, or a placeholder the backend will accept.
+
+    cartesia-line 0.2.16 loses it on this path. `CallRequest.from_` is declared with
+    `alias="from"` — the name the harness actually puts on the wire, as its own `StartInput` model
+    confirms — but `VoiceAgentApp.create_chat_session` builds the request with
+    `body.get("from_", "unknown")`, reading the *field* name rather than the alias. So inside
+    `pre_call_handler` the caller number is the literal string "unknown" no matter who dialled.
+
+    That is survivable: the caller number only personalises the greeting, and `/context` requires a
+    non-empty string rather than a valid number. It is not survivable silently, hence the warning —
+    a salon reporting "it never recognises returning customers" should land on this line, not on a
+    hunt through our own lookup code.
+    """
+    raw = (call_request.from_ or "").strip()
+    if not raw or raw == "unknown":
+        logger.warning("caller number unavailable from the SDK; continuing without it")
+        return "unknown"
+    return raw
+
+
 async def pre_call_handler(call_request: CallRequest) -> Optional[PreCallResult]:
     """
     Resolves the salon and its voice before the agent is built.
@@ -83,11 +105,15 @@ async def pre_call_handler(call_request: CallRequest) -> Optional[PreCallResult]
     and dies. Every failure here instead produces a call that connects and explains itself — the
     backend's own 402/404 messages are written to be spoken, so they are carried through as-is.
     """
+    # First line of the call in the logs, and the one that says whether this code is serving at all.
+    # An agent whose console prompt answered instead prints nothing here.
+    logger.info("pre_call_handler: to=%r from=%r call_id=%r", call_request.to, call_request.from_, call_request.call_id)
+
     status, body = 0, {}
     try:
         status, body = await _post(
             "/api/voice/context",
-            {"calledNumber": call_request.to, "callerNumber": call_request.from_},
+            {"calledNumber": call_request.to, "callerNumber": caller_number(call_request)},
         )
     except Exception as err:  # network, DNS, timeout
         logger.exception("context fetch failed for %s", call_request.to)
@@ -101,6 +127,15 @@ async def pre_call_handler(call_request: CallRequest) -> Optional[PreCallResult]
             metadata={"tori_error": body.get("error") or UNREACHABLE_HE},
             config={"tts": {"language": LANGUAGE}},
         )
+
+    # A 200 that carries no business name is not a context. Letting it through builds an agent whose
+    # greeting is "שלום, הגעתם ל" and whose prompt lists no services — a bot that sounds like it is
+    # working while knowing nothing, which is the hardest failure to diagnose from a phone call.
+    if not body.get("businessName"):
+        logger.error("context 200 for %s but no businessName; keys=%s", call_request.to, sorted(body))
+        return PreCallResult(metadata={"tori_error": UNREACHABLE_HE}, config={"tts": {"language": LANGUAGE}})
+
+    logger.info("context resolved for %s: %s", call_request.to, body.get("businessName"))
 
     tts: Dict[str, Any] = {"language": LANGUAGE}
     # The salon's own voice, chosen in the dashboard. Null means "whatever the agent is set to",
@@ -139,7 +174,7 @@ def _fmt_hours(ctx: Dict[str, Any]) -> str:
     return "\n".join(out) if out else "(שעות לא הוגדרו)"
 
 
-def build_prompt(ctx: Dict[str, Any]) -> str:
+def build_prompt(ctx: Dict[str, Any], caller_known: bool = True) -> str:
     """
     The salon's data, rendered into the prompt rather than left for the model to ask about.
 
@@ -205,6 +240,12 @@ def build_prompt(ctx: Dict[str, Any]) -> str:
             "אל תמציאי זמנים ואל תאשרי תור שלא חזר מ-book_appointment.",
             "העבירי ל-startTime בדיוק את המחרוזת שהתקבלה מ-check_availability.",
         ]
+        if not caller_known:
+            # Only when the number really is missing. Asking a caller for a number we already have
+            # is the same self-inflicted wound as asking which number they dialled.
+            parts.append(
+                "לפני שאת קובעת תור, שאלי את המתקשר מה מספר הטלפון שלו והעבירי אותו ב-caller_phone."
+            )
 
     return "\n".join(parts)
 
@@ -225,7 +266,25 @@ async def get_agent(env: AgentEnv, call_request: CallRequest):
         )
 
     salon: Dict[str, Any] = meta.get("tori_context") or {}
-    called, caller_num = call_request.to, call_request.from_
+
+    # pre_call_handler always sets one of the two keys, so an empty context here means its result
+    # never made it back — the metadata the /chats response returns is echoed to us on the websocket
+    # start message, and that round trip is the part outside this file. Say the fallback rather than
+    # improvise about a business we know nothing about.
+    if not salon:
+        logger.error("no tori_context in metadata (keys=%s); pre-call result did not survive", sorted(meta))
+        return LlmAgent(
+            model=MODEL,
+            api_key=MODEL_API_KEY,
+            config=LlmConfig(
+                system_prompt="עני במשפט אחד בלבד, בדיוק את ההודעה שניתנה לך, ואל תוסיפי דבר.",
+                introduction=UNREACHABLE_HE,
+            ),
+        )
+
+    called = call_request.to
+    caller_num = caller_number(call_request)
+    caller_known = caller_num != "unknown"
 
     # The numbers are closed over rather than exposed as tool parameters. The model cannot mistype
     # them, cannot invent them, and cannot ask the caller for them — which is exactly what it did
@@ -256,12 +315,21 @@ async def get_agent(env: AgentEnv, call_request: CallRequest):
         service_name: Annotated[str, "שם השירות"],
         start_time: Annotated[str, "מחרוזת startTime המדויקת שהתקבלה מ-check_availability"],
         caller_name: Annotated[str, "שם המתקשר"] = "",
+        caller_phone: Annotated[str, "מספר הטלפון של המתקשר. נדרש רק אם ביקשת ממנו אותו"] = "",
         staff_name: Annotated[str, "שם איש הצוות, אם נבחר"] = "",
     ):
         """קובע תור בזמן שהתקבל מ-check_availability."""
+        # The booked customer is created under this number, so "unknown" would produce an
+        # appointment the salon cannot call back and a confirmation message sent nowhere. When the
+        # SDK loses the caller ID, the number has to come from the conversation instead — the one
+        # question a salon asks on every call anyway.
+        number = caller_num if caller_known else caller_phone.strip()
+        if not number:
+            return "שאלי את המתקשר מה מספר הטלפון שלו, ואז קראי לי שוב עם caller_phone."
+
         payload = {
             "calledNumber": called,
-            "callerNumber": caller_num,
+            "callerNumber": number,
             "serviceName": service_name,
             "startTime": start_time,
         }
@@ -335,7 +403,7 @@ async def get_agent(env: AgentEnv, call_request: CallRequest):
         api_key=MODEL_API_KEY,
         tools=tools,
         config=LlmConfig(
-            system_prompt=build_prompt(salon),
+            system_prompt=build_prompt(salon, caller_known=caller_known),
             # The salon's own greeting. Hardcoding one business's name here is what made a second
             # number answer as the first — the introduction is spoken before any tool could correct it.
             introduction=salon.get("greeting") or f'שלום, הגעתם ל{salon.get("businessName", "")}. איך אפשר לעזור?',
