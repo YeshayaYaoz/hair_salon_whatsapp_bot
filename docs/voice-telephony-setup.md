@@ -75,7 +75,19 @@ not a bug.
 ### 3. Point the number at Cartesia (per number, carrier side)
 
 In Zadarma: Settings → Virtual phone numbers → the number's gear → **External Server** → tick
-**SIP URI**, destination `sip.cartesia.ai`. Zadarma's API (`/direct_numbers/order/` and friends) can
+**SIP URI**, Server address `+972XXXXXXXXX@sip.cartesia.ai`.
+
+> **Keep the leading `+`.** Routing matches the SIP `To` header against imported numbers in +E.164.
+> Written without it (`972XXXXXXXXX@…`) the destination matches nothing, so there is no agent to
+> route to and the call is dropped **before a call record exists** — the number looks perfectly
+> configured on both sides while every call silently fails, and Cartesia's call list stays empty
+> because nothing ever got as far as being a call. This cost a live debugging session; it is the
+> first thing to check when a correctly-imported number does not answer.
+
+If calls still do not land, suspect transport next: append `;transport=tcp` to the destination.
+Cartesia documents TCP and TLS, while most carriers send UDP by default.
+
+Zadarma's API (`/direct_numbers/order/` and friends) can
 buy numbers but exposes no endpoint for this field, so it stays a dashboard step per number.
 
 ### 4. Save it in the dashboard
