@@ -1,0 +1,60 @@
+name: Deploy voice agent
+
+# Cartesia has no public GitHub integration — their docs mention "push to a linked GitHub
+# repository" in one sentence and document it nowhere else, with no console page for it. So the
+# push-to-deploy loop is built here instead: the CLI is non-interactive (`cartesia auth login`
+# takes the key as an argument, `cartesia deploy --agent-id` takes the target), which is all a
+# runner needs.
+on:
+  push:
+    branches: ["claude/upload-v5aw7a"]
+    # Only when the agent itself changes. A backend-only commit has nothing to redeploy here.
+    paths: ["voice-agent/**", ".github/workflows/deploy-voice-agent.yml"]
+  # For redeploying the current commit without pushing one — e.g. after changing an env var with
+  # `cartesia env set`, which does not itself trigger a rebuild.
+  workflow_dispatch:
+
+# A second push while one deploy is in flight should land last-write-wins, not race it.
+concurrency:
+  group: voice-agent-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Exercises the real pre_call_handler and get_agent against a stub backend. It is fast and it
+      # is the only thing standing between a bad prompt and a live phone line.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check the agent
+        working-directory: voice-agent
+        env:
+          # check.py builds a real LlmAgent, which refuses to construct without a key. It never
+          # sends a request, so the value only has to be non-empty.
+          ANTHROPIC_API_KEY: "unused-by-check"
+        run: |
+          pip install --quiet 'cartesia-line>=0.2.16' 'httpx>=0.27'
+          python check.py
+
+      - name: Install the Cartesia CLI
+        run: |
+          curl -fsSL https://cartesia.sh | sh
+          echo "$HOME/.cartesia/bin" >> "$GITHUB_PATH"
+
+      - name: Deploy
+        env:
+          CARTESIA_API_KEY: ${{ secrets.CARTESIA_API_KEY }}
+          CARTESIA_AGENT_ID: ${{ secrets.CARTESIA_AGENT_ID }}
+        run: |
+          if [ -z "$CARTESIA_API_KEY" ] || [ -z "$CARTESIA_AGENT_ID" ]; then
+            echo "::error::Set the CARTESIA_API_KEY and CARTESIA_AGENT_ID repository secrets."
+            exit 1
+          fi
+          cartesia auth login "$CARTESIA_API_KEY"
+          # The directory is given explicitly: without it the CLI deploys the working directory,
+          # and from the repository root that is a 386 MB archive the server rejects.
+          cartesia deploy --agent-id "$CARTESIA_AGENT_ID" voice-agent
