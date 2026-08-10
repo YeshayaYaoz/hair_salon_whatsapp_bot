@@ -44,7 +44,17 @@ import httpx
 from line import AgentEnv, CallRequest, PreCallResult, VoiceAgentApp
 from line.llm_agent import LlmAgent, LlmConfig
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("tori")
+# Cartesia's runtime configures loguru for the SDK's own output and leaves the standard library's
+# root logger at its WARNING default, so every logger.info here was silently dropped — including the
+# one line that says which salon, voice and transfer number a call resolved to. Diagnosing anything
+# from a call log meant reading warnings and inferring the rest. Own the handler explicitly.
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(levelname)s | tori | %(message)s"))
+    logger.addHandler(_handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
 
 TORI_API_URL = os.environ.get("TORI_API_URL", "").rstrip("/")
 TOOL_SECRET = os.environ.get("CARTESIA_TOOL_SECRET", "")
@@ -583,6 +593,8 @@ def build_agent(resolved: Dict[str, Any], called: str, caller_num: str) -> LlmAg
         if staff_name:
             payload["staffName"] = staff_name
         status, body = await _post("/api/voice/check-availability", payload)
+        if status not in (200, 404):
+            logger.error("check-availability %s for %s: %s", status, called, body)
         if status == 404 and body.get("availableServices"):
             return f"אין שירות בשם הזה. השירותים הקיימים: {', '.join(body['availableServices'])}"
         if status != 200:
@@ -625,6 +637,8 @@ def build_agent(resolved: Dict[str, Any], called: str, caller_num: str) -> LlmAg
         if staff_name:
             payload["staffName"] = staff_name
         status, body = await _post("/api/voice/book", payload)
+        if status not in (200, 409):
+            logger.error("book %s for %s: %s", status, called, body)
         if status == 409:
             return "התור נתפס בינתיים. בדקי זמינות שוב והציעי זמן אחר."
         if status != 200:
@@ -704,6 +718,10 @@ def build_agent(resolved: Dict[str, Any], called: str, caller_num: str) -> LlmAg
             payload["callerName"] = caller_name
         status, body = await _post("/api/voice/notify-owner", payload)
         if status != 200:
+            # 404 here means the backend predates this endpoint, which is indistinguishable over
+            # the phone from WhatsApp being down. The caller hears the same sentence either way,
+            # so the difference has to be in the log.
+            logger.error("notify-owner %s for %s: %s", status, called, body)
             return "לא הצלחתי לשלוח את ההודעה. אמרי למתקשר שכדאי להתקשר שוב מאוחר יותר."
         if not body.get("notified"):
             # The owner has no reachable WhatsApp number. Saying "I sent it" would be a lie the
