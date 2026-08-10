@@ -47,11 +47,19 @@ jobs:
 
       - name: Deploy
         env:
-          CARTESIA_API_KEY: ${{ secrets.CARTESIA_API_KEY }}
-          CARTESIA_AGENT_ID: ${{ secrets.CARTESIA_AGENT_ID }}
+          # Secrets first, then variables. "Secrets and variables" is one settings page with two
+          # tabs, and a value put in the wrong one resolves to an empty string with no warning —
+          # the workflow just fails at the point of use. Accepting both removes the guessing.
+          # The agent id is not sensitive and belongs in Variables anyway; only the key must be a
+          # secret, which is also what gets masked as *** in these logs.
+          CARTESIA_API_KEY: ${{ secrets.CARTESIA_API_KEY || vars.CARTESIA_API_KEY }}
+          CARTESIA_AGENT_ID: ${{ secrets.CARTESIA_AGENT_ID || vars.CARTESIA_AGENT_ID }}
         run: |
-          if [ -z "$CARTESIA_API_KEY" ] || [ -z "$CARTESIA_AGENT_ID" ]; then
-            echo "::error::Set the CARTESIA_API_KEY and CARTESIA_AGENT_ID repository secrets."
+          missing=""
+          [ -z "$CARTESIA_API_KEY" ] && missing="$missing CARTESIA_API_KEY"
+          [ -z "$CARTESIA_AGENT_ID" ] && missing="$missing CARTESIA_AGENT_ID"
+          if [ -n "$missing" ]; then
+            echo "::error::Not found:$missing — add them under Settings → Secrets and variables → Actions, on either tab, scoped to the Repository rather than an Environment."
             exit 1
           fi
           cartesia auth login "$CARTESIA_API_KEY"
