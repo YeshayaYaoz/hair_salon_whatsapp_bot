@@ -32,6 +32,7 @@ Env: TORI_API_URL, CARTESIA_TOOL_SECRET (must match the backend's), plus a model
 
 import logging
 import os
+import time
 from typing import Annotated, Any, Dict, Optional
 
 import httpx
@@ -140,21 +141,22 @@ async def resolve_context(call_request: CallRequest) -> Dict[str, Any]:
     return {"context": body}
 
 
-# Cartesia does not give PreCallResult.metadata back to the agent. A real call's websocket start
-# message carries Cartesia's own metadata instead — {'agent_id': …, 'template': 'user_code'} — so
-# anything pre_call_handler puts there is dropped, and get_agent saw an empty salon on every call.
-# The context is therefore handed over in-process, keyed by call_id. get_agent re-fetches if it is
-# missing, which covers the case where the two hops land on different replicas.
-_PENDING: Dict[str, Dict[str, Any]] = {}
+# Agents built during the ring, waiting for the websocket to arrive, keyed by call_id.
+#
+# Two reasons this exists rather than PreCallResult.metadata. Cartesia replaces that metadata with
+# its own — {'agent_id': …, 'template': 'user_code'} — so nothing put there survives. And metadata
+# could only carry the context anyway, leaving the building itself after the answer, where it is
+# silence on the line.
+_PENDING: Dict[str, "LlmAgent"] = {}
 _PENDING_MAX = 256
 
 
-def _remember(call_id: str, resolved: Dict[str, Any]) -> None:
+def _remember(call_id: str, agent: "LlmAgent") -> None:
     if len(_PENDING) >= _PENDING_MAX:
         # A call whose websocket never arrived. Dropping the oldest keeps this from growing without
         # bound in a process that stays up for weeks.
         _PENDING.pop(next(iter(_PENDING)), None)
-    _PENDING[call_id] = resolved
+    _PENDING[call_id] = agent
 
 
 async def pre_call_handler(call_request: CallRequest) -> Optional[PreCallResult]:
@@ -168,8 +170,23 @@ async def pre_call_handler(call_request: CallRequest) -> Optional[PreCallResult]
     # An agent whose console prompt answered instead prints nothing here.
     logger.info("pre_call_handler: to=%r from=%r call_id=%r", call_request.to, call_request.from_, call_request.call_id)
 
+    started = time.monotonic()
     resolved = await resolve_context(call_request)
-    _remember(call_request.call_id, resolved)
+    fetched_ms = (time.monotonic() - started) * 1000
+
+    # Built here rather than in get_agent, which runs only after the call is answered. Cartesia
+    # rings an inbound call for five seconds precisely so this can happen first ("Pre-Call
+    # Initialization" in their deployment docs) — work left until after the answer is dead air.
+    agent = build_agent(resolved, call_request.to, caller_number(call_request))
+    _remember(call_request.call_id, agent)
+
+    ctx = resolved.get("context") or {}
+    logger.info(
+        "pre_call_handler ready in %.0fms (context %.0fms) — salon=%r voice=%s transfer=%s",
+        (time.monotonic() - started) * 1000, fetched_ms,
+        ctx.get("businessName"), ctx.get("voiceGender") or "default",
+        "yes" if ctx.get("ownerTransferNumber") else "NO",
+    )
 
     tts: Dict[str, Any] = {"language": LANGUAGE}
     # The salon's own voice, chosen in the dashboard. Null means "whatever the agent is set to",
@@ -350,8 +367,9 @@ FORMS = {
         "no_booking": "את לא סוגרת הזמנות. את נותנת מידע ומעבירה את השיחה לבעל העסק כשהמתקשר רוצה להזמין.",
         "transfer": "השתמשי בכלי transfer_to_owner כדי להעביר.",
         "transfer_say": "מעבירה אותך לבעל העסק, רגע אחד.",
-        "can_transfer": "אם המתקשר מבקש לדבר עם אדם, עם בעל העסק או עם מישהו אחר — אל תתווכחי. השתמשי ב-transfer_to_owner.",
-        "no_transfer": "אין מספר להעברת שיחות. אם מבקשים לדבר עם מישהו — אמרי שתעבירי הודעה, ובקשי שם ומספר טלפון.",
+        "can_transfer": "אם המתקשר מבקש לדבר עם אדם, עם בעל העסק או עם מישהו אחר — אל תתווכחי. השתמשי ב-transfer_to_owner. אם ההעברה לא מצליחה, השתמשי ב-message_owner.",
+        "no_transfer": "אין אפשרות להעביר שיחות. אם מבקשים לדבר עם מישהו — השתמשי ב-message_owner כדי לשלוח לבעל העסק הודעה עם הבקשה, ואמרי שהוא יחזור אליהם.",
+        "leave_message": "בכל מקרה שבו המתקשר רוצה משהו שאת לא יכולה לתת לו — השתמשי ב-message_owner. אל תבטיחי שמישהו יחזור אליו בלי לקרוא לכלי הזה.",
         "booking": "השתמשי ב-check_availability כדי לראות זמנים פנויים, ואז ב-book_appointment.",
         "no_invent": "אל תמציאי זמנים ואל תאשרי תור שלא חזר מ-book_appointment.",
         "verbatim": "העבירי ל-startTime בדיוק את המחרוזת שהתקבלה מ-check_availability.",
@@ -378,8 +396,9 @@ FORMS = {
         "no_booking": "אתה לא סוגר הזמנות. אתה נותן מידע ומעביר את השיחה לבעל העסק כשהמתקשר רוצה להזמין.",
         "transfer": "השתמש בכלי transfer_to_owner כדי להעביר.",
         "transfer_say": "מעביר אותך לבעל העסק, רגע אחד.",
-        "can_transfer": "אם המתקשר מבקש לדבר עם אדם, עם בעל העסק או עם מישהו אחר — אל תתווכח. השתמש ב-transfer_to_owner.",
-        "no_transfer": "אין מספר להעברת שיחות. אם מבקשים לדבר עם מישהו — אמור שתעביר הודעה, ובקש שם ומספר טלפון.",
+        "can_transfer": "אם המתקשר מבקש לדבר עם אדם, עם בעל העסק או עם מישהו אחר — אל תתווכח. השתמש ב-transfer_to_owner. אם ההעברה לא מצליחה, השתמש ב-message_owner.",
+        "no_transfer": "אין אפשרות להעביר שיחות. אם מבקשים לדבר עם מישהו — השתמש ב-message_owner כדי לשלוח לבעל העסק הודעה עם הבקשה, ואמור שהוא יחזור אליהם.",
+        "leave_message": "בכל מקרה שבו המתקשר רוצה משהו שאתה לא יכול לתת לו — השתמש ב-message_owner. אל תבטיח שמישהו יחזור אליו בלי לקרוא לכלי הזה.",
         "booking": "השתמש ב-check_availability כדי לראות זמנים פנויים, ואז ב-book_appointment.",
         "no_invent": "אל תמציא זמנים ואל תאשר תור שלא חזר מ-book_appointment.",
         "verbatim": "העבר ל-startTime בדיוק את המחרוזת שהתקבלה מ-check_availability.",
@@ -458,12 +477,13 @@ def build_prompt(ctx: Dict[str, Any], caller_known: bool = True) -> str:
 
     if inquiry:
         # The B&B model closes bookings human-to-human. Saying otherwise invents a confirmation.
-        parts += ["", "## חשוב", f["no_booking"], f["transfer"]]
+        parts += ["", "## חשוב", f["no_booking"], f["transfer"], f["leave_message"]]
     else:
         parts += ["", "## קביעת תורים", f["booking"], f["no_invent"], f["verbatim"]]
         # A caller who asks for a person is not a booking request, and the agent used to have no
         # answer for it at all — the tool existed only for inquiry businesses.
         parts.append(f["can_transfer"] if ctx.get("ownerTransferNumber") else f["no_transfer"])
+        parts.append(f["leave_message"])
         if not caller_known:
             # Only when the number really is missing. Asking a caller for a number we already have
             # is the same self-inflicted wound as asking which number they dialled.
@@ -472,33 +492,31 @@ def build_prompt(ctx: Dict[str, Any], caller_known: bool = True) -> str:
     return "\n".join(parts)
 
 
-async def get_agent(env: AgentEnv, call_request: CallRequest):
-    meta = call_request.metadata or {}
+def _apology_agent(sentence: str) -> LlmAgent:
+    """One spoken sentence and nothing else, for every case where there is no salon to speak for."""
+    return LlmAgent(
+        model=MODEL,
+        api_key=MODEL_API_KEY,
+        config=LlmConfig(
+            system_prompt="עני במשפט אחד בלבד, בדיוק את ההודעה שניתנה לך, ואל תוסיפי דבר.",
+            introduction=sentence,
+        ),
+    )
 
-    # Cartesia's metadata first (it does not currently carry ours), then the in-process handover,
-    # then a fresh fetch. The last of those is what makes this correct rather than merely lucky:
-    # the dialled number is on call_request, so nothing here depends on the earlier hop surviving.
-    resolved = meta.get("tori") or _PENDING.pop(call_request.call_id, None)
-    if resolved is None:
-        logger.warning("context not handed over for %s; fetching again", call_request.call_id)
-        resolved = await resolve_context(call_request)
 
-    # Nothing to work with — say the one sentence we have and stop. Better than a bot improvising
-    # about a business it knows nothing about.
+def build_agent(resolved: Dict[str, Any], called: str, caller_num: str) -> LlmAgent:
+    """
+    The whole agent, built without touching the network.
+
+    Kept separate from `get_agent` so it can run during `pre_call_handler` — see the note on
+    `_PENDING`. Everything this does (rendering the prompt, generating tool schemas, constructing
+    LlmAgent) is silence on the line if it happens after the call is answered.
+    """
     if resolved.get("error"):
-        return LlmAgent(
-            model=MODEL,
-            api_key=MODEL_API_KEY,
-            config=LlmConfig(
-                system_prompt="עני במשפט אחד בלבד, בדיוק את ההודעה שניתנה לך, ואל תוסיפי דבר.",
-                introduction=resolved["error"],
-            ),
-        )
+        return _apology_agent(resolved["error"])
 
     salon: Dict[str, Any] = resolved["context"]
     f = FORMS.get(salon.get("voiceGender") or "", FORMS["feminine"])
-    called = call_request.to
-    caller_num = caller_number(call_request)
     caller_known = caller_num != "unknown"
 
     # The numbers are closed over rather than exposed as tool parameters. The model cannot mistype
@@ -618,6 +636,26 @@ async def get_agent(env: AgentEnv, call_request: CallRequest):
 
         tools.append(transfer_to_owner)
 
+    async def message_owner(
+        ctx,
+        summary: Annotated[str, "מה המתקשר רוצה, במשפט אחד, כדי שבעל העסק יוכל לחזור אליו"],
+        caller_name: Annotated[str, "שם המתקשר, אם אמר אותו"] = "",
+    ):
+        """שולח הודעת ווטסאפ לבעל העסק עם בקשת המתקשר."""
+        payload = {"calledNumber": called, "callerNumber": caller_num, "message": summary}
+        if caller_name:
+            payload["callerName"] = caller_name
+        status, body = await _post("/api/voice/notify-owner", payload)
+        if status != 200:
+            return "לא הצלחתי לשלוח את ההודעה. אמרי למתקשר שכדאי להתקשר שוב מאוחר יותר."
+        if not body.get("notified"):
+            # The owner has no reachable WhatsApp number. Saying "I sent it" would be a lie the
+            # caller only discovers by waiting for a call that never comes.
+            return "לא הצלחתי להעביר את ההודעה לבעל העסק. אמרי את זה בכנות והציעי להתקשר שוב."
+        return "ההודעה נשלחה לבעל העסק."
+
+    tools.append(message_owner)
+
     return LlmAgent(
         model=MODEL,
         api_key=MODEL_API_KEY,
@@ -630,6 +668,28 @@ async def get_agent(env: AgentEnv, call_request: CallRequest):
             temperature=0.3,
         ),
     )
+
+
+async def get_agent(env: AgentEnv, call_request: CallRequest):
+    """
+    Runs after the call is answered, so everything it does is silence on the line.
+
+    The agent is normally already built — `pre_call_handler` did it during the ring — and this just
+    hands it over. The slow path stays correct rather than fast: if the handover is missing, the
+    dialled number on `call_request` is enough to fetch and build from scratch.
+    """
+    started = time.monotonic()
+    prepared = _PENDING.pop(call_request.call_id, None)
+
+    if prepared is not None:
+        logger.info("get_agent: prepared during ring, %.0fms", (time.monotonic() - started) * 1000)
+        return prepared
+
+    logger.warning("get_agent: nothing prepared for %s; building after answer", call_request.call_id)
+    resolved = (call_request.metadata or {}).get("tori") or await resolve_context(call_request)
+    agent = build_agent(resolved, call_request.to, caller_number(call_request))
+    logger.info("get_agent: built after answer in %.0fms", (time.monotonic() - started) * 1000)
+    return agent
 
 
 app = VoiceAgentApp(get_agent=get_agent, pre_call_handler=pre_call_handler)

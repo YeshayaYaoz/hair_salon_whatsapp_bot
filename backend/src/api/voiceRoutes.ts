@@ -9,6 +9,7 @@ import { TEMPLATES, isBusinessType } from "../lib/businessTemplates.js";
 // machine" mismatch this was written for applies wherever those two meet. See lib/phone.ts.
 import { normalizePhone } from "../lib/phone.js";
 import { listHebrewVoices } from "../lib/cartesiaAdmin.js";
+import { notifyOwner } from "../lib/ownerNotify.js";
 
 export const voiceRouter = asyncRouter();
 
@@ -341,6 +342,44 @@ voiceRouter.post("/cancel", async (req, res) => {
     if (err instanceof AppointmentNotFoundError) return res.status(404).json({ error: "No matching appointment found" });
     throw err;
   }
+});
+
+/**
+ * Sends the owner a WhatsApp message about a caller who wants to reach them.
+ *
+ * A live transfer is not always possible — the owner may not answer, and a business with no
+ * notification phone has nowhere to transfer to at all. Without this the agent's only honest reply
+ * was "someone will get back to you", with nothing behind it: no message was sent and the owner
+ * never learned anyone had called.
+ *
+ * Returns 200 with `{ notified: false }` rather than an error when the owner is unreachable, so the
+ * agent can tell the caller the truth instead of promising a message that did not send.
+ */
+voiceRouter.post("/notify-owner", async (req, res) => {
+  const parsed = z
+    .object({
+      calledNumber: z.string().min(1),
+      callerNumber: z.string().min(1),
+      callerName: z.string().max(120).optional(),
+      // What the caller actually wants, in the agent's own words. Capped because it is model output
+      // going into a WhatsApp message.
+      message: z.string().min(1).max(600),
+    })
+    .safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "calledNumber, callerNumber and message are required" });
+
+  const business = await resolveBusinessByCalledNumber(parsed.data.calledNumber);
+  if (!business) return res.status(404).json({ error: "No salon configured for this number" });
+  if (rejectIfNotEntitled(business, res)) return;
+
+  const who = parsed.data.callerName?.trim() || "מתקשר";
+  // The number is the part the owner acts on, so it goes on its own line rather than mid-sentence.
+  const phone = parsed.data.callerNumber === "unknown" ? "לא זוהה" : parsed.data.callerNumber;
+  const notified = await notifyOwner(
+    business.id,
+    `📞 בקשה משיחת טלפון\n\n${who}: ${parsed.data.message}\n\nלחזור אליו: ${phone}`
+  );
+  res.json({ notified });
 });
 
 // Reschedules to a new time (and optionally a new service/staff) — newStartTime follows the same
