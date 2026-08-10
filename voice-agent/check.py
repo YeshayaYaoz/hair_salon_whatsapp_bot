@@ -13,10 +13,13 @@ class H(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(STATE["body"]).encode())
     def log_message(self, *a): pass
 
-srv = HTTPServer(("127.0.0.1", 877), H)
+# Port 0 lets the OS pick. A fixed port below 1024 needs root, which a CI runner is not — and a
+# fixed high port would still collide with whatever else the machine happens to be running.
+srv = HTTPServer(("127.0.0.1", 0), H)
+STUB_URL = f"http://127.0.0.1:{srv.server_address[1]}"
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 
-os.environ["TORI_API_URL"] = "http://127.0.0.1:877"
+os.environ["TORI_API_URL"] = STUB_URL
 os.environ["CARTESIA_TOOL_SECRET"] = "topsecret"
 import main
 from line import CallRequest
@@ -102,7 +105,7 @@ async def main_():
     pre = await main.pre_call_handler(req())
     assert pre is not None and "מצטערת" in pre.metadata["tori"]["error"]
     print("7 backend unreachable: generic spoken apology, not silence                  OK")
-    main.TORI_API_URL = "http://127.0.0.1:877"
+    main.TORI_API_URL = STUB_URL
 
     # --- 5. tools close over the numbers ----------------------------------------------
     STATE.update(status=200, body=SALON, seen=[])
