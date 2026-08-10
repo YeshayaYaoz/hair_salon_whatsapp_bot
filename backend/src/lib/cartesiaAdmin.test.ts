@@ -178,6 +178,23 @@ describe("assignNumberToAgent", () => {
       expect(voices.map((v) => v.id)).toEqual(["v_he", "v_he_regional"]);
     });
 
+    // Listing voices needs the API key and nothing else. Requiring an agent id here meant an
+    // account that had not configured one got an empty picker and, because /context reads the
+    // agent's grammatical gender off this catalogue, a voice agent stuck in the feminine.
+    it("works without CARTESIA_AGENT_ID, which listing voices does not need", async () => {
+      delete process.env.CARTESIA_AGENT_ID;
+      mockFetch(() => ({ body: catalogue }));
+      expect((await listHebrewVoices()).map((v) => v.id)).toEqual(["v_he", "v_he_regional"]);
+      process.env.CARTESIA_AGENT_ID = "agent_tori";
+    });
+
+    it("returns nothing, rather than throwing, when there is no API key", async () => {
+      const key = process.env.CARTESIA_API_KEY;
+      delete process.env.CARTESIA_API_KEY;
+      expect(await listHebrewVoices()).toEqual([]);
+      process.env.CARTESIA_API_KEY = key;
+    });
+
     it("counts a region-tagged locale as Hebrew", async () => {
       // The tags are BCP-47, so an exact "he" match would drop every he-IL voice.
       mockFetch(() => ({ body: catalogue }));
