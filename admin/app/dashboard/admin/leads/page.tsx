@@ -398,8 +398,12 @@ function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => 
       {showForm && (
         <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4 flex flex-col gap-3 max-w-md">
           <input placeholder="שם הקמפיין (למשל: ספרים - חיפה - יולי 2026)" value={name} onChange={(e) => setName(e.target.value)} />
-          <input placeholder="קטגוריה (למשל: מספרות)" value={category} onChange={(e) => setCategory(e.target.value)} />
-          <input placeholder="מיקום (למשל: חיפה, רדיוס 15 ק״מ)" value={locationQuery} onChange={(e) => setLocationQuery(e.target.value)} />
+          <input placeholder="קטגוריה (למשל: מספרות | ברברשופ)" value={category} onChange={(e) => setCategory(e.target.value)} />
+          <input placeholder="מיקום (למשל: חיפה | קריות)" value={locationQuery} onChange={(e) => setLocationQuery(e.target.value)} />
+          <p className="text-xs text-gray-500 -mt-1">
+            אפשר להזין כמה קטגוריות או מיקומים מופרדים ב-| כדי להרחיב את החיפוש. גוגל מחזיר עד כ-60 עסקים לכל צירוף,
+            והכפילויות מסוננות אוטומטית.
+          </p>
           <button
             disabled={saving}
             onClick={createCampaign}
