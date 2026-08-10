@@ -136,10 +136,13 @@ function speaksHebrew(voice: CartesiaVoice): boolean {
 export async function listHebrewVoices(): Promise<VoiceOption[]> {
   if (voiceCache && Date.now() - voiceCache.at < VOICE_CACHE_MS) return voiceCache.voices;
 
-  let apiKey: string;
-  try {
-    ({ apiKey } = creds());
-  } catch {
+  // Deliberately not creds(): that also demands CARTESIA_AGENT_ID, which listing voices has no use
+  // for. An account with a key but no agent id configured silently had an empty voice picker and,
+  // since /context derives the agent's grammatical gender from this catalogue, an agent stuck
+  // speaking in the feminine — two unrelated-looking symptoms from one missing variable.
+  const apiKey = process.env.CARTESIA_API_KEY?.trim();
+  if (!apiKey) {
+    console.warn("[cartesia] CARTESIA_API_KEY is not set — no voices, and no voice gender");
     return [];
   }
 
