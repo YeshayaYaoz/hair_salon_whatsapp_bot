@@ -37,6 +37,7 @@ const RECOMMENDED: RequiredVar[] = [
   { name: "APP_URL", description: "public base URL used in every emailed link (password reset, email verification, trial signup) — without it links fall back to localhost and are unusable" },
   { name: "TORI_OUTREACH_PHONE_NUMBER_ID", description: "Tori's own WABA for Lead Finder WhatsApp broadcasts — the whatsapp broadcast channel fails at send time without it" },
   { name: "TORI_OUTREACH_ACCESS_TOKEN", description: "access token for Tori's own outreach WABA (Lead Finder WhatsApp broadcasts)" },
+  { name: "OUTREACH_REPLY_TO", description: "mailbox that receives replies and opt-out requests to cold outreach email — the email broadcast channel refuses to send without it" },
   { name: "TORI_OUTREACH_TEMPLATE_NAME", description: "Meta-approved MARKETING template used for cold WhatsApp outreach — free-form text to a cold number is blocked (error 131047)" },
   { name: "DEEPSEEK_API_KEY", description: "lets a business opt their WhatsApp bot into DeepSeek instead of Claude (Bot settings page) — without it, that provider choice fails at send time" },
   { name: "WHATSAPP_APP_SECRET", description: "verifies WhatsApp webhook signatures, and (as the Meta app secret) exchanges the Embedded Signup code for an access token" },

@@ -11,7 +11,7 @@ import { APP_URL, sendTrialAccountCreatedEmail } from "../lib/email.js";
 import { nameSimilarity } from "./matching.js";
 import { generateOutreachDraft } from "./outreach.js";
 import { sendWhatsAppTemplate } from "../webhook/whatsappClient.js";
-import { sendOutreachEmail } from "../lib/email.js";
+import { sendOutreachEmail, outreachReplyTo } from "../lib/email.js";
 
 export const leadFinderRouter = asyncRouter();
 
@@ -472,6 +472,18 @@ leadFinderRouter.post("/campaigns/:id/outreach/broadcast", async (req: AuthedReq
     return res.status(400).json({
       error:
         "WhatsApp outreach isn't configured. Set TORI_OUTREACH_PHONE_NUMBER_ID, TORI_OUTREACH_ACCESS_TOKEN and TORI_OUTREACH_TEMPLATE_NAME (a Meta-approved MARKETING template with one {{1}} name variable and an opt-out line).",
+    });
+  }
+
+  // Refuse to send email nobody can answer. The footer below tells recipients to reply "הסר" to
+  // opt out, so without a Reply-To this promises an opt-out route that lands in an unread noreply
+  // mailbox — the failure is invisible from here and shows up later as spam complaints against the
+  // domain that also carries paying customers' system mail. Blocking the send is the only version
+  // of this the operator finds out about.
+  if (!isWhatsapp && !outreachReplyTo()) {
+    return res.status(400).json({
+      error:
+        "Email outreach isn't configured. Set OUTREACH_REPLY_TO to a mailbox you actually read — cold email sends from noreply@, so without it both replies and opt-out requests are silently discarded.",
     });
   }
 

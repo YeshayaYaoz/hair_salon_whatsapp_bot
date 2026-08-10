@@ -12,6 +12,7 @@ import { decryptSecret } from "../lib/crypto.js";
 import { hasActiveSubscription } from "../lib/subscriptionGate.js";
 import { rateLimit } from "../lib/rateLimit.js";
 import { prisma } from "../lib/prisma.js";
+import { handleOutreachReply, isOutreachNumber } from "../leadfinder/inboundReplies.js";
 import { Prisma } from "@prisma/client";
 import { captureError } from "../lib/errorMonitoring.js";
 import { transcribeWhatsAppVoiceNote, TranscriptionNotConfiguredError } from "../lib/transcription.js";
@@ -218,6 +219,18 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
 
     const extracted = extractMessage(message);
     if (extracted.kind === "ignore") return;
+
+    // Replies to Tori's own cold-outreach number, which no Business row owns — without this they
+    // fall through to the "no business configured" warning below and are lost.
+    if (isOutreachNumber(phoneNumberId)) {
+      // Raw body rather than `extracted`, which classifies bot keywords a prospect never meant:
+      // a lead whose reply happens to be a reset keyword would otherwise arrive as "(לא טקסט)".
+      const replyText =
+        (message.text?.body as string | undefined)?.trim() ||
+        (extracted.kind === "text" ? extracted.text : "(הודעה שאינה טקסט)");
+      await handleOutreachReply(message.from as string, replyText);
+      return;
+    }
 
     const business = await resolveBusinessByPhoneNumberId(phoneNumberId);
     if (!business?.whatsappAccessToken) {

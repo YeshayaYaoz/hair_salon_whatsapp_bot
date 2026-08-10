@@ -697,10 +697,15 @@ function BroadcastModal({
                 <input value={subject} onChange={(e) => setSubject(e.target.value)} className="text-sm w-full" />
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">תוכן ההודעה</label>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">
+                  {channel === "whatsapp" ? "תוכן ההודעה (לתיעוד בלבד — לא נשלח)" : "תוכן ההודעה"}
+                </label>
                 <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={10} className="text-sm w-full" />
                 {channel === "email" && (
-                  <p className="text-[11px] text-gray-600 mt-1">שורת הסרה מרשימת התפוצה תתווסף אוטומטית בסוף ההודעה.</p>
+                  <p className="text-[11px] text-gray-600 mt-1">
+                    שורת הסרה מרשימת התפוצה תתווסף אוטומטית בסוף ההודעה. תשובות ובקשות הסרה יגיעו לתיבה שמוגדרת ב-
+                    <code dir="ltr">OUTREACH_REPLY_TO</code> — בלעדיה השליחה תיחסם.
+                  </p>
                 )}
               </div>
 

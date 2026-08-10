@@ -4,7 +4,13 @@ export const APP_URL = (process.env.APP_URL ?? "http://localhost:3000").replace(
 
 const FROM = "תורי-אונליין <noreply@torionline.com>";
 
-async function resendSend(payload: { from: string; to: string; subject: string; html: string }) {
+async function resendSend(payload: {
+  from: string;
+  to: string;
+  subject: string;
+  html: string;
+  reply_to?: string;
+}) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) { console.error("RESEND_API_KEY not set"); return; }
 
@@ -116,16 +122,35 @@ export async function sendTrialAccountCreatedEmail(to: string, businessName: str
 /** Sends a Lead Finder outreach email — deliberately plain (no Tori branding chrome) since this is
  * a cold email meant to read as personal correspondence from the sales side, not a product email.
  * Left unstyled on purpose: branded chrome is exactly what makes a cold email read as bulk mail. */
+/**
+ * Where replies to cold outreach land.
+ *
+ * Everything else here sends from a noreply address, which is right for transactional mail nobody
+ * answers. Outreach is the opposite: a reply is the entire point of sending it, and the footer
+ * promises that replying with "הסר" removes the recipient. Without a Reply-To, both the interested
+ * answers and the opt-out requests went to an unread noreply mailbox — the opt-outs silently, which
+ * is what turns cold email into spam complaints against the domain that also carries paying
+ * customers' system mail.
+ *
+ * Callers must check this before sending rather than falling back to a guessed address: a Reply-To
+ * pointing at a mailbox nobody owns fails exactly as quietly as no Reply-To at all.
+ */
+export function outreachReplyTo(): string | null {
+  return process.env.OUTREACH_REPLY_TO?.trim() || null;
+}
+
 export async function sendOutreachEmail(to: string, subject: string, bodyText: string) {
   const bodyHtml = bodyText
     .split("\n\n")
     .map((para) => `<p style="margin:0 0 14px;">${para.replace(/\n/g, "<br/>")}</p>`)
     .join("");
+  const replyTo = outreachReplyTo();
   await resendSend({
     from: FROM,
     to,
     subject,
     html: `<div dir="rtl" style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:8px;color:#1a1a1a;font-size:14px;line-height:1.6;">${bodyHtml}</div>`,
+    ...(replyTo ? { reply_to: replyTo } : {}),
   });
 }
 
