@@ -59,7 +59,7 @@ async def main_():
     cfg = agent._config
     assert cfg.introduction == SALON["greeting"], cfg.introduction
     names = sorted(getattr(t, "__name__", None) or getattr(t, "name", str(t)) for t in (agent._tools or []))
-    assert names == ["book_appointment", "cancel_appointment", "check_availability", "reschedule_appointment"], names
+    assert names == ["book_appointment", "cancel_appointment", "check_availability", "message_owner", "reschedule_appointment"], names
     assert "תספורת אישה" in cfg.system_prompt and "120" in cfg.system_prompt
     assert "דנה" in cfg.system_prompt          # known caller surfaced
     assert "לקוחה" in cfg.system_prompt        # vertical vocabulary used
@@ -70,7 +70,7 @@ async def main_():
     pre = await main.pre_call_handler(req())
     agent = await main.get_agent(None, req(meta=pre.metadata))
     names = sorted(getattr(t, "__name__", None) or getattr(t, "name", str(t)) for t in (agent._tools or []))
-    assert names == ["transfer_to_owner"], names
+    assert names == ["message_owner", "transfer_to_owner"], names
     assert agent._config.introduction == BNB["greeting"]
     print("3 inquiry business: transfer only, no booking tools, own greeting           OK")
 
@@ -312,8 +312,8 @@ async def main_():
     pre = await main.pre_call_handler(req())
     agent = await main.get_agent(None, req(meta=pre.metadata))
     names = sorted(getattr(t, "__name__", None) or getattr(t, "name", str(t)) for t in agent._tools)
-    assert "transfer_to_owner" not in names, names
-    assert "אין מספר להעברת שיחות" in agent._config.system_prompt
+    assert "transfer_to_owner" not in names and "message_owner" in names, names
+    assert "אין אפשרות להעביר שיחות" in agent._config.system_prompt
     print("19 a booking business can hand the caller to a person, or say it cannot      OK")
 
     # The handover sentence is spoken aloud, so it inflects like everything else.
@@ -326,6 +326,39 @@ async def main_():
     assert getattr(said[0], "text", "") == "מעביר אותך לבעל העסק, רגע אחד.", said[0]
     assert getattr(said[-1], "target_phone_number", None) == "+972500000000", said[-1]
     print("20 the handover sentence follows the voice's gender too                      OK")
+
+    # --- 10. the agent is ready before the phone is answered --------------------------
+    # Cartesia rings an inbound call for five seconds so pre_call_handler can warm up. Anything left
+    # for get_agent happens after the answer, where it is silence on the line.
+    STATE.update(status=200, body=SALON, seen=[])
+    pre = await main.pre_call_handler(req())
+    assert main._PENDING, "nothing was prepared during the ring"
+    STATE["seen"] = []
+    agent = await main.get_agent(None, req(meta=CARTESIA_META))
+    assert not STATE["seen"], "get_agent went to the network after the call was answered"
+    assert agent._config.introduction == SALON["greeting"]
+    assert not main._PENDING, "the prepared agent was not handed over"
+    print("21 the agent is built during the ring; get_agent does no I/O                 OK")
+
+    # --- 11. a request the agent cannot satisfy still reaches the owner ---------------
+    # "someone will get back to you" was previously said with nothing behind it.
+    STATE.update(status=200, body=dict(SALON, ownerTransferNumber=None), seen=[])
+    pre = await main.pre_call_handler(req())
+    agent = await main.get_agent(None, req(meta=CARTESIA_META))
+    tool = next(t for t in agent._tools if (getattr(t, "__name__", None) or getattr(t, "name", "")) == "message_owner")
+    STATE.update(status=200, body={"notified": True}, seen=[])
+    out = await tool(None, summary="רוצה מחיר לחבילת כלה", caller_name="דנה")
+    path, payload, _ = STATE["seen"][0]
+    assert path == "/api/voice/notify-owner", path
+    assert payload["message"] == "רוצה מחיר לחבילת כלה" and payload["callerName"] == "דנה", payload
+    assert payload["callerNumber"] == "+972533391353", payload
+    assert "נשלחה" in out, out
+
+    # An owner with no reachable WhatsApp must not produce a promise the caller waits on.
+    STATE.update(status=200, body={"notified": False}, seen=[])
+    out = await tool(None, summary="רוצה לדבר עם הבעלים")
+    assert "בכנות" in out, out
+    print("22 what the agent cannot answer becomes a message to the owner               OK")
 
 asyncio.run(main_())
 print("\nALL CHECKS PASSED")
