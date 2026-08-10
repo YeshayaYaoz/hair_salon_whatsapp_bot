@@ -98,6 +98,11 @@ describe("openaiCompatibleProvider", () => {
     const provider = makeProvider();
     const res = await provider.send({ model: "deepseek-chat", system: { stable: "stable-part", volatile: "volatile-part" }, tools: [], turns: [] });
     expect(res.usage.cacheReadTokens).toBe(150);
+    // prompt_tokens is the TOTAL prompt including the cache hits, where Anthropic's input_tokens
+    // excludes them. Reporting it whole billed the 150 cached tokens twice — once at the full input
+    // rate and again as a cache read — which made a well-cached DeepSeek call look about as
+    // expensive as an uncached one in the cost dashboard.
+    expect(res.usage.inputTokens).toBe(50);
   });
 
   // Ordering is the whole point of splitting the system prompt: the stable block must form the

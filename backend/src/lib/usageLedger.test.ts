@@ -131,3 +131,40 @@ describe("logWhatsAppBillingEvent", () => {
     expect(call.data.costAgorot).toBeUndefined();
   });
 });
+
+/**
+ * DeepSeek reports prompt tokens and cache economics differently from Anthropic, and getting either
+ * wrong misstates spend without ever affecting the bot — the failure is invisible except by
+ * comparing the dashboard against DeepSeek's own billing page.
+ */
+describe("DeepSeek cost accounting", () => {
+  it("prices a cached-heavy call at DeepSeek's published rates", async () => {
+    await logClaudeUsage({
+      businessId: "biz1",
+      customerPhone: "972500000000",
+      provider: "deepseek",
+      model: "deepseek-chat",
+      inputTokens: 1_000_000,
+      cacheReadTokens: 10_000_000,
+      outputTokens: 1_000_000,
+    });
+    // $0.14 miss + $0.0028 hit + $0.28 out -> 0.14 + 0.028 + 0.28 = $0.448 -> 166 agorot.
+    // The previous table ($0.28/$0.42 with Anthropic's 0.1x cache read) made this 363 — more than
+    // double, which is what made the dashboard disagree with DeepSeek's own usage page.
+    expect(mockPrisma.apiUsageEvent.create.mock.calls.at(-1)![0].data.costAgorot).toBe(166);
+  });
+
+  it("keeps Anthropic's cache read at its own 0.1x rate", async () => {
+    await logClaudeUsage({
+      businessId: "biz1",
+      customerPhone: "972500000000",
+      provider: "anthropic",
+      model: "claude-sonnet-5",
+      inputTokens: 0,
+      cacheReadTokens: 1_000_000,
+      outputTokens: 0,
+    });
+    // A per-model override must not leak into models that don't set one: $2 * 0.1 = $0.2 -> 74.
+    expect(mockPrisma.apiUsageEvent.create.mock.calls.at(-1)![0].data.costAgorot).toBe(74);
+  });
+});

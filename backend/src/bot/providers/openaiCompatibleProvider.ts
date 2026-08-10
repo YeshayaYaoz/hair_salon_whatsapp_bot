@@ -70,14 +70,20 @@ function fromOpenAiResponse(response: OpenAI.Chat.ChatCompletion): GenericRespon
   // context-caching discount shows up in cost tracking too, without this adapter needing to know
   // it's specifically talking to DeepSeek.
   const usageAny = response.usage as unknown as { prompt_cache_hit_tokens?: number } | undefined;
+  const promptTokens = response.usage?.prompt_tokens ?? 0;
+  const cacheReadTokens = usageAny?.prompt_cache_hit_tokens;
   return {
     text: choice.message.content?.trim() ?? "",
     toolCalls,
     stopReason: toolCalls.length > 0 ? "tool_use" : "end",
     usage: {
-      inputTokens: response.usage?.prompt_tokens ?? 0,
+      // prompt_tokens is the TOTAL prompt including cache hits, unlike Anthropic's input_tokens
+      // which excludes them. Passing it through whole double-counted every cached token: once at
+      // the full input rate here and again at the cache rate downstream, which reported DeepSeek
+      // spend as roughly the price of never caching at all — the opposite of what caching did.
+      inputTokens: Math.max(0, promptTokens - (cacheReadTokens ?? 0)),
       outputTokens: response.usage?.completion_tokens ?? 0,
-      cacheReadTokens: usageAny?.prompt_cache_hit_tokens,
+      cacheReadTokens,
     },
   };
 }

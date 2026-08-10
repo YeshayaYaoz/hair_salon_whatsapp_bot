@@ -9,18 +9,31 @@ import { prisma } from "./prisma.js";
  * needs to change. Keyed by model id alone (not provider+model) since ids are unique across
  * providers already.
  */
-const CLAUDE_PRICING_USD_PER_MTOK: Record<string, { input: number; output: number }> = {
+interface ModelRate {
+  input: number;
+  output: number;
+  /**
+   * Cache-read price as a fraction of the input rate, when the provider's discount differs from
+   * Anthropic's. Anthropic bills a cache read at 0.1× input; DeepSeek bills it at roughly 0.02×
+   * (published as $0.0028 against $0.14), so applying Anthropic's multiplier to DeepSeek overstated
+   * every cached token five-fold.
+   */
+  cacheReadMultiplier?: number;
+}
+
+const CLAUDE_PRICING_USD_PER_MTOK: Record<string, ModelRate> = {
   "claude-haiku-4-5-20251001": { input: 1, output: 5 },
   "claude-sonnet-5": { input: 2, output: 10 }, // introductory rate through 2026-08-31
   "gpt-4o-mini": { input: 0.15, output: 0.6 },
   "gpt-4o": { input: 2.5, output: 10 },
-  // UNVERIFIED: these two were entered from memory and could not be checked against DeepSeek's
-  // live pricing page (blocked from the dev environment). They affect only cost *reporting*, never
-  // bot behavior — a wrong figure silently under/over-states spend in the dashboard. Confirm at
-  // api-docs.deepseek.com/quick_start/pricing before relying on DeepSeek cost numbers. Note also
-  // that DeepSeek bills cache-hit input at a lower rate than cache-miss, which this flat
-  // input/output shape does not model.
-  "deepseek-chat": { input: 0.28, output: 0.42 },
+  // Checked against DeepSeek's published rates, August 2026: $0.14 cache-miss input, $0.0028
+  // cache-hit input, $0.28 output. Previously $0.28/$0.42 entered from memory, which overstated
+  // input 2× and output 1.5× on top of the cache errors.
+  //
+  // Note: the "deepseek-chat" alias is documented as deprecating in favour of the V4 models. When
+  // it moves, these rates move with it — the alias will keep working while quietly billing at the
+  // new model's price, so this is worth re-checking rather than trusting to stay put.
+  "deepseek-chat": { input: 0.14, output: 0.28, cacheReadMultiplier: 0.02 },
 };
 
 // USD→ILS is only needed to express cost in shekels next to ILS subscription revenue — update
@@ -56,7 +69,7 @@ export async function logClaudeUsage(params: {
     ? (params.inputTokens * rate.input +
         params.outputTokens * rate.output +
         (params.cacheCreationTokens ?? 0) * rate.input * CACHE_WRITE_MULTIPLIER +
-        (params.cacheReadTokens ?? 0) * rate.input * CACHE_READ_MULTIPLIER) /
+        (params.cacheReadTokens ?? 0) * rate.input * (rate.cacheReadMultiplier ?? CACHE_READ_MULTIPLIER)) /
       1_000_000
     : null;
   const costAgorot = costUsd !== null ? Math.round(costUsd * USD_TO_ILS * 100) : null;
