@@ -32,6 +32,7 @@ Env: TORI_API_URL, CARTESIA_TOOL_SECRET (must match the backend's), plus a model
 
 import logging
 import os
+import re
 import time
 from typing import Annotated, Any, Dict, Optional
 
@@ -141,22 +142,38 @@ async def resolve_context(call_request: CallRequest) -> Dict[str, Any]:
     return {"context": body}
 
 
-# Agents built during the ring, waiting for the websocket to arrive, keyed by call_id.
+# Agents built during the ring, waiting for the websocket to arrive.
 #
-# Two reasons this exists rather than PreCallResult.metadata. Cartesia replaces that metadata with
-# its own — {'agent_id': …, 'template': 'user_code'} — so nothing put there survives. And metadata
-# could only carry the context anyway, leaving the building itself after the answer, where it is
-# silence on the line.
-_PENDING: Dict[str, "LlmAgent"] = {}
-_PENDING_MAX = 256
+# Keyed by the dialled number, not the call id. A live call showed the two hops disagreeing about
+# the id — pre_call_handler stored one, the websocket start message carried 'PA_GMGzcsM7PSLM', and
+# the prepared agent was thrown away and rebuilt after the answer, which is exactly the dead air
+# this exists to remove. The dialled number is the one identifier both hops agree on, because it is
+# what the SIP trunk routed on.
+#
+# Two callers reaching the same salon within the window get the same prepared agent. That is
+# harmless here: the agent is built from the salon's context and the dialled number, and the caller
+# number is "unknown" in pre_call_handler anyway (see caller_number), so both would be identical.
+_PENDING: Dict[str, tuple[float, "LlmAgent"]] = {}
+_PENDING_TTL = 120.0
 
 
-def _remember(call_id: str, agent: "LlmAgent") -> None:
-    if len(_PENDING) >= _PENDING_MAX:
-        # A call whose websocket never arrived. Dropping the oldest keeps this from growing without
-        # bound in a process that stays up for weeks.
-        _PENDING.pop(next(iter(_PENDING)), None)
-    _PENDING[call_id] = agent
+def _remember(dialled: str, agent: "LlmAgent") -> None:
+    now = time.monotonic()
+    # Calls whose websocket never arrived. Cheap to sweep here rather than run a timer.
+    for key, (at, _) in list(_PENDING.items()):
+        if now - at > _PENDING_TTL:
+            _PENDING.pop(key, None)
+    _PENDING[dialled] = (now, agent)
+
+
+def _take(dialled: str) -> Optional["LlmAgent"]:
+    entry = _PENDING.pop(dialled, None)
+    if entry is None:
+        return None
+    at, agent = entry
+    if time.monotonic() - at > _PENDING_TTL:
+        return None
+    return agent
 
 
 async def pre_call_handler(call_request: CallRequest) -> Optional[PreCallResult]:
@@ -178,7 +195,7 @@ async def pre_call_handler(call_request: CallRequest) -> Optional[PreCallResult]
     # rings an inbound call for five seconds precisely so this can happen first ("Pre-Call
     # Initialization" in their deployment docs) — work left until after the answer is dead air.
     agent = build_agent(resolved, call_request.to, caller_number(call_request))
-    _remember(call_request.call_id, agent)
+    _remember(call_request.to, agent)
 
     ctx = resolved.get("context") or {}
     logger.info(
@@ -294,6 +311,37 @@ def _fmt_datetime(iso: str) -> str:
     return f"{_fmt_date(date_part)} בשעה {_fmt_clock(h * 60 + m)}"
 
 
+# Emoji, ZWJ sequences and variation selectors. A WhatsApp greeting is full of them and the TTS
+# reads each one out — a real call opened with the agent saying "🌿" aloud.
+_DECORATION = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\uFE0F\u200D\u2190-\u21FF]")
+
+
+def _same_number(a: str, b: str) -> bool:
+    """Digits only, last nine compared: 972533391353, +972-53-339-1353 and 0533391353 are one line."""
+    da, db = re.sub(r"\D", "", a or ""), re.sub(r"\D", "", b or "")
+    return bool(da) and bool(db) and da[-9:] == db[-9:]
+
+
+def spoken_greeting(salon: Dict[str, Any]) -> str:
+    """
+    The first thing the caller hears.
+
+    `greeting` comes from `botGreeting`, which is written for WhatsApp: several lines, emoji, an
+    intake form, and sometimes bracket placeholders the WhatsApp bot itself refuses to send raw.
+    Spoken down a phone line that is a minute of talking before the caller can say a word.
+
+    A greeting written deliberately short is still honoured — one line, no placeholders, and short
+    enough to say in a breath. Anything larger is a chat greeting, and gets a spoken one instead.
+    """
+    name = str(salon.get("businessName") or "").strip()
+    raw = _DECORATION.sub("", str(salon.get("greeting") or "")).strip()
+    if raw and "\n" not in raw and len(raw) <= 120 and "[" not in raw:
+        return raw
+    # "כאן X" is how Israeli businesses answer the phone, and it avoids the ל+ה contraction that
+    # "הגעתם ל…" hits on any name starting with ה — no rule separates להרמוניה from למספרה.
+    return f"שלום, כאן {name}. איך אפשר לעזור?" if name else "שלום, איך אפשר לעזור?"
+
+
 def _fmt_duration(minutes: int) -> str:
     """
     A duration as someone would say it on the phone.
@@ -367,6 +415,7 @@ FORMS = {
         "no_booking": "את לא סוגרת הזמנות. את נותנת מידע ומעבירה את השיחה לבעל העסק כשהמתקשר רוצה להזמין.",
         "transfer": "השתמשי בכלי transfer_to_owner כדי להעביר.",
         "transfer_say": "מעבירה אותך לבעל העסק, רגע אחד.",
+        "transfer_is_caller": "המספר של בעל העסק הוא המספר שממנו את מתקשרת, אז אי אפשר להעביר. אמרי את זה והציעי לשלוח לו הודעה עם message_owner.",
         "can_transfer": "אם המתקשר מבקש לדבר עם אדם, עם בעל העסק או עם מישהו אחר — אל תתווכחי. השתמשי ב-transfer_to_owner. אם ההעברה לא מצליחה, השתמשי ב-message_owner.",
         "no_transfer": "אין אפשרות להעביר שיחות. אם מבקשים לדבר עם מישהו — השתמשי ב-message_owner כדי לשלוח לבעל העסק הודעה עם הבקשה, ואמרי שהוא יחזור אליהם.",
         "leave_message": "בכל מקרה שבו המתקשר רוצה משהו שאת לא יכולה לתת לו — השתמשי ב-message_owner. אל תבטיחי שמישהו יחזור אליו בלי לקרוא לכלי הזה.",
@@ -396,6 +445,7 @@ FORMS = {
         "no_booking": "אתה לא סוגר הזמנות. אתה נותן מידע ומעביר את השיחה לבעל העסק כשהמתקשר רוצה להזמין.",
         "transfer": "השתמש בכלי transfer_to_owner כדי להעביר.",
         "transfer_say": "מעביר אותך לבעל העסק, רגע אחד.",
+        "transfer_is_caller": "המספר של בעל העסק הוא המספר שממנו אתה מתקשר, אז אי אפשר להעביר. אמור את זה והצע לשלוח לו הודעה עם message_owner.",
         "can_transfer": "אם המתקשר מבקש לדבר עם אדם, עם בעל העסק או עם מישהו אחר — אל תתווכח. השתמש ב-transfer_to_owner. אם ההעברה לא מצליחה, השתמש ב-message_owner.",
         "no_transfer": "אין אפשרות להעביר שיחות. אם מבקשים לדבר עם מישהו — השתמש ב-message_owner כדי לשלוח לבעל העסק הודעה עם הבקשה, ואמור שהוא יחזור אליהם.",
         "leave_message": "בכל מקרה שבו המתקשר רוצה משהו שאתה לא יכול לתת לו — השתמש ב-message_owner. אל תבטיח שמישהו יחזור אליו בלי לקרוא לכלי הזה.",
@@ -631,6 +681,13 @@ def build_agent(resolved: Dict[str, Any], called: str, caller_num: str) -> LlmAg
         # documented for this but its own docstring calls it legacy and identical to loopback.
         async def transfer_to_owner(ctx):
             """מעביר את השיחה לבעל העסק."""
+            # The owner testing their own bot calls from the very number the business notifies, and
+            # the transfer then dials the line the call is already on. It cannot connect, and to
+            # the caller it looks like the agent ignored the request.
+            if _same_number(transfer_to, caller_num):
+                logger.warning("transfer target is the caller's own number (%s); messaging instead", transfer_to)
+                yield f["transfer_is_caller"]
+                return
             yield AgentSendText(text=f["transfer_say"])
             yield AgentTransferCall(target_phone_number=transfer_to)
 
@@ -662,9 +719,9 @@ def build_agent(resolved: Dict[str, Any], called: str, caller_num: str) -> LlmAg
         tools=tools,
         config=LlmConfig(
             system_prompt=build_prompt(salon, caller_known=caller_known),
-            # The salon's own greeting. Hardcoding one business's name here is what made a second
-            # number answer as the first — the introduction is spoken before any tool could correct it.
-            introduction=salon.get("greeting") or f'שלום, הגעתם ל{salon.get("businessName", "")}. איך אפשר לעזור?',
+            # Spoken, not the WhatsApp greeting. Hardcoding one business's name here is what made
+            # a second number answer as the first — this is said before any tool could correct it.
+            introduction=spoken_greeting(salon),
             temperature=0.3,
         ),
     )
@@ -679,7 +736,7 @@ async def get_agent(env: AgentEnv, call_request: CallRequest):
     dialled number on `call_request` is enough to fetch and build from scratch.
     """
     started = time.monotonic()
-    prepared = _PENDING.pop(call_request.call_id, None)
+    prepared = _take(call_request.to)
 
     if prepared is not None:
         logger.info("get_agent: prepared during ring, %.0fms", (time.monotonic() - started) * 1000)
