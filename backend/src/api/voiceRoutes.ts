@@ -102,6 +102,23 @@ voiceRouter.use(requireCartesiaAuth);
 // agent can open with something like "Hi Dana, calling about your appointment tomorrow?" instead of
 // a blind generic greeting.
 /**
+ * The first thing a caller hears — built here rather than taken from `botGreeting`.
+ *
+ * `botGreeting` is written for WhatsApp: several lines, emoji, a menu of options, and sometimes
+ * bracket placeholders like "[פירוט של כל הצימרים]" that the WhatsApp bot itself refuses to send
+ * raw (`claudeBot.ts`). Spoken down a phone line it is far too long to open a call with, and a
+ * placeholder gets read out literally.
+ *
+ * A phone greeting has one job: say who answered, and invite the caller to talk. "כאן X" is how
+ * Israeli businesses actually answer, and it sidesteps the ל+ה contraction that "הגעתם ל…" would
+ * hit on any name starting with ה — "להרמוניה" is right, "למספרה" is right, and no rule tells the
+ * two apart from the name alone.
+ */
+function spokenGreeting(name: string): string {
+  return `שלום, כאן ${name.trim()}. איך אפשר לעזור?`;
+}
+
+/**
  * The gender of the voice this business chose, or null if it cannot be determined.
  *
  * listHebrewVoices caches for an hour and returns [] when the catalogue is unreachable, so this
@@ -194,7 +211,7 @@ voiceRouter.post("/context", async (req, res) => {
     /** Free-text pricing rules the owner wrote (non-linear packages, surcharges, exclusions). The
      * agent states these as written and still never computes a total from them. */
     pricingNotes: full.pricingNotes,
-    greeting: full.botGreeting,
+    greeting: spokenGreeting(full.name),
     personality: full.botPersonality,
     // The voice this salon chose. One shared agent answers for every business, so without this each
     // one sounds identical; the agent applies it per call (AgentUpdateCall) after reading this

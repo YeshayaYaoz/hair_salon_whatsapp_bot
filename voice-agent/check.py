@@ -360,5 +360,58 @@ async def main_():
     assert "בכנות" in out, out
     print("22 what the agent cannot answer becomes a message to the owner               OK")
 
+    # --- 12. the greeting is spoken, not the WhatsApp one -----------------------------
+    # A real call opened by reading the WhatsApp greeting aloud: "🌿" as a word, then the whole
+    # intake form — name, adults, children, infants, check-in, check-out — before the caller
+    # could say anything.
+    WHATSAPP = ("🌿 שלום וברכה! 🌿\nשמחים שפנית אלינו,\nבנחת רוח - צימרים במירון 🏡\n\n"
+                "📝 נשמח לקבל את פרטי הבקשה שלך:\n👤 שם מלא:\n📅 תאריך כניסה:")
+    STATE.update(status=200, body=dict(SALON, greeting=WHATSAPP, businessName="בנחת רוח"), seen=[])
+    pre = await main.pre_call_handler(req())
+    intro = (await main.get_agent(None, req(meta=CARTESIA_META)))._config.introduction
+    assert intro == "שלום, כאן בנחת רוח. איך אפשר לעזור?", intro
+    assert "🌿" not in intro and "שם מלא" not in intro
+
+    # A greeting written deliberately short is still the owner's to keep.
+    STATE.update(status=200, body=dict(SALON, greeting="שלום, כאן מספרת רונית. מה שלומך?"), seen=[])
+    pre = await main.pre_call_handler(req())
+    intro = (await main.get_agent(None, req(meta=CARTESIA_META)))._config.introduction
+    assert intro == "שלום, כאן מספרת רונית. מה שלומך?", intro
+
+    # Emoji alone should not cost the owner their greeting — strip them and keep the words.
+    assert main.spoken_greeting({"greeting": "🌿 שלום, כאן הצימר 🌷", "businessName": "x"}) == "שלום, כאן הצימר"
+    # A bracket placeholder is read out literally, so it falls back like the long ones.
+    assert main.spoken_greeting({"greeting": "שלום, [שם העסק]", "businessName": "רונית"}) == "שלום, כאן רונית. איך אפשר לעזור?"
+    print("23 the greeting is one spoken sentence, never the WhatsApp text              OK")
+
+    # --- 13. the prepared agent survives a call_id the two hops disagree on -----------
+    # Observed live: pre_call_handler stored one id, the start message carried another, and the
+    # prepared agent was discarded and rebuilt after the answer — the dead air it exists to remove.
+    STATE.update(status=200, body=SALON, seen=[])
+    await main.pre_call_handler(req())
+    STATE["seen"] = []
+    mismatched = CallRequest(call_id="PA_totally_different", **{"from": "+972533391353"},
+                             to="+972555077941", agent_call_id="ac", agent={"id": "a1"},
+                             metadata=CARTESIA_META)
+    agent = await main.get_agent(None, mismatched)
+    assert not STATE["seen"], "rebuilt after the answer despite being prepared during the ring"
+    assert agent._config.introduction == main.spoken_greeting(SALON)
+    print("24 the handover survives the two hops disagreeing about the call id          OK")
+
+    # --- 14. transferring the owner to their own line ---------------------------------
+    # The owner testing their own bot calls from the number the business notifies.
+    assert main._same_number("972533391353", "+972-53-339-1353")
+    assert main._same_number("0533391353", "+972533391353")
+    assert not main._same_number("972533391353", "972500000000")
+
+    STATE.update(status=200, body=dict(SALON, ownerTransferNumber="0533391353"), seen=[])
+    await main.pre_call_handler(req())
+    agent = await main.get_agent(None, req(meta=CARTESIA_META))
+    tool = next(t for t in agent._tools if (getattr(t, "__name__", None) or getattr(t, "name", "")) == "transfer_to_owner")
+    said = [e async for e in tool(None)]
+    assert len(said) == 1 and isinstance(said[0], str), said
+    assert "message_owner" in said[0], said[0]
+    print("25 no transferring the caller to the line they are already on                OK")
+
 asyncio.run(main_())
 print("\nALL CHECKS PASSED")
