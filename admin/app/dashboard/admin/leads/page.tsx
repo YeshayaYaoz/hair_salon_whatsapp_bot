@@ -398,8 +398,12 @@ function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => 
       {showForm && (
         <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4 flex flex-col gap-3 max-w-md">
           <input placeholder="שם הקמפיין (למשל: ספרים - חיפה - יולי 2026)" value={name} onChange={(e) => setName(e.target.value)} />
-          <input placeholder="קטגוריה (למשל: מספרות)" value={category} onChange={(e) => setCategory(e.target.value)} />
-          <input placeholder="מיקום (למשל: חיפה, רדיוס 15 ק״מ)" value={locationQuery} onChange={(e) => setLocationQuery(e.target.value)} />
+          <input placeholder="קטגוריה (למשל: מספרות | ברברשופ)" value={category} onChange={(e) => setCategory(e.target.value)} />
+          <input placeholder="מיקום (למשל: חיפה | קריות)" value={locationQuery} onChange={(e) => setLocationQuery(e.target.value)} />
+          <p className="text-xs text-gray-500 -mt-1">
+            אפשר להזין כמה קטגוריות או מיקומים מופרדים ב-| כדי להרחיב את החיפוש. גוגל מחזיר עד כ-60 עסקים לכל צירוף,
+            והכפילויות מסוננות אוטומטית.
+          </p>
           <button
             disabled={saving}
             onClick={createCampaign}
@@ -495,9 +499,9 @@ function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => 
 
 // --- Broadcast (one operator-written message, sent to every lead with a discovered email) ---
 
-const DEFAULT_BROADCAST_SUBJECT = "בוט AI שקובע לכם תורים אוטומטית בוואטסאפ";
+const DEFAULT_BROADCAST_SUBJECT = 'הזמנה לפיילוט סגור: תורי-אונליין — חודש ב-80 ש"ח';
 const DEFAULT_BROADCAST_BODY =
-  "היי,\n\nראיתי את העסק שלכם וחשבתי שזה יכול לעניין אתכם: בנינו את תורי — בוט AI שיושב על הוואטסאפ העסקי ומנהל לבד את קביעת התורים, 24/7, בלי שתצטרכו לענות לכל הודעה בעצמכם.\n\nאם זה נשמע רלוונטי, אשמח לתאם דמו קצר של 5 דקות.\n\nתודה,\nצוות תורי";
+  'אהלן, שמי ישעיה, מנכ"ל KestechStudio - אוטומציות.\n\nאני שמח להזמין אתכם להיות מהראשונים שמשתמשים ב"תורי-אונליין" — מערכת AI חדשה שמנהלת לכם את קביעת התורים, 24/7, בלי שתצטרכו לענות לטלפונים או אפילו לשלוח הודעות תזכורת בעצמכם.\n\nאתם מקבלים חשבון ניהול משלכם שבו אתם רואים ומנהלים הכל מלמעלה.\n\nלפני ההשקה אנחנו פותחים פיילוט סגור למספר מצומצם של עסקים: חודש, בעלות של 80 ש"ח. אתם מקבלים את המערכת המלאה, אנחנו מחברים ומלווים אתכם, ואתם אומרים לנו מה עובד ומה פחות.\n\nרוצים להצטרף? תשיבו להודעה "כן, אני מעוניין/ת" או "לא מעוניין". אם כן — נשלח פרטים, ואם לא — נעזוב אתכם בשקט :)\n\nבתודה,\nצוות תורי-אונליין';
 
 function AddLeadModal({
   campaignId,
