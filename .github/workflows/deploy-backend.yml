@@ -54,6 +54,10 @@ jobs:
           npx vitest run
 
       - name: Deploy
+        # The repository root, not backend/. The Railway service builds from `backend/Dockerfile`
+        # — a path relative to the repo root — so uploading only backend/ gives the builder a
+        # context in which that path does not exist, and it fails with a bare "Deploy failed".
+        working-directory: .
         env:
           # Secrets first, then variables — same reasoning as deploy-voice-agent.yml: one settings
           # page, two tabs, and a value in the wrong tab resolves to an empty string with no
