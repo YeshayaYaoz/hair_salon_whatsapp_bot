@@ -10,6 +10,7 @@ import { TEMPLATES, isBusinessType } from "../lib/businessTemplates.js";
 import { normalizePhone } from "../lib/phone.js";
 import { listHebrewVoices } from "../lib/cartesiaAdmin.js";
 import { notifyOwner } from "../lib/ownerNotify.js";
+import { logClaudeUsage } from "../lib/usageLedger.js";
 
 export const voiceRouter = asyncRouter();
 
@@ -448,4 +449,50 @@ voiceRouter.post("/reschedule", async (req, res) => {
     if (err instanceof OutsideBusinessHoursError) return res.status(400).json({ error: err.message + "; original appointment kept" });
     throw err;
   }
+});
+
+/**
+ * Token usage from one voice-agent LLM call.
+ *
+ * Phone calls were the only AI spend with no ledger entry at all: the agent runs out-of-process
+ * (Cartesia's container, not ours) and talks to the model directly, so nothing passed through
+ * logClaudeUsage. Cost-per-business, the AI budget alerts and the margin figures all silently
+ * excluded voice — which matters most for exactly the businesses that take calls.
+ *
+ * Reported per call rather than per conversation because that's the granularity the model returns,
+ * and it matches how the WhatsApp side already logs. `customerPhone` is the caller, so voice and
+ * WhatsApp spend for the same person land on the same key.
+ *
+ * Failures here must never affect the call — the agent logs and moves on (see report_usage in
+ * voice-agent/main.py), and a rejected report costs a ledger row, not a conversation.
+ */
+voiceRouter.post("/usage", async (req, res) => {
+  const parsed = z
+    .object({
+      calledNumber: z.string().min(1),
+      callerNumber: z.string().optional(),
+      model: z.string().min(1),
+      inputTokens: z.number().int().min(0),
+      outputTokens: z.number().int().min(0),
+      cacheReadTokens: z.number().int().min(0).optional(),
+    })
+    .safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid usage payload" });
+
+  const business = await resolveBusinessByCalledNumber(parsed.data.calledNumber);
+  if (!business) return res.status(404).json({ error: "No salon configured for this number" });
+
+  await logClaudeUsage({
+    businessId: business.id,
+    // "unknown" rather than dropping the row: a withheld caller ID still costs money, and losing
+    // the spend would understate exactly the calls we can say least about.
+    customerPhone: parsed.data.callerNumber || "unknown",
+    provider: "voice",
+    model: parsed.data.model,
+    inputTokens: parsed.data.inputTokens,
+    outputTokens: parsed.data.outputTokens,
+    cacheReadTokens: parsed.data.cacheReadTokens,
+  });
+
+  res.json({ logged: true });
 });

@@ -106,9 +106,15 @@ Set these wherever the agent ends up running — Railway service variables when 
 |---|---|
 | `TORI_API_URL` | Base URL of the backend, e.g. `https://api.torionline.co.il` |
 | `CARTESIA_TOOL_SECRET` | Must equal the backend's — `voiceRoutes` rejects every request without it |
-| `TORI_AGENT_MODEL` | Optional; defaults to `anthropic/claude-haiku-4-5-20251001` |
+| `TORI_AGENT_MODEL` | Optional; defaults to `deepseek/deepseek-chat` |
 
-The matching model provider key (e.g. `ANTHROPIC_API_KEY`) is needed too.
+The matching model provider key is needed too: `DEEPSEEK_API_KEY` for the default, or
+`TORI_AGENT_API_KEY` to set one explicitly regardless of provider (`ANTHROPIC_API_KEY` still works
+if `TORI_AGENT_MODEL` is pointed back at a Claude model).
+
+Token usage from every model call is reported to `POST /api/voice/usage`, so phone spend lands in
+the same per-business ledger as WhatsApp. It rides `TORI_API_URL` + `CARTESIA_TOOL_SECRET`; with
+either unset the agent still runs and logs a warning, it just reports nothing.
 
 ## What it does per booking model
 

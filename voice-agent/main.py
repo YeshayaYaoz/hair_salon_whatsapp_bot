@@ -44,6 +44,11 @@ import httpx
 from line import AgentEnv, CallRequest, PreCallResult, VoiceAgentApp
 from line.llm_agent import LlmAgent, LlmConfig
 
+# LiteLLM is what cartesia-line calls under the hood (see line/llm_agent/http_provider.py), which
+# makes its success callback the only place the agent's token usage is visible to us.
+import litellm
+from litellm.integrations.custom_logger import CustomLogger
+
 logger = logging.getLogger("tori")
 # Cartesia's runtime configures loguru for the SDK's own output and leaves the standard library's
 # root logger at its WARNING default, so every logger.info here was silently dropped — including the
@@ -58,10 +63,14 @@ if not logger.handlers:
 
 TORI_API_URL = os.environ.get("TORI_API_URL", "").rstrip("/")
 TOOL_SECRET = os.environ.get("CARTESIA_TOOL_SECRET", "")
-MODEL = os.environ.get("TORI_AGENT_MODEL", "anthropic/claude-haiku-4-5-20251001")
+MODEL = os.environ.get("TORI_AGENT_MODEL", "deepseek/deepseek-chat")
 # LlmAgent raises if this is empty, so a missing key fails at deploy rather than mid-call. The
 # variable follows the provider in MODEL — swap both together.
-MODEL_API_KEY = os.environ.get("TORI_AGENT_API_KEY") or os.environ.get("ANTHROPIC_API_KEY", "")
+MODEL_API_KEY = (
+    os.environ.get("TORI_AGENT_API_KEY")
+    or os.environ.get("DEEPSEEK_API_KEY")
+    or os.environ.get("ANTHROPIC_API_KEY", "")
+)
 
 # Israeli salons and B&Bs; the STT and TTS both need telling, and the voice picked in the dashboard
 # is Hebrew-capable by construction (the picker filters on it).
@@ -95,6 +104,83 @@ async def _post(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]
     except Exception:
         body = {"error": res.text[:300]}
     return res.status_code, body
+
+
+class _UsageReporter(CustomLogger):
+    """
+    Reports the agent's token usage to Tori, so voice spend appears in the same ledger as WhatsApp.
+
+    Hooked into LiteLLM rather than into the Cartesia SDK because that is where the numbers exist:
+    `LlmAgent` streams through `litellm.acompletion` and its `StreamChunk` carries only text and
+    tool calls — usage never reaches any surface the SDK exposes to us. LiteLLM's success callback
+    sees the completed response, including the usage block, for every call the agent makes.
+
+    Which call belongs to which salon is carried on the request itself (`metadata`), since this
+    callback is global and fires for concurrent calls to different businesses on one worker. Reading
+    it from a module-level "current call" would attribute one salon's tokens to another the moment
+    two people phone at once.
+    """
+
+    async def async_log_success_event(self, kwargs, response_obj, start_time, end_time):
+        try:
+            meta = (kwargs.get("litellm_params") or {}).get("metadata") or {}
+            called = meta.get("tori_called_number")
+            if not called:
+                return  # not one of ours (or a warmup call) — nothing to attribute
+
+            usage = getattr(response_obj, "usage", None)
+            if usage is None:
+                return
+            prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
+            # Same shape as the WhatsApp side: DeepSeek's prompt_tokens INCLUDES cache hits, so the
+            # cached portion is subtracted out rather than counted twice (see usageLedger.ts).
+            cache_read = getattr(usage, "prompt_cache_hit_tokens", 0) or 0
+
+            await _post(
+                "/api/voice/usage",
+                {
+                    "calledNumber": called,
+                    "callerNumber": meta.get("tori_caller_number") or "unknown",
+                    "model": _billed_model_name(kwargs.get("model") or MODEL),
+                    "inputTokens": max(0, prompt_tokens - cache_read),
+                    "outputTokens": getattr(usage, "completion_tokens", 0) or 0,
+                    "cacheReadTokens": cache_read,
+                },
+            )
+        except Exception:
+            # Never let cost bookkeeping touch a live call. A lost ledger row is a reporting gap;
+            # an exception raised inside a callback during a call is a caller hearing silence.
+            logger.exception("usage report failed")
+
+
+def _billed_model_name(model: str) -> str:
+    """
+    The bare model id, matching the keys in the backend's rate table.
+
+    LiteLLM works in "provider/model" form while the ledger is keyed on model alone, so
+    "deepseek/deepseek-chat" has to arrive as "deepseek-chat" or it silently prices at null.
+    """
+    return model.split("/", 1)[1] if "/" in model else model
+
+
+def _usage_metadata(called: str, caller: str) -> Dict[str, Any]:
+    """Per-request metadata the usage callback reads back. See `_UsageReporter`."""
+    return {"metadata": {"tori_called_number": called, "tori_caller_number": caller}}
+
+
+# OpenAI-compatible providers (DeepSeek among them) only emit usage on a streamed response when
+# asked. Anthropic's API rejects the parameter outright, so it is attached by provider rather than
+# unconditionally — a 400 here would take every call down, not just the bookkeeping.
+_STREAM_USAGE_OPTION: Dict[str, Any] = (
+    {} if MODEL.startswith("anthropic/") else {"stream_options": {"include_usage": True}}
+)
+
+# Global by design: LiteLLM has no per-request callback hook, and the callback attributes each call
+# via request metadata rather than shared state (see `_UsageReporter`).
+if TORI_API_URL and TOOL_SECRET:
+    litellm.callbacks = [*getattr(litellm, "callbacks", []), _UsageReporter()]
+else:
+    logger.warning("usage reporting disabled: TORI_API_URL or CARTESIA_TOOL_SECRET unset")
 
 
 def caller_number(call_request: CallRequest) -> str:
@@ -741,6 +827,10 @@ def build_agent(resolved: Dict[str, Any], called: str, caller_num: str) -> LlmAg
             # a second number answer as the first — this is said before any tool could correct it.
             introduction=spoken_greeting(salon),
             temperature=0.3,
+            # `extra` is merged into the LiteLLM kwargs verbatim. stream_options asks the provider
+            # to emit a usage block on the final streamed chunk — without it a streamed call
+            # reports no usage at all and voice spend stays invisible, which is the whole point.
+            extra={**_usage_metadata(called, caller_num), **_STREAM_USAGE_OPTION},
         ),
     )
 

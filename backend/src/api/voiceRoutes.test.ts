@@ -18,8 +18,10 @@ const mockFindAvailableSlots = vi.fn();
 const mockBookAppointmentWithSideEffects = vi.fn();
 const mockCancelAppointmentById = vi.fn();
 const mockRescheduleAppointmentById = vi.fn();
+const mockLogClaudeUsage = vi.fn();
 
 vi.mock("../lib/prisma.js", () => ({ prisma: mockPrisma }));
+vi.mock("../lib/usageLedger.js", () => ({ logClaudeUsage: mockLogClaudeUsage }));
 // The real one calls Cartesia and caches for an hour; stubbed so the catalogue is per-test.
 vi.mock("../lib/cartesiaAdmin.js", () => ({ listHebrewVoices: vi.fn(async () => []) }));
 vi.mock("../booking/availability.js", async () => {
@@ -543,5 +545,67 @@ describe("POST /api/voice/reschedule", () => {
       .send({ calledNumber: "972501111111", appointmentId: "appt1", newStartTime: "2026-08-02T10:00:00Z" });
 
     expect(res.status).toBe(409);
+  });
+});
+
+/**
+ * Voice was the only AI spend with no ledger entry: the agent runs in Cartesia's container and
+ * talks to the model directly, so every phone call was free as far as the cost dashboard knew.
+ */
+describe("POST /api/voice/usage", () => {
+  let app: express.Express;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    process.env.CARTESIA_TOOL_SECRET = "test-secret";
+    const { voiceRouter } = await import("./voiceRoutes.js");
+    app = express();
+    app.use(express.json());
+    app.use("/api/voice", voiceRouter);
+  });
+
+  const usage = {
+    calledNumber: "+972501111111",
+    callerNumber: "+972502222222",
+    model: "deepseek-chat",
+    inputTokens: 500,
+    outputTokens: 40,
+    cacheReadTokens: 8000,
+  };
+
+  it("rejects an unauthenticated report", async () => {
+    // The endpoint writes billing rows, so an open one would let anyone inflate a salon's costs.
+    expect((await request(app).post("/api/voice/usage").send(usage)).status).toBe(401);
+  });
+
+  it("logs usage against the business that owns the dialled number", async () => {
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
+    const res = await request(app).post("/api/voice/usage").set("Authorization", "Bearer test-secret").send(usage);
+    expect(res.status).toBe(200);
+    expect(mockLogClaudeUsage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        businessId: "biz1",
+        customerPhone: "+972502222222",
+        model: "deepseek-chat",
+        inputTokens: 500,
+        cacheReadTokens: 8000,
+      })
+    );
+  });
+
+  it("still records the spend when the caller withheld their number", async () => {
+    // Dropping the row would understate cost for exactly the calls we can say least about.
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
+    const { callerNumber, ...withheld } = usage;
+    const res = await request(app).post("/api/voice/usage").set("Authorization", "Bearer test-secret").send(withheld);
+    expect(res.status).toBe(200);
+    expect(mockLogClaudeUsage.mock.calls[0][0].customerPhone).toBe("unknown");
+  });
+
+  it("404s for a number no business owns", async () => {
+    mockPrisma.business.findMany.mockResolvedValue([]);
+    const res = await request(app).post("/api/voice/usage").set("Authorization", "Bearer test-secret").send(usage);
+    expect(res.status).toBe(404);
+    expect(mockLogClaudeUsage).not.toHaveBeenCalled();
   });
 });
