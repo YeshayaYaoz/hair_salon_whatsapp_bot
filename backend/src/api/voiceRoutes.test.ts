@@ -14,6 +14,7 @@ const mockPrisma = {
   staffMember: { findFirst: vi.fn(), findMany: vi.fn() },
   faqEntry: { findMany: vi.fn() },
   specialPeriod: { findMany: vi.fn() },
+  conversationMessage: { findFirst: vi.fn() },
 };
 
 const mockFindAvailableSlots = vi.fn();
@@ -21,9 +22,19 @@ const mockBookAppointmentWithSideEffects = vi.fn();
 const mockCancelAppointmentById = vi.fn();
 const mockRescheduleAppointmentById = vi.fn();
 const mockLogClaudeUsage = vi.fn();
+const mockSendWhatsAppMessage = vi.fn();
+const mockSendWhatsAppImage = vi.fn();
+const mockSendUnitDetailsEmail = vi.fn();
 
 vi.mock("../lib/prisma.js", () => ({ prisma: mockPrisma }));
 vi.mock("../lib/usageLedger.js", () => ({ logClaudeUsage: mockLogClaudeUsage }));
+vi.mock("../lib/crypto.js", () => ({ decryptSecret: (s: string) => `dec:${s}` }));
+vi.mock("../lib/ownerNotify.js", () => ({ notifyOwner: vi.fn(async () => true) }));
+vi.mock("../webhook/whatsappClient.js", () => ({
+  sendWhatsAppMessage: mockSendWhatsAppMessage,
+  sendWhatsAppImage: mockSendWhatsAppImage,
+}));
+vi.mock("../lib/email.js", () => ({ sendUnitDetailsEmail: mockSendUnitDetailsEmail }));
 // The real one calls Cartesia and caches for an hour; stubbed so the catalogue is per-test.
 // Synchronous and cache-only by design: awaiting the catalogue here put a Cartesia round trip
 // between a phone being answered and the greeting. See cachedHebrewVoices.
@@ -648,5 +659,74 @@ describe("POST /api/voice/usage", () => {
     const res = await request(app).post("/api/voice/usage").set("Authorization", "Bearer test-secret").send(usage);
     expect(res.status).toBe(404);
     expect(mockLogClaudeUsage).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The request the product exists to automate: a caller asking for pictures used to get a note
+ * relayed to the owner, who then did the sending by hand.
+ */
+describe("POST /api/voice/send-details", () => {
+  let app: express.Express;
+
+  const unit = {
+    name: "גפן", description: "יחידה משפחתית", priceCents: 210000, maxGuests: 7,
+    imageUrls: ["https://img/1.jpg", "https://img/2.jpg", "https://img/3.jpg", "https://img/4.jpg", "https://img/5.jpg"],
+    linkUrl: "https://zimmer.example/gefen",
+  };
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    process.env.CARTESIA_TOOL_SECRET = "test-secret";
+    const { voiceRouter } = await import("./voiceRoutes.js");
+    app = express();
+    app.use(express.json());
+    app.use("/api/voice", voiceRouter);
+
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
+    mockPrisma.service.findFirst.mockResolvedValue(unit);
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue({
+      name: "בנחת רוח", email: "owner@zimmer.test", whatsappPhoneNumberId: "pn1", whatsappAccessToken: "enc",
+    });
+  });
+
+  const post = (body: Record<string, unknown>) =>
+    request(app).post("/api/voice/send-details").set("Authorization", "Bearer test-secret")
+      .send({ calledNumber: "972501111111", serviceName: "גפן", ...body });
+
+  it("sends details and at most four photos to an open WhatsApp window", async () => {
+    // Window open = the caller messaged this business recently.
+    mockPrisma.conversationMessage.findFirst.mockResolvedValue({ id: "m1" });
+    const res = await post({ channel: "whatsapp", callerNumber: "+972533391353" });
+    expect(res.status).toBe(200);
+    expect(mockSendWhatsAppMessage).toHaveBeenCalledOnce();
+    // Four, not five: enough to show the unit, few enough not to flood a phone.
+    expect(mockSendWhatsAppImage).toHaveBeenCalledTimes(4);
+  });
+
+  it("refuses WhatsApp when the caller has no open window, instead of a send that dies in transit", async () => {
+    // Meta accepts free-form sends outside the 24h window and rejects them asynchronously — the
+    // agent would promise photos that never arrive, which is the owner-alert bug all over again.
+    mockPrisma.conversationMessage.findFirst.mockResolvedValue(null);
+    const res = await post({ channel: "whatsapp", callerNumber: "+972500000000" });
+    expect(res.status).toBe(409);
+    expect(mockSendWhatsAppMessage).not.toHaveBeenCalled();
+  });
+
+  it("refuses WhatsApp for a withheld caller ID", async () => {
+    expect((await post({ channel: "whatsapp", callerNumber: "unknown" })).status).toBe(400);
+  });
+
+  it("emails the details with the business as Reply-To", async () => {
+    const res = await post({ channel: "email", toEmail: "caller@x.test" });
+    expect(res.status).toBe(200);
+    expect(mockSendUnitDetailsEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "caller@x.test", replyTo: "owner@zimmer.test", unitName: "גפן" })
+    );
+  });
+
+  it("404s an unknown unit rather than sending something vague", async () => {
+    mockPrisma.service.findFirst.mockResolvedValue(null);
+    expect((await post({ channel: "email", toEmail: "caller@x.test" })).status).toBe(404);
   });
 });

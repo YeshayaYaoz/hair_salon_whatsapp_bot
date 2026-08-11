@@ -633,7 +633,7 @@ FORMS = {
         "verbatim": "העבירי ל-startTime בדיוק את המחרוזת שהתקבלה מ-check_availability.",
         "ask_phone": "לפני שאת קובעת תור, שאלי את המתקשר מה מספר הטלפון שלו והעבירי אותו ב-caller_phone.",
         "confirm_number": 'אם מתקשר מכתיב לך מספר טלפון — חזרי עליו ספרה-ספרה ובקשי אישור לפני שאת משתמשת בו. תמלול קולי טועה במספרים.',
-        "no_media": "אין לך אפשרות לשלוח תמונות, קבצים או הודעות בעצמך, ואל תציעי לשלוח. אם מבקשים תמונות — אמרי שבעל העסק ישלח בוואטסאפ, והשתמשי ב-message_owner.",
+        "no_media": 'כשמבקשים תמונות או פרטים — השתמשי ב-send_details כדי לשלוח אותם למתקשר עכשיו, לוואטסאפ או למייל. אל תגידי "נשלח" לפני שהכלי החזיר שהשליחה הצליחה. אם הכלי נכשל — הציעי את הערוץ השני, ואם גם הוא לא אפשרי, message_owner. כתובת מייל שהמתקשר מכתיב — חזרי עליה ובקשי אישור לפני השליחה.',
         "rules": [
             'מספרים אמרי במילים ולא כספרות: "מאה ועשרים שקל".',
             "אל תשתמשי בכוכביות, בסולמיות או בכל סימון Markdown — כל תו שאת כותבת נאמר בקול.",
@@ -667,7 +667,7 @@ FORMS = {
         "verbatim": "העבר ל-startTime בדיוק את המחרוזת שהתקבלה מ-check_availability.",
         "ask_phone": "לפני שאתה קובע תור, שאל את המתקשר מה מספר הטלפון שלו והעבר אותו ב-caller_phone.",
         "confirm_number": 'אם מתקשר מכתיב לך מספר טלפון — חזור עליו ספרה-ספרה ובקש אישור לפני שאתה משתמש בו. תמלול קולי טועה במספרים.',
-        "no_media": "אין לך אפשרות לשלוח תמונות, קבצים או הודעות בעצמך, ואל תציע לשלוח. אם מבקשים תמונות — אמור שבעל העסק ישלח בוואטסאפ, והשתמש ב-message_owner.",
+        "no_media": 'כשמבקשים תמונות או פרטים — השתמש ב-send_details כדי לשלוח אותם למתקשר עכשיו, לוואטסאפ או למייל. אל תגיד "נשלח" לפני שהכלי החזיר שהשליחה הצליחה. אם הכלי נכשל — הצע את הערוץ השני, ואם גם הוא לא אפשרי, message_owner. כתובת מייל שהמתקשר מכתיב — חזור עליה ובקש אישור לפני השליחה.',
         "rules": [
             'מספרים אמור במילים ולא כספרות: "מאה ועשרים שקל".',
             "אל תשתמש בכוכביות, בסולמיות או בכל סימון Markdown — כל תו שאתה כותב נאמר בקול.",
@@ -933,6 +933,32 @@ def build_agent(resolved: Dict[str, Any], called: str, caller_num: str) -> LlmAg
             yield AgentTransferCall(target_phone_number=transfer_to)
 
         tools.append(transfer_to_owner)
+
+    async def send_details(
+        ctx,
+        service_name: Annotated[str, "שם היחידה או השירות בדיוק כפי שמופיע ברשימה"],
+        channel: Annotated[str, 'לאן לשלוח: "whatsapp" או "email"'],
+        to_email: Annotated[str, "כתובת המייל של המתקשר — חובה בערוץ email, אחרי שאישר אותה"] = "",
+    ):
+        """שולח למתקשר את הפרטים והתמונות של יחידה — לוואטסאפ שלו או למייל שלו — עכשיו, בזמן השיחה."""
+        payload: Dict[str, Any] = {"calledNumber": called, "serviceName": service_name, "channel": channel}
+        if channel == "whatsapp":
+            payload["callerNumber"] = caller_num
+        if to_email:
+            payload["toEmail"] = to_email.strip()
+        status, body = await _post("/api/voice/send-details", payload)
+        if status == 409 and channel == "whatsapp":
+            # No open WhatsApp window for this caller — Meta would accept the send and kill it in
+            # transit, so the backend refuses instead. Email is the honest alternative.
+            return "אי אפשר לשלוח לוואטסאפ של המתקשר הזה. הציעי לשלוח למייל במקום, או השתמשי ב-message_owner."
+        if status != 200:
+            logger.error("send-details %s for %s: %s", status, called, body)
+            return f"השליחה נכשלה: {body.get('error', '')}. אל תגידי שנשלח."
+        if not body.get("photos"):
+            return "הפרטים נשלחו, אבל ליחידה הזאת אין תמונות במערכת. אמרי את זה בכנות."
+        return "הפרטים והתמונות נשלחו. אפשר להגיד למתקשר שזה אצלו."
+
+    tools.append(send_details)
 
     async def message_owner(
         ctx,

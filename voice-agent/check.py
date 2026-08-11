@@ -67,7 +67,7 @@ async def main_():
     cfg = agent._config
     assert cfg.introduction == SALON["greeting"], cfg.introduction
     names = sorted(getattr(t, "__name__", None) or getattr(t, "name", str(t)) for t in (agent._tools or []))
-    assert names == ["book_appointment", "cancel_appointment", "check_availability", "message_owner", "reschedule_appointment"], names
+    assert names == ["book_appointment", "cancel_appointment", "check_availability", "message_owner", "reschedule_appointment", "send_details"], names
     assert "תספורת אישה" in cfg.system_prompt and "120" in cfg.system_prompt
     assert "דנה" in cfg.system_prompt          # known caller surfaced
     assert "לקוחה" in cfg.system_prompt        # vertical vocabulary used
@@ -78,7 +78,7 @@ async def main_():
     pre = await main.pre_call_handler(req())
     agent = await main.get_agent(None, req(meta=pre.metadata))
     names = sorted(getattr(t, "__name__", None) or getattr(t, "name", str(t)) for t in (agent._tools or []))
-    assert names == ["message_owner", "transfer_to_owner"], names
+    assert names == ["message_owner", "send_details", "transfer_to_owner"], names
     assert agent._config.introduction == BNB["greeting"]
     print("3 inquiry business: transfer only, no booking tools, own greeting           OK")
 
@@ -585,12 +585,45 @@ async def main_():
     prompt = agent._config.system_prompt
     assert "מועבר אוטומטית" in prompt, "known caller must be told the number is already known"
     assert "ספרה-ספרה" in prompt, "a dictated number must be read back before use"
-    assert "תמונות" in prompt and "message_owner" in prompt, "no offering media it cannot send"
+    assert "send_details" in prompt, "the agent must know it can send details itself"
     assert "Markdown" in prompt, "spoken output must forbid markdown"
     # A live call read the hyphen inside an FAQ phone number aloud as the word "minus" — the model,
     # not the TTS, wrote it while spelling out the digits.
     assert "מינוס" in prompt, "phone numbers must be read digit by digit, hyphens silent"
     print("32 the live call's failures are pinned into the prompt                          OK")
+
+    # --- 33. the agent fulfils "send me pictures" itself ---------------------------------
+    # On a live call the only move was relaying a note to the owner — the exact manual step the
+    # product sells the removal of. The tool sends details+photos to the caller's WhatsApp or
+    # email during the call, and the agent may only claim "sent" after the tool says so.
+    STATE.update(status=200, body=ZIMMER, seen=[])
+    pre = await main.pre_call_handler(req())
+    agent = await main.get_agent(None, req(meta=pre.metadata))
+    send = next(t for t in agent._tools if (getattr(t, "__name__", None) or getattr(t, "name", "")) == "send_details")
+
+    STATE.update(status=200, body={"sent": True, "photos": 3}, seen=[])
+    said = await send(None, "גפן", "email", to_email="y@x.test")
+    path, payload, _auth = STATE["seen"][0]
+    assert path == "/api/voice/send-details", path
+    assert payload == {"calledNumber": "+972555077941", "serviceName": "גפן", "channel": "email", "toEmail": "y@x.test"}, payload
+    assert "נשלחו" in said, said
+
+    # WhatsApp rides the caller ID the agent already has — never a dictated number.
+    STATE.update(status=200, body={"sent": True, "photos": 2}, seen=[])
+    await send(None, "גפן", "whatsapp")
+    assert STATE["seen"][0][1]["callerNumber"] == "+972533391353", STATE["seen"][0][1]
+
+    # A closed WhatsApp window is refused by the backend (Meta would accept the send and kill it
+    # in transit); the agent is steered to email, not to a false "sent".
+    STATE.update(status=409, body={"error": "no window"}, seen=[])
+    said = await send(None, "גפן", "whatsapp")
+    assert "מייל" in said and "נשלחו" not in said, said
+
+    # No photos configured is said honestly, not papered over.
+    STATE.update(status=200, body={"sent": True, "photos": 0}, seen=[])
+    said = await send(None, "גפן", "email", to_email="y@x.test")
+    assert "אין תמונות" in said, said
+    print("33 'send me pictures' is fulfilled by the agent, honestly                       OK")
 
 asyncio.run(main_())
 print("\nALL CHECKS PASSED")

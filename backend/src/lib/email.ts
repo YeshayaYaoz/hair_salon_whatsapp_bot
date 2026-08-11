@@ -154,6 +154,40 @@ export async function sendOutreachEmail(to: string, subject: string, bodyText: s
   });
 }
 
+/**
+ * A unit's details and photos, emailed to a caller by the voice agent mid-call.
+ *
+ * Exists for callers WhatsApp cannot reach — on the live call that prompted this, the caller had
+ * no WhatsApp at all (a kosher-phone user, common for exactly the B&B audience this serves).
+ * Reply-To is the business's own address: an answer to this email is a warm lead answering, and it
+ * must land with the owner, not in noreply.
+ */
+export async function sendUnitDetailsEmail(params: {
+  to: string;
+  replyTo?: string | null;
+  businessName: string;
+  unitName: string;
+  lines: string[];
+  imageUrls: string[];
+  linkUrl?: string | null;
+}) {
+  const photos = params.imageUrls
+    .slice(0, 8)
+    .map((u) => `<img src="${esc(u)}" alt="${esc(params.unitName)}" style="max-width:100%;border-radius:12px;margin:0 0 12px;"/>`)
+    .join("");
+  const body =
+    params.lines.map((l) => `<p style="margin:0 0 10px;">${esc(l)}</p>`).join("") +
+    photos +
+    (params.linkUrl ? `<p style="margin:14px 0 0;"><a href="${esc(params.linkUrl)}">לכל הפרטים והתמונות</a></p>` : "");
+  await resendSend({
+    from: FROM,
+    to: params.to,
+    subject: `${params.unitName} — ${params.businessName}`,
+    html: `<div dir="rtl" style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:8px;color:#1a1a1a;font-size:14px;line-height:1.6;">${body}</div>`,
+    ...(params.replyTo ? { reply_to: params.replyTo } : {}),
+  });
+}
+
 export async function sendEmailVerificationEmail(to: string, verifyUrl: string) {
   await resendSend({
     from: FROM,

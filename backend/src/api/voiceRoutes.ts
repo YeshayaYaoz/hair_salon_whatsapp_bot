@@ -12,6 +12,9 @@ import { normalizePhone } from "../lib/phone.js";
 import { cachedHebrewVoices } from "../lib/cartesiaAdmin.js";
 import { notifyOwner } from "../lib/ownerNotify.js";
 import { logClaudeUsage } from "../lib/usageLedger.js";
+import { sendUnitDetailsEmail } from "../lib/email.js";
+import { decryptSecret } from "../lib/crypto.js";
+import { sendWhatsAppMessage, sendWhatsAppImage } from "../webhook/whatsappClient.js";
 
 export const voiceRouter = asyncRouter();
 
@@ -537,4 +540,116 @@ voiceRouter.post("/usage", async (req, res) => {
   });
 
   res.json({ logged: true });
+});
+
+/**
+ * Sends a unit's details and photos to the caller, from the voice agent, during the call.
+ *
+ * This is the request the product exists to automate. On a live call the agent's only move was
+ * "אעביר לבעל הצימר" — a caller who asked for pictures got a note relayed to the owner, who then
+ * had to do the sending by hand. The WhatsApp bot already sends these photos itself; the phone
+ * channel gets the same ability here.
+ *
+ * Two channels, honestly different in reliability:
+ * - WhatsApp: sent from the business's own WABA. Meta only guarantees delivery inside the
+ *   caller's 24h customer-service window, so the send is attempted only when that window is open
+ *   (the caller has messaged the business recently). Outside it the endpoint says so instead of
+ *   firing a message that Meta accepts and then kills in transit — the exact failure that hit
+ *   the owner alerts.
+ * - Email: always deliverable. Reply-To is the business's own address, so an answer goes to the
+ *   owner, not to a noreply void.
+ *
+ * Either way the owner gets a notification that details were auto-sent — the caller is a warm
+ * lead, and the notification is what turns "the bot handled it" into a follow-up.
+ */
+voiceRouter.post("/send-details", async (req, res) => {
+  const parsed = z
+    .object({
+      calledNumber: z.string().min(1),
+      serviceName: z.string().min(1),
+      channel: z.enum(["whatsapp", "email"]),
+      callerNumber: z.string().optional(),
+      toEmail: z.string().email().optional(),
+    })
+    .safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid send-details payload" });
+
+  const business = await resolveBusinessByCalledNumber(parsed.data.calledNumber);
+  if (!business) return res.status(404).json({ error: "No salon configured for this number" });
+  if (rejectIfNotEntitled(business, res)) return;
+
+  const service = await prisma.service.findFirst({
+    where: { businessId: business.id, name: { equals: parsed.data.serviceName, mode: "insensitive" } },
+    select: { name: true, description: true, priceCents: true, maxGuests: true, imageUrls: true, linkUrl: true },
+  });
+  if (!service) return res.status(404).json({ error: "Unknown service" });
+
+  const full = await prisma.business.findUniqueOrThrow({
+    where: { id: business.id },
+    select: { name: true, email: true, whatsappPhoneNumberId: true, whatsappAccessToken: true },
+  });
+
+  const lines = [
+    `${service.name} — ${full.name}`,
+    service.description ?? "",
+    service.priceCents ? `מחיר: ${Math.round(service.priceCents / 100)} ש"ח ללילה` : "",
+    service.maxGuests ? `עד ${service.maxGuests} אורחים` : "",
+    service.linkUrl ? `פרטים נוספים: ${service.linkUrl}` : "",
+  ].filter(Boolean);
+
+  if (parsed.data.channel === "whatsapp") {
+    const caller = parsed.data.callerNumber?.trim();
+    if (!caller || caller === "unknown") {
+      return res.status(400).json({ error: "callerNumber is required for the whatsapp channel" });
+    }
+    if (!full.whatsappPhoneNumberId || !full.whatsappAccessToken) {
+      return res.status(409).json({ error: "This business has no WhatsApp connected" });
+    }
+    // Same 24h rule that governs the owner alerts: a free-form send outside the caller's window
+    // is accepted by Meta and dies in transit, which would have the agent promising photos that
+    // never arrive. The window is open only if the caller has messaged this business recently.
+    const windowOpen = await prisma.conversationMessage.findFirst({
+      where: {
+        businessId: business.id,
+        phone: normalizePhone(caller),
+        role: "user",
+        createdAt: { gte: new Date(Date.now() - 23.5 * 60 * 60 * 1000) },
+      },
+      select: { id: true },
+    });
+    if (!windowOpen) {
+      return res.status(409).json({
+        error:
+          "Caller has no open WhatsApp window with this business — offer email instead, or message_owner so the owner sends it.",
+      });
+    }
+    const accessToken = decryptSecret(full.whatsappAccessToken);
+    await sendWhatsAppMessage({
+      phoneNumberId: full.whatsappPhoneNumberId, accessToken, to: caller, text: lines.join("\n"),
+    });
+    // Up to four photos: enough to show the unit, few enough not to flood a phone.
+    for (const url of service.imageUrls.slice(0, 4)) {
+      await sendWhatsAppImage({ phoneNumberId: full.whatsappPhoneNumberId, accessToken, to: caller, imageUrl: url });
+    }
+  } else {
+    if (!parsed.data.toEmail) return res.status(400).json({ error: "toEmail is required for the email channel" });
+    await sendUnitDetailsEmail({
+      to: parsed.data.toEmail,
+      replyTo: full.email,
+      businessName: full.name,
+      unitName: service.name,
+      lines,
+      imageUrls: service.imageUrls,
+      linkUrl: service.linkUrl,
+    });
+  }
+
+  // The caller is a warm lead; the notification is what turns "the bot handled it" into an owner
+  // follow-up. Fire-and-forget — a failed heads-up must not fail the send that already happened.
+  void notifyOwner(
+    business.id,
+    `📞 שיחת טלפון: נשלחו פרטים ותמונות של "${service.name}" ל${parsed.data.channel === "email" ? `מייל ${parsed.data.toEmail}` : `וואטסאפ ${parsed.data.callerNumber}`}.`
+  );
+
+  res.json({ sent: true, photos: Math.min(service.imageUrls.length, 4) });
 });
