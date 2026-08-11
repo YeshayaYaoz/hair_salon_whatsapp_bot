@@ -410,6 +410,21 @@ export async function resolveTerminalConfig(): Promise<{
  * to the payer, so any is chargeable; the last list item is the most recently added.
  */
 export async function fetchTokenForCustomer(terminalUid: string, customerUid: string): Promise<string | undefined> {
+  return (await lookupCustomerTokens(terminalUid, customerUid)).token;
+}
+
+/**
+ * Same lookup, but reporting WHY there is no token — the count and the error travel into the
+ * webhook's persisted diagnostic, so "the card was not saved" is answerable from the admin health
+ * page instead of from production logs. An empty list on a terminal that just processed a
+ * create_token payment means the tokenization permission is off — PayPlus's own generateLink doc
+ * scopes create_token with "in case you have tokenization permission", and without it the flag is
+ * silently ignored.
+ */
+export async function lookupCustomerTokens(
+  terminalUid: string,
+  customerUid: string
+): Promise<{ token?: string; count: number; error?: string }> {
   const { apiKey, secretKey } = creds();
   const res = await fetch(`${BASE_URL}/Token/List`, {
     method: "POST",
@@ -422,10 +437,15 @@ export async function fetchTokenForCustomer(terminalUid: string, customerUid: st
     body: JSON.stringify({ terminal_uid: terminalUid, customer_uid: customerUid }),
   });
   if (!res.ok) {
-    console.warn(`[payplus] Token/List failed (${res.status}): ${await res.text()}`);
-    return undefined;
+    const text = await res.text();
+    console.warn(`[payplus] Token/List failed (${res.status}): ${text}`);
+    return { count: 0, error: `HTTP ${res.status}: ${text.slice(0, 200)}` };
   }
-  const body = (await res.json()) as { data?: Array<{ token?: string }>; results?: { status?: string } };
+  const body = (await res.json()) as { data?: Array<{ token?: string }>; results?: { status?: string; description?: string } };
+  if (body.results?.status && body.results.status !== "success") {
+    return { count: 0, error: body.results.description ?? body.results.status };
+  }
   const tokens = (body.data ?? []).map((t) => t.token).filter((t): t is string => Boolean(t));
-  return tokens.length > 0 ? tokens[tokens.length - 1] : undefined;
+  // The newest entry: every listed card belongs to this customer, the last one was added last.
+  return { token: tokens[tokens.length - 1], count: tokens.length };
 }

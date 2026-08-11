@@ -4,6 +4,8 @@ import express from "express";
 
 const mockPrisma = {
   business: { update: vi.fn(), findUnique: vi.fn(), findUniqueOrThrow: vi.fn() },
+  // The webhook persists a keys-only diagnostic of every callback for the admin health card.
+  systemSetting: { findMany: vi.fn(async () => []), findUnique: vi.fn(async () => null), upsert: vi.fn(async () => ({})) },
 };
 vi.mock("../lib/prisma.js", () => ({ prisma: mockPrisma }));
 vi.mock("../lib/crypto.js", () => ({ encryptSecret: (v: string) => v, decryptSecret: (v: string) => v }));

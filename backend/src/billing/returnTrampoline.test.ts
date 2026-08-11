@@ -82,4 +82,26 @@ describe("billing-health callback", () => {
     expect((healthCall![0] as { create: { value: string } }).create.value).toBe("enc:tok-health");
     vi.unstubAllGlobals();
   });
+
+  it("records WHY when Token/List stays empty — the diagnosis the admin card shows", async () => {
+    // The live failure this exists for: a paid create_token page whose terminal has no
+    // tokenization permission. PayPlus ignores the flag silently; the only evidence anywhere is
+    // an empty Token/List — which must land on the admin page, not in production logs.
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ results: { status: "success" }, data: [] }),
+    })));
+    await request(app).post("/webhook/billing/payplus/hook-secret").send({
+      transaction_type: "Charge",
+      transaction: { status_code: "000", amount: 1, more_info: "billing-health" },
+      data: { customer_uid: "cust-h", terminal_uid: "term-h", cashier_uid: "cash-h" },
+    });
+    await new Promise((r) => setTimeout(r, 100)); // three attempts with 5ms pauses under vitest
+    const keys = upsert.mock.calls.map((c) => (c[0] as { where: { key: string } }).where.key);
+    expect(keys).not.toContain("payplus_health_token");
+    const debugCall = upsert.mock.calls.find((c) => (c[0] as { where: { key: string } }).where.key === "payplus_last_callback_debug");
+    const record = JSON.parse((debugCall![0] as { create: { value: string } }).create.value);
+    expect(record).toMatchObject({ success: true, hasCustomer: true, tokenInCallback: false, tokenViaList: false, tokenListCount: 0 });
+    vi.unstubAllGlobals();
+  });
 });

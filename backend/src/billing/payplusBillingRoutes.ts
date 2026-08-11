@@ -17,7 +17,7 @@ import {
   PayPlusTerminalNotConfiguredError,
   probeGenerateLink,
   resolveTerminalConfig,
-  fetchTokenForCustomer,
+  lookupCustomerTokens,
 } from "./payplusSubscription.js";
 import { requireSuperAdmin } from "../api/businessRoutes.js";
 import { captureError } from "../lib/errorMonitoring.js";
@@ -26,6 +26,13 @@ import { parsePayPlusCallback, keyTree } from "../lib/payplusCallback.js";
 
 /** Fallback return URL when the caller sends none — the dashboard page these actions start from. */
 const APP_URL = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+
+/**
+ * Pauses between Token/List attempts after a create_token payment: attempt, wait, attempt, wait,
+ * final attempt. The 200 was acknowledged before this starts, so the waits cost PayPlus nothing.
+ * Milliseconds under vitest — a webhook test must not take twelve real seconds.
+ */
+const TOKEN_LIST_RETRY_DELAYS_MS = process.env.VITEST ? [5, 5] : [4000, 8000];
 
 export const payplusBillingRouter = asyncRouter();
 export const payplusBillingWebhookRouter = asyncRouter();
@@ -86,8 +93,36 @@ payplusBillingRouter.get("/payplus/health", requireAuth, requireSuperAdmin, asyn
     ok: Boolean(healthToken),
     detail: healthToken
       ? "אפשר להריץ חיוב ₪1 בכרטיס השמור"
-      : "ישמר אוטומטית בתשלום ה-₪1 הבא — ואז ייפתח מבחן חיוב ה-token",
+      : "ישמר אוטומטית בתשלום ה-₪1 הבא — ואם לא, השורה הבאה אומרת למה",
   });
+
+  // What actually happened on the last callback — the webhook records every hop of the token
+  // capture, so "paid and the card still was not saved" is diagnosable from this page instead of
+  // from production logs.
+  const lastDebug = await prisma.systemSetting.findUnique({ where: { key: "payplus_last_callback_debug" } });
+  if (lastDebug) {
+    let d: {
+      at?: string; ref?: string | null; success?: boolean; hasCustomer?: boolean;
+      tokenInCallback?: boolean; tokenViaList?: boolean;
+      tokenListCount?: number; tokenListError?: string | null; shape?: string;
+    } = {};
+    try { d = JSON.parse(lastDebug.value); } catch { /* an unreadable record reports itself below */ }
+    const when = d.at ? new Date(d.at).toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" }) : "";
+    const gotToken = Boolean(d.tokenInCallback || d.tokenViaList);
+    let detail: string;
+    if (!d.at) detail = "רשומת האבחון לא נקראה — פנו לתמיכה";
+    else if (d.success === false) detail = `${when} — העסקה עצמה לא הצליחה (כרטיס נדחה?), אז אין כרטיס לשמור`;
+    else if (gotToken) detail = `${when} — כרטיס נשמר ונקלט`;
+    else if (!d.hasCustomer)
+      detail = `${when} — ה-callback הגיע בלי customer_uid, אי אפשר לאתר את הכרטיס. מבנה: ${d.shape ?? "?"}`;
+    else if (d.tokenListError) detail = `${when} — Token/List נכשל: ${d.tokenListError}`;
+    else if (d.tokenListCount === 0)
+      detail =
+        `${when} — התשלום עבר אבל Token/List החזיר 0 כרטיסים גם אחרי המתנה. ` +
+        `כמעט בוודאות שמירת כרטיסים (טוקניזציה) לא פעילה במסוף — בקשו מתמיכת PayPlus להפעיל אותה, ואז שלמו שוב דף ₪1`;
+    else detail = `${when} — לא נשמר כרטיס מסיבה לא מזוהה. מבנה: ${d.shape ?? "?"}`;
+    checks.push({ name: "ה-callback האחרון מ-PayPlus", ok: gotToken && d.success !== false, detail });
+  }
 
   // Credentials against the real PayPlus host; with ?link=1 the ₪1 page URL is returned too.
   const wantLink = req.query.link === "1";
@@ -390,19 +425,60 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
     // a shape miss here is a card charged, a 200 acknowledged, and a subscription that never
     // activates, with no retry from PayPlus. See lib/payplusCallback.ts.
     const event = parsePayPlusCallback(req.body);
-    if (!event.success) return;
+
+    // Every hop of the token capture, persisted — the one place this can be debugged from is the
+    // admin health card, because a webhook failure leaves nothing user-visible and PayPlus does
+    // not retry an acknowledged 200. Keys and booleans only: the payload's values are a
+    // customer's name, email and card digits, and this record is shown on an admin page.
+    const debug: Record<string, unknown> = {
+      at: new Date().toISOString(),
+      ref: event.referenceId ?? null,
+      success: event.success,
+      amountIls: event.amountIls ?? null,
+      hasTerminal: Boolean(event.terminalUid),
+      hasCashier: Boolean(event.cashierUid),
+      hasCustomer: Boolean(event.customerUid),
+      tokenInCallback: Boolean(event.tokenUid),
+      shape: keyTree(req.body),
+    };
+    const persistDebug = () =>
+      prisma.systemSetting
+        .upsert({
+          where: { key: "payplus_last_callback_debug" },
+          create: { key: "payplus_last_callback_debug", value: JSON.stringify(debug) },
+          update: { value: JSON.stringify(debug) },
+        })
+        .catch((err) => console.error("[payplus subscription webhook] Could not store callback debug:", err));
+
+    if (!event.success) {
+      await persistDebug();
+      return;
+    }
 
     // The callback never carries the token. Verified across PayPlus's entire documentation and
     // with a real paid checkout: create_token stores the card, but the token is only retrievable
     // via Token/List, filtered by the customer_uid the callback does carry. Fetch it here — the
-    // 200 was already acknowledged above, so this costs the caller nothing.
+    // 200 was already acknowledged above, so this costs the caller nothing. Retried with a pause:
+    // the callback fires at transaction time and nothing promises the stored card is listable in
+    // the same instant.
     if (!event.tokenUid && event.terminalUid && event.customerUid) {
-      try {
-        event.tokenUid = await fetchTokenForCustomer(event.terminalUid, event.customerUid);
-      } catch (err) {
-        console.warn("[payplus subscription webhook] Token/List lookup failed:", err);
+      for (let attempt = 0; attempt <= TOKEN_LIST_RETRY_DELAYS_MS.length; attempt++) {
+        if (attempt > 0) await new Promise((r) => setTimeout(r, TOKEN_LIST_RETRY_DELAYS_MS[attempt - 1]));
+        try {
+          const lookup = await lookupCustomerTokens(event.terminalUid, event.customerUid);
+          debug.tokenListCount = lookup.count;
+          debug.tokenListError = lookup.error ?? null;
+          if (lookup.token) {
+            event.tokenUid = lookup.token;
+            break;
+          }
+        } catch (err) {
+          debug.tokenListError = err instanceof Error ? err.message : String(err);
+          console.warn("[payplus subscription webhook] Token/List lookup failed:", err);
+        }
       }
     }
+    debug.tokenViaList = Boolean(event.tokenUid) && !debug.tokenInCallback;
     if (!event.tokenUid) {
       // Either tokenization is not enabled on the PayPlus account (their support toggles it), or
       // the payload changed shape again. The keys-only tree (no values — the payload carries the
@@ -412,6 +488,7 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
           `to enable tokenization (טוקניזציה) on the terminal. Payload shape: ${keyTree(req.body)}`
       );
     }
+    await persistDebug();
 
     // Transactions/Charge (renewals, upgrades, token top-ups) requires terminal_uid + cashier_uid,
     // no PayPlus endpoint lists them, and asking the operator to dig them out of the dashboard is
