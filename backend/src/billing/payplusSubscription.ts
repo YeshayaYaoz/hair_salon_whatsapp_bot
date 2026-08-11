@@ -263,8 +263,17 @@ export class PayPlusTerminalNotConfiguredError extends Error {
  */
 export async function chargeSubscriptionToken(token: string, amountIls: number, description: string): Promise<{ success: boolean; transactionId?: string; error?: string }> {
   const { apiKey, secretKey } = creds();
-  const terminalUid = process.env.PAYPLUS_TERMINAL_UID?.trim();
-  const cashierUid = process.env.PAYPLUS_CASHIER_UID?.trim();
+  // Env wins when set; otherwise the values the checkout webhook captured from a real callback
+  // (see payplusBillingRoutes) — which means one paid checkout configures renewals by itself.
+  let terminalUid = process.env.PAYPLUS_TERMINAL_UID?.trim();
+  let cashierUid = process.env.PAYPLUS_CASHIER_UID?.trim();
+  if (!terminalUid || !cashierUid) {
+    const stored = await prisma.systemSetting.findMany({
+      where: { key: { in: ["payplus_terminal_uid", "payplus_cashier_uid"] } },
+    });
+    terminalUid ||= stored.find((s) => s.key === "payplus_terminal_uid")?.value;
+    cashierUid ||= stored.find((s) => s.key === "payplus_cashier_uid")?.value;
+  }
   if (!terminalUid || !cashierUid) throw new PayPlusTerminalNotConfiguredError();
 
   const res = await fetch(`${BASE_URL}/Transactions/Charge`, {
@@ -297,4 +306,67 @@ export async function chargeSubscriptionToken(token: string, amountIls: number, 
     return { success: false, error: body.results.description ?? "unknown error" };
   }
   return { success: true, transactionId: body.data?.transaction_uid ?? body.data?.transaction?.uid };
+}
+
+/**
+ * The ₪1 credentials check, callable from the admin health endpoint. Creating a payment link has
+ * no financial effect — nobody is charged unless someone completes the page — and it exercises
+ * exactly the auth + page-uid path every real checkout uses.
+ */
+export async function probeGenerateLink(): Promise<{ ok: boolean; url?: string; error?: string }> {
+  let apiKey: string, secretKey: string, pageUid: string;
+  try {
+    ({ apiKey, secretKey, pageUid } = creds());
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+  try {
+    const res = await fetch(`${BASE_URL}/PaymentPages/generateLink`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: JSON.stringify({ api_key: apiKey, secret_key: secretKey }),
+      },
+      body: JSON.stringify({
+        payment_page_uid: pageUid,
+        charge_method: 1,
+        amount: 1,
+        currency_code: "ILS",
+        sendEmailApproval: false,
+        sendEmailFailure: false,
+        more_info: "billing-health",
+        customer: { customer_name: "Tori health check" },
+        items: [{ name: "תורי — בדיקת חיבור (₪1)", quantity: 1, price: 1 }],
+      }),
+    });
+    const body = (await res.json().catch(() => ({}))) as {
+      data?: { payment_page_link?: string };
+      results?: { status?: string; description?: string };
+      message?: string;
+    };
+    const ok = res.ok && body.results?.status === "success" && !!body.data?.payment_page_link;
+    return ok
+      ? { ok: true, url: body.data!.payment_page_link }
+      : { ok: false, error: `HTTP ${res.status}: ${body.results?.description ?? body.message ?? "unknown"}` };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "network error" };
+  }
+}
+
+/** Where the token charge would take its terminal/cashier from right now — for the health page. */
+export async function resolveTerminalConfig(): Promise<{
+  terminalUid?: string;
+  cashierUid?: string;
+  source: "env" | "captured" | "missing";
+}> {
+  const envT = process.env.PAYPLUS_TERMINAL_UID?.trim();
+  const envC = process.env.PAYPLUS_CASHIER_UID?.trim();
+  if (envT && envC) return { terminalUid: envT, cashierUid: envC, source: "env" };
+  const stored = await prisma.systemSetting.findMany({
+    where: { key: { in: ["payplus_terminal_uid", "payplus_cashier_uid"] } },
+  });
+  const t = envT ?? stored.find((s) => s.key === "payplus_terminal_uid")?.value;
+  const c = envC ?? stored.find((s) => s.key === "payplus_cashier_uid")?.value;
+  if (t && c) return { terminalUid: t, cashierUid: c, source: "captured" };
+  return { source: "missing" };
 }

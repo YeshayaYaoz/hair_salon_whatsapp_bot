@@ -4,7 +4,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // throws without DATABASE_URL. Nothing here touches the database, so the suite would otherwise
 // pass or fail on whether the machine running it happens to have a .env — every other test file
 // mocks prisma for the same reason.
-vi.mock("../lib/prisma.js", () => ({ prisma: {} }));
+const mockSystemSetting = { findMany: vi.fn(async () => [] as Array<{ key: string; value: string }>) };
+vi.mock("../lib/prisma.js", () => ({ prisma: { systemSetting: mockSystemSetting } }));
 
 const { chargeSubscriptionToken, PayPlusTerminalNotConfiguredError } = await import("./payplusSubscription.js");
 
@@ -71,6 +72,23 @@ describe("chargeSubscriptionToken", () => {
     delete process.env.PAYPLUS_TERMINAL_UID;
     await expect(chargeSubscriptionToken("tok", 149, "x")).rejects.toThrow(PayPlusTerminalNotConfiguredError);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the terminal/cashier captured from a checkout callback", async () => {
+    // One paid checkout configures renewals by itself: the webhook stores what the callback
+    // carried, and the charge uses it when the env vars were never set.
+    delete process.env.PAYPLUS_TERMINAL_UID;
+    delete process.env.PAYPLUS_CASHIER_UID;
+    mockSystemSetting.findMany.mockResolvedValueOnce([
+      { key: "payplus_terminal_uid", value: "term-captured" },
+      { key: "payplus_cashier_uid", value: "cash-captured" },
+    ]);
+    fetchMock.mockResolvedValue(okResponse({ transaction_uid: "tr-1" }));
+    const result = await chargeSubscriptionToken("tok", 149, "x");
+    expect(result.success).toBe(true);
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.terminal_uid).toBe("term-captured");
+    expect(body.cashier_uid).toBe("cash-captured");
   });
 
   it("surfaces PayPlus's own rejection reason instead of a generic failure", async () => {

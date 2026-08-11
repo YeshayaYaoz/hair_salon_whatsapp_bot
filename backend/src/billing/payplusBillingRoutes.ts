@@ -15,7 +15,10 @@ import {
   chargeAfterCredit,
   PayPlusBillingNotConfiguredError,
   PayPlusTerminalNotConfiguredError,
+  probeGenerateLink,
+  resolveTerminalConfig,
 } from "./payplusSubscription.js";
+import { requireSuperAdmin } from "../api/businessRoutes.js";
 import { captureError } from "../lib/errorMonitoring.js";
 import { explainPayPlusError } from "../lib/payplusErrors.js";
 import { parsePayPlusCallback } from "../lib/payplusCallback.js";
@@ -25,6 +28,67 @@ const APP_URL = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, 
 
 export const payplusBillingRouter = asyncRouter();
 export const payplusBillingWebhookRouter = asyncRouter();
+
+/**
+ * The payplus-probe script, as a page the operator can open — the server already holds every
+ * variable the CLI version needed `railway run` for. Read-only except ?link=1, which creates a
+ * real ₪1 payment page (still charges nobody until it is paid; paying it yourself is the one
+ * end-to-end proof no code can give).
+ */
+payplusBillingRouter.get("/payplus/health", requireAuth, requireSuperAdmin, async (req: AuthedRequest, res) => {
+  const sandbox = process.env.PAYPLUS_ENV === "sandbox";
+  const backend = (process.env.PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
+  const webhookSecret = process.env.PAYPLUS_BILLING_WEBHOOK_SECRET?.trim();
+
+  const checks: Array<{ name: string; ok: boolean; detail?: string }> = [];
+  checks.push({
+    name: "סביבת PayPlus",
+    ok: !sandbox,
+    detail: sandbox ? "SANDBOX — נוצרים לינקים אבל אף שקל לא נגבה" : "production",
+  });
+  for (const name of ["PAYPLUS_API_KEY", "PAYPLUS_SECRET_KEY", "PAYPLUS_PAGE_UID", "PAYPLUS_BILLING_WEBHOOK_SECRET", "PUBLIC_BACKEND_URL"]) {
+    checks.push({ name, ok: Boolean(process.env[name]?.trim()) });
+  }
+
+  // Renewals: env vars, or the values captured from a paid checkout's callback.
+  const terminal = await resolveTerminalConfig();
+  checks.push({
+    name: "terminal_uid + cashier_uid (חיובי חידוש)",
+    ok: terminal.source !== "missing",
+    detail:
+      terminal.source === "missing"
+        ? "חסרים — ייקלטו אוטומטית מה-callback של התשלום המוצלח הראשון, או שיוגדרו ידנית ב-Railway"
+        : terminal.source === "env"
+          ? "מוגדרים ב-Railway"
+          : "נקלטו אוטומטית מ-callback של תשלום",
+  });
+
+  // The webhook GET self-check, via the public URL — proves what PayPlus will actually reach.
+  if (backend && webhookSecret) {
+    try {
+      const r = await fetch(`${backend}/webhook/billing/payplus/${webhookSecret}`);
+      const body = (await r.json().catch(() => ({}))) as { ok?: boolean };
+      checks.push({
+        name: "ה-webhook חי והסוד תואם",
+        ok: r.status === 200 && body.ok === true,
+        detail: r.status === 200 ? undefined : `GET החזיר ${r.status} — כרטיס יחויב ושום מנוי לא יופעל`,
+      });
+    } catch (err) {
+      checks.push({ name: "ה-webhook חי והסוד תואם", ok: false, detail: err instanceof Error ? err.message : "network error" });
+    }
+  }
+
+  // Credentials against the real PayPlus host; with ?link=1 the ₪1 page URL is returned too.
+  const wantLink = req.query.link === "1";
+  const probe = await probeGenerateLink();
+  checks.push({ name: "המפתחות מתקבלים אצל PayPlus (יצירת דף ₪1)", ok: probe.ok, detail: probe.ok ? undefined : probe.error });
+
+  res.json({
+    ok: checks.every((c) => c.ok),
+    checks,
+    ...(wantLink && probe.ok ? { testPaymentUrl: probe.url } : {}),
+  });
+});
 
 /** Creates a PayPlus checkout link that charges the first period AND captures a recurring token. */
 payplusBillingRouter.post("/payplus/checkout", requireAuth, async (req: AuthedRequest, res) => {
@@ -269,6 +333,22 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
     // activates, with no retry from PayPlus. See lib/payplusCallback.ts.
     const event = parsePayPlusCallback(req.body);
     if (!event.success) return;
+
+    // Transactions/Charge (renewals, upgrades, token top-ups) requires terminal_uid + cashier_uid,
+    // no PayPlus endpoint lists them, and asking the operator to dig them out of the dashboard is
+    // one more manual step that can silently not happen. Every successful checkout callback
+    // carries both — so record them, and the token charge uses them when the env vars are unset.
+    if (event.terminalUid && event.cashierUid) {
+      const capture = [
+        ["payplus_terminal_uid", event.terminalUid],
+        ["payplus_cashier_uid", event.cashierUid],
+      ] as const;
+      for (const [key, value] of capture) {
+        prisma.systemSetting
+          .upsert({ where: { key }, create: { key, value }, update: { value } })
+          .catch((err) => console.error(`[payplus subscription webhook] Could not store ${key}:`, err));
+      }
+    }
 
     // more_info is a short reference, not the businessId — PayPlus caps the field at 19 characters
     // and a cuid alone is longer. The plan and cycle were parked on the row when the link was made.

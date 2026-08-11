@@ -66,6 +66,10 @@ export interface PayPlusCallback {
   /** When the account has חשבונית+ enabled, PayPlus issues the receipt itself and reports its
    * URL inside the callback (invoice[].res_doc_original_url). */
   receiptUrl?: string;
+  /** Present on every successful page charge (under data.data). Transactions/Charge requires both
+   * and no PayPlus endpoint lists them — the callback is the one place they can be learned. */
+  terminalUid?: string;
+  cashierUid?: string;
 }
 
 export function parsePayPlusCallback(body: unknown): PayPlusCallback {
@@ -80,5 +84,7 @@ export function parsePayPlusCallback(body: unknown): PayPlusCallback {
     customerName: (findField(body, "customer_name") as string) || undefined,
     customerPhone: (findField(body, "customer_phone", "phone") as string) || undefined,
     receiptUrl: (findField(body, "res_doc_original_url", "res_doc_copy_url") as string) || undefined,
+    terminalUid: (findField(body, "terminal_uid") as string) || undefined,
+    cashierUid: (findField(body, "cashier_uid") as string) || undefined,
   };
 }
