@@ -17,6 +17,8 @@ interface ParsedPaymentEvent {
   referenceId?: string;
   customerName?: string;
   customerPhone?: string;
+  /** PayPlus only: the receipt חשבונית+ auto-issued during the charge, reported in the callback. */
+  receiptUrl?: string;
 }
 
 // Each provider's webhook payload shape is different — normalize to one common event before
@@ -193,6 +195,21 @@ paymentWebhookRouter.post("/:provider/:businessId/:webhookSecret", async (req, r
 
     const resolved = resolveInvoiceCredentials(business);
     if (!resolved) return; // no invoice provider connected — payment still succeeded, just no auto-receipt
+
+    // PayPlus's own Invoice+ issues the receipt DURING the charge and reports its URL in this very
+    // callback — issuing another document here would give the customer two receipts for one
+    // payment. (Until recently this path also called an Invoices/GenerateInvoice endpoint that
+    // does not exist on PayPlus's API, so every auto-receipt for these businesses landed in
+    // captureError instead.)
+    if (resolved.provider === "payplus-invoice") {
+      const receiptUrl = event.receiptUrl;
+      console.log(
+        receiptUrl
+          ? `[payments webhook] PayPlus Invoice+ auto-issued the receipt for ${businessId}: ${receiptUrl}`
+          : `[payments webhook] PayPlus Invoice+ handles receipts account-side for ${businessId} — none reported on this callback`
+      );
+      return;
+    }
 
     if (!event.amountIls || !event.customerName) {
       console.warn(`[payments webhook] Missing amount/customer name for ${provider}/${businessId} — skipping receipt`);
