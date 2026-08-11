@@ -587,6 +587,9 @@ async def main_():
     assert "ספרה-ספרה" in prompt, "a dictated number must be read back before use"
     assert "תמונות" in prompt and "message_owner" in prompt, "no offering media it cannot send"
     assert "Markdown" in prompt, "spoken output must forbid markdown"
+    # A live call read the hyphen inside an FAQ phone number aloud as the word "minus" — the model,
+    # not the TTS, wrote it while spelling out the digits.
+    assert "מינוס" in prompt, "phone numbers must be read digit by digit, hyphens silent"
     print("32 the live call's failures are pinned into the prompt                          OK")
 
 asyncio.run(main_())
