@@ -76,7 +76,10 @@ jobs:
           # Print them instead, so one failed run answers the question it raised.
           if [ -z "$RAILWAY_SERVICE" ]; then
             echo "RAILWAY_SERVICE is not set. Services visible to this token:"
-            railway status --json 2>/dev/null | jq -r '.services.edges[]?.node.name | "  - " + .' || echo "  (could not read railway status --json)"
+            # Every name anywhere in the payload, not just .services.edges — the CLI reported
+            # "multiple services" while that one path yielded a single entry, so the shape is not
+            # what it appears and a guess here deploys the backend over the wrong service.
+            railway status --json 2>/dev/null | jq -r '[.. | objects | select(has("name")) | .name] | unique | .[] | "  - " + .' || echo "  (could not read railway status --json)"
           fi
 
           args=""
