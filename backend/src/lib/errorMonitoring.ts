@@ -26,6 +26,18 @@ export function initErrorMonitoring(): void {
   console.log("[monitoring] Sentry error monitoring enabled");
 }
 
+/**
+ * Whether Sentry actually initialised — reported on /health.
+ *
+ * The only existing evidence was one line printed at boot, which means checking it requires access
+ * to the deploy logs. That is the wrong place for it: the whole reason to configure monitoring is
+ * that nobody is reading those logs. A DSN that is set but malformed, or set on the wrong service,
+ * looks exactly like a DSN that works until the first error is silently not reported.
+ */
+export function isErrorMonitoringEnabled(): boolean {
+  return enabled;
+}
+
 /** Report an error to Sentry (no-op if monitoring isn't configured). Never throws. */
 export function captureError(err: unknown, context?: Record<string, unknown>): void {
   if (!enabled) return;

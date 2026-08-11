@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { validateEnv } from "./lib/validateEnv.js";
-import { initErrorMonitoring, captureError } from "./lib/errorMonitoring.js";
+import { initErrorMonitoring, captureError, isErrorMonitoringEnabled } from "./lib/errorMonitoring.js";
 import { authRouter } from "./api/authRoutes.js";
 import { businessRouter } from "./api/businessRoutes.js";
 import { whatsappRouter } from "./webhook/whatsappRoutes.js";
@@ -113,6 +113,10 @@ app.get("/health", (_req, res) =>
     // and reading both means either route to production can still answer "which code is this".
     commit: (process.env.APP_COMMIT_SHA || process.env.RAILWAY_GIT_COMMIT_SHA)?.slice(0, 7) ?? "unknown",
     startedAt: STARTED_AT,
+    // Whether Sentry took the DSN, not whether one is set: a malformed DSN sets the variable and
+    // initialises nothing, and the difference is only visible the first time an error goes
+    // unreported.
+    monitoring: isErrorMonitoringEnabled(),
   })
 );
 
