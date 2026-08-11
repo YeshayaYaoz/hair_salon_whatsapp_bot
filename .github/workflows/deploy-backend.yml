@@ -95,6 +95,21 @@ jobs:
           # currently leaves the old code serving and reports success nowhere.
           railway up --ci $args
 
+      # "Deploy failed" is the whole of what `railway up --ci` says, and the build log it links to
+      # needs a browser session nobody has here. This is the log that matters: a build failing on
+      # Railway is what leaves the previous code serving, which is the condition this workflow was
+      # written to expose.
+      - name: Why the build failed
+        if: failure()
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+          RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+        run: |
+          railway logs --build --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" 2>&1 | tail -100 || true
+          echo "--- deployment logs ---"
+          railway logs --deployment --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" 2>&1 | tail -60 || true
+
       - name: Confirm which commit is live
         # Best-effort. It reads /health, which reports the commit Railway built from, so a deploy
         # that "succeeded" while the old process kept serving is visible here rather than on the
