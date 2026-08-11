@@ -328,6 +328,12 @@ export async function probeGenerateLink(): Promise<{ ok: boolean; url?: string; 
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
+  // Same callback wiring as a real checkout. The first ₪1 test was paid WITHOUT this — the money
+  // arrived, but PayPlus had nowhere to post the callback, so nothing was captured and the
+  // "terminal/cashier will configure themselves" promise silently did not happen. A test page
+  // that exercises less than the real flow is how every bug in this file survived.
+  const webhookSecret = process.env.PAYPLUS_BILLING_WEBHOOK_SECRET?.trim();
+  const appUrl = (process.env.PUBLIC_BACKEND_URL ?? process.env.APP_URL ?? "").replace(/\/$/, "");
   try {
     const res = await fetch(`${BASE_URL}/PaymentPages/generateLink`, {
       method: "POST",
@@ -343,6 +349,9 @@ export async function probeGenerateLink(): Promise<{ ok: boolean; url?: string; 
         sendEmailApproval: false,
         sendEmailFailure: false,
         more_info: "billing-health",
+        ...(appUrl && webhookSecret
+          ? { refURL_callback: `${appUrl}/webhook/billing/payplus/${encodeURIComponent(webhookSecret)}` }
+          : {}),
         customer: { customer_name: "Tori health check" },
         items: [{ name: "תורי — בדיקת חיבור (₪1)", quantity: 1, price: 1 }],
       }),

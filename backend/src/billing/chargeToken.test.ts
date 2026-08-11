@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const mockSystemSetting = { findMany: vi.fn(async () => [] as Array<{ key: string; value: string }>) };
 vi.mock("../lib/prisma.js", () => ({ prisma: { systemSetting: mockSystemSetting } }));
 
-const { chargeSubscriptionToken, PayPlusTerminalNotConfiguredError } = await import("./payplusSubscription.js");
+const { chargeSubscriptionToken, PayPlusTerminalNotConfiguredError, probeGenerateLink } = await import("./payplusSubscription.js");
 
 /**
  * Pins the HTTP contract of the token charge — endpoint path and required fields.
@@ -104,5 +104,25 @@ describe("chargeSubscriptionToken", () => {
     fetchMock.mockResolvedValue(okResponse({ transaction: { uid: "tr-nested" } }));
     const result = await chargeSubscriptionToken("tok", 149, "x");
     expect(result.transactionId).toBe("tr-nested");
+  });
+});
+
+describe("probeGenerateLink", () => {
+  it("wires the same callback URL a real checkout gets — the ₪1 test must exercise the full path", async () => {
+    // The first live ₪1 was paid without this: money arrived, no callback was sent, and the
+    // terminal/cashier auto-capture silently did not happen. A test page that exercises less
+    // than the real flow reports health it did not earn.
+    process.env.PUBLIC_BACKEND_URL = "https://api.example.com";
+    process.env.PAYPLUS_BILLING_WEBHOOK_SECRET = "hook-secret";
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ results: { status: "success" }, data: { payment_page_link: "https://pay/1" } }),
+    });
+    const r = await probeGenerateLink();
+    expect(r).toEqual({ ok: true, url: "https://pay/1" });
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.refURL_callback).toBe("https://api.example.com/webhook/billing/payplus/hook-secret");
+    delete process.env.PUBLIC_BACKEND_URL;
+    delete process.env.PAYPLUS_BILLING_WEBHOOK_SECRET;
   });
 });
