@@ -92,10 +92,31 @@ curl -X PATCH https://api.cartesia.ai/agents/$CARTESIA_AGENT_ID \
 
 (`cartesia connect --url …` does the same thing from the CLI.)
 
-Use this when the managed routes are unavailable, or when you want the agent's uptime and rollout
-under your own control — accepting single-region latency and cold starts in exchange. Cartesia's own
-docs frame managed as the way to deploy *low-latency* agents, so treat this as the deliberate
-trade rather than the default.
+**This is now the recommended route**, and the reasoning reversed on live measurement. The managed
+runtime scales the agent to zero when idle, and the first call after a quiet stretch pays ~5
+seconds of dead air waking the container — measured on a real call, and confirmed as cold start by
+an immediate second call answering within a second. A Railway service on a paid plan never sleeps,
+so no caller is ever the cold one. The price is single-region: every conversational turn crosses
+from Cartesia's infrastructure to the Railway region and back, adding some fixed per-turn latency.
+A steady ~150ms on every turn is a far better deal than 5 seconds of silence for the first caller
+of the morning — and first impressions are exactly the calls a booking line exists for.
+
+Two further wins over the managed route, both learned the hard way:
+- **Deploys ride `git push`** like the rest of the repo, retiring the `cartesia deploy` laptop
+  ritual and the stray-`cartesia.toml` failure mode entirely.
+- **`GET /health` says which code is live** — model, gender, whether usage reporting is wired —
+  answering in one curl the "which code answered that call" question that once took an evening.
+
+### Railway setup (once)
+
+1. Railway → the existing project → **New Service → GitHub repo**, same repo, and set the
+   service's **Root Directory** to `voice-agent/`. The `Procfile` (`web: python main.py`) and
+   `requirements.txt` do the rest.
+2. Set the service variables: `TORI_API_URL`, `CARTESIA_TOOL_SECRET`, `ANTHROPIC_API_KEY`,
+   `TORI_AGENT_GENDER` (and optionally `TORI_AGENT_MODEL`).
+3. `curl https://<service>.up.railway.app/health` — confirm the config it booted with.
+4. Point the agent at it (the PATCH above, or `cartesia connect --url`). Calls switch over
+   immediately; switching back is the same call with the managed deployment restored.
 
 ## Environment
 

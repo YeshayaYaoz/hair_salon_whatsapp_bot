@@ -1011,6 +1011,28 @@ async def get_agent(env: AgentEnv, call_request: CallRequest):
 
 app = VoiceAgentApp(get_agent=get_agent, pre_call_handler=pre_call_handler)
 
+
+# For the self-hosted deployment (Railway), which is what removes the cold start: Cartesia's
+# managed runtime scales the agent to zero when idle, and the first caller after a quiet stretch
+# pays ~5 seconds of dead air waking it — measured live, and confirmed by an immediate second call
+# answering within a second. A Railway service on a paid plan never sleeps, so no caller is ever
+# first.
+#
+# The endpoint doubles as the "which code is live" check that took a whole evening during the first
+# deploy saga: it reports the configuration this process actually booted with, so a stale deploy is
+# visible in one curl instead of a test call.
+@app.fastapi_app.get("/health")
+def health():
+    return {
+        "ok": True,
+        "model": MODEL,
+        "gender": AGENT_GENDER or "unset (falls back to /context voiceGender)",
+        "tori_api": bool(TORI_API_URL),
+        "tool_secret": bool(TOOL_SECRET),
+        "usage_reporting": bool(TORI_API_URL and TOOL_SECRET),
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
 
