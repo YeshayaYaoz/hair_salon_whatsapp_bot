@@ -67,7 +67,7 @@ async def main_():
     cfg = agent._config
     assert cfg.introduction == SALON["greeting"], cfg.introduction
     names = sorted(getattr(t, "__name__", None) or getattr(t, "name", str(t)) for t in (agent._tools or []))
-    assert names == ["book_appointment", "cancel_appointment", "check_availability", "message_owner", "reschedule_appointment", "send_details"], names
+    assert names == ["book_appointment", "cancel_appointment", "check_availability", "end_call", "message_owner", "reschedule_appointment", "send_details"], names
     assert "תספורת אישה" in cfg.system_prompt and "120" in cfg.system_prompt
     assert "דנה" in cfg.system_prompt          # known caller surfaced
     assert "לקוחה" in cfg.system_prompt        # vertical vocabulary used
@@ -78,7 +78,7 @@ async def main_():
     pre = await main.pre_call_handler(req())
     agent = await main.get_agent(None, req(meta=pre.metadata))
     names = sorted(getattr(t, "__name__", None) or getattr(t, "name", str(t)) for t in (agent._tools or []))
-    assert names == ["message_owner", "send_details", "transfer_to_owner"], names
+    assert names == ["end_call", "message_owner", "send_details", "transfer_to_owner"], names
     assert agent._config.introduction == BNB["greeting"]
     print("3 inquiry business: transfer only, no booking tools, own greeting           OK")
 
@@ -624,6 +624,21 @@ async def main_():
     said = await send(None, "גפן", "email", to_email="y@x.test")
     assert "אין תמונות" in said, said
     print("33 'send me pictures' is fulfilled by the agent, honestly                       OK")
+
+    # --- 34. the agent hangs up when the conversation is over ----------------------------
+    # A live call sat open for three minutes after the agent's last word, waiting for the caller
+    # to press end — billed airtime, and to the caller a bot that did not notice the call was
+    # finished. Ending is the agent's job.
+    STATE.update(status=200, body=ZIMMER, seen=[])
+    pre = await main.pre_call_handler(req())
+    agent = await main.get_agent(None, req(meta=pre.metadata))
+    names = [getattr(t, "__name__", None) or getattr(t, "name", str(t)) for t in agent._tools]
+    assert "end_call" in names, names
+    prompt = agent._config.system_prompt
+    # Say goodbye first, and never cut someone off mid-sentence — hanging up on a live caller is
+    # worse than the open line this fixes.
+    assert "end_call" in prompt and "פרידה" in prompt, prompt[-400:]
+    print("34 the agent ends the call itself once the caller is done                       OK")
 
 asyncio.run(main_())
 print("\nALL CHECKS PASSED")

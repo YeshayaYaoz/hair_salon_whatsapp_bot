@@ -42,7 +42,7 @@ import httpx
 # `from line.voice_agent_app import AgentEnv, ...`, but AgentEnv is defined in line/agent.py and is
 # only re-exported at the top level — that import raises ImportError against cartesia-line 0.2.16.
 from line import AgentEnv, CallRequest, PreCallResult, VoiceAgentApp
-from line.llm_agent import LlmAgent, LlmConfig
+from line.llm_agent import LlmAgent, LlmConfig, end_call
 
 # LiteLLM is what cartesia-line calls under the hood (see line/llm_agent/http_provider.py), which
 # makes its success callback the only place the agent's token usage is visible to us.
@@ -628,6 +628,7 @@ FORMS = {
         "can_transfer": "אם המתקשר מבקש לדבר עם אדם, עם בעל העסק או עם מישהו אחר — אל תתווכחי. השתמשי ב-transfer_to_owner. אם ההעברה לא מצליחה, השתמשי ב-message_owner.",
         "no_transfer": "אין אפשרות להעביר שיחות. אם מבקשים לדבר עם מישהו — השתמשי ב-message_owner כדי לשלוח לבעל העסק הודעה עם הבקשה, ואמרי שהוא יחזור אליהם.",
         "leave_message": "בכל מקרה שבו המתקשר רוצה משהו שאת לא יכולה לתת לו — השתמשי ב-message_owner. אל תבטיחי שמישהו יחזור אליו בלי לקרוא לכלי הזה.",
+        "end_call": 'כשהשיחה נגמרה — המתקשר נפרד, אמר תודה וסיים, או אין לו עוד מה לשאול — אמרי משפט פרידה קצר ומיד אחריו קראי ל-end_call. אל תחכי שינתק. אם הוא עוד באמצע משהו, אל תסיימי.',
         "booking": "השתמשי ב-check_availability כדי לראות זמנים פנויים, ואז ב-book_appointment.",
         "no_invent": "אל תמציאי זמנים ואל תאשרי תור שלא חזר מ-book_appointment.",
         "verbatim": "העבירי ל-startTime בדיוק את המחרוזת שהתקבלה מ-check_availability.",
@@ -663,6 +664,7 @@ FORMS = {
         "can_transfer": "אם המתקשר מבקש לדבר עם אדם, עם בעל העסק או עם מישהו אחר — אל תתווכח. השתמש ב-transfer_to_owner. אם ההעברה לא מצליחה, השתמש ב-message_owner.",
         "no_transfer": "אין אפשרות להעביר שיחות. אם מבקשים לדבר עם מישהו — השתמש ב-message_owner כדי לשלוח לבעל העסק הודעה עם הבקשה, ואמור שהוא יחזור אליהם.",
         "leave_message": "בכל מקרה שבו המתקשר רוצה משהו שאתה לא יכול לתת לו — השתמש ב-message_owner. אל תבטיח שמישהו יחזור אליו בלי לקרוא לכלי הזה.",
+        "end_call": 'כשהשיחה נגמרה — המתקשר נפרד, אמר תודה וסיים, או אין לו עוד מה לשאול — אמור משפט פרידה קצר ומיד אחריו קרא ל-end_call. אל תחכה שינתק. אם הוא עוד באמצע משהו, אל תסיים.',
         "booking": "השתמש ב-check_availability כדי לראות זמנים פנויים, ואז ב-book_appointment.",
         "no_invent": "אל תמציא זמנים ואל תאשר תור שלא חזר מ-book_appointment.",
         "verbatim": "העבר ל-startTime בדיוק את המחרוזת שהתקבלה מ-check_availability.",
@@ -748,13 +750,14 @@ def build_prompt(ctx: Dict[str, Any], caller_known: bool = True) -> str:
 
     if inquiry:
         # The B&B model closes bookings human-to-human. Saying otherwise invents a confirmation.
-        parts += ["", "## חשוב", f["no_booking"], f["transfer"], f["leave_message"]]
+        parts += ["", "## חשוב", f["no_booking"], f["transfer"], f["leave_message"], f["end_call"]]
     else:
         parts += ["", "## קביעת תורים", f["booking"], f["no_invent"], f["verbatim"]]
         # A caller who asks for a person is not a booking request, and the agent used to have no
         # answer for it at all — the tool existed only for inquiry businesses.
         parts.append(f["can_transfer"] if ctx.get("ownerTransferNumber") else f["no_transfer"])
         parts.append(f["leave_message"])
+        parts.append(f["end_call"])
         if not caller_known:
             # Only when the number really is missing. Asking a caller for a number we already have
             # is the same self-inflicted wound as asking which number they dialled.
@@ -985,6 +988,17 @@ def build_agent(resolved: Dict[str, Any], called: str, caller_num: str) -> LlmAg
         return "ההודעה נשלחה לבעל העסק."
 
     tools.append(message_owner)
+
+    # Hanging up is the agent's job, not the caller's. Without this the line stayed open after
+    # goodbye until the caller pressed end — one live call sat open for three minutes past the
+    # last word, which is billed airtime and reads to the caller as a bot that did not understand
+    # the conversation was over. The SDK's own tool emits the hangup event; the wording tells it
+    # to say goodbye first, and never to cut someone off mid-sentence.
+    tools.append(end_call(description=(
+        "מסיים את השיחה ומנתק. השתמש בזה רק אחרי שאמרת משפט פרידה, וכשברור שהמתקשר סיים — "
+        "הוא נפרד, אמר תודה, או אמר שאין לו עוד שאלות. אל תשתמש בזה אם הוא באמצע משפט, "
+        "מבקש להמתין, או שהכוונה שלו לא ברורה."
+    )))
 
     return LlmAgent(
         model=MODEL,
