@@ -44,6 +44,10 @@ process.on("unhandledRejection", (reason) => {
   captureError(reason, { kind: "unhandledRejection" });
 });
 
+// Boot time, not request time: it distinguishes "the deploy restarted" from "the deploy never
+// happened", which look identical from the outside.
+const STARTED_AT = new Date().toISOString();
+
 const app = express();
 const allowedOrigins = (process.env.FRONTEND_URL ?? "*").split(",").map(o => o.trim());
 app.use(cors({
@@ -89,7 +93,25 @@ app.use("/api/billing", payplusBillingRouter);
 app.use("/api/leadfinder", leadFinderRouter);
 app.use("/api/voice", voiceRouter);
 
-app.get("/health", (_req, res) => res.json({ ok: true }));
+/**
+ * Answers "is it up" and — the part that matters — "which code is up".
+ *
+ * A live call got `Cannot POST /api/voice/send-details` from a route that had been on the branch
+ * for fifteen hours, while a neighbouring route in the same file answered normally. Proving the
+ * deploy was stale took reasoning from the shape of two 404s, because nothing served by this
+ * process would say what it was built from. Railway injects the commit sha; exposing it turns that
+ * whole question into one curl.
+ *
+ * Unauthenticated, like the rest of /health: a commit sha of a private repo tells an outsider
+ * nothing they can act on, and gating it would defeat the point of checking a deploy quickly.
+ */
+app.get("/health", (_req, res) =>
+  res.json({
+    ok: true,
+    commit: process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? "unknown",
+    startedAt: STARTED_AT,
+  })
+);
 
 // Safety net for anything a route handler passes to next(err) or throws synchronously —
 // individual routes already handle their own errors, this just ensures nothing falls through
