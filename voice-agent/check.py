@@ -563,5 +563,16 @@ async def main_():
     assert main._latency_extra("deepseek/deepseek-chat") == {}
     print("30 the call is configured for first-token latency, not for throughput          OK")
 
+    # --- 31. even the apology speaks in the deployment's gender -------------------------
+    # The apology agent answers when there is no salon to speak for — the worst call we have, and
+    # the one whose grammar an instruction-only fix can't reach because its sentence is pre-written.
+    main.AGENT_GENDER = "masculine"
+    ag = main._apology_agent("שלום")
+    assert "ענה" in ag._config.system_prompt and "לשון זכר" in ag._config.system_prompt
+    main.AGENT_GENDER = ""
+    ag = main._apology_agent("שלום")
+    assert "עני" in ag._config.system_prompt and "לשון נקבה" in ag._config.system_prompt
+    print("31 the apology agent is inflected by deployment gender too                     OK")
+
 asyncio.run(main_())
 print("\nALL CHECKS PASSED")

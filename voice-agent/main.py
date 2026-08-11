@@ -752,13 +752,31 @@ def build_prompt(ctx: Dict[str, Any], caller_known: bool = True) -> str:
 
 
 def _apology_agent(sentence: str) -> LlmAgent:
-    """One spoken sentence and nothing else, for every case where there is no salon to speak for."""
+    """
+    One spoken sentence and nothing else, for every case where there is no salon to speak for.
+
+    The instruction is inflected like everything else: it addresses the model in the agent's own
+    gender, and it names that gender for self-reference — the introduction is pre-written, but a
+    caller who answers the apology gets a model-generated reply, and Hebrew marks the gender on
+    every verb of it.
+    """
+    masculine = _forms_for(None) is FORMS["masculine"]
+    instruction = (
+        "ענה במשפט אחד בלבד, חזור בדיוק על ההודעה שניתנה לך, ואל תוסיף דבר. דבר על עצמך בלשון זכר."
+        if masculine
+        else "עני במשפט אחד בלבד, חזרי בדיוק על ההודעה שניתנה לך, ואל תוסיפי דבר. דברי על עצמך בלשון נקבה."
+    )
     return LlmAgent(
         model=MODEL,
         api_key=MODEL_API_KEY,
         config=LlmConfig(
-            system_prompt="עני במשפט אחד בלבד, בדיוק את ההודעה שניתנה לך, ואל תוסיפי דבר.",
+            system_prompt=instruction,
             introduction=sentence,
+            # Same budget-for-latency stance as the real agent — this one has even less to say.
+            reasoning_effort="none",
+            max_tokens=150,
+            timeout=15.0,
+            num_retries=1,
         ),
     )
 

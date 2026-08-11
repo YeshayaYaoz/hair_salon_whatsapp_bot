@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const findMany = vi.fn();
+const queryRaw = vi.fn();
 const update = vi.fn();
 const consentCreate = vi.fn();
 const eventCreate = vi.fn();
@@ -9,10 +9,11 @@ const sendAdminAlertEmail = vi.fn();
 
 vi.mock("../lib/prisma.js", () => ({
   prisma: {
-    lead: { findMany, update },
+    lead: { update },
     consentLog: { create: consentCreate },
     leadStatusEvent: { create: eventCreate },
     $transaction,
+    $queryRaw: queryRaw,
   },
 }));
 vi.mock("../lib/email.js", () => ({ sendAdminAlertEmail }));
@@ -21,7 +22,9 @@ const { handleOutreachReply, classifyReply, phoneKey, isOutreachNumber } = await
 
 beforeEach(() => {
   vi.clearAllMocks();
-  findMany.mockResolvedValue([{ id: "lead1", name: "מספרת דנה", phone: "04-123-4567", status: "contacted", campaignId: "c1" }]);
+  // The lookup is one raw query matching the trailing nine digits in SQL — it used to fetch every
+  // lead with a phone and compare in code, which grew with every campaign ever run.
+  queryRaw.mockResolvedValue([{ id: "lead1", name: "מספרת דנה", phone: "04-123-4567", status: "contacted", campaignId: "c1" }]);
 });
 
 describe("classifyReply", () => {
@@ -87,7 +90,7 @@ describe("handleOutreachReply", () => {
   it("never walks a later funnel status backwards", async () => {
     // A lead already at meeting_scheduled replying "כן" must not be demoted to replied — the
     // operator's own progress outranks anything inferred from a message.
-    findMany.mockResolvedValue([{ id: "lead1", name: "x", phone: "0412345678", status: "meeting_scheduled", campaignId: "c1" }]);
+    queryRaw.mockResolvedValue([{ id: "lead1", name: "x", phone: "0412345678", status: "meeting_scheduled", campaignId: "c1" }]);
     await handleOutreachReply("972412345678", "כן");
     expect($transaction).not.toHaveBeenCalled();
     expect(sendAdminAlertEmail).toHaveBeenCalled();
@@ -96,7 +99,7 @@ describe("handleOutreachReply", () => {
   it("still alerts when no lead matches the number", async () => {
     // Owners often reply from a mobile that isn't the listed business line; dropping those is the
     // exact failure this module exists to fix.
-    findMany.mockResolvedValue([]);
+    queryRaw.mockResolvedValue([]);
     expect(await handleOutreachReply("972500000000", "מעניין, ספר לי עוד")).toBe(true);
     expect($transaction).not.toHaveBeenCalled();
     expect(sendAdminAlertEmail).toHaveBeenCalled();

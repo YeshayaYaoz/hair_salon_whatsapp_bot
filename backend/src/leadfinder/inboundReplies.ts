@@ -12,6 +12,7 @@
  * automated. This records the reply and alerts the operator; the conversation continues by hand.
  */
 import { prisma } from "../lib/prisma.js";
+import { Prisma } from "@prisma/client";
 import { sendAdminAlertEmail } from "../lib/email.js";
 import { esc } from "../lib/emailLayout.js";
 
@@ -62,13 +63,18 @@ export async function handleOutreachReply(fromPhone: string, text: string): Prom
   const key = phoneKey(fromPhone);
   const kind = classifyReply(text);
 
-  // No phone index on Lead, and formats vary too much for an equality match, so the candidate set
-  // is narrowed in SQL by the trailing digits and confirmed in code.
-  const candidates = await prisma.lead.findMany({
-    where: { phone: { not: null } },
-    select: { id: true, name: true, phone: true, status: true, campaignId: true },
-  });
-  const lead = candidates.find((l) => phoneKey(l.phone!) === key) ?? null;
+  // Matched on the trailing nine digits inside SQL — stored formats vary too much for an equality
+  // match, and fetching every lead to compare in code grows linearly with every campaign ever run.
+  // Same rule as the voice caller lookup (voiceRoutes.ts): Israeli subscriber numbers are nine
+  // digits after the country code. phoneKey("") can't happen here — fromPhone is WhatsApp's own
+  // sender id, which always carries digits.
+  const rows = await prisma.$queryRaw<{ id: string; name: string; phone: string; status: string; campaignId: string }[]>(
+    Prisma.sql`SELECT id, name, phone, status, "campaignId" FROM "Lead"
+               WHERE phone IS NOT NULL
+                 AND RIGHT(regexp_replace(phone, '[^0-9]', '', 'g'), 9) = ${key}
+               LIMIT 1`
+  );
+  const lead = rows[0] ?? null;
 
   if (lead) {
     if (kind === "opt_out") {
