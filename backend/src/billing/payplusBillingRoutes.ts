@@ -79,6 +79,16 @@ payplusBillingRouter.get("/payplus/health", requireAuth, requireSuperAdmin, asyn
     }
   }
 
+  // The parked test card — what the ₪1 token-charge button uses.
+  const healthToken = await prisma.systemSetting.findUnique({ where: { key: "payplus_health_token" } });
+  checks.push({
+    name: "כרטיס בדיקה שמור (token)",
+    ok: Boolean(healthToken),
+    detail: healthToken
+      ? "אפשר להריץ חיוב ₪1 בכרטיס השמור"
+      : "ישמר אוטומטית בתשלום ה-₪1 הבא — ואז ייפתח מבחן חיוב ה-token",
+  });
+
   // Credentials against the real PayPlus host; with ?link=1 the ₪1 page URL is returned too.
   const wantLink = req.query.link === "1";
   const probe = await probeGenerateLink();
@@ -89,6 +99,28 @@ payplusBillingRouter.get("/payplus/health", requireAuth, requireSuperAdmin, asyn
     checks,
     ...(wantLink && probe.ok ? { testPaymentUrl: probe.url } : {}),
   });
+});
+
+/**
+ * Charges ₪1 on the parked test card — the exact code path of a renewal (Transactions/Charge with
+ * use_token and the captured terminal/cashier), for the price of a shekel, touching no business's
+ * wallet or subscription. The operator is charging their own card from their own admin page.
+ */
+payplusBillingRouter.post("/payplus/health/charge-token", requireAuth, requireSuperAdmin, async (_req: AuthedRequest, res) => {
+  const stored = await prisma.systemSetting.findUnique({ where: { key: "payplus_health_token" } });
+  if (!stored) {
+    return res.status(409).json({ error: "אין עדיין כרטיס בדיקה שמור — שלמו קודם דף ₪1 מהכרטיס הזה." });
+  }
+  try {
+    const result = await chargeSubscriptionToken(decryptSecret(stored.value), 1, "תורי — בדיקת חיוב בכרטיס שמור (₪1)");
+    if (!result.success) return res.status(502).json({ error: `החיוב נכשל: ${explainPayPlusError(result.error ?? "")}` });
+    res.json({ ok: true, transactionId: result.transactionId });
+  } catch (err) {
+    if (err instanceof PayPlusTerminalNotConfiguredError) {
+      return res.status(503).json({ error: "חסרים terminal/cashier — הם נלכדים מאותו תשלום ₪1, נסו לרענן ולבדוק שוב." });
+    }
+    throw err;
+  }
 });
 
 /** Creates a PayPlus checkout link that charges the first period AND captures a recurring token. */
@@ -395,6 +427,21 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
           .upsert({ where: { key }, create: { key, value }, update: { value } })
           .catch((err) => console.error(`[payplus subscription webhook] Could not store ${key}:`, err));
       }
+    }
+
+    // The ₪1 health payment: park the recovered token as the operator's test card, so the admin
+    // page can charge ₪1 through the exact code renewals use — the cheapest possible live test of
+    // Transactions/Charge. No business row is involved.
+    if (event.referenceId === "billing-health") {
+      if (event.tokenUid) {
+        await prisma.systemSetting.upsert({
+          where: { key: "payplus_health_token" },
+          create: { key: "payplus_health_token", value: encryptSecret(event.tokenUid) },
+          update: { value: encryptSecret(event.tokenUid) },
+        });
+        console.log("[payplus subscription webhook] Health payment token parked for the ₪1 token-charge test");
+      }
+      return;
     }
 
     // more_info is a short reference, not the businessId — PayPlus caps the field at 19 characters

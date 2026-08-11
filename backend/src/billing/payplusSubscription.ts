@@ -353,10 +353,16 @@ export async function probeGenerateLink(): Promise<{ ok: boolean; url?: string; 
         sendEmailApproval: false,
         sendEmailFailure: false,
         more_info: "billing-health",
+        // The health payment doubles as the token-path test: create_token stores the card, the
+        // webhook recovers the token via Token/List (the callback never carries one) and parks it
+        // as the operator's test card, and the health endpoint can then charge ₪1 through the
+        // exact code renewals use. The email is what PayPlus keys the customer on — stable, so
+        // every health payment lands on one customer instead of minting anonymous ones.
+        create_token: true,
         ...(appUrl && webhookSecret
           ? { refURL_callback: `${appUrl}/webhook/billing/payplus/${encodeURIComponent(webhookSecret)}` }
           : {}),
-        customer: { customer_name: "Tori health check" },
+        customer: { customer_name: "Tori health check", email: "billing-health@torionline.co.il" },
         items: [{ name: "תורי — בדיקת חיבור (₪1)", quantity: 1, price: 1 }],
       }),
     });
