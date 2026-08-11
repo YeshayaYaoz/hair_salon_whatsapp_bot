@@ -1,0 +1,101 @@
+name: Deploy backend
+
+# Railway's own GitHub integration deploys on push, which is enough right up until it isn't: when a
+# build fails, Railway keeps serving the previous one and says so nowhere the repository can see. A
+# live call hit `Cannot POST /api/voice/send-details` fifteen hours after that route was pushed,
+# while the route beside it in the same file answered — and nothing here could confirm, force, or
+# even observe a deploy. This workflow makes the deploy something the repository does and reports.
+#
+# It coexists with the Railway GitHub integration rather than replacing it. Two deploys of the same
+# commit is a wasted build; a deploy nobody can trigger is the situation this was written for.
+on:
+  push:
+    branches: ["claude/upload-v5aw7a"]
+    # Migrations run at boot (`prisma migrate deploy` in the start script), so a schema change is a
+    # deploy too. The workflow file itself is included so a fix to it can be exercised.
+    paths: ["backend/**", ".github/workflows/deploy-backend.yml"]
+  # For redeploying the current commit without pushing one — after changing an env var, or to
+  # recover from a build that failed on Railway's side and left the old code serving.
+  workflow_dispatch:
+
+# A second push while one deploy is in flight should land last-write-wins, not race it. Especially
+# here: two concurrent `prisma migrate deploy` runs contend on the same advisory lock.
+concurrency:
+  group: backend-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      # Deliberately not trusting the CI workflow to have run first: it triggers on the same push,
+      # so nothing orders them, and a green tick from a sibling job proves nothing about this one.
+      # The tests are seconds and they gate a deploy that carries a database migration.
+      - name: Verify before deploying
+        env:
+          # Dummy values: prisma generate and tsc resolve the datasource but never connect, and
+          # every test mocks the client. See chargeToken.test.ts for what happens without this.
+          DATABASE_URL: "postgresql://user:pass@localhost:5432/db"
+          DIRECT_URL: "postgresql://user:pass@localhost:5432/db"
+        run: |
+          npm ci
+          npx prisma generate
+          npx tsc --noEmit -p .
+          npx vitest run
+
+      - name: Deploy
+        env:
+          # Secrets first, then variables — same reasoning as deploy-voice-agent.yml: one settings
+          # page, two tabs, and a value in the wrong tab resolves to an empty string with no
+          # warning. Only the token is sensitive; the service and environment names are not.
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE }}
+          RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT }}
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::error::RAILWAY_TOKEN is not set. Create one at Railway → Account Settings → Tokens (a *project* token is enough and is scoped to the one project), then add it under Settings → Secrets and variables → Actions → Secrets, scoped to the Repository rather than an Environment."
+            exit 1
+          fi
+          npm i -g @railway/cli
+
+          # A project token authenticates to exactly one project, so `railway up` needs no link
+          # step — but it still needs to be told which service when the project has more than one,
+          # and it will otherwise fail asking interactively on a runner that cannot answer.
+          args=""
+          [ -n "$RAILWAY_SERVICE" ] && args="$args --service $RAILWAY_SERVICE"
+          [ -n "$RAILWAY_ENVIRONMENT" ] && args="$args --environment $RAILWAY_ENVIRONMENT"
+
+          # --ci exits when the build finishes instead of tailing logs forever, and fails the job
+          # on a failed build. That failure is the entire point: a build that dies on Railway
+          # currently leaves the old code serving and reports success nowhere.
+          railway up --ci $args
+
+      - name: Confirm which commit is live
+        # Best-effort. It reads /health, which reports the commit Railway built from, so a deploy
+        # that "succeeded" while the old process kept serving is visible here rather than on the
+        # next phone call. Skipped without a URL rather than failing the deploy that just worked.
+        env:
+          BACKEND_URL: ${{ secrets.PUBLIC_BACKEND_URL || vars.PUBLIC_BACKEND_URL }}
+        run: |
+          if [ -z "$BACKEND_URL" ]; then
+            echo "No PUBLIC_BACKEND_URL configured — skipping the check. Set it to this backend's public URL to have every deploy confirm itself."
+            exit 0
+          fi
+          # Railway swaps the container in after the build; give it a moment before asking.
+          sleep 20
+          live=$(curl -fsS --max-time 20 "${BACKEND_URL%/}/health" || echo '{}')
+          echo "/health says: $live"
+          case "$live" in
+            *"${GITHUB_SHA:0:7}"*) echo "Live commit matches ${GITHUB_SHA:0:7}." ;;
+            *) echo "::warning::/health does not report ${GITHUB_SHA:0:7}. Either the rollout is still finishing, or the old build is still serving." ;;
+          esac
