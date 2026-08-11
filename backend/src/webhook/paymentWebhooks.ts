@@ -7,6 +7,7 @@ import { decryptSecret } from "../lib/crypto.js";
 import { sendWhatsAppMessage } from "./whatsappClient.js";
 import { syncAppointmentToCalendar } from "../lib/googleCalendar.js";
 import { notifyOwner } from "../lib/ownerNotify.js";
+import { parsePayPlusCallback } from "../lib/payplusCallback.js";
 
 export const paymentWebhookRouter = asyncRouter();
 
@@ -20,17 +21,14 @@ interface ParsedPaymentEvent {
 
 // Each provider's webhook payload shape is different — normalize to one common event before
 // deciding whether to auto-issue a receipt. Field names below reflect each provider's own
-// terminology (PayPlus: more_info/status_code, Tranzila: myid/Response, Cardcom: ReturnValue/ResponseCode).
+// terminology (Tranzila: myid/Response, Cardcom: ReturnValue/ResponseCode).
+//
+// PayPlus goes through the shared parser: their documented callback nests the fields under
+// data.transaction while older integrations receive them flat, and reading only the flat shape
+// meant a documented-shape callback parsed as failure — deposit paid, appointment never
+// confirmed, and a 200 acknowledged so PayPlus never retried. See lib/payplusCallback.ts.
 function parsePayPlusEvent(body: Record<string, unknown>): ParsedPaymentEvent {
-  const data = (body.data ?? body) as Record<string, unknown>;
-  const status = (data.status_code ?? data.status) as string | number | undefined;
-  return {
-    success: status === "000" || status === 0 || status === "success",
-    amountIls: typeof data.amount === "number" ? data.amount : Number(data.amount) || undefined,
-    referenceId: (data.more_info as string) || undefined,
-    customerName: (data.customer_name as string) || undefined,
-    customerPhone: (data.customer_phone as string) || undefined,
-  };
+  return parsePayPlusCallback(body);
 }
 
 function parseTranzilaEvent(body: Record<string, unknown>): ParsedPaymentEvent {

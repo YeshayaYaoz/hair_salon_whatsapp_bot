@@ -89,6 +89,9 @@ async function main() {
         charge_method: 1,
         amount: 1,
         currency_code: "ILS",
+        // Documented as required by generateLink; false so a probe never emails anyone.
+        sendEmailApproval: false,
+        sendEmailFailure: false,
         more_info: "payplus-probe",
         customer: { customer_name: "Tori probe" },
         items: [{ name: "Tori — בדיקת חיבור (₪1)", quantity: 1, price: 1 }],

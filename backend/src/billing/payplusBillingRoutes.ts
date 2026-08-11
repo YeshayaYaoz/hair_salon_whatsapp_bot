@@ -18,6 +18,7 @@ import {
 } from "./payplusSubscription.js";
 import { captureError } from "../lib/errorMonitoring.js";
 import { explainPayPlusError } from "../lib/payplusErrors.js";
+import { parsePayPlusCallback } from "../lib/payplusCallback.js";
 
 /** Fallback return URL when the caller sends none — the dashboard page these actions start from. */
 const APP_URL = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
@@ -262,15 +263,17 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
   res.status(200).json({ ok: true }); // acknowledge fast, PayPlus retries aggressively on non-2xx
 
   try {
-    const data = (req.body?.data ?? req.body) as Record<string, unknown>;
-    const status = (data.status_code ?? data.status) as string | number | undefined;
-    const success = status === "000" || status === 0 || status === "success";
-    if (!success) return;
+    // Parsed by the shared walker: PayPlus's documented callback nests these fields under
+    // data.transaction, older integrations get them flat, and this webhook must accept both —
+    // a shape miss here is a card charged, a 200 acknowledged, and a subscription that never
+    // activates, with no retry from PayPlus. See lib/payplusCallback.ts.
+    const event = parsePayPlusCallback(req.body);
+    if (!event.success) return;
 
     // more_info is a short reference, not the businessId — PayPlus caps the field at 19 characters
     // and a cuid alone is longer. The plan and cycle were parked on the row when the link was made.
-    const checkoutRef = data.more_info as string | undefined;
-    const tokenUid = (data.token_uid ?? data.token) as string | undefined;
+    const checkoutRef = event.referenceId;
+    const tokenUid = event.tokenUid;
     if (!checkoutRef) {
       console.warn("[payplus subscription webhook] No more_info on the callback — cannot attribute the payment");
       return;
