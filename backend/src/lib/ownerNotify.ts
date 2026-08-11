@@ -49,6 +49,11 @@ export async function notifyOwner(businessId: string, message: string): Promise<
         businessId,
         phone: normalizePhone(business.notificationPhone),
         role: "user",
+        // WhatsApp only. Meta's window opens when someone messages the business on WhatsApp — a
+        // phone call does not open it, however much it looks like one in this table. The owner
+        // rang his own zimmer to test it, the call's transcript landed here as inbound 'user'
+        // turns, this read them as an open window, and the alert he was promised died at Meta.
+        channel: "whatsapp",
         createdAt: { gte: new Date(Date.now() - WINDOW_MS) },
       },
       select: { id: true },

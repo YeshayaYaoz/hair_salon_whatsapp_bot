@@ -49,6 +49,16 @@ describe("notifyOwner", () => {
     expect(mockPrisma.conversationMessage.findFirst.mock.calls[0][0].where.phone).toBe("972533391353");
   });
 
+  it("does not treat a phone call as an open WhatsApp window", async () => {
+    // The owner rang his own zimmer to test it. The call's transcript is written to
+    // ConversationMessage as role:'user' rows under his number — identical in shape to an inbound
+    // WhatsApp message — so the window check read the call as proof he was reachable on WhatsApp.
+    // Meta accepted the free-form send with a 200 and dropped it (131047), and the agent told a
+    // caller on the line that the host had been messaged. Nothing ever arrived.
+    await notifyOwner("biz1", "הודעה");
+    expect(mockPrisma.conversationMessage.findFirst.mock.calls[0][0].where.channel).toBe("whatsapp");
+  });
+
   it("falls back to the approved template outside the window", async () => {
     process.env.WHATSAPP_OWNER_ALERT_TEMPLATE = "owner_alert";
     mockPrisma.conversationMessage.findFirst.mockResolvedValue(null);

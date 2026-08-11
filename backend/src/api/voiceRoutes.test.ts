@@ -736,6 +736,10 @@ describe("POST /api/voice/send-details", () => {
     expect(mockSendWhatsAppMessage).toHaveBeenCalledOnce();
     // Four, not five: enough to show the unit, few enough not to flood a phone.
     expect(mockSendWhatsAppImage).toHaveBeenCalledTimes(4);
+    // "Messaged", not "called". This same call is being written to ConversationMessage as 'user'
+    // turns, so without the channel filter the call would vouch for itself and every caller would
+    // look reachable on WhatsApp.
+    expect(mockPrisma.conversationMessage.findFirst.mock.calls[0][0].where.channel).toBe("whatsapp");
   });
 
   it("refuses WhatsApp when the caller has no open window, instead of a send that dies in transit", async () => {
@@ -802,6 +806,9 @@ describe("POST /api/voice/transcript", () => {
     // Spoken turns are labelled: a transcription error reads as nonsense without the marker.
     expect(rows[0].content).toMatch(/^📞 /);
     expect(rows[1].content).toBe("יש לנו תאנה");
+    // The emoji is for people; this is the part code reads. Turns written as 'whatsapp' would
+    // make every call open a WhatsApp window it did not open — see the window checks.
+    expect(rows.every((r: { channel: string }) => r.channel === "voice")).toBe(true);
   });
 
   it("stores nothing for a withheld caller ID", async () => {

@@ -436,6 +436,12 @@ model ConversationMessage {
   role       String // "user" | "assistant"
   content    String
   createdAt  DateTime @default(now())
+  // "whatsapp" | "voice". Which medium the turn actually happened on, and it has to be a column
+  // rather than an inference: only a real inbound WhatsApp message opens Meta's 24h
+  // customer-service window, and this table is what that window is measured from. Phone calls are
+  // recorded here too, so without this a call looked exactly like an inbound message — see the
+  // window check in lib/ownerNotify.ts. Defaults to whatsapp because every pre-existing row is one.
+  channel    String   @default("whatsapp")
 
   @@index([businessId, phone, createdAt])
 }

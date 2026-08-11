@@ -638,6 +638,10 @@ voiceRouter.post("/send-details", async (req, res) => {
         businessId: business.id,
         phone: normalizePhone(caller),
         role: "user",
+        // The caller is on the phone right now, and this very call is being written to this table
+        // as 'user' turns. Without the filter the call would vouch for itself: every caller would
+        // look reachable on WhatsApp, and every photo would be accepted by Meta and dropped.
+        channel: "whatsapp",
         createdAt: { gte: new Date(Date.now() - 23.5 * 60 * 60 * 1000) },
       },
       select: { id: true },
@@ -726,6 +730,10 @@ voiceRouter.post("/transcript", async (req, res) => {
       // typed one — they read very differently, and a transcription error looks like nonsense
       // without the label.
       content: t.role === "user" ? `📞 ${t.content}` : t.content,
+      // The emoji above is for human readers. This is the part code reads: a spoken turn must
+      // never be mistaken for an inbound WhatsApp message, because that is what Meta's 24h
+      // window is measured from.
+      channel: "voice",
     })),
   });
 
