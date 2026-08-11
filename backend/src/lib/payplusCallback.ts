@@ -70,6 +70,8 @@ export interface PayPlusCallback {
    * and no PayPlus endpoint lists them — the callback is the one place they can be learned. */
   terminalUid?: string;
   cashierUid?: string;
+  /** PayPlus's customer record for the payer — the key Token/List filters by. */
+  customerUid?: string;
 }
 
 export function parsePayPlusCallback(body: unknown): PayPlusCallback {
@@ -86,5 +88,24 @@ export function parsePayPlusCallback(body: unknown): PayPlusCallback {
     receiptUrl: (findField(body, "res_doc_original_url", "res_doc_copy_url") as string) || undefined,
     terminalUid: (findField(body, "terminal_uid") as string) || undefined,
     cashierUid: (findField(body, "cashier_uid") as string) || undefined,
+    customerUid: (findField(body, "customer_uid") as string) || undefined,
   };
+}
+
+/**
+ * The shape of a payload, keys only — safe to log where the values are a customer's name, card
+ * digits and email. Exists because the one question a missing field raises is "so what DID the
+ * callback contain?", and until now the answer was nowhere: the webhook logged only derived
+ * values, and PayPlus does not retry a 200.
+ */
+export function keyTree(body: unknown, depth = 0): string {
+  if (depth > 4 || typeof body !== "object" || body === null) return "";
+  if (Array.isArray(body)) {
+    return body.length === 0 ? "[]" : `[${keyTree(body[0], depth + 1) || "…"}]`;
+  }
+  const parts = Object.entries(body as Record<string, unknown>).map(([key, value]) => {
+    const child = keyTree(value, depth + 1);
+    return child ? `${key}${child.startsWith("[") ? child : `{${child}}`}` : key;
+  });
+  return parts.join(",");
 }

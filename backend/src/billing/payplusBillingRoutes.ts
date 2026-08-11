@@ -17,11 +17,12 @@ import {
   PayPlusTerminalNotConfiguredError,
   probeGenerateLink,
   resolveTerminalConfig,
+  fetchTokenForCustomer,
 } from "./payplusSubscription.js";
 import { requireSuperAdmin } from "../api/businessRoutes.js";
 import { captureError } from "../lib/errorMonitoring.js";
 import { explainPayPlusError } from "../lib/payplusErrors.js";
-import { parsePayPlusCallback } from "../lib/payplusCallback.js";
+import { parsePayPlusCallback, keyTree } from "../lib/payplusCallback.js";
 
 /** Fallback return URL when the caller sends none — the dashboard page these actions start from. */
 const APP_URL = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
@@ -358,6 +359,27 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
     // activates, with no retry from PayPlus. See lib/payplusCallback.ts.
     const event = parsePayPlusCallback(req.body);
     if (!event.success) return;
+
+    // The callback never carries the token. Verified across PayPlus's entire documentation and
+    // with a real paid checkout: create_token stores the card, but the token is only retrievable
+    // via Token/List, filtered by the customer_uid the callback does carry. Fetch it here — the
+    // 200 was already acknowledged above, so this costs the caller nothing.
+    if (!event.tokenUid && event.terminalUid && event.customerUid) {
+      try {
+        event.tokenUid = await fetchTokenForCustomer(event.terminalUid, event.customerUid);
+      } catch (err) {
+        console.warn("[payplus subscription webhook] Token/List lookup failed:", err);
+      }
+    }
+    if (!event.tokenUid) {
+      // Either tokenization is not enabled on the PayPlus account (their support toggles it), or
+      // the payload changed shape again. The keys-only tree (no values — the payload carries the
+      // customer's card digits and email) separates the two without another round of guessing.
+      console.warn(
+        `[payplus subscription webhook] No token via callback or Token/List — if this repeats, ask PayPlus support ` +
+          `to enable tokenization (טוקניזציה) on the terminal. Payload shape: ${keyTree(req.body)}`
+      );
+    }
 
     // Transactions/Charge (renewals, upgrades, token top-ups) requires terminal_uid + cashier_uid,
     // no PayPlus endpoint lists them, and asking the operator to dig them out of the dashboard is
