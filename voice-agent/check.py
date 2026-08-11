@@ -467,5 +467,58 @@ async def main_():
     assert "את עונה" in agent._config.system_prompt
     print("27 the deployment's gender wins over the catalogue's, and falls back to it     OK")
 
+    # --- 28. cost reporting, which fails silently by design ----------------------------
+    # Every failure path here is swallowed so that bookkeeping can never interrupt a live call —
+    # which also means a broken reporter looks exactly like a working one from the outside. These
+    # are the only checks that would ever say otherwise.
+    class _Usage:
+        def __init__(self, prompt, completion, hits=None):
+            self.prompt_tokens = prompt
+            self.completion_tokens = completion
+            if hits is not None:
+                self.prompt_cache_hit_tokens = hits
+
+    class _Resp:
+        def __init__(self, usage):
+            self.usage = usage
+
+    reporter = main._UsageReporter()
+    meta = {"litellm_params": {"metadata": main._usage_metadata("+972555077941", "+972533391353")["metadata"]},
+            "model": "deepseek/deepseek-chat"}
+
+    STATE.update(status=200, body={"logged": True}, seen=[])
+    await reporter.async_log_success_event(meta, _Resp(_Usage(9000, 300, hits=8000)), 0, 1)
+    path, payload, _auth = STATE["seen"][0]
+    assert path == "/api/voice/usage", path
+    # prompt_tokens INCLUDES the cache hits, so reporting it whole would bill the cached portion
+    # twice — once at full rate and again as a cache read. Same trap as the WhatsApp side.
+    assert payload["inputTokens"] == 1000, payload
+    assert payload["cacheReadTokens"] == 8000, payload
+    assert payload["outputTokens"] == 300, payload
+    # The ledger is keyed on the bare model id; "deepseek/deepseek-chat" would price at null.
+    assert payload["model"] == "deepseek-chat", payload
+    assert payload["calledNumber"] == "+972555077941", payload
+
+    # A call with no usage block reports nothing rather than zeros, which would read as a free call.
+    STATE.update(status=200, body={"logged": True}, seen=[])
+    await reporter.async_log_success_event(meta, _Resp(None), 0, 1)
+    assert STATE["seen"] == [], STATE["seen"]
+
+    # Somebody else's litellm call (no tori metadata) is not attributed to a random salon.
+    STATE.update(status=200, body={"logged": True}, seen=[])
+    await reporter.async_log_success_event({"litellm_params": {}}, _Resp(_Usage(10, 1)), 0, 1)
+    assert STATE["seen"] == [], STATE["seen"]
+
+    # A backend that rejects the report must not raise into the call. This is the one that matters:
+    # an exception in a callback mid-call is a caller hearing silence, for a ledger row.
+    STATE.update(status=500, body={"error": "boom"}, seen=[])
+    await reporter.async_log_success_event(meta, _Resp(_Usage(10, 1)), 0, 1)
+    print("28 usage reported per call, deduped against cache hits, never raising          OK")
+
+    # Streamed responses only carry usage when asked for it, and Anthropic rejects the parameter
+    # outright — so it has to be attached per provider, not unconditionally.
+    assert main._STREAM_USAGE_OPTION == {"stream_options": {"include_usage": True}}, main._STREAM_USAGE_OPTION
+    print("29 streamed usage is requested, and only where the provider accepts it         OK")
+
 asyncio.run(main_())
 print("\nALL CHECKS PASSED")

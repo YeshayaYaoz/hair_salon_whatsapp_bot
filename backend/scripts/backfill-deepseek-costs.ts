@@ -23,6 +23,35 @@
 const RATE = { input: 0.14, output: 0.28, cacheReadMultiplier: 0.02 };
 const USD_TO_ILS = 3.7;
 
+export interface StoredRow {
+  /** As written by the buggy code: prompt_tokens + cache hits, where prompt_tokens already had them. */
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number | null;
+}
+
+/**
+ * The corrected token split and cost for one mis-recorded row.
+ *
+ * Exported and pure so the arithmetic is testable: this rewrites real billing history in place and
+ * cannot be re-run to correct itself, which makes an error here permanent in a way a bug in the
+ * live path would not be.
+ */
+export function recompute(row: StoredRow): { inputTokens: number; costAgorot: number } {
+  const hits = row.cacheReadTokens ?? 0;
+  // Stored inputTokens was prompt_tokens + hits, and prompt_tokens itself already contained the
+  // hits — hence subtracting them twice to recover the cache-miss portion. Clamped because a
+  // handful of early rows predate cache reporting entirely and would otherwise go negative.
+  const miss = Math.max(0, row.inputTokens - 2 * hits);
+  const costUsd =
+    (miss * RATE.input + row.outputTokens * RATE.output + hits * RATE.input * RATE.cacheReadMultiplier) / 1_000_000;
+  return {
+    // Stored as the full prompt (miss + hits), matching what the fixed code writes.
+    inputTokens: miss + hits,
+    costAgorot: Math.round(costUsd * USD_TO_ILS * 100),
+  };
+}
+
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name);
   return i === -1 ? undefined : process.argv[i + 1];
@@ -53,18 +82,10 @@ async function main() {
   const updates: { id: string; inputTokens: number; costAgorot: number }[] = [];
 
   for (const row of rows) {
-    const hits = row.cacheReadTokens ?? 0;
-    // Stored inputTokens was prompt_tokens + hits, and prompt_tokens itself already contained the
-    // hits — hence subtracting them twice to recover the cache-miss portion. Clamped because a
-    // handful of early rows predate cache reporting entirely and would otherwise go negative.
-    const miss = Math.max(0, row.inputTokens - 2 * hits);
-    const costUsd = (miss * RATE.input + row.outputTokens * RATE.output + hits * RATE.input * RATE.cacheReadMultiplier) / 1_000_000;
-    const costAgorot = Math.round(costUsd * USD_TO_ILS * 100);
-
+    const { inputTokens, costAgorot } = recompute(row);
     oldTotal += row.costAgorot ?? 0;
     newTotal += costAgorot;
-    // inputTokens is stored as the full prompt (miss + hits), matching what the fixed code writes.
-    updates.push({ id: row.id, inputTokens: miss + hits, costAgorot });
+    updates.push({ id: row.id, inputTokens, costAgorot });
   }
 
   console.log(`DeepSeek rows before ${cutoff.toISOString()}: ${rows.length}`);
@@ -92,7 +113,11 @@ async function main() {
   console.log("Done.");
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Guarded so importing this module for its arithmetic does not connect to the database or,
+// worse, start rewriting rows.
+if (process.argv[1]?.includes("backfill-deepseek-costs")) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
