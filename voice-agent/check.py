@@ -446,5 +446,26 @@ async def main_():
     main._CONTEXT_TTL = 0.0
     print("26 context cached per caller, never across callers, never on failure         OK")
 
+    # --- 27. the agent's gender belongs to the deployment ------------------------------
+    # Two agents exist, one masculine and one feminine, and every call an agent takes is in its own
+    # gender. Deriving it per call from Cartesia's voice catalogue put an outbound request between
+    # the phone being answered and the greeting — grammar paid for in dead air.
+    STATE.update(status=200, body=dict(SALON, voiceGender="feminine"), seen=[])
+    main.AGENT_GENDER = "masculine"
+    pre = await main.pre_call_handler(req())
+    agent = await main.get_agent(None, req(meta=pre.metadata))
+    prompt = agent._config.system_prompt
+    assert "אתה עונה" in prompt, prompt[:200]
+    # The salon's own voiceGender must not win: it describes a catalogue entry, this describes the
+    # deployment actually speaking.
+    assert "את עונה" not in prompt
+
+    # Unset falls back to whatever /context worked out, so an older deployment keeps working.
+    main.AGENT_GENDER = ""
+    pre = await main.pre_call_handler(req())
+    agent = await main.get_agent(None, req(meta=pre.metadata))
+    assert "את עונה" in agent._config.system_prompt
+    print("27 the deployment's gender wins over the catalogue's, and falls back to it     OK")
+
 asyncio.run(main_())
 print("\nALL CHECKS PASSED")

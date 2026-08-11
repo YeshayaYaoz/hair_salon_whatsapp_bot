@@ -76,12 +76,32 @@ MODEL_API_KEY = (
 # is Hebrew-capable by construction (the picker filters on it).
 LANGUAGE = "he"
 
+# Which gender this deployment speaks about itself in.
+#
+# Hebrew marks gender on every verb, so the agent has to know before it says a word. This used to be
+# derived per call from Cartesia's voice catalogue, which meant an outbound request to Cartesia
+# sitting between the phone being answered and the greeting — grammar bought with dead air.
+#
+# It is a property of the deployment, not of the call: there are two agents, one masculine and one
+# feminine, and every call an agent takes is in its own gender. So it is read once, from the
+# environment, and costs nothing per call.
+#
+# `/context` still sends `voiceGender` and it is still honoured when this is unset, so an older
+# deployment keeps working — but on a configured agent this wins, because the catalogue can only
+# ever be a guess at what this particular deployment sounds like.
+AGENT_GENDER = os.environ.get("TORI_AGENT_GENDER", "").strip().lower()
+
 # Spoken aloud, so they are sentences rather than error codes. Used when Tori cannot be reached at
 # all — a caller must never hear silence or a stack trace.
-UNREACHABLE_HE = (
-    "מצטערת, יש תקלה זמנית במערכת ואני לא מצליחה לגשת לפרטים. "
-    "אפשר לנסות שוב בעוד כמה דקות."
-)
+#
+# Inflected, because this is one of the few lines the agent speaks without the model's involvement:
+# a masculine agent apologising in "מצטערת" is the first thing a caller would hear on the worst call
+# we have, and it is the sentence that has to sound most like a person.
+_UNREACHABLE = {
+    "feminine": "מצטערת, יש תקלה זמנית במערכת ואני לא מצליחה לגשת לפרטים. אפשר לנסות שוב בעוד כמה דקות.",
+    "masculine": "מצטער, יש תקלה זמנית במערכת ואני לא מצליח לגשת לפרטים. אפשר לנסות שוב בעוד כמה דקות.",
+}
+UNREACHABLE_HE = _UNREACHABLE.get(AGENT_GENDER, _UNREACHABLE["feminine"])
 
 
 _HTTP: Optional[httpx.AsyncClient] = None
@@ -543,6 +563,11 @@ def _fmt_hours(ctx: Dict[str, Any]) -> str:
 # The forms are written out per gender rather than derived by substitution: Hebrew inflection is not
 # a suffix swap (שתקי/שתוק, פני/פנה, אמרי/אמור), and a rule that "usually" conjugates correctly would
 # produce invented words on the exceptions.
+def _forms_for(context_gender: Optional[str]) -> Dict[str, str]:
+    """This deployment's gender if it declares one, otherwise whatever /context worked out."""
+    return FORMS.get(AGENT_GENDER) or FORMS.get(context_gender or "") or FORMS["feminine"]
+
+
 FORMS = {
     "feminine": {
         "answers": "את עונה לשיחות טלפון של",
@@ -613,15 +638,15 @@ def build_prompt(ctx: Dict[str, Any], caller_known: bool = True) -> str:
     Prices, hours and policy are stated verbatim and never computed: a voice agent that does
     arithmetic on a price list will eventually quote a total the salon does not honour.
 
-    The agent speaks about itself in the gender of the voice the salon chose (`voiceGender` from
-    /context, resolved from Cartesia's own catalogue). Unknown or gender-neutral keeps the feminine
-    forms, which is what every salon heard before the setting existed.
+    The agent speaks about itself in this deployment's own gender (TORI_AGENT_GENDER), falling back
+    to the voice gender /context reports. Unknown keeps the feminine forms, which is what every
+    salon heard before the setting existed.
     """
     vocab = ctx.get("vocabulary") or {}
     customer_word = vocab.get("customerHe") or "לקוח"
     inquiry = ctx.get("bookingModel") == "inquiry"
     caller = ctx.get("caller") or {}
-    f = FORMS.get(ctx.get("voiceGender") or "", FORMS["feminine"])
+    f = _forms_for(ctx.get("voiceGender"))
 
     parts = [
         f'{f["answers"]} "{ctx.get("businessName", "")}".',
@@ -708,7 +733,7 @@ def build_agent(resolved: Dict[str, Any], called: str, caller_num: str) -> LlmAg
         return _apology_agent(resolved["error"])
 
     salon: Dict[str, Any] = resolved["context"]
-    f = FORMS.get(salon.get("voiceGender") or "", FORMS["feminine"])
+    f = _forms_for(salon.get("voiceGender"))
     caller_known = caller_num != "unknown"
 
     # The numbers are closed over rather than exposed as tool parameters. The model cannot mistype

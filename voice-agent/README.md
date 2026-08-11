@@ -107,10 +107,16 @@ Set these wherever the agent ends up running — Railway service variables when 
 | `TORI_API_URL` | Base URL of the backend, e.g. `https://api.torionline.co.il` |
 | `CARTESIA_TOOL_SECRET` | Must equal the backend's — `voiceRoutes` rejects every request without it |
 | `TORI_AGENT_MODEL` | Optional; defaults to `deepseek/deepseek-chat` |
+| `TORI_AGENT_GENDER` | `masculine` or `feminine` — the gender this deployment speaks about itself in |
 
 The matching model provider key is needed too: `DEEPSEEK_API_KEY` for the default, or
 `TORI_AGENT_API_KEY` to set one explicitly regardless of provider (`ANTHROPIC_API_KEY` still works
 if `TORI_AGENT_MODEL` is pointed back at a Claude model).
+
+There are two agents, one per voice gender, so `TORI_AGENT_GENDER` is a property of the deployment
+rather than of the call. Set it to match the voice the agent actually speaks in: Hebrew marks gender
+on every verb, and it also picks which of the two apology sentences a caller hears when the backend
+is unreachable. Left unset, the agent falls back to the `voiceGender` `/context` reports.
 
 Token usage from every model call is reported to `POST /api/voice/usage`, so phone spend lands in
 the same per-business ledger as WhatsApp. It rides `TORI_API_URL` + `CARTESIA_TOOL_SECRET`; with
