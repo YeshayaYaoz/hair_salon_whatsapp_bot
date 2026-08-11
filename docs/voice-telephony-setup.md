@@ -130,6 +130,34 @@ Absent, and `voice-agent/main.py` did not serve that call — check which agent 
 Present, and the next lines say exactly where the context went. `voice-agent/README.md` lists the
 four causes and what each looks like in that log.
 
+## When the greeting is slow
+
+Measure before touching anything: the delay between "answered" and the first word is three
+segments, and only one of them is in our code.
+
+```
+[Zadarma answers] ──?──▶ [pre_call_handler: logs its own ms] ──▶ [websocket] ──▶ [audio]
+```
+
+The agent log shows the last two segments (`pre_call_handler ready in Xms`, then the websocket
+timestamps — audio starts ~0.4s after the websocket on a healthy call). Whatever remains of the
+caller's wait sits **before** `pre_call_handler`, between Zadarma and Cartesia, and one question
+splits it:
+
+**Does the caller hear ringback or silence during the wait?**
+
+- **Silence**: Zadarma's External Server mode answers the call immediately (B2BUA) and only then
+  bridges to Cartesia — so the caller counts every setup millisecond as dead air after answer.
+  Fix on the Zadarma side: keep the call unanswered (ringback / early media) until the
+  destination answers. This is also the perception fix — four seconds of ringing feels normal,
+  four seconds of post-answer silence feels like a dead line.
+- **Ringback**: Cartesia's own setup is slow, most likely a cold container after idle (a first
+  call ~30+ minutes after the previous one fits this exactly). That is a Cartesia support
+  question; nothing in this repo can warm their workers.
+
+Do not re-optimize the agent code for this: after the context cache and ring-time build landed,
+its whole contribution is under half a second and the log proves it per call.
+
 ## Cost
 
 | | Number | Per minute |
