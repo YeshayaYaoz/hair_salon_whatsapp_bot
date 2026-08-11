@@ -12,7 +12,11 @@ async function resendSend(payload: {
   reply_to?: string;
 }) {
   const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) { console.error("RESEND_API_KEY not set"); return; }
+  // Throws rather than returning, because a caller that awaits this and sees no error concludes the
+  // mail was sent. notifyOwner did exactly that: it fell back to email, this returned quietly, and
+  // it reported success to a live call — the owner was told a lead was on the way and no lead ever
+  // arrived. Every caller here already has a catch; none of them can act on silence.
+  if (!apiKey) throw new Error("RESEND_API_KEY is not set — no email can be sent");
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",

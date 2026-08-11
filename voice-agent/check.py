@@ -723,11 +723,13 @@ async def main_():
     assert "אחד עשר באוגוסט" in block and "שנים עשר באוגוסט" in block, block
     assert "## היום" in prompt and "יום" in prompt, prompt[:400]
 
-    # The pronunciation example used to be a plausible-looking domain, and the model read it out
-    # to a caller as this zimmer's actual website when send_details failed. An example that can be
-    # mistaken for real data is data.
-    assert "zimmermeron" not in prompt, "a fake domain is back in the prompt"
+    # The pronunciation example is a real domain, so it cannot be removed to stop the model reciting
+    # it — it has to be forbidden outright. On a live call, with send_details failing, the agent
+    # offered the example as this zimmer's website to a caller who had not been given one.
     assert "אל תמציא" in prompt or "אל תמציאי" in prompt, prompt
+    # Punctuation is spoken as words, and the suffix keeps its Latin letters: "נקודה co נקודה IL",
+    # not "נקודה קו נקודה איי אל", which is how it came out of the TTS the first time.
+    assert "נקודה co נקודה IL" in prompt, prompt
     print("37 the agent knows today's date, and quotes no website it was not given         OK")
 
 asyncio.run(main_())

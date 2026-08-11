@@ -55,6 +55,10 @@ export async function notifyOwner(businessId: string, message: string): Promise<
     });
 
     if (lastInbound) {
+      // Which channel carried it, on every alert. An owner reporting "nothing arrived" is otherwise
+      // three indistinguishable failures — window misjudged, Meta dropped it after its 200, or the
+      // mail never left — and the logs said nothing at all about which.
+      console.log(`[notifyOwner] ${businessId}: free-form WhatsApp to ${business.notificationPhone} (window open)`);
       await sendWhatsAppMessage({
         phoneNumberId: business.whatsappPhoneNumberId, accessToken,
         to: business.notificationPhone, text: message,
@@ -62,6 +66,7 @@ export async function notifyOwner(businessId: string, message: string): Promise<
     } else {
       const templateName = process.env.WHATSAPP_OWNER_ALERT_TEMPLATE;
       if (templateName) {
+        console.log(`[notifyOwner] ${businessId}: template '${templateName}' to ${business.notificationPhone} (window closed)`);
         await sendWhatsAppTemplate({
           phoneNumberId: business.whatsappPhoneNumberId, accessToken,
           to: business.notificationPhone,
@@ -78,6 +83,7 @@ export async function notifyOwner(businessId: string, message: string): Promise<
         console.warn(
           `[notifyOwner] owner of ${businessId} has no open 24h window and no WHATSAPP_OWNER_ALERT_TEMPLATE — falling back to email`
         );
+        console.log(`[notifyOwner] ${businessId}: email to ${business.email} (window closed, no template)`);
         await sendBusinessNoticeEmail(business.email, business.name, message);
       }
     }

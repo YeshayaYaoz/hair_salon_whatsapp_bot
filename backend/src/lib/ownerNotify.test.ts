@@ -70,6 +70,16 @@ describe("notifyOwner", () => {
     expect(sendBusinessNoticeEmail).toHaveBeenCalledWith("owner@zimmer.test", "בנחת רוח", "הודעה");
   });
 
+  it("reports failure when the email fallback itself fails", async () => {
+    // The owner called after a live booking and said no message arrived — yet this had returned
+    // true and the agent had told the caller a message was on its way. The email path was the
+    // liar: with RESEND_API_KEY unset it logged and returned, and an await over silence reads
+    // exactly like success. Now it throws, and 'sent' means sent.
+    mockPrisma.conversationMessage.findFirst.mockResolvedValue(null);
+    sendBusinessNoticeEmail.mockRejectedValue(new Error("RESEND_API_KEY is not set"));
+    expect(await notifyOwner("biz1", "הודעה")).toBe(false);
+  });
+
   it("still refuses when no notification phone is configured", async () => {
     mockPrisma.business.findUnique.mockResolvedValue({
       notificationPhone: null, whatsappPhoneNumberId: "pn1", whatsappAccessToken: "enc",
