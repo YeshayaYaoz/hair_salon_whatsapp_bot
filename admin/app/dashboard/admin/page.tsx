@@ -255,6 +255,7 @@ function BillingHealthCard({ he }: { he: boolean }) {
   const [state, setState] = useState<{ ok: boolean; checks: BillingCheck[]; testPaymentUrl?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tokenResult, setTokenResult] = useState<string | null>(null);
 
   async function run(withLink: boolean) {
     setLoading(true);
@@ -281,6 +282,26 @@ function BillingHealthCard({ he }: { he: boolean }) {
             className="text-xs px-3 py-1.5 rounded-lg bg-[#1B7FA0] text-white hover:bg-[#16688a] disabled:opacity-50">
             {he ? "צור דף ₪1 לבדיקה" : "Create ₪1 test page"}
           </button>
+          <button
+            onClick={async () => {
+              // The renewal code path for the price of a shekel: Transactions/Charge with
+              // use_token on the parked test card — the operator's own.
+              setTokenResult(null); setError(null); setLoading(true);
+              try {
+                const r = await apiFetch<{ ok: boolean; transactionId?: string }>(
+                  "/api/billing/payplus/health/charge-token", { method: "POST" }
+                );
+                setTokenResult(he
+                  ? `✅ חיוב ה-token עבר — עסקה ${r.transactionId ?? ""}. זה בדיוק המסלול של חיוב חידוש.`
+                  : `✅ Token charge succeeded — transaction ${r.transactionId ?? ""}.`);
+              } catch (err) {
+                setTokenResult(`❌ ${err instanceof Error ? err.message : "failed"}`);
+              } finally { setLoading(false); }
+            }}
+            disabled={loading}
+            className="text-xs px-3 py-1.5 rounded-lg border border-[#1B7FA0] text-[#1B7FA0] hover:bg-teal-50 disabled:opacity-50">
+            {he ? "חייב ₪1 בכרטיס השמור" : "Charge ₪1 on saved card"}
+          </button>
         </div>
       </div>
       {error && <div className="text-xs text-red-600 mb-2">{error}</div>}
@@ -297,6 +318,7 @@ function BillingHealthCard({ he }: { he: boolean }) {
           ))}
         </ul>
       )}
+      {tokenResult && <div className="mt-2 text-xs font-medium">{tokenResult}</div>}
       {state?.testPaymentUrl && (
         <div className="mt-3 text-xs bg-teal-50 border border-teal-200 rounded-lg p-3 text-gray-800">
           {he
