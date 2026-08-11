@@ -146,7 +146,7 @@ function speaksHebrew(voice: CartesiaVoice): boolean {
  * and `warmVoiceCache()` on boot means it should never open in the first place.
  */
 export function cachedHebrewVoices(): VoiceOption[] {
-  if (voiceCache && Date.now() - voiceCache.at < VOICE_CACHE_MS) return voiceCache.voices;
+  if (voiceCache && Date.now() - voiceCache.at < VOICE_CACHE_MS) return restrictToOffered(voiceCache.voices);
   void listHebrewVoices().catch(() => {});
   return [];
 }
@@ -156,8 +156,30 @@ export function warmVoiceCache(): void {
   void listHebrewVoices().catch(() => {});
 }
 
+/**
+ * The voices a business may actually choose, when the deployment restricts them.
+ *
+ * There are two voice agents — one masculine, one feminine — and each speaks about itself in its
+ * own gender, fixed at deploy time (TORI_AGENT_GENDER in voice-agent/main.py). A salon picking any
+ * other voice from Cartesia's full Hebrew catalogue would get that voice speaking the wrong
+ * gender's verbs, because the number it dialled routes to one of those two agents regardless.
+ *
+ * Left empty, the full catalogue is offered — the restriction only exists once the two ids are
+ * configured, so nothing changes for a deployment that hasn't set them.
+ */
+function offeredVoiceIds(): Set<string> {
+  const raw = process.env.TORI_VOICE_IDS?.trim();
+  if (!raw) return new Set();
+  return new Set(raw.split(",").map((id) => id.trim()).filter(Boolean));
+}
+
+function restrictToOffered(voices: VoiceOption[]): VoiceOption[] {
+  const offered = offeredVoiceIds();
+  return offered.size === 0 ? voices : voices.filter((v) => offered.has(v.id));
+}
+
 export async function listHebrewVoices(): Promise<VoiceOption[]> {
-  if (voiceCache && Date.now() - voiceCache.at < VOICE_CACHE_MS) return voiceCache.voices;
+  if (voiceCache && Date.now() - voiceCache.at < VOICE_CACHE_MS) return restrictToOffered(voiceCache.voices);
 
   // Deliberately not creds(): that also demands CARTESIA_AGENT_ID, which listing voices has no use
   // for. An account with a key but no agent id configured silently had an empty voice picker and,
@@ -192,8 +214,9 @@ export async function listHebrewVoices(): Promise<VoiceOption[]> {
     return [];
   }
 
+  // The cache holds the unfiltered catalogue so the restriction can change without a refetch.
   voiceCache = { at: Date.now(), voices };
-  return voices;
+  return restrictToOffered(voices);
 }
 
 /** Test seam — the cache would otherwise leak one test's catalogue into the next. */

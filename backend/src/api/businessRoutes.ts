@@ -738,7 +738,17 @@ businessRouter.put("/me", async (req: AuthedRequest, res) => {
   if (parsed.data.voiceId) {
     const voices = await listHebrewVoices();
     if (voices.length && !voices.some((v) => v.id === parsed.data.voiceId)) {
-      return res.status(400).json({ error: "הקול שנבחר אינו זמין. רעננו את הדף ובחרו קול מהרשימה." });
+      // Only a *change* to an unavailable voice is refused. The offered list narrowed to the two
+      // agent voices (TORI_VOICE_IDS), so a salon that chose a third one earlier still has it
+      // stored — and blocking that save would lock them out of editing their hours or prices over
+      // a field they did not touch.
+      const current = await prisma.business.findUnique({
+        where: { id: req.businessId! },
+        select: { voiceId: true },
+      });
+      if (current?.voiceId !== parsed.data.voiceId) {
+        return res.status(400).json({ error: "הקול שנבחר אינו זמין. רעננו את הדף ובחרו קול מהרשימה." });
+      }
     }
   }
 

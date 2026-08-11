@@ -172,6 +172,34 @@ describe("assignNumberToAgent", () => {
       resetVoiceCache();
     });
 
+  // Two voice agents exist, one masculine and one feminine, each fixed to its own gender at deploy
+  // time. Offering the full Hebrew catalogue let a salon pick a third voice that would then speak
+  // the wrong gender's verbs, because the dialled number routes to one of those two agents anyway.
+    // Two voice agents exist, one masculine and one feminine, each fixed to its own gender at
+    // deploy time. Offering the full Hebrew catalogue let a salon pick a third voice that would
+    // then speak the wrong gender's verbs, because the dialled number routes to one of those two
+    // agents regardless of which voice was chosen.
+    describe("TORI_VOICE_IDS restriction", () => {
+      beforeEach(() => {
+        delete process.env.TORI_VOICE_IDS;
+        mockFetch(() => ({ body: catalogue }));
+      });
+
+      it("offers only the configured voices", async () => {
+        process.env.TORI_VOICE_IDS = "v_he, v_he_regional";
+        expect((await listHebrewVoices()).map((v) => v.id)).toEqual(["v_he", "v_he_regional"]);
+      });
+
+      it("drops a voice that is not offered", async () => {
+        process.env.TORI_VOICE_IDS = "v_he";
+        expect((await listHebrewVoices()).map((v) => v.id)).toEqual(["v_he"]);
+      });
+
+      it("offers the whole catalogue when unset, so an unconfigured deployment is unaffected", async () => {
+        expect((await listHebrewVoices()).length).toBeGreaterThan(1);
+      });
+    });
+
     it("keeps only the voices that can actually speak Hebrew", async () => {
       mockFetch(() => ({ body: catalogue }));
       const voices = await listHebrewVoices();
