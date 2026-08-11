@@ -157,6 +157,22 @@ async function handleYieldCampaignReply(
  * attaches `pricing` to status callbacks it actually bills for — most delivery/read receipts have
  * no pricing field at all and are skipped here, same as WhatsApp's own accounting would skip them. */
 async function recordWhatsAppBillingStatuses(phoneNumberId: string, statuses: any[]) {
+  // Delivery FAILURES arrive here too, and used to be filtered out with everything unpriced. That
+  // made them perfectly invisible: the send API returns 200 with a message id (Meta "accepted" it),
+  // and the real verdict — e.g. 131047, free-form message outside the 24h session window — lands
+  // asynchronously in this callback. An owner alert died this way on a live call while the agent
+  // told the caller "ההודעה נשלחה": every layer reported success because the only layer that knew
+  // otherwise was being thrown away right here.
+  for (const status of statuses) {
+    if (status?.status === "failed") {
+      const errors = (status.errors ?? []).map((e: any) => `${e.code} ${e.title ?? ""}`).join("; ") || "unknown";
+      console.error(`[whatsapp webhook] Message ${status.id} to ${status.recipient_id} FAILED: ${errors}`);
+      captureError(new Error(`WhatsApp delivery failed: ${errors}`), {
+        kind: "whatsappDeliveryFailure", phoneNumberId, recipient: status.recipient_id,
+      });
+    }
+  }
+
   const billed = statuses.filter((s) => s?.pricing);
   if (billed.length === 0) return;
   try {
