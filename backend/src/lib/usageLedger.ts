@@ -24,8 +24,11 @@ interface ModelRate {
 const CLAUDE_PRICING_USD_PER_MTOK: Record<string, ModelRate> = {
   "claude-haiku-4-5-20251001": { input: 1, output: 5 },
   "claude-sonnet-5": { input: 2, output: 10 }, // introductory rate through 2026-08-31
-  "gpt-4o-mini": { input: 0.15, output: 0.6 },
-  "gpt-4o": { input: 2.5, output: 10 },
+  // OpenAI caches long prompts automatically and bills cached reads at half the input rate
+  // ($0.075 against $0.15, $1.25 against $2.50 — checked August 2026). Without the multiplier the
+  // default (Anthropic's 0.1x) would understate every cached OpenAI token five-fold.
+  "gpt-4o-mini": { input: 0.15, output: 0.6, cacheReadMultiplier: 0.5 },
+  "gpt-4o": { input: 2.5, output: 10, cacheReadMultiplier: 0.5 },
   // Checked against DeepSeek's published rates, August 2026: $0.14 cache-miss input, $0.0028
   // cache-hit input, $0.28 output. Previously $0.28/$0.42 entered from memory, which overstated
   // input 2× and output 1.5× on top of the cache errors.

@@ -154,6 +154,21 @@ describe("DeepSeek cost accounting", () => {
     expect(mockPrisma.apiUsageEvent.create.mock.calls.at(-1)![0].data.costAgorot).toBe(166);
   });
 
+  it("prices OpenAI cache reads at their published half rate, not Anthropic's tenth", async () => {
+    await logClaudeUsage({
+      businessId: "biz1",
+      customerPhone: "972500000000",
+      provider: "openai",
+      model: "gpt-4o-mini",
+      inputTokens: 0,
+      cacheReadTokens: 1_000_000,
+      outputTokens: 0,
+    });
+    // $0.15 * 0.5 = $0.075 -> 28 agorot. At the 0.1x default this would be 6 — a five-fold
+    // understatement on every cached OpenAI token.
+    expect(mockPrisma.apiUsageEvent.create.mock.calls.at(-1)![0].data.costAgorot).toBe(28);
+  });
+
   it("keeps Anthropic's cache read at its own 0.1x rate", async () => {
     await logClaudeUsage({
       businessId: "biz1",

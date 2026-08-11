@@ -65,13 +65,16 @@ function fromOpenAiResponse(response: OpenAI.Chat.ChatCompletion): GenericRespon
       }
       return { id: tc.id, name: tc.function.name, input };
     });
-  // DeepSeek's OpenAI-compatible usage payload adds prompt_cache_hit_tokens/prompt_cache_miss_tokens
-  // on top of the standard OpenAI fields — surface it as cacheReadTokens when present so its
-  // context-caching discount shows up in cost tracking too, without this adapter needing to know
-  // it's specifically talking to DeepSeek.
-  const usageAny = response.usage as unknown as { prompt_cache_hit_tokens?: number } | undefined;
+  // Each provider behind this adapter hides its cache hits in a different field. DeepSeek adds
+  // prompt_cache_hit_tokens next to the standard fields; OpenAI reports its automatic caching in
+  // prompt_tokens_details.cached_tokens. Both fold the hits into prompt_tokens, so a field this
+  // adapter doesn't read is a cache discount that silently never reaches the ledger — the exact
+  // failure already hit twice (DeepSeek here, Anthropic in the voice agent's reporter).
+  const usageAny = response.usage as unknown as
+    | { prompt_cache_hit_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } }
+    | undefined;
   const promptTokens = response.usage?.prompt_tokens ?? 0;
-  const cacheReadTokens = usageAny?.prompt_cache_hit_tokens;
+  const cacheReadTokens = usageAny?.prompt_cache_hit_tokens ?? usageAny?.prompt_tokens_details?.cached_tokens;
   return {
     text: choice.message.content?.trim() ?? "",
     toolCalls,

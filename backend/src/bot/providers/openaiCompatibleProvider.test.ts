@@ -105,6 +105,20 @@ describe("openaiCompatibleProvider", () => {
     expect(res.usage.inputTokens).toBe(50);
   });
 
+  it("reads OpenAI's prompt_tokens_details.cached_tokens the same way", async () => {
+    // This adapter serves OpenAI too, and OpenAI reports its automatic caching in a different
+    // field again. Missing it billed every cached OpenAI token at the full input rate — the third
+    // instance of the same bug (DeepSeek here, Anthropic in the voice agent's reporter).
+    mockCreate.mockResolvedValue({
+      choices: [{ message: { content: "ok", tool_calls: undefined } }],
+      usage: { prompt_tokens: 200, completion_tokens: 30, prompt_tokens_details: { cached_tokens: 150 } },
+    });
+    const provider = makeProvider();
+    const res = await provider.send({ model: "gpt-4o-mini", system: { stable: "stable-part", volatile: "volatile-part" }, tools: [], turns: [] });
+    expect(res.usage.cacheReadTokens).toBe(150);
+    expect(res.usage.inputTokens).toBe(50);
+  });
+
   // Ordering is the whole point of splitting the system prompt: the stable block must form the
   // cacheable prefix, with the per-minute clock text trailing it. Reversing these silently
   // destroys prefix caching (which is exactly the bug this split was introduced to fix), and
