@@ -391,3 +391,35 @@ export async function resolveTerminalConfig(): Promise<{
   if (t && c) return { terminalUid: t, cashierUid: c, source: "captured" };
   return { source: "missing" };
 }
+
+/**
+ * The token a checkout created, fetched the only way PayPlus exposes it.
+ *
+ * Verified across their entire documentation: the payment-page callback, the redirect response and
+ * the IPN all carry NO token field — create_token stores the card, but the token itself is only
+ * retrievable via Token/List, filtered by the customer_uid that the callback DOES carry. Confirmed
+ * with a real paid checkout: wallet credited, callback parsed, no token anywhere in the payload.
+ *
+ * Returns the newest entry when the customer has several saved cards — every one of them belongs
+ * to the payer, so any is chargeable; the last list item is the most recently added.
+ */
+export async function fetchTokenForCustomer(terminalUid: string, customerUid: string): Promise<string | undefined> {
+  const { apiKey, secretKey } = creds();
+  const res = await fetch(`${BASE_URL}/Token/List`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: JSON.stringify({ api_key: apiKey, secret_key: secretKey }),
+      "api-key": apiKey,
+      "secret-key": secretKey,
+    },
+    body: JSON.stringify({ terminal_uid: terminalUid, customer_uid: customerUid }),
+  });
+  if (!res.ok) {
+    console.warn(`[payplus] Token/List failed (${res.status}): ${await res.text()}`);
+    return undefined;
+  }
+  const body = (await res.json()) as { data?: Array<{ token?: string }>; results?: { status?: string } };
+  const tokens = (body.data ?? []).map((t) => t.token).filter((t): t is string => Boolean(t));
+  return tokens.length > 0 ? tokens[tokens.length - 1] : undefined;
+}

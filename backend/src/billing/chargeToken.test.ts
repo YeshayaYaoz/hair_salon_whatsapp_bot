@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const mockSystemSetting = { findMany: vi.fn(async () => [] as Array<{ key: string; value: string }>) };
 vi.mock("../lib/prisma.js", () => ({ prisma: { systemSetting: mockSystemSetting } }));
 
-const { chargeSubscriptionToken, PayPlusTerminalNotConfiguredError, probeGenerateLink } = await import("./payplusSubscription.js");
+const { chargeSubscriptionToken, PayPlusTerminalNotConfiguredError, probeGenerateLink, fetchTokenForCustomer } = await import("./payplusSubscription.js");
 
 /**
  * Pins the HTTP contract of the token charge — endpoint path and required fields.
@@ -150,5 +150,32 @@ describe("checkout return trampoline", () => {
     );
     delete process.env.PUBLIC_BACKEND_URL;
     delete process.env.PAYPLUS_BILLING_WEBHOOK_SECRET;
+  });
+});
+
+describe("fetchTokenForCustomer", () => {
+  it("retrieves the token Token/List holds for the callback's customer — the callback itself never carries one", async () => {
+    // Verified with a real paid checkout: wallet credited, callback parsed, and no token field
+    // anywhere in the payload or in any of PayPlus's documented callback/redirect/IPN schemas.
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        results: { status: "success" },
+        data: [
+          { token: "tok-old", customer_uid: "cust-1" },
+          { token: "tok-newest", customer_uid: "cust-1" },
+        ],
+      }),
+    });
+    const token = await fetchTokenForCustomer("term-1", "cust-1");
+    expect(token).toBe("tok-newest");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain("/Token/List");
+    expect(JSON.parse((init as RequestInit).body as string)).toMatchObject({ terminal_uid: "term-1", customer_uid: "cust-1" });
+  });
+
+  it("returns undefined when the account has no tokens — tokenization likely not enabled", async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ results: { status: "success" }, data: [] }) });
+    expect(await fetchTokenForCustomer("term-1", "cust-1")).toBeUndefined();
   });
 });
