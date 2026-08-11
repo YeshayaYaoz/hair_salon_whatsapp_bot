@@ -84,6 +84,24 @@ UNREACHABLE_HE = (
 )
 
 
+_HTTP: Optional[httpx.AsyncClient] = None
+
+
+def _client() -> httpx.AsyncClient:
+    """
+    One connection pool for the process, not one per request.
+
+    A fresh `AsyncClient` per call meant a fresh TCP connect and TLS handshake to the backend on
+    every tool call and on the context fetch — and the context fetch is the one thing standing
+    between the phone being answered and the caller hearing a word. Keeping the pool alive turns
+    the repeat cost into a single round trip.
+    """
+    global _HTTP
+    if _HTTP is None or _HTTP.is_closed:
+        _HTTP = httpx.AsyncClient(timeout=10.0)
+    return _HTTP
+
+
 async def _post(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
     """One place that knows how to talk to Tori, so auth and timeouts cannot drift apart."""
     if not TORI_API_URL:
@@ -93,12 +111,11 @@ async def _post(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]
     # reads like a network fault rather than an unset variable. Say what it actually is.
     if not TOOL_SECRET:
         raise RuntimeError("CARTESIA_TOOL_SECRET is not set — run: cartesia env set CARTESIA_TOOL_SECRET=…")
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        res = await client.post(
-            f"{TORI_API_URL}{path}",
-            json=payload,
-            headers={"Authorization": f"Bearer {TOOL_SECRET}"},
-        )
+    res = await _client().post(
+        f"{TORI_API_URL}{path}",
+        json=payload,
+        headers={"Authorization": f"Bearer {TOOL_SECRET}"},
+    )
     try:
         body = res.json()
     except Exception:
@@ -205,13 +222,38 @@ def caller_number(call_request: CallRequest) -> str:
     return raw
 
 
+_CONTEXT_CACHE: Dict[str, tuple[float, Dict[str, Any]]] = {}
+# Short enough that a price or hours edit in the dashboard reaches the phone within a minute, long
+# enough that a run of calls to one salon pays for the fetch once.
+_CONTEXT_TTL = 60.0
+
+
 async def resolve_context(call_request: CallRequest) -> Dict[str, Any]:
     """
     Asks Tori who this call is for. Returns `{"context": {...}}` or `{"error": "<spoken sentence>"}`.
 
     Never raises and never returns nothing: a caller must always hear a sentence, so every failure
     becomes one. The backend's own 402/404 bodies are already written to be read aloud.
+
+    Cached briefly per dialled number because the `_PENDING` agent handover does not survive in the
+    deployed topology: `pre_call_handler` and the websocket session run in different processes, so
+    `get_agent` finds nothing prepared and refetches *after the call is answered* — and every
+    millisecond of that fetch is silence on an answered line. The cache does not fix the first call
+    into a cold worker, which still pays the round trip; it stops every call after it from paying
+    again. Errors are deliberately not cached: a failed fetch must be retried on the next call, not
+    turned into a minute of apologies.
     """
+    # Keyed on dialled AND caller number, never on the salon alone: the response carries a
+    # `caller` block (isKnownCustomer, name, upcomingAppointment), so a salon-wide cache would greet
+    # the next caller by the previous caller's name and read out their appointment. In practice the
+    # key is usually "<number>|unknown" because cartesia-line 0.2.16 loses the caller ID on this
+    # path (see caller_number), which is what makes the cache hit at all.
+    cache_key = f"{call_request.to}|{caller_number(call_request)}"
+    cached = _CONTEXT_CACHE.get(cache_key)
+    if cached and time.monotonic() - cached[0] < _CONTEXT_TTL:
+        logger.info("context cache hit for %s", call_request.to)
+        return {"context": cached[1]}
+
     try:
         status, body = await _post(
             "/api/voice/context",
@@ -235,6 +277,10 @@ async def resolve_context(call_request: CallRequest) -> Dict[str, Any]:
         return {"error": UNREACHABLE_HE}
 
     logger.info("context resolved for %s: %s", call_request.to, body.get("businessName"))
+    _CONTEXT_CACHE[cache_key] = (time.monotonic(), body)
+    for key, (at, _) in list(_CONTEXT_CACHE.items()):
+        if time.monotonic() - at > _CONTEXT_TTL:
+            _CONTEXT_CACHE.pop(key, None)
     return {"context": body}
 
 

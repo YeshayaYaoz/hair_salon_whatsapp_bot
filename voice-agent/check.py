@@ -24,6 +24,11 @@ os.environ["CARTESIA_TOOL_SECRET"] = "topsecret"
 import main
 from line import CallRequest
 
+# Every scenario below reuses one dialled number for a different business, which the context cache
+# would serve from the previous scenario. Disabled by default so each check exercises a real fetch;
+# scenario 26 re-enables it to test the cache itself.
+main._CONTEXT_TTL = 0.0
+
 def req(to="+972555077941", frm="+972533391353", meta=None):
     # Cartesia merges PreCallResult.metadata into call_request.metadata before get_agent runs,
     # so the harness has to do the same or get_agent sees an empty salon.
@@ -415,6 +420,31 @@ async def main_():
     assert len(said) == 1 and isinstance(said[0], str), said
     assert "message_owner" in said[0], said[0]
     print("25 no transferring the caller to the line they are already on                OK")
+
+    # --- 26. the context cache, which is what keeps an answered call from waiting -----
+    # pre_call_handler and the websocket session run in different processes on the deployed
+    # topology, so the _PENDING agent handover misses and get_agent refetches *after* the caller
+    # has been answered. Every cache hit here is dead air the caller does not hear.
+    main._CONTEXT_TTL = 60.0
+    main._CONTEXT_CACHE.clear()
+    STATE.update(status=200, body=SALON, seen=[])
+    await main.resolve_context(req())
+    await main.resolve_context(req())
+    assert len(STATE["seen"]) == 1, STATE["seen"]
+
+    # A different caller must NOT reuse it: the response carries the caller's own name and next
+    # appointment, so a salon-wide cache would read one caller's details out to the next.
+    await main.resolve_context(req(frm="+972540000000"))
+    assert len(STATE["seen"]) == 2, STATE["seen"]
+
+    # A failure is never cached — the next call must be free to succeed.
+    main._CONTEXT_CACHE.clear()
+    STATE.update(status=500, body={"error": "boom"}, seen=[])
+    await main.resolve_context(req())
+    await main.resolve_context(req())
+    assert len(STATE["seen"]) == 2, STATE["seen"]
+    main._CONTEXT_TTL = 0.0
+    print("26 context cached per caller, never across callers, never on failure         OK")
 
 asyncio.run(main_())
 print("\nALL CHECKS PASSED")
