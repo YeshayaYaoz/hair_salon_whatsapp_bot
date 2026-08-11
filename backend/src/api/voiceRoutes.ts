@@ -484,6 +484,9 @@ voiceRouter.post("/usage", async (req, res) => {
       inputTokens: z.number().int().min(0),
       outputTokens: z.number().int().min(0),
       cacheReadTokens: z.number().int().min(0).optional(),
+      // Anthropic bills cache writes at 1.25x input; dropping them here would understate every
+      // first turn of every call, which is where the whole system prompt gets written to cache.
+      cacheCreationTokens: z.number().int().min(0).optional(),
     })
     .safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Invalid usage payload" });
@@ -501,6 +504,7 @@ voiceRouter.post("/usage", async (req, res) => {
     inputTokens: parsed.data.inputTokens,
     outputTokens: parsed.data.outputTokens,
     cacheReadTokens: parsed.data.cacheReadTokens,
+    cacheCreationTokens: parsed.data.cacheCreationTokens,
   });
 
   res.json({ logged: true });

@@ -595,6 +595,18 @@ describe("POST /api/voice/usage", () => {
     );
   });
 
+  it("carries cache-write tokens through, which Anthropic bills at 1.25x", async () => {
+    // The first turn of every call writes the whole system prompt to cache; dropping the field
+    // would understate exactly that turn on every single call.
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
+    const res = await request(app)
+      .post("/api/voice/usage")
+      .set("Authorization", "Bearer test-secret")
+      .send({ ...usage, model: "claude-haiku-4-5-20251001", cacheCreationTokens: 8500 });
+    expect(res.status).toBe(200);
+    expect(mockLogClaudeUsage.mock.calls[0][0].cacheCreationTokens).toBe(8500);
+  });
+
   it("still records the spend when the caller withheld their number", async () => {
     // Dropping the row would understate cost for exactly the calls we can say least about.
     mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);

@@ -472,11 +472,18 @@ async def main_():
     # which also means a broken reporter looks exactly like a working one from the outside. These
     # are the only checks that would ever say otherwise.
     class _Usage:
-        def __init__(self, prompt, completion, hits=None):
+        def __init__(self, prompt, completion, hits=None, details=None):
             self.prompt_tokens = prompt
             self.completion_tokens = completion
             if hits is not None:
                 self.prompt_cache_hit_tokens = hits
+            if details is not None:
+                self.prompt_tokens_details = details
+
+    class _Details:
+        def __init__(self, cached, creation):
+            self.cached_tokens = cached
+            self.cache_creation_tokens = creation
 
     class _Resp:
         def __init__(self, usage):
@@ -508,6 +515,17 @@ async def main_():
     STATE.update(status=200, body={"logged": True}, seen=[])
     await reporter.async_log_success_event({"litellm_params": {}}, _Resp(_Usage(10, 1)), 0, 1)
     assert STATE["seen"] == [], STATE["seen"]
+
+    # Anthropic's shape: LiteLLM folds cache reads AND writes into prompt_tokens and reports them
+    # under prompt_tokens_details. Reading only DeepSeek's field priced every cached Haiku token at
+    # the full input rate — undoing, in the ledger, the exact discount cache_control buys.
+    STATE.update(status=200, body={"logged": True}, seen=[])
+    await reporter.async_log_success_event(
+        meta, _Resp(_Usage(9000, 300, details=_Details(cached=7000, creation=1500))), 0, 1)
+    payload = STATE["seen"][0][1]
+    assert payload["inputTokens"] == 500, payload
+    assert payload["cacheReadTokens"] == 7000, payload
+    assert payload["cacheCreationTokens"] == 1500, payload
 
     # A backend that rejects the report must not raise into the call. This is the one that matters:
     # an exception in a callback mid-call is a caller hearing silence, for a ledger row.

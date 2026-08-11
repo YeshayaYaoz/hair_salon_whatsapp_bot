@@ -175,9 +175,18 @@ class _UsageReporter(CustomLogger):
             if usage is None:
                 return
             prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
-            # Same shape as the WhatsApp side: DeepSeek's prompt_tokens INCLUDES cache hits, so the
-            # cached portion is subtracted out rather than counted twice (see usageLedger.ts).
-            cache_read = getattr(usage, "prompt_cache_hit_tokens", 0) or 0
+            # Both providers fold cached tokens into prompt_tokens, but report them in different
+            # fields. DeepSeek puts hits in prompt_cache_hit_tokens; LiteLLM normalizes Anthropic
+            # into prompt_tokens_details (cached_tokens = reads, cache_creation_tokens = writes),
+            # and Anthropic's prompt_tokens includes BOTH. Reading only DeepSeek's field priced
+            # every cached Haiku token at the full input rate — quietly undoing, in the ledger,
+            # exactly the discount the cache_control work went in to buy.
+            details = getattr(usage, "prompt_tokens_details", None)
+            cache_read = (
+                (getattr(usage, "prompt_cache_hit_tokens", 0) or 0)
+                or (getattr(details, "cached_tokens", 0) or 0)
+            )
+            cache_write = getattr(details, "cache_creation_tokens", 0) or 0
 
             await _post(
                 "/api/voice/usage",
@@ -185,9 +194,10 @@ class _UsageReporter(CustomLogger):
                     "calledNumber": called,
                     "callerNumber": meta.get("tori_caller_number") or "unknown",
                     "model": _billed_model_name(kwargs.get("model") or MODEL),
-                    "inputTokens": max(0, prompt_tokens - cache_read),
+                    "inputTokens": max(0, prompt_tokens - cache_read - cache_write),
                     "outputTokens": getattr(usage, "completion_tokens", 0) or 0,
                     "cacheReadTokens": cache_read,
+                    "cacheCreationTokens": cache_write,
                 },
             )
         except Exception:
