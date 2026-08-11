@@ -49,6 +49,7 @@ function VerifyEmailInner() {
           alt="תורי-אונליין"
           width={56}
           height={56}
+          priority
           style={{ borderRadius: 14, margin: "0 auto 20px" }}
         />
 

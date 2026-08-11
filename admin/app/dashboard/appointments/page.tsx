@@ -465,16 +465,18 @@ function WeekCalendar({
                         // this was unreachable there while still being tappable); only pointer
                         // devices get the reveal-on-hover treatment, and then `pointer-events-none`
                         // while hidden means a click can't land on something nobody can see.
-                        // focus-visible brings it back for keyboard users, who could otherwise
-                        // trigger a cancel they had no way to perceive.
+                        // Plain :focus (not :focus-visible) brings it back — the button is only
+                        // ever focused deliberately, and programmatic/AT focus doesn't reliably
+                        // match :focus-visible, which left screen-reader users on an invisible
+                        // control. 24px square is the WCAG 2.2 target-size floor.
                         <button
                           onClick={() => onCancel(a.id)}
                           disabled={cancellingId === a.id}
-                          className="absolute top-0 end-0 grid place-items-center w-5 h-5 rounded text-white/80
+                          className="absolute top-0 end-0 grid place-items-center w-6 h-6 rounded text-white/80
                             hover:text-white hover:bg-black/25 transition leading-none
                             [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:pointer-events-none
                             [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-hover:pointer-events-auto
-                            focus-visible:opacity-100 focus-visible:pointer-events-auto"
+                            focus:opacity-100 focus:pointer-events-auto"
                           aria-label={`${t.cancel} — ${a.customer.name ?? formatPhone(a.customer.phone)}`}
                         >×</button>
                       )}

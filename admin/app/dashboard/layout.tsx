@@ -248,6 +248,7 @@ function SidebarContent({
             alt="תורי"
             width={46}
             height={46}
+            priority
             className="rounded-xl shrink-0"
             style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.3)" }}
           />

@@ -22,6 +22,8 @@ const COPY = {
     steps: ["שירות", "תאריך", "שעה", "פרטים"],
     loading: "טוען…",
     loadFailed: "לא הצלחנו לטעון את פרטי העסק.",
+    linkInvalid: "הקישור הזה כבר לא פעיל. כדאי לבדוק מול העסק שממנו קיבלתם אותו.",
+    notAcceptingOnline: "העסק לא מקבל כרגע הזמנות דרך האתר. אפשר ליצור איתו קשר ישירות.",
     chooseService: "בחרו שירות",
     chooseDateFor: "בחרו תאריך ל",
     back: "חזרה",
@@ -47,6 +49,8 @@ const COPY = {
     steps: ["Service", "Date", "Time", "Details"],
     loading: "Loading…",
     loadFailed: "Could not load salon information.",
+    linkInvalid: "This booking link is no longer active. Please check with the business that sent it.",
+    notAcceptingOnline: "This business isn't taking online bookings right now. Please contact them directly.",
     chooseService: "Choose a service",
     chooseDateFor: "Choose a date for ",
     back: "Back",
@@ -140,9 +144,17 @@ export default function BookPage() {
   } | null>(null);
 
   useEffect(() => {
+    // The API's error strings are contract text ("Not found"), not customer copy — a Hebrew
+    // customer following a salon's dead Instagram link was shown bare English. Map the status to
+    // the page's own language instead of parroting the body.
     fetch(`${API}/api/public/${businessId}`)
-      .then((r) => r.json())
-      .then((d) => { if (d.error) setLoadError(d.error); else setInfo(d); })
+      .then(async (r) => {
+        const d = await r.json().catch(() => ({}));
+        if (r.status === 404) setLoadError(c.linkInvalid);
+        else if (r.status === 403) setLoadError(c.notAcceptingOnline);
+        else if (!r.ok || d.error) setLoadError(c.loadFailed);
+        else setInfo(d);
+      })
       .catch(() => setLoadError(c.loadFailed));
   }, [businessId]);
 
