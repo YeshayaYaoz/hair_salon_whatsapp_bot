@@ -149,6 +149,50 @@ async def _post(path: str, payload: Dict[str, Any]) -> tuple[int, Dict[str, Any]
     return res.status_code, body
 
 
+# How many transcript turns have already been posted for each call, so each turn is stored once.
+# Keyed by the same (called|caller) pair the transcript is filed under; a handful of ints per call,
+# swept when the process restarts, which is the same lifetime as the call itself.
+_TRANSCRIPT_SENT: Dict[str, int] = {}
+
+
+async def _post_transcript(called: str, caller: str, messages: Any) -> None:
+    """
+    Stores the turns of this call that Tori has not seen yet.
+
+    Read off the message list LiteLLM is about to send, because that list IS the conversation and
+    it costs nothing extra to look at. Posted per turn rather than as one summary at the end: a
+    call can drop at any moment, and a transcript that only survives a clean goodbye is missing
+    exactly the calls worth reading.
+
+    Never raises. A lost transcript row is a gap in the dashboard; an exception here is a caller
+    hearing silence.
+    """
+    try:
+        if not isinstance(messages, list):
+            return
+        turns = [
+            {"role": m["role"], "content": m["content"].strip()}
+            for m in messages
+            if isinstance(m, dict)
+            and m.get("role") in ("user", "assistant")
+            and isinstance(m.get("content"), str)
+            and m.get("content", "").strip()
+        ]
+        key = f"{called}|{caller}"
+        already = _TRANSCRIPT_SENT.get(key, 0)
+        fresh = turns[already:]
+        if not fresh:
+            return
+        status, _body = await _post(
+            "/api/voice/transcript",
+            {"calledNumber": called, "callerNumber": caller, "turns": fresh[-20:]},
+        )
+        if status == 200:
+            _TRANSCRIPT_SENT[key] = len(turns)
+    except Exception:
+        logger.exception("transcript post failed")
+
+
 class _UsageReporter(CustomLogger):
     """
     Reports the agent's token usage to Tori, so voice spend appears in the same ledger as WhatsApp.
@@ -187,6 +231,8 @@ class _UsageReporter(CustomLogger):
                 or (getattr(details, "cached_tokens", 0) or 0)
             )
             cache_write = getattr(details, "cache_creation_tokens", 0) or 0
+
+            await _post_transcript(called, meta.get("tori_caller_number") or "unknown", kwargs.get("messages"))
 
             await _post(
                 "/api/voice/usage",

@@ -231,6 +231,31 @@ voiceRouter.post("/context", async (req, res) => {
   // reads from, so the two channels never disagree on what kind of business this is.
   const template = isBusinessType(full.businessType) ? TEMPLATES[full.businessType] : null;
 
+  // Register the caller as a customer, exactly as the WhatsApp webhook does for anyone who writes
+  // in. Phone callers were the one channel that left no trace: the Customers page never learned
+  // they existed, so a caller who rang twice was "unknown" both times and the WhatsApp bot had no
+  // idea it had already spoken to them. The dashboard's own empty state promises every customer
+  // who reaches the bot is saved automatically — this makes that true for the phone too.
+  //
+  // Fire-and-forget and non-fatal: a caller is on the line, and a CRM write must never delay the
+  // greeting or fail the call.
+  if (callerDigits.length >= 7) {
+    // try/catch around the fire-and-forget, not just .catch on the promise: this sits in the
+    // handler a caller is waiting on, and anything that throws *synchronously* here would 500 the
+    // context fetch and put the unreachable apology in the caller's ear over a CRM row.
+    try {
+      void prisma.customer
+        .upsert({
+          where: { businessId_phone: { businessId: business.id, phone: callerDigits } },
+          create: { businessId: business.id, phone: callerDigits },
+          update: {},
+        })
+        .catch((err) => console.error("[voice] Failed to register caller as customer:", err));
+    } catch (err) {
+      console.error("[voice] Failed to register caller as customer:", err);
+    }
+  }
+
   console.log(`[voice] /context for ${full.name} in ${Date.now() - startedAt}ms`);
 
   res.json({
@@ -652,4 +677,57 @@ voiceRouter.post("/send-details", async (req, res) => {
   );
 
   res.json({ sent: true, photos: Math.min(service.imageUrls.length, 4) });
+});
+
+/**
+ * Records what was said on a phone call, into the same conversation history the WhatsApp bot uses.
+ *
+ * Until now a call left nothing behind. Every WhatsApp exchange lands in ConversationMessage and
+ * shows up in the dashboard's Conversations view; a phone call — the channel where a caller states
+ * their dates, their party size, and what they want — produced one owner note at best and vanished.
+ * The owner could not answer "who called this morning and what did they want", and neither could
+ * the WhatsApp bot when the same person messaged an hour later.
+ *
+ * Stored under the caller's own phone number, so the two channels form one thread per person:
+ * `getHistory` in conversationStore reads by (businessId, phone) and does not care which channel
+ * wrote the rows. A caller who phones and then messages is picked up mid-conversation.
+ *
+ * The agent posts turns as they happen rather than one summary at the end, because a call can drop
+ * at any moment and a transcript that only exists after a clean goodbye is missing exactly the
+ * calls worth reading.
+ */
+voiceRouter.post("/transcript", async (req, res) => {
+  const parsed = z
+    .object({
+      calledNumber: z.string().min(1),
+      callerNumber: z.string().min(1),
+      turns: z
+        .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().min(1).max(4000) }))
+        .min(1)
+        .max(20),
+    })
+    .safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid transcript payload" });
+
+  const business = await resolveBusinessByCalledNumber(parsed.data.calledNumber);
+  if (!business) return res.status(404).json({ error: "No salon configured for this number" });
+
+  const phone = normalizePhone(parsed.data.callerNumber);
+  // A withheld caller ID has no thread to belong to — storing these under "" would merge every
+  // anonymous caller in the business into one unreadable conversation.
+  if (phone.length < 7) return res.json({ stored: 0 });
+
+  await prisma.conversationMessage.createMany({
+    data: parsed.data.turns.map((t) => ({
+      businessId: business.id,
+      phone,
+      role: t.role,
+      // Marked so the dashboard (and anyone reading the thread) can tell a spoken turn from a
+      // typed one — they read very differently, and a transcription error looks like nonsense
+      // without the label.
+      content: t.role === "user" ? `📞 ${t.content}` : t.content,
+    })),
+  });
+
+  res.json({ stored: parsed.data.turns.length });
 });

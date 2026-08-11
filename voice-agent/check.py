@@ -640,5 +640,45 @@ async def main_():
     assert "end_call" in prompt and "פרידה" in prompt, prompt[-400:]
     print("34 the agent ends the call itself once the caller is done                       OK")
 
+    # --- 35. the call leaves a record ----------------------------------------------------
+    # Until now a phone call left nothing: no customer row, no transcript. Every WhatsApp exchange
+    # lands in the dashboard's Conversations view; the channel where a caller states their dates
+    # and party size produced one owner note at best, and the owner could not answer "who called
+    # this morning and what did they want".
+    main._TRANSCRIPT_SENT.clear()
+    STATE.update(status=200, body={"stored": 2}, seen=[])
+    msgs = [
+        {"role": "system", "content": "prompt"},
+        {"role": "user", "content": "אני רוצה צימר לשלושה"},
+        {"role": "assistant", "content": "יש לנו תאנה"},
+    ]
+    await main._post_transcript("+972555077941", "+972533391353", msgs)
+    path, payload, _auth = STATE["seen"][0]
+    assert path == "/api/voice/transcript", path
+    # The system prompt is not part of the conversation, and tool plumbing is not either.
+    assert payload["turns"] == [
+        {"role": "user", "content": "אני רוצה צימר לשלושה"},
+        {"role": "assistant", "content": "יש לנו תאנה"},
+    ], payload
+
+    # Each turn is stored once: the callback fires per LLM call and sees the whole history again.
+    STATE.update(status=200, body={"stored": 1}, seen=[])
+    msgs = msgs + [{"role": "user", "content": "כמה זה עולה?"}]
+    await main._post_transcript("+972555077941", "+972533391353", msgs)
+    assert STATE["seen"][0][1]["turns"] == [{"role": "user", "content": "כמה זה עולה?"}], STATE["seen"][0][1]
+
+    # A failed post is retried on the next turn rather than losing the rows silently.
+    main._TRANSCRIPT_SENT.clear()
+    STATE.update(status=500, body={"error": "boom"}, seen=[])
+    await main._post_transcript("+972555077941", "+972533391353", msgs)
+    STATE.update(status=200, body={"stored": 3}, seen=[])
+    await main._post_transcript("+972555077941", "+972533391353", msgs)
+    assert len(STATE["seen"][0][1]["turns"]) == 3, STATE["seen"][0][1]
+
+    # Never raises into the call — a lost transcript row is a gap in a dashboard; an exception here
+    # is a caller hearing silence.
+    await main._post_transcript("+972555077941", "+972533391353", None)
+    print("35 the call is recorded turn by turn, each turn once, never raising              OK")
+
 asyncio.run(main_())
 print("\nALL CHECKS PASSED")

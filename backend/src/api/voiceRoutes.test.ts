@@ -8,13 +8,15 @@ const mockPrisma = {
   // The caller lookup runs as raw SQL (see findCallerCustomer) — resolve "no match" by default.
   $queryRaw: vi.fn(async () => []),
   businessHours: { findMany: vi.fn() },
-  customer: { findMany: vi.fn() },
+  // Registering the caller is fire-and-forget on the live-call path; it must resolve, not return
+  // undefined, or the handler would appear to fail for a reason that never happens in production.
+  customer: { findMany: vi.fn(), upsert: vi.fn(async () => ({})) },
   appointment: { findFirst: vi.fn() },
   service: { findFirst: vi.fn(), findMany: vi.fn() },
   staffMember: { findFirst: vi.fn(), findMany: vi.fn() },
   faqEntry: { findMany: vi.fn() },
   specialPeriod: { findMany: vi.fn() },
-  conversationMessage: { findFirst: vi.fn() },
+  conversationMessage: { findFirst: vi.fn(), createMany: vi.fn() },
 };
 
 const mockFindAvailableSlots = vi.fn();
@@ -103,6 +105,38 @@ describe("POST /api/voice/context", () => {
       .set("Authorization", "Bearer test-secret")
       .send({ calledNumber: "+972501111111", callerNumber: "+972502222222" });
     expect(res.status).toBe(404);
+  });
+
+  it("registers the caller as a customer, the way the WhatsApp webhook does", async () => {
+    // Phone callers were the one channel that left no trace: the Customers page never learned they
+    // existed, so a caller who rang twice was 'unknown' both times.
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ name: "Salon Dana", timezone: "Asia/Jerusalem", address: null, botGreeting: null });
+    mockPrisma.businessHours.findMany.mockResolvedValue([]);
+    mockPrisma.service.findMany.mockResolvedValue([]);
+    mockPrisma.faqEntry.findMany.mockResolvedValue([]);
+    mockPrisma.specialPeriod.findMany.mockResolvedValue([]);
+
+    await request(app).post("/api/voice/context").set("Authorization", "Bearer test-secret")
+      .send({ calledNumber: "+972501111111", callerNumber: "+972502222222" });
+
+    expect(mockPrisma.customer.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ create: { businessId: "biz1", phone: "972502222222" } })
+    );
+  });
+
+  it("does not register a withheld caller ID as a customer", async () => {
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ name: "Salon Dana", timezone: "Asia/Jerusalem", address: null, botGreeting: null });
+    mockPrisma.businessHours.findMany.mockResolvedValue([]);
+    mockPrisma.service.findMany.mockResolvedValue([]);
+    mockPrisma.faqEntry.findMany.mockResolvedValue([]);
+    mockPrisma.specialPeriod.findMany.mockResolvedValue([]);
+
+    await request(app).post("/api/voice/context").set("Authorization", "Bearer test-secret")
+      .send({ calledNumber: "+972501111111", callerNumber: "unknown" });
+
+    expect(mockPrisma.customer.upsert).not.toHaveBeenCalled();
   });
 
   it("matches the called number regardless of a leading + or formatting differences", async () => {
@@ -728,5 +762,59 @@ describe("POST /api/voice/send-details", () => {
   it("404s an unknown unit rather than sending something vague", async () => {
     mockPrisma.service.findFirst.mockResolvedValue(null);
     expect((await post({ channel: "email", toEmail: "caller@x.test" })).status).toBe(404);
+  });
+});
+
+/**
+ * A phone call used to leave nothing behind — no customer row, no transcript. The owner could not
+ * answer "who called this morning and what did they want", and the WhatsApp bot had no idea it had
+ * already spoken to the same person an hour earlier.
+ */
+describe("POST /api/voice/transcript", () => {
+  let app: express.Express;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    process.env.CARTESIA_TOOL_SECRET = "test-secret";
+    const { voiceRouter } = await import("./voiceRoutes.js");
+    app = express();
+    app.use(express.json());
+    app.use("/api/voice", voiceRouter);
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
+    mockPrisma.conversationMessage.createMany.mockResolvedValue({ count: 2 });
+  });
+
+  const post = (body: Record<string, unknown>) =>
+    request(app).post("/api/voice/transcript").set("Authorization", "Bearer test-secret")
+      .send({ calledNumber: "972501111111", callerNumber: "+972533391353", ...body });
+
+  it("files spoken turns under the caller's number, marked as spoken", async () => {
+    const res = await post({
+      turns: [
+        { role: "user", content: "אני רוצה צימר לשלושה" },
+        { role: "assistant", content: "יש לנו תאנה" },
+      ],
+    });
+    expect(res.status).toBe(200);
+    const rows = mockPrisma.conversationMessage.createMany.mock.calls[0][0].data;
+    // Same (businessId, phone) key the WhatsApp history uses, so both channels form one thread.
+    expect(rows[0]).toMatchObject({ businessId: "biz1", phone: "972533391353", role: "user" });
+    // Spoken turns are labelled: a transcription error reads as nonsense without the marker.
+    expect(rows[0].content).toMatch(/^📞 /);
+    expect(rows[1].content).toBe("יש לנו תאנה");
+  });
+
+  it("stores nothing for a withheld caller ID", async () => {
+    // Filing these under "" would merge every anonymous caller into one unreadable conversation.
+    const res = await post({ callerNumber: "unknown", turns: [{ role: "user", content: "שלום" }] });
+    expect(res.status).toBe(200);
+    expect(res.body.stored).toBe(0);
+    expect(mockPrisma.conversationMessage.createMany).not.toHaveBeenCalled();
+  });
+
+  it("rejects an empty or oversized batch rather than writing junk", async () => {
+    expect((await post({ turns: [] })).status).toBe(400);
+    const tooMany = Array.from({ length: 21 }, () => ({ role: "user", content: "x" }));
+    expect((await post({ turns: tooMany })).status).toBe(400);
   });
 });
