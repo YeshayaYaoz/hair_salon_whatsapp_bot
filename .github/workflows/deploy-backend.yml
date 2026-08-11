@@ -59,8 +59,12 @@ jobs:
           # page, two tabs, and a value in the wrong tab resolves to an empty string with no
           # warning. Only the token is sensitive; the service and environment names are not.
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE }}
-          RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT }}
+          # Defaults are the live project's own names, read off `railway status` — the CLI refuses
+          # to pick when a project has more than one, and a Railway project always has more than
+          # one: the volume and the environment count. Neither name is a secret. Override either
+          # from Secrets or Variables without touching this file.
+          RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+          RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
         run: |
           if [ -z "$RAILWAY_TOKEN" ]; then
             echo "::error::RAILWAY_TOKEN is not set. Create one at Railway → Account Settings → Tokens (a *project* token is enough and is scoped to the one project), then add it under Settings → Secrets and variables → Actions → Secrets, scoped to the Repository rather than an Environment."
