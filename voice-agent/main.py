@@ -34,6 +34,8 @@ import logging
 import os
 import re
 import time
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from typing import Annotated, Any, Dict, Optional
 
 import httpx
@@ -508,6 +510,32 @@ def _fmt_date(iso: str) -> str:
         return str(iso)
 
 
+HE_WEEKDAYS = ["יום שני", "יום שלישי", "יום רביעי", "יום חמישי",
+               "יום שישי", "שבת", "יום ראשון"]  # indexed by date.weekday(), Monday=0
+
+
+def _today_block(now: Optional[datetime] = None) -> str:
+    """
+    What day it is, in the prompt.
+
+    Without this the agent has no clock at all. On a live call someone asked for a room "מחר" and
+    the agent answered "מחר זה יום כמה?" — then apologised that it cannot see today's date. Every
+    real booking conversation is anchored on today ("מחר", "בסופ\"ש", "עוד שבוע"), so a booking
+    agent that does not know the date cannot take a booking.
+
+    Israel time, not the container's UTC: at 01:00 Israel time UTC still says yesterday, and being
+    one day off is worse than being vague.
+    """
+    now = now or datetime.now(ZoneInfo("Asia/Jerusalem"))
+    d = now.date()
+    tomorrow = d + timedelta(days=1)
+    return (
+        f"היום {HE_WEEKDAYS[d.weekday()]}, {_fmt_date(d.isoformat())}. "
+        f"מחר {HE_WEEKDAYS[tomorrow.weekday()]}, {_fmt_date(tomorrow.isoformat())}. "
+        'חשב תאריכים יחסיים ("מחר", "בסופ"ש הקרוב", "עוד שבוע") מהיום הזה, ואל תשאל את המתקשר מה התאריך.'
+    )
+
+
 def _fmt_clock(minutes: int) -> str:
     """
     Minutes past midnight as someone says a time: `540` → `תשע בבוקר`.
@@ -686,7 +714,7 @@ FORMS = {
             'מספרים אמרי במילים ולא כספרות: "מאה ועשרים שקל".',
             "אל תשתמשי בכוכביות, בסולמיות או בכל סימון Markdown — כל תו שאת כותבת נאמר בקול.",
             'מספר טלפון הקריאי ספרה אחרי ספרה: "אפס ארבע, שש תשע תשע, תשע תשע אחת תשע". מקף בתוך מספר הוא שקט — לעולם אל תגידי "מינוס".',
-            'כתובת אתר אמרי בלי הקידומת: "zimmermeron נקודה קו נקודה איי אל", לא "אייץ טי טי פי אס".',
+            'כתובת אתר קראי בלי הקידומת — "נקודה קו נקודה איי אל" ולא "אייץ טי טי פי אס". אל תמסרי כתובת אתר שלא כתובה במידע שקיבלת; אם אין כזו, אל תמציאי.',
             'שעות אמרי כמו בדיבור: "מתשע בבוקר עד שש בערב".',
             "אל תקראי רשימות שלמות. הציעי שתיים או שלוש אפשרויות ותני לאדם לבחור.",
             'ביטויים קבועים נאמרים בדיוק כפי שהם: "ברוך הבא", "תודה רבה", "יום טוב". אל תמציאי גרסה משלך.',
@@ -723,7 +751,7 @@ FORMS = {
             'מספרים אמור במילים ולא כספרות: "מאה ועשרים שקל".',
             "אל תשתמש בכוכביות, בסולמיות או בכל סימון Markdown — כל תו שאתה כותב נאמר בקול.",
             'מספר טלפון הקרא ספרה אחרי ספרה: "אפס ארבע, שש תשע תשע, תשע תשע אחת תשע". מקף בתוך מספר הוא שקט — לעולם אל תגיד "מינוס".',
-            'כתובת אתר אמור בלי הקידומת: "zimmermeron נקודה קו נקודה איי אל", לא "אייץ טי טי פי אס".',
+            'כתובת אתר קרא בלי הקידומת — "נקודה קו נקודה איי אל" ולא "אייץ טי טי פי אס". אל תמסור כתובת אתר שלא כתובה במידע שקיבלת; אם אין כזו, אל תמציא.',
             'שעות אמור כמו בדיבור: "מתשע בבוקר עד שש בערב".',
             "אל תקרא רשימות שלמות. הצע שתיים או שלוש אפשרויות ותן לאדם לבחור.",
             'ביטויים קבועים נאמרים בדיוק כפי שהם: "ברוך הבא", "תודה רבה", "יום טוב". אל תמציא גרסה משלך.',
@@ -763,6 +791,9 @@ def build_prompt(ctx: Dict[str, Any], caller_known: bool = True) -> str:
         *f["rules"],
         f["confirm_number"],
         f["no_media"],
+        "",
+        "## היום",
+        _today_block(),
         "",
         "## שירותים ומחירים",
         _fmt_services(ctx),

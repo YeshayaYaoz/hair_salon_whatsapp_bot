@@ -21,6 +21,9 @@ threading.Thread(target=srv.serve_forever, daemon=True).start()
 
 os.environ["TORI_API_URL"] = STUB_URL
 os.environ["CARTESIA_TOOL_SECRET"] = "topsecret"
+# LlmAgent refuses to construct without one, and every check here builds an agent. Nothing in this
+# file reaches the network, so the value only has to exist.
+os.environ.setdefault("ANTHROPIC_API_KEY", "sk-ant-not-a-real-key-for-checks")
 import main
 from line import CallRequest
 
@@ -706,6 +709,26 @@ async def main_():
     # spelling an address the caller never needed to give.
     assert "אל תבקש" in prompt or "אל תבקשי" in prompt, prompt[-800:]
     print("36 a transfer records the lead first, and email is asked for only on demand     OK")
+
+    # --- 37. the agent knows what day it is, and invents no website ----------------------
+    # On a live call someone asked for a room "מחר" and the agent answered "מחר זה יום כמה?",
+    # then apologised that it cannot see today's date. Relative dates are how people actually
+    # book, so the date goes in the prompt rather than being asked of the caller.
+    from datetime import datetime as _dt
+    from zoneinfo import ZoneInfo as _tz
+    block = main._today_block(_dt(2026, 8, 11, 23, 30, tzinfo=_tz("Asia/Jerusalem")))
+    # 11 Aug 2026 is a Tuesday. Late evening, because UTC would still say the 11th at 23:30 but
+    # says the 10th at 01:00 — being a day off is worse than being vague.
+    assert "היום יום שלישי" in block and "מחר יום רביעי" in block, block
+    assert "אחד עשר באוגוסט" in block and "שנים עשר באוגוסט" in block, block
+    assert "## היום" in prompt and "יום" in prompt, prompt[:400]
+
+    # The pronunciation example used to be a plausible-looking domain, and the model read it out
+    # to a caller as this zimmer's actual website when send_details failed. An example that can be
+    # mistaken for real data is data.
+    assert "zimmermeron" not in prompt, "a fake domain is back in the prompt"
+    assert "אל תמציא" in prompt or "אל תמציאי" in prompt, prompt
+    print("37 the agent knows today's date, and quotes no website it was not given         OK")
 
 asyncio.run(main_())
 print("\nALL CHECKS PASSED")
