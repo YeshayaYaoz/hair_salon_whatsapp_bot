@@ -115,8 +115,14 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
   if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
 });
 
+import { warmVoiceCache } from "./lib/cartesiaAdmin.js";
+
 const port = Number(process.env.PORT ?? 4000);
-app.listen(port, () => console.log(`Backend listening on :${port}`));
+app.listen(port, () => {
+  console.log(`Backend listening on :${port}`);
+  // Off the critical path here, so it is not on the critical path of an answered phone call.
+  warmVoiceCache();
+});
 
 // Run retention job daily at 10:00 Jerusalem time
 function scheduleRetentionJob() {

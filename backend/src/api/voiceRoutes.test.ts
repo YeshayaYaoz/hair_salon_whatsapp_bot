@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import request from "supertest";
 import express from "express";
-import { listHebrewVoices } from "../lib/cartesiaAdmin.js";
+import { cachedHebrewVoices } from "../lib/cartesiaAdmin.js";
 
 const mockPrisma = {
   business: { findMany: vi.fn(), findUniqueOrThrow: vi.fn() },
@@ -23,7 +23,9 @@ const mockLogClaudeUsage = vi.fn();
 vi.mock("../lib/prisma.js", () => ({ prisma: mockPrisma }));
 vi.mock("../lib/usageLedger.js", () => ({ logClaudeUsage: mockLogClaudeUsage }));
 // The real one calls Cartesia and caches for an hour; stubbed so the catalogue is per-test.
-vi.mock("../lib/cartesiaAdmin.js", () => ({ listHebrewVoices: vi.fn(async () => []) }));
+// Synchronous and cache-only by design: awaiting the catalogue here put a Cartesia round trip
+// between a phone being answered and the greeting. See cachedHebrewVoices.
+vi.mock("../lib/cartesiaAdmin.js", () => ({ cachedHebrewVoices: vi.fn(() => []), warmVoiceCache: vi.fn() }));
 vi.mock("../booking/availability.js", async () => {
   const actual = await vi.importActual<typeof import("../booking/availability.js")>("../booking/availability.js");
   return { ...actual, findAvailableSlots: mockFindAvailableSlots };
@@ -159,7 +161,7 @@ describe("POST /api/voice/context", () => {
     // before it can say "אני בודקת" rather than "אני בודק". Derived from Cartesia's catalogue so it
     // cannot drift from the voice actually playing.
     it("tells the agent which gender to speak about itself in", async () => {
-      vi.mocked(listHebrewVoices).mockResolvedValue([
+      vi.mocked(cachedHebrewVoices).mockReturnValue([
         { id: "voice_abc", name: "Yael", description: null, gender: "feminine", previewUrl: null },
         { id: "voice_xyz", name: "Amir", description: null, gender: "masculine", previewUrl: null },
       ]);
@@ -173,7 +175,7 @@ describe("POST /api/voice/context", () => {
       ["a voice that is not in the catalogue", "voice_missing", [] as const],
       ["a gender_neutral voice", "voice_n", [{ id: "voice_n", gender: "gender_neutral" }] as const],
     ])("sends null for %s", async (_label, voiceId, catalogue) => {
-      vi.mocked(listHebrewVoices).mockResolvedValue(
+      vi.mocked(cachedHebrewVoices).mockReturnValue(
         catalogue.map((v) => ({ name: "V", description: null, previewUrl: null, ...v })) as never
       );
       stubContext({ voiceId });

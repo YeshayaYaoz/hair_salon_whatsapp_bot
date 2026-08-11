@@ -133,6 +133,29 @@ function speaksHebrew(voice: CartesiaVoice): boolean {
  * and a settings page that fails to load because a third party is down is a worse outcome than one
  * that says the choice is unavailable right now.
  */
+/**
+ * The catalogue if it is already cached, otherwise nothing — never a network call.
+ *
+ * `/api/voice/context` runs while a caller listens to silence, and it needs the chosen voice's
+ * gender to inflect the agent's Hebrew. Awaiting `listHebrewVoices()` there put an outbound request
+ * to Cartesia (a 100-voice list with preview URLs) inside the path between the phone being answered
+ * and the first word spoken — on every cold cache, which means after every single deploy.
+ *
+ * The trade is deliberate: a caller in that window gets the default feminine inflection instead of
+ * seconds of dead air. The refresh is kicked off in the background so the window closes on its own,
+ * and `warmVoiceCache()` on boot means it should never open in the first place.
+ */
+export function cachedHebrewVoices(): VoiceOption[] {
+  if (voiceCache && Date.now() - voiceCache.at < VOICE_CACHE_MS) return voiceCache.voices;
+  void listHebrewVoices().catch(() => {});
+  return [];
+}
+
+/** Fills the catalogue cache at startup, off the critical path of any request. */
+export function warmVoiceCache(): void {
+  void listHebrewVoices().catch(() => {});
+}
+
 export async function listHebrewVoices(): Promise<VoiceOption[]> {
   if (voiceCache && Date.now() - voiceCache.at < VOICE_CACHE_MS) return voiceCache.voices;
 

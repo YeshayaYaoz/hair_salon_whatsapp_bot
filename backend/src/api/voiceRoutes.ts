@@ -8,7 +8,7 @@ import { TEMPLATES, isBusinessType } from "../lib/businessTemplates.js";
 // Shared with the owner-notification phone: the same "typed by a human vs formatted by a
 // machine" mismatch this was written for applies wherever those two meet. See lib/phone.ts.
 import { normalizePhone } from "../lib/phone.js";
-import { listHebrewVoices } from "../lib/cartesiaAdmin.js";
+import { cachedHebrewVoices } from "../lib/cartesiaAdmin.js";
 import { notifyOwner } from "../lib/ownerNotify.js";
 import { logClaudeUsage } from "../lib/usageLedger.js";
 
@@ -122,18 +122,25 @@ function spokenGreeting(name: string): string {
 /**
  * The gender of the voice this business chose, or null if it cannot be determined.
  *
- * listHebrewVoices caches for an hour and returns [] when the catalogue is unreachable, so this
- * costs nothing per call and degrades to "unknown" rather than failing the call — a voice agent
- * that cannot answer the phone is far worse than one using the wrong verb form.
+ * Reads the cached catalogue only, and never waits on one. The hour-long cache made this look free
+ * per call, but the cache is per process and empties on every deploy — so the first caller after
+ * each one waited on an outbound Cartesia request, mid-call, before hearing anything. Degrades to
+ * "unknown" (default feminine inflection) rather than delaying the greeting: a caller notices
+ * silence long before they notice a verb form.
  */
-async function voiceGenderFor(voiceId: string | null): Promise<"masculine" | "feminine" | null> {
+function voiceGenderFor(voiceId: string | null): "masculine" | "feminine" | null {
   if (!voiceId) return null;
-  const voice = (await listHebrewVoices()).find((v) => v.id === voiceId);
+  // Cache-only: see cachedHebrewVoices. A caller is on the line while this runs.
+  const voice = cachedHebrewVoices().find((v) => v.id === voiceId);
   // gender_neutral gives us nothing to inflect with, so it is treated the same as unknown.
   return voice?.gender === "masculine" || voice?.gender === "feminine" ? voice.gender : null;
 }
 
 voiceRouter.post("/context", async (req, res) => {
+  // A caller is listening to silence for exactly as long as this handler runs, and the agent's own
+  // log can only show the round trip as a whole. Without this line, "the greeting is slow" cannot
+  // be split into our query time versus the network between Cartesia and us.
+  const startedAt = Date.now();
   const parsed = z.object({ calledNumber: z.string().min(1), callerNumber: z.string().min(1) }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "calledNumber and callerNumber are required" });
 
@@ -192,6 +199,8 @@ voiceRouter.post("/context", async (req, res) => {
   // reads from, so the two channels never disagree on what kind of business this is.
   const template = isBusinessType(full.businessType) ? TEMPLATES[full.businessType] : null;
 
+  console.log(`[voice] /context for ${full.name} in ${Date.now() - startedAt}ms`);
+
   res.json({
     businessName: full.name,
     businessType: template ? { key: template.type, labelHe: template.labelHe, labelEn: template.labelEn } : null,
@@ -223,7 +232,7 @@ voiceRouter.post("/context", async (req, res) => {
      * is jarring in a way an English agent never is, because Hebrew marks gender on every verb.
      * Derived from the Cartesia catalogue rather than stored, so it always matches the voice
      * actually playing; null (no key, unknown voice, gender_neutral) leaves the agent's default. */
-    voiceGender: await voiceGenderFor(full.voiceId),
+    voiceGender: voiceGenderFor(full.voiceId),
     cancellationPolicy: full.cancellationPolicy,
     // Date-only strings: the agent reads these out loud and compares them to what the caller asks
     // for, so a timezone-bearing timestamp would be both wrong to speak and easy to misread.
