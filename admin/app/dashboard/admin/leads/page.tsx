@@ -717,7 +717,9 @@ function BroadcastModal({
                 </div>
               ) : !confirming ? (
                 <button
-                  disabled={!subject.trim() || !body.trim()}
+                  // WhatsApp sends a pre-approved template — no subject exists on that channel, so
+                  // requiring one just strands the operator on a field that goes nowhere.
+                  disabled={!body.trim() || (channel === "email" && !subject.trim())}
                   onClick={() => setConfirming(true)}
                   className="px-4 py-2 rounded-lg text-sm font-medium text-white self-start disabled:opacity-50"
                   style={{ background: "#1B7FA0" }}

@@ -417,8 +417,22 @@ leadFinderRouter.post("/outreach/:id/send", async (req: AuthedRequest, res) => {
   if (message.approvalStatus !== "approved") return res.status(400).json({ error: "Approve the draft before sending" });
   if (message.sentAt) return res.status(409).json({ error: "Already sent" });
 
+  // The broadcast route skips opted-out leads; this route must too, or an opt-out only protects
+  // against bulk mail. A lead who replied "הסר" on WhatsApp lands in ConsentLog, and a follow-up
+  // sent to them from here — even a hand-approved one — is the Israeli spam-law violation the
+  // consent log exists to prevent.
+  const optedOut = await prisma.consentLog.findFirst({ where: { leadId: message.leadId, event: "opted_out" } });
+  if (optedOut) return res.status(409).json({ error: "This lead opted out — sending to them is off the table." });
+
   if (message.channel === "email") {
     if (!parsed.data.toEmail) return res.status(400).json({ error: "toEmail required for email channel" });
+    // Same guard as the broadcast: a reply is the entire point of a personal outreach email, and
+    // without OUTREACH_REPLY_TO it lands in the unread noreply mailbox.
+    if (!outreachReplyTo()) {
+      return res.status(400).json({
+        error: "Set OUTREACH_REPLY_TO to a mailbox you actually read before sending outreach email.",
+      });
+    }
     try {
       await sendOutreachEmail(parsed.data.toEmail, message.subject ?? "", message.body);
     } catch (err) {
