@@ -146,14 +146,21 @@ splits it:
 
 **Does the caller hear ringback or silence during the wait?**
 
-- **Silence**: Zadarma's External Server mode answers the call immediately (B2BUA) and only then
-  bridges to Cartesia — so the caller counts every setup millisecond as dead air after answer.
-  Fix on the Zadarma side: keep the call unanswered (ringback / early media) until the
-  destination answers. This is also the perception fix — four seconds of ringing feels normal,
-  four seconds of post-answer silence feels like a dead line.
-- **Ringback**: Cartesia's own setup is slow, most likely a cold container after idle (a first
-  call ~30+ minutes after the previous one fits this exactly). That is a Cartesia support
-  question; nothing in this repo can warm their workers.
+Verified live (2026-08-11): **silence**, and almost exactly five seconds of it. That number is not
+a coincidence — it is Cartesia's fixed ~5s "Pre-Call Initialization" ring window, made audible as
+dead air because Zadarma's External Server mode answers the caller's leg immediately and only then
+bridges. Two independent fixes, both support tickets rather than code:
+
+- **Cartesia**: ask whether the pre-call ring window can end as soon as `pre_call_handler`
+  returns (ours finishes in ~0.4s). This removes the wait at the root.
+- **Zadarma**: ask whether External Server forwarding can relay ringing / early media instead of
+  answering the caller before the destination answers. Even with the window unchanged, five
+  seconds of ringback feels normal where five seconds of post-answer silence feels like a dead
+  line.
+
+If the wait had been heard as **ringback**, the remaining suspect would have been a cold Cartesia
+container after idle (a first call ~30 minutes after the previous one fits that profile) — also a
+Cartesia support question; nothing in this repo can warm their workers.
 
 Do not re-optimize the agent code for this: after the context cache and ring-time build landed,
 its whole contribution is under half a second and the log proves it per call.
