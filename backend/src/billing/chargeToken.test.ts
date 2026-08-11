@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { chargeSubscriptionToken, PayPlusTerminalNotConfiguredError } from "./payplusSubscription.js";
+
+// payplusSubscription.js pulls in lib/prisma, which builds a real PrismaClient at import time and
+// throws without DATABASE_URL. Nothing here touches the database, so the suite would otherwise
+// pass or fail on whether the machine running it happens to have a .env — every other test file
+// mocks prisma for the same reason.
+vi.mock("../lib/prisma.js", () => ({ prisma: {} }));
+
+const { chargeSubscriptionToken, PayPlusTerminalNotConfiguredError } = await import("./payplusSubscription.js");
 
 /**
  * Pins the HTTP contract of the token charge — endpoint path and required fields.
