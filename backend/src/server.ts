@@ -108,7 +108,10 @@ app.use("/api/voice", voiceRouter);
 app.get("/health", (_req, res) =>
   res.json({
     ok: true,
-    commit: process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? "unknown",
+    // Railway injects RAILWAY_GIT_COMMIT_SHA only for deploys it makes from GitHub itself. A
+    // `railway up` from CI has no git context, so the workflow passes the sha as APP_COMMIT_SHA —
+    // and reading both means either route to production can still answer "which code is this".
+    commit: (process.env.APP_COMMIT_SHA || process.env.RAILWAY_GIT_COMMIT_SHA)?.slice(0, 7) ?? "unknown",
     startedAt: STARTED_AT,
   })
 );

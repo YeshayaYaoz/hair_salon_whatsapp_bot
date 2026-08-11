@@ -94,6 +94,14 @@ jobs:
           [ -n "$RAILWAY_SERVICE" ] && args="$args --service $RAILWAY_SERVICE"
           [ -n "$RAILWAY_ENVIRONMENT" ] && args="$args --environment $RAILWAY_ENVIRONMENT"
 
+          # Railway only injects RAILWAY_GIT_COMMIT_SHA for deploys it makes from GitHub itself;
+          # `railway up` has no git context, so /health would report "unknown" and the one question
+          # this workflow exists to answer would go unanswered. --skip-deploys because the value is
+          # for the build that follows, not a reason to roll the current one. Best-effort: a deploy
+          # is worth more than knowing its sha.
+          railway variables --set "APP_COMMIT_SHA=${GITHUB_SHA}" --skip-deploys $args || \
+            echo "::warning::Could not set APP_COMMIT_SHA — /health will report 'unknown' for this deploy."
+
           # --ci exits when the build finishes instead of tailing logs forever, and fails the job
           # on a failed build. That failure is the entire point: a build that dies on Railway
           # currently leaves the old code serving and reports success nowhere.
