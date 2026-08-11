@@ -574,5 +574,20 @@ async def main_():
     assert "עני" in ag._config.system_prompt and "לשון נקבה" in ag._config.system_prompt
     print("31 the apology agent is inflected by deployment gender too                     OK")
 
+    # --- 32. lessons from the first full live call ---------------------------------------
+    # Each of these is a sentence the agent actually said on a real call, encoded so it cannot
+    # come back: it asked a known caller for the number the system already had (and got a
+    # mis-transcribed one, which went to the owner), it offered to send pictures it cannot send,
+    # and it spoke markdown asterisks aloud.
+    STATE.update(status=200, body=dict(SALON, caller={"isKnownCustomer": True, "name": "דנה", "upcomingAppointment": None}), seen=[])
+    pre = await main.pre_call_handler(req())
+    agent = await main.get_agent(None, req(meta=pre.metadata))
+    prompt = agent._config.system_prompt
+    assert "מועבר אוטומטית" in prompt, "known caller must be told the number is already known"
+    assert "ספרה-ספרה" in prompt, "a dictated number must be read back before use"
+    assert "תמונות" in prompt and "message_owner" in prompt, "no offering media it cannot send"
+    assert "Markdown" in prompt, "spoken output must forbid markdown"
+    print("32 the live call's failures are pinned into the prompt                          OK")
+
 asyncio.run(main_())
 print("\nALL CHECKS PASSED")
