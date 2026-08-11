@@ -117,10 +117,15 @@ export function validateEnv(): void {
 /**
  * Checks the shape of the billing webhook secret, and prints the exact callback URL to register.
  *
- * Presence alone is not enough here, because every way this goes wrong is silent. The secret is a
- * URL path segment: put a "/", "?", "#" or a space in it and the route simply never matches, so
- * PayPlus's callback 404s and the payment is taken while nothing is activated or credited. A
- * pasted trailing newline does the same the moment the URL is typed into PayPlus by hand.
+ * Presence alone is not enough here, because every way this goes wrong is silent: PayPlus's
+ * callback 404s and the payment is taken while nothing is activated or credited.
+ *
+ * URL-unsafe characters used to be checked here too, and were the loudest thing this printed. They
+ * are no longer a problem — the callback URL percent-encodes the secret (payplusSubscription.ts)
+ * and Express decodes it back — and a warning that names a fixed problem is worse than none: it
+ * sends someone to rotate a production billing secret that was never at fault. What remains are
+ * the two this cannot fix from the inside: whitespace, which is a paste artefact that changes the
+ * value itself, and length, which is a real weakness.
  *
  * And the URL itself has to be assembled from two variables and a literal path, which is exactly
  * the kind of thing that gets one character wrong. Printing it means it can be copied, not derived.
@@ -134,9 +139,6 @@ function reportBillingWebhookProblems(): void {
     problems.push("it has leading or trailing whitespace — almost certainly a paste artefact, and it silently becomes part of the URL");
   }
   const secret = raw.trim();
-  if (!/^[A-Za-z0-9._~-]+$/.test(secret)) {
-    problems.push('it contains characters that are not safe in a URL path (use only letters, digits, and " - _ . ~ ")');
-  }
   if (secret.length < 16) {
     problems.push(`it is only ${secret.length} characters — this is the sole thing standing between the public internet and free subscriptions; use 32+`);
   }

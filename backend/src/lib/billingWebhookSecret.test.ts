@@ -54,9 +54,13 @@ describe("PAYPLUS_BILLING_WEBHOOK_SECRET validation", () => {
     expect(errors).not.toContain("unusable");
   });
 
-  it("rejects a secret containing a slash — it would split the route path", async () => {
+  it("accepts a secret containing a slash — the callback URL encodes it", async () => {
+    // This used to be reported as fatal, and on a live deploy it was the loudest line at startup:
+    // "payments will be taken and nothing activated". The secret was never the problem — the URL
+    // was built by interpolating it raw. Now that the callback percent-encodes it, warning about
+    // it would send someone to rotate a production billing secret that works.
     const { errors } = await run("abc/def" + "x".repeat(20));
-    expect(errors).toContain("not safe in a URL path");
+    expect(errors).not.toContain("unusable");
   });
 
   it("catches a pasted trailing newline", async () => {

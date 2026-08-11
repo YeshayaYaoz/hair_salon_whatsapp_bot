@@ -1,5 +1,11 @@
-import { describe, it, expect } from "vitest";
-import { PARSERS } from "./paymentWebhooks.js";
+import { describe, it, expect, vi } from "vitest";
+
+// paymentWebhooks.js pulls in lib/prisma, which builds a real PrismaClient at import time and
+// throws without DATABASE_URL. The parsers under test are pure, so the suite would otherwise pass
+// or fail on whether the machine running it happens to have a .env.
+vi.mock("../lib/prisma.js", () => ({ prisma: {} }));
+
+const { PARSERS } = await import("./paymentWebhooks.js");
 
 /**
  * Pins each provider's callback parser to the payload its documentation shows.

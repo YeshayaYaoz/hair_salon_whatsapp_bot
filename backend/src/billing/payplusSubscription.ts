@@ -218,7 +218,15 @@ async function generateCheckoutPage(params: {
       // Server-to-server notification. Without it the only signal a payment succeeded is the
       // customer's browser landing on refURL_success — so anyone who closes the tab after paying
       // is charged and never activated.
-      ...(appUrl && webhookSecret ? { refURL_callback: `${appUrl}/webhook/billing/payplus/${webhookSecret}` } : {}),
+      // Percent-encoded, because this is a path segment and the secret is an opaque string nobody
+      // chose with URL grammar in mind. A "/" in it silently became a path separator, a space
+      // became a broken URL, and either way PayPlus's callback matched no route — so the payment
+      // was taken and the subscription never activated, with the only trace a startup warning.
+      // Express decodes req.params.secret, so the comparison in payplusBillingRoutes still sees
+      // the raw value.
+      ...(appUrl && webhookSecret
+        ? { refURL_callback: `${appUrl}/webhook/billing/payplus/${encodeURIComponent(webhookSecret)}` }
+        : {}),
       // PayPlus issues the receipt itself once "חשבונית+" is enabled on the account, which is why
       // the customer object below is mandatory rather than nice-to-have.
       initial_invoice: true,
