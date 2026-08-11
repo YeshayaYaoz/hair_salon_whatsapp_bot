@@ -2,6 +2,7 @@ import { prisma } from "./prisma.js";
 import { decryptSecret } from "./crypto.js";
 import { normalizePhone } from "./phone.js";
 import { sendWhatsAppMessage, sendWhatsAppTemplate } from "../webhook/whatsappClient.js";
+import { sendBusinessNoticeEmail } from "./email.js";
 
 /**
  * Sends a WhatsApp message to the business owner's own notification number — used for new-booking
@@ -29,6 +30,8 @@ export async function notifyOwner(businessId: string, message: string): Promise<
     const business = await prisma.business.findUnique({
       where: { id: businessId },
       select: {
+        name: true,
+        email: true,
         notificationPhone: true,
         notificationPhoneVerifiedAt: true,
         whatsappPhoneNumberId: true,
@@ -58,22 +61,25 @@ export async function notifyOwner(businessId: string, message: string): Promise<
       });
     } else {
       const templateName = process.env.WHATSAPP_OWNER_ALERT_TEMPLATE;
-      if (!templateName) {
-        // Sending free-form here would "succeed" at the API and die in transit. Refusing is what
-        // keeps every caller's failure path honest — the voice agent says it could not deliver
-        // and collects a callback instead of promising a message nobody will receive.
-        console.error(
-          `[notifyOwner] owner of ${businessId} has no open 24h window and WHATSAPP_OWNER_ALERT_TEMPLATE is not set — alert NOT sent`
+      if (templateName) {
+        await sendWhatsAppTemplate({
+          phoneNumberId: business.whatsappPhoneNumberId, accessToken,
+          to: business.notificationPhone,
+          templateName,
+          languageCode: process.env.WHATSAPP_OWNER_ALERT_TEMPLATE_LANG || "he",
+          bodyParams: [message],
+        });
+      } else {
+        // Sending free-form here would "succeed" at Meta's API and die in transit. But an owner
+        // who cannot be reached on WhatsApp still said, in as many words, "I want the messages" —
+        // so the alert falls back to the business's own email rather than being refused. Slower to
+        // be noticed than WhatsApp, but it arrives, and a lead that arrives late beats a lead
+        // that never existed.
+        console.warn(
+          `[notifyOwner] owner of ${businessId} has no open 24h window and no WHATSAPP_OWNER_ALERT_TEMPLATE — falling back to email`
         );
-        return false;
+        await sendBusinessNoticeEmail(business.email, business.name, message);
       }
-      await sendWhatsAppTemplate({
-        phoneNumberId: business.whatsappPhoneNumberId, accessToken,
-        to: business.notificationPhone,
-        templateName,
-        languageCode: process.env.WHATSAPP_OWNER_ALERT_TEMPLATE_LANG || "he",
-        bodyParams: [message],
-      });
     }
 
     // A send that succeeded is the proof that the number is real and reachable — nothing else we

@@ -6,6 +6,7 @@ const mockPrisma = {
 };
 const sendWhatsAppMessage = vi.fn();
 const sendWhatsAppTemplate = vi.fn();
+const sendBusinessNoticeEmail = vi.fn();
 
 vi.mock("./prisma.js", () => ({ prisma: mockPrisma }));
 vi.mock("./crypto.js", () => ({ decryptSecret: (s: string) => `dec:${s}` }));
@@ -13,6 +14,7 @@ vi.mock("../webhook/whatsappClient.js", () => ({
   sendWhatsAppMessage: (...a: unknown[]) => sendWhatsAppMessage(...a),
   sendWhatsAppTemplate: (...a: unknown[]) => sendWhatsAppTemplate(...a),
 }));
+vi.mock("./email.js", () => ({ sendBusinessNoticeEmail: (...a: unknown[]) => sendBusinessNoticeEmail(...a) }));
 
 const { notifyOwner } = await import("./ownerNotify.js");
 
@@ -27,6 +29,8 @@ describe("notifyOwner", () => {
     vi.clearAllMocks();
     delete process.env.WHATSAPP_OWNER_ALERT_TEMPLATE;
     mockPrisma.business.findUnique.mockResolvedValue({
+      name: "בנחת רוח",
+      email: "owner@zimmer.test",
       notificationPhone: "0533391353",
       notificationPhoneVerifiedAt: new Date(),
       whatsappPhoneNumberId: "pn1",
@@ -55,13 +59,15 @@ describe("notifyOwner", () => {
     expect(sendWhatsAppMessage).not.toHaveBeenCalled();
   });
 
-  it("returns false outside the window with no template, instead of a send that dies in transit", async () => {
-    // This false is what lets the voice agent tell the caller honestly that the message could not
-    // be delivered and collect a callback — the alternative is a promised message nobody receives.
+  it("falls back to the business's email outside the window with no template", async () => {
+    // A free-form send here would 'succeed' at Meta's API and die in transit. The owner's answer
+    // to that, verbatim, was 'I want the messages' — so the alert arrives by email rather than
+    // being refused. Late beats never; a lead that arrives is a lead.
     mockPrisma.conversationMessage.findFirst.mockResolvedValue(null);
-    expect(await notifyOwner("biz1", "הודעה")).toBe(false);
+    expect(await notifyOwner("biz1", "הודעה")).toBe(true);
     expect(sendWhatsAppMessage).not.toHaveBeenCalled();
     expect(sendWhatsAppTemplate).not.toHaveBeenCalled();
+    expect(sendBusinessNoticeEmail).toHaveBeenCalledWith("owner@zimmer.test", "בנחת רוח", "הודעה");
   });
 
   it("still refuses when no notification phone is configured", async () => {
