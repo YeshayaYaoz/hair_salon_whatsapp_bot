@@ -81,3 +81,62 @@ describe("payplus createPaymentLink", () => {
     expect(body.more_info).toBe("appt1");
   });
 });
+
+/**
+ * The two providers audited after PayPlus, pinned against their own documentation the same way:
+ * Grow's docs ("Server-to-Server Callback" for CreatePaymentProcess) and Cardcom's v11 swagger.
+ * Every assertion below encodes a bug that shipped: a strict ===1 check against a string status,
+ * a notifyUrl that was never sent, three required Cardcom fields that were never sent, and
+ * webhook fields read from places the providers do not put them.
+ */
+import { growProvider } from "./grow.js";
+import { cardcomProvider } from "./cardcom.js";
+
+describe("grow createPaymentLink", () => {
+  let sent: Record<string, unknown>;
+  beforeEach(() => {
+    globalThis.fetch = (async (_url: string, init: RequestInit) => {
+      sent = JSON.parse(init.body as string);
+      // The live API answers status as a STRING — {"status":"0"} on error, "1" on success.
+      return { ok: true, json: async () => ({ status: "1", data: { url: "https://grow/pay", processId: "p1" } }) };
+    }) as unknown as typeof fetch;
+  });
+
+  it("accepts the string status Grow actually returns", async () => {
+    const r = await growProvider.createPaymentLink({ apiKey: "u", apiSecret: "page" }, {
+      amountIls: 50, description: "מקדמה", referenceId: "appt1",
+      callbackUrl: "https://api.example.com/webhook/payments/grow/biz/s",
+    });
+    expect(r.paymentUrl).toBe("https://grow/pay");
+  });
+
+  it("sends notifyUrl — Grow's callback goes ONLY where this request says", async () => {
+    await growProvider.createPaymentLink({ apiKey: "u", apiSecret: "page" }, {
+      amountIls: 50, description: "מקדמה", referenceId: "appt1",
+      callbackUrl: "https://api.example.com/webhook/payments/grow/biz/s",
+    });
+    expect(sent.notifyUrl).toBe("https://api.example.com/webhook/payments/grow/biz/s");
+    expect((sent.pageField as Record<string, unknown>).cField1).toBe("appt1");
+  });
+});
+
+describe("cardcom createPaymentLink", () => {
+  let sent: Record<string, unknown>;
+  beforeEach(() => {
+    globalThis.fetch = (async (_url: string, init: RequestInit) => {
+      sent = JSON.parse(init.body as string);
+      return { ok: true, json: async () => ({ ResponseCode: 0, Url: "https://cardcom/pay", LowProfileId: "lp1" }) };
+    }) as unknown as typeof fetch;
+  });
+
+  it("sends the three fields Cardcom's swagger marks required, and a numeric terminal", async () => {
+    await cardcomProvider.createPaymentLink({ apiKey: "1000", apiSecret: "api" }, {
+      amountIls: 50, description: "מקדמה", referenceId: "appt1",
+      callbackUrl: "https://api.example.com/webhook/payments/cardcom/biz/s",
+    });
+    expect(sent.WebHookUrl).toBe("https://api.example.com/webhook/payments/cardcom/biz/s");
+    expect(typeof sent.SuccessRedirectUrl).toBe("string");
+    expect(typeof sent.FailedRedirectUrl).toBe("string");
+    expect(sent.TerminalNumber).toBe(1000);
+  });
+});

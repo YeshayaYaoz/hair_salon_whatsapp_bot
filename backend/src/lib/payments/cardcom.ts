@@ -6,17 +6,27 @@ const BASE_URL = "https://secure.cardcom.solutions/api/v11";
 
 export const cardcomProvider: PaymentProvider = {
   async createPaymentLink(creds: PaymentCredentials, params: CreatePaymentLinkParams): Promise<PaymentLinkResult> {
+    // Cardcom's swagger marks SuccessRedirectUrl, FailedRedirectUrl and WebHookUrl as REQUIRED on
+    // CreateLowProfile — a request without them is rejected outright, so no Cardcom salon could
+    // generate a deposit link at all. The webhook URL is per-request (nothing to configure in
+    // their dashboard), and the redirects land the customer on a page that says what happened;
+    // Cardcom's own hosted result page is used when we have nowhere better to send them.
+    const webhook = params.callbackUrl;
     const res = await fetch(`${BASE_URL}/LowProfile/Create`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        TerminalNumber: creds.apiKey,
+        // Their schema types TerminalNumber as an integer; a numeric string is what owners paste.
+        TerminalNumber: Number(creds.apiKey),
         ApiName: creds.apiSecret,
         Operation: "ChargeOnly",
         Amount: params.amountIls,
         ISOCoinId: 1, // ILS
         ProductName: params.description,
         ReturnValue: params.referenceId, // echoed back on the result/webhook for correlation
+        ...(webhook ? { WebHookUrl: webhook } : {}),
+        SuccessRedirectUrl: "https://secure.cardcom.solutions/DealWasSuccessful.aspx",
+        FailedRedirectUrl: "https://secure.cardcom.solutions/DealWasUnSuccessful.aspx",
         UIDefinition: { IsHideCardOwnerName: false },
       }),
     });

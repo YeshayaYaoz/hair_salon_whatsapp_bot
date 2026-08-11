@@ -43,29 +43,41 @@ function parseTranzilaEvent(body: Record<string, unknown>): ParsedPaymentEvent {
   };
 }
 
+// Cardcom's LowProfileResult (their swagger, v11): ResponseCode and ReturnValue are top-level,
+// but the money and the payer live inside TranzactionInfo (their spelling) — there IS no
+// top-level Amount. Reading body.Amount yielded undefined, and the deposit confirmation requires
+// a covering amount, so every real Cardcom payment was rejected as underpaid.
 function parseCardcomEvent(body: Record<string, unknown>): ParsedPaymentEvent {
-  const responseCode = Number(body.ResponseCode ?? body.ResponseCodeString);
+  const tx = (body.TranzactionInfo ?? {}) as Record<string, unknown>;
+  const ui = (body.UIValues ?? {}) as Record<string, unknown>;
   return {
-    success: responseCode === 0,
-    amountIls: Number(body.Amount) || undefined,
+    success: Number(body.ResponseCode ?? body.ResponseCodeString) === 0,
+    amountIls: Number(tx.Amount ?? body.Amount) || undefined,
     referenceId: (body.ReturnValue as string) || undefined,
-    customerName: (body.CardOwnerName as string) || undefined,
+    customerName: (tx.CardOwnerName ?? ui.CardOwnerName ?? body.CardOwnerName) as string | undefined,
+    customerPhone: (tx.CardOwnerPhone ?? ui.CardOwnerPhone) as string | undefined,
   };
 }
 
+// Grow's server callback (their docs, "Server-to-Server Callback" for CreatePaymentProcess):
+// form-encoded, every value a string, status "1" as a string, the payer's phone under payerPhone,
+// and the cField1 we sent echoed back under data.customFields — NOT under data.pageField, which
+// is only the name of the REQUEST field. Reading pageField meant the reference never matched and
+// a paid deposit was silently ignored.
 function parseGrowEvent(body: Record<string, unknown>): ParsedPaymentEvent {
   const data = (body.data ?? body) as Record<string, unknown>;
-  const fields = (data.pageField ?? {}) as Record<string, unknown>;
+  const fields = (data.customFields ?? data.pageField ?? {}) as Record<string, unknown>;
   return {
     success: Number(body.status) === 1,
     amountIls: Number(data.sum) || undefined,
     referenceId: (fields.cField1 as string) || undefined,
     customerName: (data.fullName as string) || undefined,
-    customerPhone: (data.phone as string) || undefined,
+    customerPhone: (data.payerPhone ?? data.phone) as string | undefined,
   };
 }
 
-const PARSERS: Record<string, (body: Record<string, unknown>) => ParsedPaymentEvent> = {
+/** Exported for the contract tests — each parser is pinned against its provider's documented callback. */
+export const PARSERS: Record<string, (body: Record<string, unknown>) => ParsedPaymentEvent> = {
   payplus: parsePayPlusEvent,
   tranzila: parseTranzilaEvent,
   cardcom: parseCardcomEvent,

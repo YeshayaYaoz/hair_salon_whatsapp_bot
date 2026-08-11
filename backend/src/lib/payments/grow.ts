@@ -32,12 +32,18 @@ export const growProvider: PaymentProvider = {
         phone: params.customerPhone,
         paymentNum: 1,
         pageField: { cField1: params.referenceId }, // echoed back on the callback for correlation
+        // Grow's server-to-server callback goes ONLY to the notifyUrl passed on this request —
+        // there is no account-level webhook field to fall back on. Without it the customer pays,
+        // no notification is ever sent, and the deposit hold expires as if they hadn't.
+        ...(params.callbackUrl ? { notifyUrl: params.callbackUrl } : {}),
       }),
     });
 
     if (!res.ok) throw new Error(`Grow createPaymentProcess failed (${res.status}): ${await res.text()}`);
-    const body = (await res.json()) as { status: number; err?: { message?: string }; data?: { url?: string; processId?: string } };
-    if (body.status !== 1) throw new Error(`Grow rejected the request: ${body.err?.message ?? "unknown error"}`);
+    // status arrives as the STRING "1"/"0" — the live API answers {"status":"0"} on errors and its
+    // docs show "status": "1" on success. A strict === 1 check rejected every successful response.
+    const body = (await res.json()) as { status: number | string; err?: { message?: string }; data?: { url?: string; processId?: string } };
+    if (Number(body.status) !== 1) throw new Error(`Grow rejected the request: ${body.err?.message ?? "unknown error"}`);
     if (!body.data?.url || !body.data?.processId) throw new Error("Grow response missing url");
     return { paymentUrl: body.data.url, providerTransactionId: body.data.processId };
   },
