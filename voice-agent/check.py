@@ -680,5 +680,32 @@ async def main_():
     await main._post_transcript("+972555077941", "+972533391353", None)
     print("35 the call is recorded turn by turn, each turn once, never raising              OK")
 
+    # --- 36. a transfer records the lead before handing the call over --------------------
+    # A live call collected name, unit, dates, nights and an email — then the agent transferred
+    # and nothing else. The transfer never connected, the call ended, and neither the owner nor
+    # the caller got anything. A transfer is best-effort by nature; the written record is not, so
+    # it happens inside the transfer rather than as a second tool the model may skip.
+    STATE.update(status=200, body=dict(ZIMMER, ownerTransferNumber="+972500000000"), seen=[])
+    pre = await main.pre_call_handler(req())
+    agent = await main.get_agent(None, req(meta=pre.metadata))
+    transfer = next(t for t in agent._tools if (getattr(t, "__name__", None) or getattr(t, "name", "")) == "transfer_to_owner")
+
+    STATE.update(status=200, body={"notified": True}, seen=[])
+    events = [e async for e in transfer(None, summary="ראובן, תאנה, רביעי-חמישי, שני לילות", caller_name="ראובן")]
+    path, payload, _auth = STATE["seen"][0]
+    assert path == "/api/voice/notify-owner", path
+    assert "ראובן" in payload["message"] and payload["callerName"] == "ראובן", payload
+    # And the handover still happens — recording replaces nothing.
+    assert any(type(e).__name__ == "AgentTransferCall" for e in events), events
+
+    # The prompt tells it to summarise before transferring, in both places a transfer can happen.
+    prompt = agent._config.system_prompt
+    assert "message_owner" in prompt and "העברה יכולה להיכשל" in prompt, prompt[-500:]
+
+    # Email is asked for only when WhatsApp is not an option — a live call burned three minutes
+    # spelling an address the caller never needed to give.
+    assert "אל תבקש" in prompt or "אל תבקשי" in prompt, prompt[-800:]
+    print("36 a transfer records the lead first, and email is asked for only on demand     OK")
+
 asyncio.run(main_())
 print("\nALL CHECKS PASSED")

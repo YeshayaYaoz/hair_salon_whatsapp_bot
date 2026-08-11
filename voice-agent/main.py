@@ -680,7 +680,8 @@ FORMS = {
         "verbatim": "העבירי ל-startTime בדיוק את המחרוזת שהתקבלה מ-check_availability.",
         "ask_phone": "לפני שאת קובעת תור, שאלי את המתקשר מה מספר הטלפון שלו והעבירי אותו ב-caller_phone.",
         "confirm_number": 'אם מתקשר מכתיב לך מספר טלפון — חזרי עליו ספרה-ספרה ובקשי אישור לפני שאת משתמשת בו. תמלול קולי טועה במספרים.',
-        "no_media": 'כשמבקשים תמונות או פרטים — השתמשי ב-send_details כדי לשלוח אותם למתקשר עכשיו, לוואטסאפ או למייל. אל תגידי "נשלח" לפני שהכלי החזיר שהשליחה הצליחה. אם הכלי נכשל — הציעי את הערוץ השני, ואם גם הוא לא אפשרי, message_owner. כתובת מייל שהמתקשר מכתיב — חזרי עליה ובקשי אישור לפני השליחה.',
+        "no_media": 'כשמבקשים תמונות או פרטים — השתמשי ב-send_details ושלחי לוואטסאפ של המתקשר. אל תבקשי כתובת מייל: המספר שלו כבר ידוע והוואטסאפ הוא ברירת המחדל. רק אם הוא אומר שאין לו וואטסאפ, או מבקש מייל במפורש — בקשי כתובת מייל, חזרי עליה ובקשי אישור, ואז שלחי במייל. אל תגידי "נשלח" לפני שהכלי החזיר שהשליחה הצליחה.',
+        "record_first": 'לפני שאת מעבירה שיחה או מסיימת אותה — קראי ל-message_owner עם כל מה שאספת: שם, יחידה, תאריכים, מספר לילות, מספר אנשים וכל בקשה מיוחדת. תמיד, גם אם את מעבירה. העברה יכולה להיכשל בלי שאף אחד ידע, וההודעה היא הדבר היחיד שנשאר אם היא נכשלה.',
         "rules": [
             'מספרים אמרי במילים ולא כספרות: "מאה ועשרים שקל".',
             "אל תשתמשי בכוכביות, בסולמיות או בכל סימון Markdown — כל תו שאת כותבת נאמר בקול.",
@@ -716,7 +717,8 @@ FORMS = {
         "verbatim": "העבר ל-startTime בדיוק את המחרוזת שהתקבלה מ-check_availability.",
         "ask_phone": "לפני שאתה קובע תור, שאל את המתקשר מה מספר הטלפון שלו והעבר אותו ב-caller_phone.",
         "confirm_number": 'אם מתקשר מכתיב לך מספר טלפון — חזור עליו ספרה-ספרה ובקש אישור לפני שאתה משתמש בו. תמלול קולי טועה במספרים.',
-        "no_media": 'כשמבקשים תמונות או פרטים — השתמש ב-send_details כדי לשלוח אותם למתקשר עכשיו, לוואטסאפ או למייל. אל תגיד "נשלח" לפני שהכלי החזיר שהשליחה הצליחה. אם הכלי נכשל — הצע את הערוץ השני, ואם גם הוא לא אפשרי, message_owner. כתובת מייל שהמתקשר מכתיב — חזור עליה ובקש אישור לפני השליחה.',
+        "no_media": 'כשמבקשים תמונות או פרטים — השתמש ב-send_details ושלח לוואטסאפ של המתקשר. אל תבקש כתובת מייל: המספר שלו כבר ידוע והוואטסאפ הוא ברירת המחדל. רק אם הוא אומר שאין לו וואטסאפ, או מבקש מייל במפורש — בקש כתובת מייל, חזור עליה ובקש אישור, ואז שלח במייל. אל תגיד "נשלח" לפני שהכלי החזיר שהשליחה הצליחה.',
+        "record_first": 'לפני שאתה מעביר שיחה או מסיים אותה — קרא ל-message_owner עם כל מה שאספת: שם, יחידה, תאריכים, מספר לילות, מספר אנשים וכל בקשה מיוחדת. תמיד, גם אם אתה מעביר. העברה יכולה להיכשל בלי שאף אחד ידע, וההודעה היא הדבר היחיד שנשאר אם היא נכשלה.',
         "rules": [
             'מספרים אמור במילים ולא כספרות: "מאה ועשרים שקל".',
             "אל תשתמש בכוכביות, בסולמיות או בכל סימון Markdown — כל תו שאתה כותב נאמר בקול.",
@@ -796,12 +798,13 @@ def build_prompt(ctx: Dict[str, Any], caller_known: bool = True) -> str:
 
     if inquiry:
         # The B&B model closes bookings human-to-human. Saying otherwise invents a confirmation.
-        parts += ["", "## חשוב", f["no_booking"], f["transfer"], f["leave_message"], f["end_call"]]
+        parts += ["", "## חשוב", f["no_booking"], f["record_first"], f["transfer"], f["leave_message"], f["end_call"]]
     else:
         parts += ["", "## קביעת תורים", f["booking"], f["no_invent"], f["verbatim"]]
         # A caller who asks for a person is not a booking request, and the agent used to have no
         # answer for it at all — the tool existed only for inquiry businesses.
         parts.append(f["can_transfer"] if ctx.get("ownerTransferNumber") else f["no_transfer"])
+        parts.append(f["record_first"])
         parts.append(f["leave_message"])
         parts.append(f["end_call"])
         if not caller_known:
@@ -971,8 +974,12 @@ def build_agent(resolved: Dict[str, Any], called: str, caller_num: str) -> LlmAg
         # No decorator: the SDK branches per yielded value at runtime — raw values feed back to
         # the model, OutputEvent instances go straight to the caller. @passthrough_tool is
         # documented for this but its own docstring calls it legacy and identical to loopback.
-        async def transfer_to_owner(ctx):
-            """מעביר את השיחה לבעל העסק."""
+        async def transfer_to_owner(
+            ctx,
+            summary: Annotated[str, "מה המתקשר רוצה, במשפט אחד: שם, יחידה, תאריכים, לילות, כמה אנשים"] = "",
+            caller_name: Annotated[str, "שם המתקשר, אם אמר אותו"] = "",
+        ):
+            """מעביר את השיחה לבעל העסק, אחרי שהפרטים נשמרים אצלו."""
             # The owner testing their own bot calls from the very number the business notifies, and
             # the transfer then dials the line the call is already on. It cannot connect, and to
             # the caller it looks like the agent ignored the request.
@@ -980,6 +987,22 @@ def build_agent(resolved: Dict[str, Any], called: str, caller_num: str) -> LlmAg
                 logger.warning("transfer target is the caller's own number (%s); messaging instead", transfer_to)
                 yield f["transfer_is_caller"]
                 return
+
+            # Send the summary BEFORE handing the call over, not as a separate step the model may
+            # skip. A live call collected a complete request — name, unit, dates, nights, email —
+            # and the agent went straight to transfer; the transfer never connected, the call
+            # ended, and nobody heard about the lead at all. A transfer is best-effort by nature
+            # (the owner may not answer, the trunk may not bridge); the written record is the only
+            # part that must survive, so it goes first and does not depend on the model choosing
+            # to call a second tool.
+            if summary.strip():
+                payload = {"calledNumber": called, "callerNumber": caller_num, "message": summary.strip()}
+                if caller_name:
+                    payload["callerName"] = caller_name
+                status, body = await _post("/api/voice/notify-owner", payload)
+                if status != 200 or not body.get("notified"):
+                    logger.error("notify-owner before transfer failed (%s): %s", status, body)
+
             yield AgentSendText(text=f["transfer_say"])
             yield AgentTransferCall(target_phone_number=transfer_to)
 
