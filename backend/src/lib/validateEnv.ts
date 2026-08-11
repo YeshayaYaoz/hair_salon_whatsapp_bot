@@ -50,6 +50,8 @@ const RECOMMENDED: RequiredVar[] = [
   { name: "PUBLIC_BACKEND_URL", description: "public URL of THIS backend — sent to PayPlus as refURL_callback so a payment is confirmed server-to-server, not only when the customer's browser returns. Falls back to APP_URL, which points at the dashboard and is usually a different host" },
   { name: "PAYPLUS_BILLING_WEBHOOK_SECRET", description: "shared secret in the subscription webhook URL (/webhook/billing/payplus/<secret>) — without it the endpoint rejects every call, and subscriptions never activate after payment" },
   { name: "PAYPLUS_PAGE_UID", description: "uid of the PayPlus payment page to render for subscription checkout — PayPlus rejects every generateLink call without it (405 not-authorize-missing-payment-page-uid), so subscriptions cannot be bought until it's set" },
+  { name: "PAYPLUS_TERMINAL_UID", description: "PayPlus terminal uid — required by Transactions/Charge for every saved-card charge. Without it first payments succeed (hosted page) and every RENEWAL fails, which is the quietest way to stop getting paid" },
+  { name: "PAYPLUS_CASHIER_UID", description: "PayPlus cashier uid — required alongside PAYPLUS_TERMINAL_UID for saved-card charges" },
   // NOTE: managed *payment clearing* is disabled at the API layer (see businessRoutes.ts) — third-
   // party card clearing through Tori's own merchant account is contractually/legally not allowed.
   // These stay only for Tori's own subscription billing, not for clearing on behalf of salons.

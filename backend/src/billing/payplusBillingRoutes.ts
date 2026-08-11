@@ -14,6 +14,7 @@ import {
   unusedCreditIls,
   chargeAfterCredit,
   PayPlusBillingNotConfiguredError,
+  PayPlusTerminalNotConfiguredError,
 } from "./payplusSubscription.js";
 import { captureError } from "../lib/errorMonitoring.js";
 import { explainPayPlusError } from "../lib/payplusErrors.js";
@@ -92,7 +93,13 @@ payplusBillingRouter.post("/payplus/switch-to-annual", requireAuth, async (req: 
   const creditIls = unusedCreditIls(business);
   const amountIls = chargeAfterCredit(planPriceForCycle(business.subscriptionPlan, "annual"), creditIls);
   const token = decryptSecret(business.subscriptionToken);
-  const result = await chargeSubscriptionToken(token, amountIls, "תורי — מעבר למנוי שנתי");
+  let result;
+  try {
+    result = await chargeSubscriptionToken(token, amountIls, "תורי — מעבר למנוי שנתי");
+  } catch (err) {
+    if (err instanceof PayPlusTerminalNotConfiguredError) return res.status(503).json({ error: "חיוב בכרטיס שמור אינו מוגדר בשרת. פנו לתמיכה." });
+    throw err;
+  }
   if (!result.success) return res.status(502).json({ error: `החיוב למנוי השנתי נכשל. ${explainPayPlusError(result.error ?? "")}` });
 
   await prisma.business.update({
@@ -131,7 +138,13 @@ payplusBillingRouter.post("/payplus/wallet/topup", requireAuth, async (req: Auth
   }
 
   const token = decryptSecret(business.subscriptionToken);
-  const result = await chargeSubscriptionToken(token, parsed.data.amountIls, "תורי — טעינת ארנק להודעות");
+  let result;
+  try {
+    result = await chargeSubscriptionToken(token, parsed.data.amountIls, "תורי — טעינת ארנק להודעות");
+  } catch (err) {
+    if (err instanceof PayPlusTerminalNotConfiguredError) return res.status(503).json({ error: "חיוב בכרטיס שמור אינו מוגדר בשרת. פנו לתמיכה." });
+    throw err;
+  }
   if (!result.success) return res.status(502).json({ error: `טעינת הארנק נכשלה. ${explainPayPlusError(result.error ?? "")}` });
 
   const updated = await prisma.business.update({
@@ -181,7 +194,13 @@ payplusBillingRouter.put("/payplus/plan", requireAuth, async (req: AuthedRequest
 
   if (proratedDiff > 0) {
     const token = decryptSecret(business.subscriptionToken);
-    const result = await chargeSubscriptionToken(token, proratedDiff, `תורי — שדרוג תוכנית (${parsed.data.plan})`);
+    let result;
+    try {
+      result = await chargeSubscriptionToken(token, proratedDiff, `תורי — שדרוג תוכנית (${parsed.data.plan})`);
+    } catch (err) {
+      if (err instanceof PayPlusTerminalNotConfiguredError) return res.status(503).json({ error: "חיוב בכרטיס שמור אינו מוגדר בשרת. פנו לתמיכה." });
+      throw err;
+    }
     if (!result.success) return res.status(502).json({ error: `חיוב ההפרש נכשל. ${explainPayPlusError(result.error ?? "")}` });
   }
 

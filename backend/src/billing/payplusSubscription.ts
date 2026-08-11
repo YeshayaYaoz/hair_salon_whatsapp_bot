@@ -238,26 +238,63 @@ async function generateCheckoutPage(params: {
   return body.data.payment_page_link;
 }
 
-/** Charges a previously-saved recurring token — used both by the nightly billing cron and by
- * immediate upgrade/downgrade proration charges. */
+export class PayPlusTerminalNotConfiguredError extends Error {
+  constructor() {
+    super(
+      "PAYPLUS_TERMINAL_UID / PAYPLUS_CASHIER_UID are not set — charging a saved card needs them. " +
+        "Both are in the PayPlus dashboard under Settings → Terminals."
+    );
+    this.name = "PayPlusTerminalNotConfiguredError";
+  }
+}
+
+/**
+ * Charges a previously-saved recurring token — used both by the nightly billing cron and by
+ * immediate upgrade/downgrade proration charges.
+ *
+ * `Transactions/Charge` (J4) with `use_token`, per docs.payplus.co.il. The previous path here,
+ * `Transactions/ChargeByToken`, does not exist: PayPlus answers a real endpoint's bad auth with
+ * 422 "AUTHORIZATION HEADER IS NOT VALID", and answered that path with the same bare 403 it gives
+ * `Transactions/NoSuchThing`. Every renewal would have failed after a first period that worked,
+ * because the hosted checkout page uses a different, valid endpoint.
+ *
+ * `terminal_uid` and `cashier_uid` are required by the API and are account constants, so they come
+ * from the environment like the rest of the credentials.
+ */
 export async function chargeSubscriptionToken(token: string, amountIls: number, description: string): Promise<{ success: boolean; transactionId?: string; error?: string }> {
   const { apiKey, secretKey } = creds();
+  const terminalUid = process.env.PAYPLUS_TERMINAL_UID?.trim();
+  const cashierUid = process.env.PAYPLUS_CASHIER_UID?.trim();
+  if (!terminalUid || !cashierUid) throw new PayPlusTerminalNotConfiguredError();
 
-  // NOTE: verify this exact path against current PayPlus API docs before going live — token-charge
-  // endpoints on payment gateways are the part most likely to have shifted since this was written.
-  const res = await fetch(`${BASE_URL}/Transactions/ChargeByToken`, {
+  const res = await fetch(`${BASE_URL}/Transactions/Charge`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: JSON.stringify({ api_key: apiKey, secret_key: secretKey }),
     },
-    body: JSON.stringify({ token, amount: amountIls, currency_code: "ILS", more_info: description }),
+    body: JSON.stringify({
+      terminal_uid: terminalUid,
+      cashier_uid: cashierUid,
+      amount: amountIls,
+      currency_code: "ILS",
+      use_token: true,
+      token,
+      // Same receipt behaviour as the hosted checkout page: with חשבונית+ enabled on the account,
+      // PayPlus issues the invoice for renewals too, not only for first purchases.
+      initial_invoice: true,
+      // J4 has no plain more_info field; more_info_1 is its first free-text slot.
+      more_info_1: description,
+    }),
   });
 
   if (!res.ok) return { success: false, error: `HTTP ${res.status}: ${await res.text()}` };
-  const body = (await res.json()) as { data?: { transaction_uid?: string }; results?: { status?: string; description?: string } };
+  const body = (await res.json()) as {
+    data?: { transaction_uid?: string; transaction?: { uid?: string } };
+    results?: { status?: string; description?: string };
+  };
   if (body.results?.status && body.results.status !== "success") {
     return { success: false, error: body.results.description ?? "unknown error" };
   }
-  return { success: true, transactionId: body.data?.transaction_uid };
+  return { success: true, transactionId: body.data?.transaction_uid ?? body.data?.transaction?.uid };
 }
