@@ -146,21 +146,29 @@ splits it:
 
 **Does the caller hear ringback or silence during the wait?**
 
-Verified live (2026-08-11): **silence**, and almost exactly five seconds of it. That number is not
-a coincidence — it is Cartesia's fixed ~5s "Pre-Call Initialization" ring window, made audible as
-dead air because Zadarma's External Server mode answers the caller's leg immediately and only then
-bridges. Two independent fixes, both support tickets rather than code:
+Verified live (2026-08-11), in two steps that each eliminated a suspect:
 
-- **Cartesia**: ask whether the pre-call ring window can end as soon as `pre_call_handler`
-  returns (ours finishes in ~0.4s). This removes the wait at the root.
+1. The wait was heard as **silence**, not ringback — so Zadarma's External Server mode answers
+   the caller's leg immediately and bridges after, which is what turns any upstream setup time
+   into audible dead air.
+2. **Two calls in a row: the first waited ~5s, the second answered within a second.** That
+   acquits any fixed window (a window would hit every call equally) and convicts a **cold
+   start** — Cartesia scales agents to zero when idle, and the first call after a quiet stretch
+   pays the container wake-up. The "exactly five seconds" that suggested their documented
+   pre-call ring window was a coincidence; the second call disproved it.
+
+So the slow greeting hits exactly one caller: the first after ~30+ minutes of quiet. Two fixes,
+both support tickets rather than code:
+
+- **Cartesia**: ask for a minimum-instances / keep-warm option for the deployment, citing the
+  cold-vs-warm timeline. Their platform markets "scale from zero"; a paid floor of one is the
+  standard ask.
 - **Zadarma**: ask whether External Server forwarding can relay ringing / early media instead of
-  answering the caller before the destination answers. Even with the window unchanged, five
+  answering the caller before the destination answers. Even with cold starts unchanged, five
   seconds of ringback feels normal where five seconds of post-answer silence feels like a dead
-  line.
+  line — and this fix covers every future upstream delay, whatever causes it.
 
-If the wait had been heard as **ringback**, the remaining suspect would have been a cold Cartesia
-container after idle (a first call ~30 minutes after the previous one fits that profile) — also a
-Cartesia support question; nothing in this repo can warm their workers.
+The two-calls-in-a-row test is the cheap way to re-run this diagnosis after any change.
 
 Do not re-optimize the agent code for this: after the context cache and ring-time build landed,
 its whole contribution is under half a second and the log proves it per call.
