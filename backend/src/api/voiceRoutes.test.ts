@@ -5,6 +5,8 @@ import { cachedHebrewVoices } from "../lib/cartesiaAdmin.js";
 
 const mockPrisma = {
   business: { findMany: vi.fn(), findUniqueOrThrow: vi.fn() },
+  // The caller lookup runs as raw SQL (see findCallerCustomer) — resolve "no match" by default.
+  $queryRaw: vi.fn(async () => []),
   businessHours: { findMany: vi.fn() },
   customer: { findMany: vi.fn() },
   appointment: { findFirst: vi.fn() },
@@ -267,11 +269,13 @@ describe("POST /api/voice/context", () => {
     expect(res.body.businessName).toBe("Salon Dana");
   });
 
-  it("recognises a caller who saved their own number in local format", async () => {
+  it("recognises a caller matched by the SQL last-nine-digits lookup", async () => {
     mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
     mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ name: "Salon Dana", timezone: "Asia/Jerusalem", address: null, botGreeting: null });
     mockPrisma.businessHours.findMany.mockResolvedValue([]);
-    mockPrisma.customer.findMany.mockResolvedValue([{ id: "c1", phone: "0502222222", name: "אורי" }]);
+    // The lookup is one raw query returning at most one row — it used to fetch EVERY customer of
+    // the business, on the path where an answered caller is hearing silence.
+    mockPrisma.$queryRaw.mockResolvedValue([{ id: "c1", phone: "0502222222", name: "אורי" }]);
     mockPrisma.service.findMany.mockResolvedValue([]);
     mockPrisma.faqEntry.findMany.mockResolvedValue([]);
     mockPrisma.specialPeriod.findMany.mockResolvedValue([]);
@@ -284,13 +288,36 @@ describe("POST /api/voice/context", () => {
 
     expect(res.body.caller.isKnownCustomer).toBe(true);
     expect(res.body.caller.name).toBe("אורי");
+    // The key the SQL matches on: last nine digits, so 0502222222 and +972502222222 are one line.
+    const sql = mockPrisma.$queryRaw.mock.calls[0][0] as { values: unknown[] };
+    expect(sql.values).toContain("502222222");
+  });
+
+  it("never matches on a withheld caller ID", async () => {
+    // "unknown" normalizes to "" — fed to the LIKE-suffix as-is it would match every customer in
+    // the table, and the agent would greet the caller by whoever sorted first.
+    mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ name: "Salon Dana", timezone: "Asia/Jerusalem", address: null, botGreeting: null });
+    mockPrisma.businessHours.findMany.mockResolvedValue([]);
+    mockPrisma.service.findMany.mockResolvedValue([]);
+    mockPrisma.faqEntry.findMany.mockResolvedValue([]);
+    mockPrisma.specialPeriod.findMany.mockResolvedValue([]);
+
+    const res = await request(app)
+      .post("/api/voice/context")
+      .set("Authorization", "Bearer test-secret")
+      .send({ calledNumber: "+972501111111", callerNumber: "unknown" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.caller.isKnownCustomer).toBe(false);
+    expect(mockPrisma.$queryRaw).not.toHaveBeenCalled();
   });
 
   it("surfaces a known caller's upcoming appointment", async () => {
     mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
     mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ name: "Salon Dana", timezone: "Asia/Jerusalem", address: null, botGreeting: null });
     mockPrisma.businessHours.findMany.mockResolvedValue([]);
-    mockPrisma.customer.findMany.mockResolvedValue([{ id: "cust1", phone: "972502222222", name: "Yael" }]);
+    mockPrisma.$queryRaw.mockResolvedValue([{ id: "cust1", phone: "972502222222", name: "Yael" }]);
     mockPrisma.service.findMany.mockResolvedValue([]);
     mockPrisma.faqEntry.findMany.mockResolvedValue([]);
     mockPrisma.specialPeriod.findMany.mockResolvedValue([]);

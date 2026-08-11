@@ -1,6 +1,7 @@
 import { asyncRouter } from "../lib/asyncRouter.js";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
+import { Prisma } from "@prisma/client";
 import { findAvailableSlots, SlotUnavailableError, OutsideBusinessHoursError } from "../booking/availability.js";
 import { bookAppointmentWithSideEffects, cancelAppointmentById, rescheduleAppointmentById, AppointmentNotFoundError } from "../booking/actions.js";
 import { parseBookingTime, instantPartsInTz } from "../lib/timezone.js";
@@ -136,6 +137,35 @@ function voiceGenderFor(voiceId: string | null): "masculine" | "feminine" | null
   return voice?.gender === "masculine" || voice?.gender === "feminine" ? voice.gender : null;
 }
 
+/**
+ * The one customer whose phone matches the caller, or null.
+ *
+ * This runs while an answered caller hears silence, and it used to be a fetch of EVERY customer
+ * row in the business — thousands of rows over the wire from Neon per call — to match one number
+ * in application code (formats vary, so Prisma couldn't compare them). Matching on the last nine
+ * digits inside SQL returns at most one row instead; it is the same rule the outreach reply
+ * handler already uses, and Israeli subscriber numbers are nine digits after the country code, so
+ * it is exactly what normalizePhone equality reduced to for the numbers this ever sees.
+ *
+ * The length guard is not decorative: an unavailable caller ID arrives as "unknown", which
+ * normalizes to "" — and an empty LIKE suffix matches every customer in the table, greeting the
+ * caller by whoever happened to sort first.
+ */
+async function findCallerCustomer(
+  businessId: string,
+  callerDigits: string
+): Promise<{ id: string; phone: string; name: string | null } | null> {
+  if (callerDigits.length < 7) return null;
+  const last9 = callerDigits.slice(-9);
+  const rows = await prisma.$queryRaw<{ id: string; phone: string; name: string | null }[]>(
+    Prisma.sql`SELECT id, phone, name FROM "Customer"
+               WHERE "businessId" = ${businessId}
+                 AND RIGHT(regexp_replace(phone, '[^0-9]', '', 'g'), 9) = ${last9}
+               LIMIT 1`
+  );
+  return rows[0] ?? null;
+}
+
 voiceRouter.post("/context", async (req, res) => {
   // A caller is listening to silence for exactly as long as this handler runs, and the agent's own
   // log can only show the round trip as a whole. Without this line, "the greeting is slow" cannot
@@ -154,7 +184,7 @@ voiceRouter.post("/context", async (req, res) => {
   const now = new Date();
   const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
-  const [full, hours, customers, services, faqEntries, specialPeriods] = await Promise.all([
+  const [full, hours, caller, services, faqEntries, specialPeriods] = await Promise.all([
     prisma.business.findUniqueOrThrow({
       where: { id: business.id },
       select: {
@@ -168,7 +198,7 @@ voiceRouter.post("/context", async (req, res) => {
       },
     }),
     prisma.businessHours.findMany({ where: { businessId: business.id }, orderBy: { dayOfWeek: "asc" } }),
-    prisma.customer.findMany({ where: { businessId: business.id }, select: { id: true, phone: true, name: true } }),
+    findCallerCustomer(business.id, callerDigits),
     prisma.service.findMany({ where: { businessId: business.id }, select: { name: true, description: true, priceCents: true, durationMin: true, capacity: true } }),
     prisma.faqEntry.findMany({ where: { businessId: business.id }, select: { question: true, answer: true } }),
     // Dates on which the terms differ (holiday pricing, minimum stays). Without these the voice
@@ -182,7 +212,6 @@ voiceRouter.post("/context", async (req, res) => {
       select: { label: true, description: true, startDate: true, endDate: true },
     }),
   ]);
-  const caller = customers.find((c) => normalizePhone(c.phone) === callerDigits);
 
   let upcomingAppointment: { id: string; serviceName: string; startTime: Date; staffName: string | null } | null = null;
   if (caller) {
