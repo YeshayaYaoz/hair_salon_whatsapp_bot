@@ -211,6 +211,26 @@ def _usage_metadata(called: str, caller: str) -> Dict[str, Any]:
     return {"metadata": {"tori_called_number": called, "tori_caller_number": caller}}
 
 
+def _latency_extra(model: str) -> Dict[str, Any]:
+    """
+    LiteLLM parameters that buy time to first token, which on a phone line is the only latency
+    anyone hears.
+
+    Prompt caching is the big one. The system prompt carries the whole salon — services, prices,
+    hours, policy, FAQ — and is re-sent verbatim on every turn of the call, around 9,000 tokens of
+    it. `cache_control_injection_points` tells LiteLLM to mark the system message as cacheable;
+    Anthropic then serves it from cache on every turn after the first, which is documented to take
+    200-400ms off TTFT and cuts the input cost of a long call to a tenth.
+
+    Anthropic-only, deliberately. The hook rewrites the message into content blocks carrying
+    `cache_control`, which is Anthropic's shape — DeepSeek caches server-side on its own and has no
+    use for it, and sending it a shape it does not expect risks a 400 on every turn of every call.
+    """
+    if not model.startswith("anthropic/"):
+        return {}
+    return {"cache_control_injection_points": [{"location": "message", "role": "system"}]}
+
+
 def _stream_usage_option(model: str) -> Dict[str, Any]:
     """
     OpenAI-compatible providers (DeepSeek among them) only emit usage on a streamed response when
@@ -222,6 +242,7 @@ def _stream_usage_option(model: str) -> Dict[str, Any]:
 
 
 _STREAM_USAGE_OPTION: Dict[str, Any] = _stream_usage_option(MODEL)
+_LATENCY_EXTRA: Dict[str, Any] = _latency_extra(MODEL)
 
 # Global by design: LiteLLM has no per-request callback hook, and the callback attributes each call
 # via request metadata rather than shared state (see `_UsageReporter`).
@@ -912,7 +933,20 @@ def build_agent(resolved: Dict[str, Any], called: str, caller_num: str) -> LlmAg
             # `extra` is merged into the LiteLLM kwargs verbatim. stream_options asks the provider
             # to emit a usage block on the final streamed chunk — without it a streamed call
             # reports no usage at all and voice spend stays invisible, which is the whole point.
-            extra={**_usage_metadata(called, caller_num), **_STREAM_USAGE_OPTION},
+            extra={**_usage_metadata(called, caller_num), **_STREAM_USAGE_OPTION, **_LATENCY_EXTRA},
+            # Thinking is measured in seconds and a caller is waiting: published figures put a
+            # reasoning turn's first token minutes out, against ~100ms without. Nothing this agent
+            # does — quoting a price, reading back a slot — needs it.
+            reasoning_effort="none",
+            # A runaway turn is the other way a call stops feeling like a conversation: the caller
+            # waits through a monologue they did not ask for. The prompt already asks for two
+            # sentences; this is the backstop for when the model ignores it.
+            max_tokens=300,
+            # Long enough to survive a slow turn, short enough that a hung request becomes an
+            # apology rather than an open line. One retry, because a second costs more silence
+            # than it is likely to save.
+            timeout=15.0,
+            num_retries=1,
         ),
     )
 

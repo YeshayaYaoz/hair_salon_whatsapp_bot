@@ -117,6 +117,21 @@ The model is chosen on time to first token, not on price. Published figures put 
 answer and a dropped call — the caller starts talking again over it. The WhatsApp bot runs DeepSeek,
 where the same wait costs nothing. Change this only with a real call as the test.
 
+### What keeps the call fast
+
+Every one of these was bought with a measured problem, so they are worth knowing before changing:
+
+- **Prompt caching** on the system message (`cache_control_injection_points`). The prompt carries
+  the whole salon and is re-sent every turn — around 9,000 tokens. Anthropic-only; DeepSeek caches
+  server-side by itself.
+- **`reasoning_effort="none"`.** A reasoning turn's first token is minutes out against ~100ms.
+- **`max_tokens=300`** as a backstop against a monologue the caller sits through.
+- **Context cached per dialled+caller number for 60s**, because `pre_call_handler` and the websocket
+  session run in different processes — the agent is rebuilt *after* the answer, and every
+  millisecond of that fetch is silence.
+- **`TORI_AGENT_GENDER`**, so the agent's Hebrew grammar costs no Cartesia round trip per call.
+- **One shared httpx client**, so the context fetch is not preceded by a TLS handshake.
+
 There are two agents, one per voice gender, so `TORI_AGENT_GENDER` is a property of the deployment
 rather than of the call. Set it to match the voice the agent actually speaks in: Hebrew marks gender
 on every verb, and it also picks which of the two apology sentences a caller hears when the backend

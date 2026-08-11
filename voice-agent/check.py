@@ -523,5 +523,27 @@ async def main_():
     assert main._stream_usage_option("anthropic/claude-haiku-4-5-20251001") == {}
     print("29 streamed usage is requested, and only where the provider accepts it         OK")
 
+    # --- 30. the settings that decide whether the call feels like a conversation --------
+    STATE.update(status=200, body=SALON, seen=[])
+    pre = await main.pre_call_handler(req())
+    agent = await main.get_agent(None, req(meta=pre.metadata))
+    cfg = agent._config
+
+    # Thinking is measured in seconds with a caller on the line, and nothing here needs it.
+    assert cfg.reasoning_effort == "none", cfg.reasoning_effort
+    # A backstop against a monologue the caller has to sit through.
+    assert cfg.max_tokens == 300, cfg.max_tokens
+    # A hung request should become an apology, not an open line.
+    assert cfg.timeout == 15.0 and cfg.num_retries == 1, (cfg.timeout, cfg.num_retries)
+
+    # The system prompt carries the whole salon and is re-sent every turn; marking it cacheable is
+    # documented to take 200-400ms off time to first token.
+    anthropic = main._latency_extra("anthropic/claude-haiku-4-5-20251001")
+    assert anthropic["cache_control_injection_points"] == [{"location": "message", "role": "system"}], anthropic
+    # Anthropic's shape only. DeepSeek caches server-side and has no use for it; sending it a shape
+    # it does not expect risks a 400 on every turn of every call.
+    assert main._latency_extra("deepseek/deepseek-chat") == {}
+    print("30 the call is configured for first-token latency, not for throughput          OK")
+
 asyncio.run(main_())
 print("\nALL CHECKS PASSED")
