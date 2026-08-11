@@ -517,7 +517,10 @@ async def main_():
 
     # Streamed responses only carry usage when asked for it, and Anthropic rejects the parameter
     # outright — so it has to be attached per provider, not unconditionally.
-    assert main._STREAM_USAGE_OPTION == {"stream_options": {"include_usage": True}}, main._STREAM_USAGE_OPTION
+    assert main._stream_usage_option("deepseek/deepseek-chat") == {"stream_options": {"include_usage": True}}
+    # Anthropic 400s on the parameter, which would take down every call rather than just the
+    # bookkeeping — and it reports usage on its stream without being asked.
+    assert main._stream_usage_option("anthropic/claude-haiku-4-5-20251001") == {}
     print("29 streamed usage is requested, and only where the provider accepts it         OK")
 
 asyncio.run(main_())

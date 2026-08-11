@@ -106,12 +106,16 @@ Set these wherever the agent ends up running — Railway service variables when 
 |---|---|
 | `TORI_API_URL` | Base URL of the backend, e.g. `https://api.torionline.co.il` |
 | `CARTESIA_TOOL_SECRET` | Must equal the backend's — `voiceRoutes` rejects every request without it |
-| `TORI_AGENT_MODEL` | Optional; defaults to `deepseek/deepseek-chat` |
+| `TORI_AGENT_MODEL` | Optional; defaults to `anthropic/claude-haiku-4-5-20251001` |
 | `TORI_AGENT_GENDER` | `masculine` or `feminine` — the gender this deployment speaks about itself in |
 
-The matching model provider key is needed too: `DEEPSEEK_API_KEY` for the default, or
-`TORI_AGENT_API_KEY` to set one explicitly regardless of provider (`ANTHROPIC_API_KEY` still works
-if `TORI_AGENT_MODEL` is pointed back at a Claude model).
+The matching model provider key is needed too: `ANTHROPIC_API_KEY` for the default, or
+`TORI_AGENT_API_KEY` to set one explicitly regardless of provider.
+
+The model is chosen on time to first token, not on price. Published figures put Haiku 4.5 near
+100–150ms against DeepSeek's 0.8–1.8s, and on a phone line that gap is the difference between an
+answer and a dropped call — the caller starts talking again over it. The WhatsApp bot runs DeepSeek,
+where the same wait costs nothing. Change this only with a real call as the test.
 
 There are two agents, one per voice gender, so `TORI_AGENT_GENDER` is a property of the deployment
 rather than of the call. Set it to match the voice the agent actually speaks in: Hebrew marks gender

@@ -63,13 +63,19 @@ if not logger.handlers:
 
 TORI_API_URL = os.environ.get("TORI_API_URL", "").rstrip("/")
 TOOL_SECRET = os.environ.get("CARTESIA_TOOL_SECRET", "")
-MODEL = os.environ.get("TORI_AGENT_MODEL", "deepseek/deepseek-chat")
+# Haiku, not DeepSeek, and deliberately: on the phone the only latency that matters is time to
+# first token, and published figures put Haiku 4.5 near 100-150ms against DeepSeek's 0.8-1.8s. That
+# gap is inaudible in WhatsApp and unbearable in a conversation — a second of silence after someone
+# stops speaking reads as a dropped call, and they start talking again over the answer. The token
+# price is roughly 7x higher and it is still the right trade here; the WhatsApp bot keeps DeepSeek,
+# where the wait costs nothing.
+MODEL = os.environ.get("TORI_AGENT_MODEL", "anthropic/claude-haiku-4-5-20251001")
 # LlmAgent raises if this is empty, so a missing key fails at deploy rather than mid-call. The
 # variable follows the provider in MODEL — swap both together.
 MODEL_API_KEY = (
     os.environ.get("TORI_AGENT_API_KEY")
-    or os.environ.get("DEEPSEEK_API_KEY")
-    or os.environ.get("ANTHROPIC_API_KEY", "")
+    or os.environ.get("ANTHROPIC_API_KEY")
+    or os.environ.get("DEEPSEEK_API_KEY", "")
 )
 
 # Israeli salons and B&Bs; the STT and TTS both need telling, and the voice picked in the dashboard
@@ -205,12 +211,17 @@ def _usage_metadata(called: str, caller: str) -> Dict[str, Any]:
     return {"metadata": {"tori_called_number": called, "tori_caller_number": caller}}
 
 
-# OpenAI-compatible providers (DeepSeek among them) only emit usage on a streamed response when
-# asked. Anthropic's API rejects the parameter outright, so it is attached by provider rather than
-# unconditionally — a 400 here would take every call down, not just the bookkeeping.
-_STREAM_USAGE_OPTION: Dict[str, Any] = (
-    {} if MODEL.startswith("anthropic/") else {"stream_options": {"include_usage": True}}
-)
+def _stream_usage_option(model: str) -> Dict[str, Any]:
+    """
+    OpenAI-compatible providers (DeepSeek among them) only emit usage on a streamed response when
+    asked. Anthropic's API rejects the parameter outright and reports usage on its stream anyway, so
+    it is attached by provider rather than unconditionally — a 400 here would take every call down,
+    not just the bookkeeping.
+    """
+    return {} if model.startswith("anthropic/") else {"stream_options": {"include_usage": True}}
+
+
+_STREAM_USAGE_OPTION: Dict[str, Any] = _stream_usage_option(MODEL)
 
 # Global by design: LiteLLM has no per-request callback hook, and the callback attributes each call
 # via request metadata rather than shared state (see `_UsageReporter`).
