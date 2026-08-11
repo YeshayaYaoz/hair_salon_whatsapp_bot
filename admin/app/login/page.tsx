@@ -689,7 +689,7 @@ export default function LoginPage() {
             {/* Brand mark — the left panel (which carries the logo) is hidden on mobile, so the
                 form itself needs one for the page to feel branded on phones too. */}
             <div className="login-form-brand">
-              <Image src="/tori_logo_transparent.png" alt="תורי" width={60} height={60} style={{ borderRadius: 15 }} />
+              <Image src="/tori_logo_transparent.png" alt="תורי" width={60} height={60} priority style={{ borderRadius: 15 }} />
               <div className="login-form-golden">{he ? "תור הזהב של העסק שלך" : "The golden ticket for your business"}</div>
             </div>
 
