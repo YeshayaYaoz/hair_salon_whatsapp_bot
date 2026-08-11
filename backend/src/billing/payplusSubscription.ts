@@ -232,7 +232,11 @@ async function generateCheckoutPage(params: {
       initial_invoice: true,
       customer: { customer_name: business.name, email: business.email },
       more_info: checkoutRef,
-      refURL_success: returnUrl,
+      // Through the backend trampoline: PayPlus sends the browser here with a POST, and a Next.js
+      // page answers POST with a 405 — which is what a paying customer used to see first.
+      refURL_success: appUrl
+        ? `${appUrl}/webhook/billing/payplus/return/redirect?to=${encodeURIComponent(returnUrl)}`
+        : returnUrl,
       items: [{ name: itemName, quantity: 1, price: amountIls }],
     }),
   });

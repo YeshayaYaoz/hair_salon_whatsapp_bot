@@ -126,3 +126,29 @@ describe("probeGenerateLink", () => {
     delete process.env.PAYPLUS_BILLING_WEBHOOK_SECRET;
   });
 });
+
+describe("checkout return trampoline", () => {
+  it("routes refURL_success through the backend, which answers POST with a 303", async () => {
+    // PayPlus sends the browser back with a POST; a Next.js page answers that with 405 — which is
+    // what a customer who had just paid (with the PayPlus email to prove it) used to see first.
+    process.env.PUBLIC_BACKEND_URL = "https://api.example.com";
+    process.env.PAYPLUS_BILLING_WEBHOOK_SECRET = "hook-secret";
+    const { createWalletTopupLink } = await import("./payplusSubscription.js");
+    const prismaModule = await import("../lib/prisma.js");
+    (prismaModule.prisma as Record<string, unknown>).business = {
+      update: async () => ({ name: "עסק", email: "x@y.z" }),
+    };
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ results: { status: "success" }, data: { payment_page_link: "https://pay/1" } }),
+    });
+    await createWalletTopupLink("biz1", 20, "https://app.example.com/dashboard/billing");
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.refURL_success).toBe(
+      "https://api.example.com/webhook/billing/payplus/return/redirect?to=" +
+        encodeURIComponent("https://app.example.com/dashboard/billing")
+    );
+    delete process.env.PUBLIC_BACKEND_URL;
+    delete process.env.PAYPLUS_BILLING_WEBHOOK_SECRET;
+  });
+});

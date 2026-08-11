@@ -274,6 +274,31 @@ payplusBillingRouter.put("/payplus/plan", requireAuth, async (req: AuthedRequest
 });
 
 /**
+ * Where the customer's browser lands after paying a billing checkout.
+ *
+ * PayPlus redirects to refURL_success with a POST. A Next.js page route only answers GET, so the
+ * customer who had just paid — and had the PayPlus email to prove it — was shown a bare
+ * "HTTP ERROR 405" as the very first thing after handing over money. This trampoline accepts any
+ * method and answers 303 See Other, which the browser follows with a clean GET.
+ *
+ * Registered BEFORE the /:secret routes so the two-segment path cannot be captured by them. The
+ * destination is confined to the dashboard's own origin — an open redirect on a payment return
+ * URL is a phishing primitive, so anything else falls back to the billing page.
+ */
+payplusBillingWebhookRouter.all("/return/redirect", (req, res) => {
+  const fallback = `${APP_URL}/dashboard/billing`;
+  const to = typeof req.query.to === "string" ? req.query.to : "";
+  let destination = fallback;
+  try {
+    const parsed = new URL(to);
+    if (parsed.origin === new URL(APP_URL).origin) destination = parsed.toString();
+  } catch {
+    /* not a URL — keep the fallback */
+  }
+  res.redirect(303, destination);
+});
+
+/**
  * Browser-openable check that the callback URL is actually live and the secret matches.
  *
  * The failure it exists for is silent and expensive: a secret that does not match means PayPlus's
