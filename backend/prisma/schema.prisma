@@ -238,6 +238,16 @@ model AffiliateReferral {
 
 /// Tracks the last run of each global background job (reminders, reviews, digest, retention) so
 /// its health can be surfaced in the dashboard instead of living only in Railway logs.
+/// Operator-level values captured at runtime rather than configured by hand. First use: PayPlus's
+/// terminal_uid/cashier_uid, which Transactions/Charge requires but no PayPlus API lists — they
+/// arrive on every successful checkout callback, so the webhook records them here and the token
+/// charge falls back to them when the env vars are unset.
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
 model SystemJobRun {
   jobName        String   @id
   lastRunAt      DateTime

@@ -49,6 +49,8 @@ describe("parsePayPlusCallback", () => {
     expect(e.amountIls).toBe(90);
     expect(e.referenceId).toBe("ref-abc123");
     expect(e.tokenUid).toBe("tok-nested-1");
+    // The one place terminal_uid/cashier_uid can be learned — no PayPlus endpoint lists them.
+    expect(e.terminalUid).toBe("97432e96-3c21-4eb2-9d64-1067e845b35a");
   });
 
   it("reads the flat shape older integrations receive", () => {

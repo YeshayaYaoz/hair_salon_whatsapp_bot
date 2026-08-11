@@ -243,6 +243,75 @@ function BusinessCard({ b, he, onOpen, fmtDate }: {
   );
 }
 
+
+interface BillingCheck { name: string; ok: boolean; detail?: string }
+
+/**
+ * The payplus-probe as a card: the backend holds every variable the CLI version needed
+ * `railway run` for, so the operator gets the same checks — and the payable ₪1 test link —
+ * in one click. Operator-only page, so the copy stays Hebrew-first like the endpoint's.
+ */
+function BillingHealthCard({ he }: { he: boolean }) {
+  const [state, setState] = useState<{ ok: boolean; checks: BillingCheck[]; testPaymentUrl?: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function run(withLink: boolean) {
+    setLoading(true);
+    setError(null);
+    try {
+      setState(await apiFetch(`/api/billing/payplus/health${withLink ? "?link=1" : ""}`));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4 animate-fade-up">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+        <h2 className="text-sm font-semibold text-gray-800">{he ? "בריאות חיוב PayPlus" : "PayPlus billing health"}</h2>
+        <div className="flex gap-2">
+          <button onClick={() => run(false)} disabled={loading}
+            className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+            {loading ? "…" : he ? "בדוק" : "Check"}
+          </button>
+          <button onClick={() => run(true)} disabled={loading}
+            className="text-xs px-3 py-1.5 rounded-lg bg-[#1B7FA0] text-white hover:bg-[#16688a] disabled:opacity-50">
+            {he ? "צור דף ₪1 לבדיקה" : "Create ₪1 test page"}
+          </button>
+        </div>
+      </div>
+      {error && <div className="text-xs text-red-600 mb-2">{error}</div>}
+      {state && (
+        <ul className="text-xs space-y-1.5">
+          {state.checks.map((c) => (
+            <li key={c.name} className="flex items-start gap-2">
+              <span aria-hidden>{c.ok ? "✅" : "❌"}</span>
+              <span className={c.ok ? "text-gray-700" : "text-red-700 font-medium"}>
+                {c.name}
+                {c.detail && <span className="text-gray-600 font-normal"> — {c.detail}</span>}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {state?.testPaymentUrl && (
+        <div className="mt-3 text-xs bg-teal-50 border border-teal-200 rounded-lg p-3 text-gray-800">
+          {he
+            ? "שלם את הדף הזה (₪1) כדי להוכיח את המסלול עד הסוף: החיוב יופיע בדשבורד PayPlus, ה-webhook ייקלט, וה-terminal/cashier ייקלטו אוטומטית לחיובי חידוש."
+            : "Pay this ₪1 page to prove the path end to end: the charge appears in the PayPlus dashboard, the webhook fires, and terminal/cashier are captured for renewals."}
+          <a href={state.testPaymentUrl} target="_blank" rel="noopener noreferrer"
+            className="block mt-2 font-semibold text-[#1B7FA0] underline break-all" dir="ltr">
+            {state.testPaymentUrl}
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminBusinessesPage() {
   const { lang } = useLanguage();
   const he = lang === "he";
@@ -487,6 +556,8 @@ export default function AdminBusinessesPage() {
           )}
         </div>
       )}
+
+      <BillingHealthCard he={he} />
 
       {mrrHistory && mrrHistory.length > 1 && (
         <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4 animate-fade-up">
