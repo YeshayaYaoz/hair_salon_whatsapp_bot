@@ -77,6 +77,37 @@ async function main(): Promise<void> {
     for (const a of agentList) {
       const mine = a.id === agentId ? "  ← CARTESIA_AGENT_ID" : "";
       console.log(`    - ${a.id} "${a.name}"  tts_voice=${a.tts_voice ?? "(none)"}  tts_language=${a.tts_language ?? "(none)"}${mine}`);
+
+      // Where the agent's code actually runs, and the console prompt sitting next to it. Both are
+      // invisible from the call logs — a cold-started managed agent and a warm self-hosted one
+      // print exactly the same lines once they are awake, because the ~5 seconds a caller waits
+      // for the managed runtime to scale up from zero happens before any of our code exists to
+      // log it. So the deployment mode has to be read from the account, not inferred from a call.
+      const selfHosted = a.self_hosted_deployment_url as string | undefined;
+      console.log(
+        selfHosted
+          ? `        deployment: self-hosted → ${selfHosted} (no cold start; a paid Railway service never sleeps)`
+          : `        deployment: MANAGED — the first caller after an idle stretch waits ~5s for a cold start.` +
+            ` Point it at the Railway service to remove that (voice-agent/README.md → "self_hosted_deployment_url").`
+      );
+
+      // The console's own prompt. It is dead weight on a self-hosted agent — main.py builds the
+      // real one per call from the salon's data — but it is not inert: it was found written in the
+      // opposite gender to the deployment and instructing the model to call `get_context`, a tool
+      // deliberately removed (with no tool registered the model asked a live caller out loud for
+      // "the number you called"). Anything non-trivial here is a second prompt that can only
+      // disagree with the one in the repo.
+      const consolePrompt = (a.system_prompt as string | undefined)?.trim() ?? "";
+      if (consolePrompt.length > 120) {
+        console.log(
+          `        console prompt: ${consolePrompt.length} chars — STALE. The live prompt is built in` +
+            ` voice-agent/main.py; clear this one so it can never be the one that answers.`
+        );
+      } else if (consolePrompt) {
+        console.log(`        console prompt: ${consolePrompt.length} chars (marker only) — fine.`);
+      } else {
+        console.log(`        console prompt: empty — fine, the repo owns the prompt.`);
+      }
     }
   } else {
     console.log(`  ${brief(agents.body)}`);

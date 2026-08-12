@@ -92,6 +92,30 @@ curl -X PATCH https://api.cartesia.ai/agents/$CARTESIA_AGENT_ID \
 
 (`cartesia connect --url …` does the same thing from the CLI.)
 
+#### Clear the console's own prompt while you are in there
+
+The agent object keeps a `system_prompt` of its own, editable in the Cartesia console. On a
+self-hosted agent it is dead weight — `build_prompt` renders the real one per call, from the
+salon's data — but it is not harmless dead weight. The copy found on the live agent was written in
+the opposite gender to `TORI_AGENT_GENDER` and told the model to call `get_context`, a tool that
+was deliberately removed (see the module docstring: with no tool registered, the model asked a real
+caller out loud for "the number you called"). Two prompts that disagree is a coin toss nobody is
+watching.
+
+Replace it with a marker rather than an empty string, so an agent that somehow answers without the
+self-hosted URL is obviously misconfigured instead of quietly promptless:
+
+```bash
+curl -X PATCH https://api.cartesia.ai/agents/$CARTESIA_AGENT_ID \
+  -H "Authorization: Bearer $CARTESIA_API_KEY" \
+  -H "Cartesia-Version: 2026-03-01" \
+  -H "Content-Type: application/json" \
+  -d '{"system_prompt": "Self-hosted agent — the live prompt is built per call in voice-agent/main.py (build_prompt). This field is intentionally unused; do not write instructions here."}'
+```
+
+`railway run npx tsx scripts/cartesia-probe.ts` (from `backend/`) reports the length of whatever is
+there and flags it when it grows back into a second prompt.
+
 **This is now the recommended route**, and the reasoning reversed on live measurement. The managed
 runtime scales the agent to zero when idle, and the first call after a quiet stretch pays ~5
 seconds of dead air waking the container — measured on a real call, and confirmed as cold start by
