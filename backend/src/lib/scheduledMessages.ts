@@ -14,7 +14,7 @@ import { instantPartsInTz, dayOfWeekForDate } from "./timezone.js";
  * Any other (non-window) failure from the free-form attempt is rethrown. A successful send is
  * metered against the business's plan quota — see wallet.ts.
  */
-async function sendWithTemplateFallback(
+export async function sendWithTemplateFallback(
   businessId: string,
   common: { phoneNumberId: string; accessToken: string; to: string },
   text: string,

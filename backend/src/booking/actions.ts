@@ -8,8 +8,60 @@ import { createAppointment, SlotUnavailableError, OutsideBusinessHoursError } fr
 import { syncAppointmentToCalendar, deleteCalendarEvent } from "../lib/googleCalendar.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
 import { notifyOwner } from "../lib/ownerNotify.js";
+import { decryptSecret } from "../lib/crypto.js";
+import { sendWithTemplateFallback } from "../lib/scheduledMessages.js";
+import { confirmationTemplate } from "../lib/whatsappTemplates.js";
 
 export { SlotUnavailableError, OutsideBusinessHoursError };
+
+/**
+ * Sends the customer their booking in writing.
+ *
+ * Written for phone bookings, where nothing else does. The voice agent reads the time back and the
+ * call ends; the caller is left holding a time they heard once, for a business whose address they
+ * were told out loud. On the live calls that prompted this, callers asked to be sent details
+ * precisely because a spoken time is not something anyone trusts themselves to remember.
+ *
+ * A caller who has never messaged this business has no open 24h window, so this almost always goes
+ * out as a template — which is the whole reason a confirmation template has to exist rather than
+ * being an optional nicety.
+ */
+async function confirmBookingToCustomer(params: {
+  businessId: string;
+  customerPhone: string;
+  customerName?: string;
+  serviceName: string;
+  startTime: Date;
+}): Promise<void> {
+  const business = await prisma.business.findUnique({
+    where: { id: params.businessId },
+    select: { name: true, address: true, whatsappPhoneNumberId: true, whatsappAccessToken: true },
+  });
+  if (!business?.whatsappPhoneNumberId || !business.whatsappAccessToken) return;
+
+  // The same localized string the reminder uses, so a customer sees one format across both messages
+  // rather than two renderings of the same appointment.
+  const when = params.startTime.toLocaleString("he-IL", {
+    weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit",
+  });
+  const name = params.customerName ? params.customerName.split(" ")[0] : "היי";
+  const addressLine = business.address ? `\n📍 ${business.address}` : "";
+  const text = `${name}! 👋 התור שלך ל${params.serviceName} נקבע ל-${when} אצל ${business.name}.${addressLine}\n\nלביטול יש לכתוב "בטל תור".`;
+
+  const outcome = await sendWithTemplateFallback(
+    params.businessId,
+    {
+      phoneNumberId: business.whatsappPhoneNumberId,
+      accessToken: decryptSecret(business.whatsappAccessToken),
+      to: params.customerPhone,
+      },
+    text,
+    confirmationTemplate(),
+    [name, params.serviceName, when, business.name]
+  );
+  if (outcome === "sent") console.log(`[booking] Confirmation sent to ${params.customerPhone}`);
+  else console.warn(`[booking] Confirmation undelivered — caller has no open window and ${confirmationTemplate().name} is not approved on this WABA`);
+}
 
 export class AppointmentNotFoundError extends Error {
   constructor() {
@@ -29,6 +81,17 @@ export async function bookAppointmentWithSideEffects(params: {
   staffId?: string | null;
   staffName?: string;
   ownerAlertPrefix: string; // e.g. "📅 הזמנה חדשה (וואטסאפ)" vs "📞 הזמנה חדשה (שיחה)"
+  /**
+   * Which channel the booking came in on.
+   *
+   * Only "voice" gets a written confirmation. A WhatsApp booking is already confirmed by the bot's
+   * own reply in the same thread, and a second message repeating it reads as a duplicate. A phone
+   * booking has no thread at all — which is the gap this exists to close.
+   *
+   * Defaults to "whatsapp" so an unconverted caller keeps today's behaviour rather than silently
+   * starting to message customers.
+   */
+  source?: "whatsapp" | "voice";
 }): Promise<Appointment> {
   const appointment = await createAppointment({
     businessId: params.businessId,
@@ -38,6 +101,18 @@ export async function bookAppointmentWithSideEffects(params: {
     startTime: params.startTime,
     staffId: params.staffId,
   });
+
+  if (params.source === "voice") {
+    // Fire-and-forget: the appointment is already booked, and a caller who has hung up must never
+    // have the booking fail because a confirmation could not be delivered.
+    confirmBookingToCustomer({
+      businessId: params.businessId,
+      customerPhone: params.customerPhone,
+      customerName: params.customerName,
+      serviceName: params.serviceName,
+      startTime: appointment.startTime,
+    }).catch((err) => console.error("[booking] Customer confirmation failed (non-fatal):", err));
+  }
 
   const customerLabel = params.customerName ?? params.customerPhone;
   const staffLine = params.staffName ? `\nעם: ${params.staffName}` : "";
@@ -90,6 +165,9 @@ export async function rescheduleAppointmentById(params: {
   newServiceId?: string;
   newStaffId?: string | null;
   ownerAlertPrefix: string;
+  /** Passed straight through — a phone reschedule leaves the customer with nothing in writing for
+   * exactly the same reason a phone booking does, and the new time is the one that matters. */
+  source?: "whatsapp" | "voice";
 }): Promise<Appointment> {
   const existing = await prisma.appointment.findFirst({
     where: { id: params.appointmentId, businessId: params.businessId, status: "confirmed" },
@@ -117,6 +195,7 @@ export async function rescheduleAppointmentById(params: {
       staffId,
       staffName: staffId ? existing.staff?.name : undefined,
       ownerAlertPrefix: params.ownerAlertPrefix,
+      source: params.source,
     });
   } catch (err) {
     // New slot was taken or invalid — restore the original so the customer isn't left with nothing.
