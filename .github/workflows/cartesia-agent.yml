@@ -23,7 +23,7 @@ on:
   workflow_dispatch:
     inputs:
       clear_console_prompt:
-        description: "Replace the console's system_prompt with an inert marker"
+        description: "Replace the console's llm_system_prompt and llm_introduce with inert markers"
         type: boolean
         default: true
       deployment_url:
@@ -43,6 +43,12 @@ jobs:
       API: https://api.cartesia.ai
       VERSION: "2026-03-01"
       MARKER: "Self-hosted agent — the live prompt is built per call in voice-agent/main.py (build_prompt). This field is intentionally unused; do not write instructions here."
+      # Deliberately shorter and plainer than MARKER, because llm_introduce is the one field here
+      # that is *spoken*. It is unused in both deployment modes — main.py passes its own
+      # introduction=spoken_greeting(salon), which is why the live call opened with the salon's
+      # greeting and not the console's — but if it ever did reach a caller, a paragraph of English
+      # developer prose is a worse thing to say to someone than one short line.
+      MARKER_INTRO: "Unused — the spoken greeting is built per call in voice-agent/main.py."
     steps:
       - name: Is anything configured
         run: |
@@ -96,20 +102,23 @@ jobs:
           # Cartesia's own words for the thing the caller experiences as dead air.
           echo "is_live=$(echo "$out" | jq -r '.is_live // "?"')  stopped_for_inactivity=$(echo "$out" | jq -r '.stopped_for_inactivity // "?"')"
 
-      - name: Replace the console prompt with a marker
+      - name: Replace the console prompt and greeting with markers
         if: inputs.clear_console_prompt
         run: |
-          # A marker rather than an empty string: an agent that somehow answers without its
-          # self-hosted URL should be visibly misconfigured, not quietly promptless.
+          # Markers rather than empty strings: an agent that somehow answers without its
+          # self-hosted URL should be visibly misconfigured, not quietly promptless. Both fields
+          # go in one PATCH so the console can never be left half-cleared.
           out=$(curl -sS -X PATCH "$API/agents/$AGENT" \
             -H "Authorization: Bearer $KEY" -H "Cartesia-Version: $VERSION" \
             -H "Content-Type: application/json" \
-            --data "$(jq -nc --arg p "$MARKER" '{llm_system_prompt: $p}')")
+            --data "$(jq -nc --arg p "$MARKER" --arg i "$MARKER_INTRO" \
+                        '{llm_system_prompt: $p, llm_introduce: $i}')")
           if echo "$out" | jq -e '.error // .message' >/dev/null 2>&1; then
             echo "::error::PATCH failed: $(echo "$out" | jq -r '.error // .message')"
             exit 1
           fi
           echo "llm_system_prompt is now $(echo "$out" | jq -r '.llm_system_prompt // "" | length') chars (the marker)."
+          echo "llm_introduce   is now $(echo "$out" | jq -r '.llm_introduce // "" | length') chars (the marker)."
 
       - name: Point the agent at the self-hosted deployment
         if: inputs.deployment_url != ''
