@@ -32,6 +32,7 @@ Env: TORI_API_URL, CARTESIA_TOOL_SECRET (must match the backend's), plus a model
 
 import logging
 import os
+import threading
 import re
 import time
 from datetime import datetime, timedelta
@@ -48,8 +49,17 @@ from line.llm_agent import LlmAgent, LlmConfig, end_call
 
 # LiteLLM is what cartesia-line calls under the hood (see line/llm_agent/http_provider.py), which
 # makes its success callback the only place the agent's token usage is visible to us.
-import litellm
-from litellm.integrations.custom_logger import CustomLogger
+# NOT imported here. `import litellm` costs ~3.5 seconds, and it is the single largest thing
+# standing between a cold container and a caller hearing a word — measured against `line.llm_agent`
+# itself, which loads in 0.6s and does not pull litellm in at all. That cost was ours, paid at
+# module scope, for a callback that only fires *after* a call is answered.
+#
+# So it is loaded on a background thread while the process finishes starting. Python's import lock
+# makes that safe: whichever of this thread and the first real completion gets there first, the
+# other waits, and neither loads it twice.
+#
+# The measurement, so nobody has to redo it: litellm 3.5s, httpx 1.8s, line 0.6s. The first caller
+# after every deploy paid all of it.
 
 logger = logging.getLogger("tori")
 # Cartesia's runtime configures loguru for the SDK's own output and leaves the standard library's
@@ -195,7 +205,7 @@ async def _post_transcript(called: str, caller: str, messages: Any) -> None:
         logger.exception("transcript post failed")
 
 
-class _UsageReporter(CustomLogger):
+async def _report_usage(kwargs, response_obj) -> None:
     """
     Reports the agent's token usage to Tori, so voice spend appears in the same ledger as WhatsApp.
 
@@ -208,50 +218,63 @@ class _UsageReporter(CustomLogger):
     callback is global and fires for concurrent calls to different businesses on one worker. Reading
     it from a module-level "current call" would attribute one salon's tokens to another the moment
     two people phone at once.
+
+    A plain function rather than the callback class itself: the class has to subclass LiteLLM's
+    CustomLogger, and importing that is what used to cost every first caller 3.5 seconds. The
+    subclass is built in `_usage_reporter()` once litellm is actually loaded.
     """
+    try:
+        meta = (kwargs.get("litellm_params") or {}).get("metadata") or {}
+        called = meta.get("tori_called_number")
+        if not called:
+            return  # not one of ours (or a warmup call) — nothing to attribute
 
-    async def async_log_success_event(self, kwargs, response_obj, start_time, end_time):
-        try:
-            meta = (kwargs.get("litellm_params") or {}).get("metadata") or {}
-            called = meta.get("tori_called_number")
-            if not called:
-                return  # not one of ours (or a warmup call) — nothing to attribute
+        usage = getattr(response_obj, "usage", None)
+        if usage is None:
+            return
+        prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
+        # Both providers fold cached tokens into prompt_tokens, but report them in different
+        # fields. DeepSeek puts hits in prompt_cache_hit_tokens; LiteLLM normalizes Anthropic
+        # into prompt_tokens_details (cached_tokens = reads, cache_creation_tokens = writes),
+        # and Anthropic's prompt_tokens includes BOTH. Reading only DeepSeek's field priced
+        # every cached Haiku token at the full input rate — quietly undoing, in the ledger,
+        # exactly the discount the cache_control work went in to buy.
+        details = getattr(usage, "prompt_tokens_details", None)
+        cache_read = (
+            (getattr(usage, "prompt_cache_hit_tokens", 0) or 0)
+            or (getattr(details, "cached_tokens", 0) or 0)
+        )
+        cache_write = getattr(details, "cache_creation_tokens", 0) or 0
 
-            usage = getattr(response_obj, "usage", None)
-            if usage is None:
-                return
-            prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
-            # Both providers fold cached tokens into prompt_tokens, but report them in different
-            # fields. DeepSeek puts hits in prompt_cache_hit_tokens; LiteLLM normalizes Anthropic
-            # into prompt_tokens_details (cached_tokens = reads, cache_creation_tokens = writes),
-            # and Anthropic's prompt_tokens includes BOTH. Reading only DeepSeek's field priced
-            # every cached Haiku token at the full input rate — quietly undoing, in the ledger,
-            # exactly the discount the cache_control work went in to buy.
-            details = getattr(usage, "prompt_tokens_details", None)
-            cache_read = (
-                (getattr(usage, "prompt_cache_hit_tokens", 0) or 0)
-                or (getattr(details, "cached_tokens", 0) or 0)
-            )
-            cache_write = getattr(details, "cache_creation_tokens", 0) or 0
+        await _post_transcript(called, meta.get("tori_caller_number") or "unknown", kwargs.get("messages"))
 
-            await _post_transcript(called, meta.get("tori_caller_number") or "unknown", kwargs.get("messages"))
+        await _post(
+            "/api/voice/usage",
+            {
+                "calledNumber": called,
+                "callerNumber": meta.get("tori_caller_number") or "unknown",
+                "model": _billed_model_name(kwargs.get("model") or MODEL),
+                "inputTokens": max(0, prompt_tokens - cache_read - cache_write),
+                "outputTokens": getattr(usage, "completion_tokens", 0) or 0,
+                "cacheReadTokens": cache_read,
+                "cacheCreationTokens": cache_write,
+            },
+        )
+    except Exception:
+        # Never let cost bookkeeping touch a live call. A lost ledger row is a reporting gap;
+        # an exception raised inside a callback during a call is a caller hearing silence.
+        logger.exception("usage report failed")
 
-            await _post(
-                "/api/voice/usage",
-                {
-                    "calledNumber": called,
-                    "callerNumber": meta.get("tori_caller_number") or "unknown",
-                    "model": _billed_model_name(kwargs.get("model") or MODEL),
-                    "inputTokens": max(0, prompt_tokens - cache_read - cache_write),
-                    "outputTokens": getattr(usage, "completion_tokens", 0) or 0,
-                    "cacheReadTokens": cache_read,
-                    "cacheCreationTokens": cache_write,
-                },
-            )
-        except Exception:
-            # Never let cost bookkeeping touch a live call. A lost ledger row is a reporting gap;
-            # an exception raised inside a callback during a call is a caller hearing silence.
-            logger.exception("usage report failed")
+
+def _usage_reporter():
+    """Builds the LiteLLM callback object. Imports inside, so module load stays cheap."""
+    from litellm.integrations.custom_logger import CustomLogger  # noqa: PLC0415 — see import note
+
+    class _UsageReporter(CustomLogger):
+        async def async_log_success_event(self, kwargs, response_obj, start_time, end_time):
+            await _report_usage(kwargs, response_obj)
+
+    return _UsageReporter()
 
 
 def _billed_model_name(model: str) -> str:
@@ -304,10 +327,26 @@ _LATENCY_EXTRA: Dict[str, Any] = _latency_extra(MODEL)
 
 # Global by design: LiteLLM has no per-request callback hook, and the callback attributes each call
 # via request metadata rather than shared state (see `_UsageReporter`).
-if TORI_API_URL and TOOL_SECRET:
-    litellm.callbacks = [*getattr(litellm, "callbacks", []), _UsageReporter()]
-else:
-    logger.warning("usage reporting disabled: TORI_API_URL or CARTESIA_TOOL_SECRET unset")
+#
+# Registered from a background thread so the ~3.5s litellm import never sits between the container
+# starting and the phone being answered. The callback is only needed once a completion finishes,
+# which is seconds after the greeting at the earliest.
+def _register_usage_callback() -> None:
+    if not (TORI_API_URL and TOOL_SECRET):
+        logger.warning("usage reporting disabled: TORI_API_URL or CARTESIA_TOOL_SECRET unset")
+        return
+    try:
+        import litellm  # noqa: PLC0415 — deliberately not at module scope; see the note on imports
+
+        litellm.callbacks = [*getattr(litellm, "callbacks", []), _usage_reporter()]
+        logger.info("usage reporting enabled")
+    except Exception:
+        # A missing cost report is a gap in a dashboard. Refusing to answer the phone over it is not
+        # a trade anyone would choose.
+        logger.exception("could not enable usage reporting")
+
+
+threading.Thread(target=_register_usage_callback, name="litellm-warmup", daemon=True).start()
 
 
 def caller_number(call_request: CallRequest) -> str:
