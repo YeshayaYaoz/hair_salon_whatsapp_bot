@@ -8,6 +8,7 @@ import { sendAdminAlertEmail, sendBusinessNoticeEmail } from "../lib/email.js";
 import { assignNumberToAgent, listHebrewVoices, CartesiaNotConfiguredError } from "../lib/cartesiaAdmin.js";
 import { captureError } from "../lib/errorMonitoring.js";
 import { syncWhatsAppProfileInBackground } from "../lib/whatsappProfile.js";
+import { pointNumberAtCartesia, ZadarmaNotConfiguredError } from "../lib/zadarmaAdmin.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import { requireActiveSubscription } from "../lib/subscriptionGate.js";
 import { getAuthUrl, saveGoogleTokens, disconnectGoogleCalendar, deleteCalendarEvent, GoogleCalendarNotConfiguredError } from "../lib/googleCalendar.js";
@@ -1011,6 +1012,25 @@ businessRouter.put("/me/voice-phone", async (req: AuthedRequest, res) => {
       captureError(err, { businessId: req.businessId, kind: "cartesiaAssign" });
       voiceAgentWarning =
         "המספר נשמר, אך לא הצלחנו לחבר אותו לבוט הקולי אצל הספק. שיחות נכנסות לא ייענו עד שזה יטופל.";
+    }
+  }
+
+  // The carrier half: tell Zadarma to send this number's calls to Cartesia. Without it the number
+  // is imported and assigned on Cartesia's side and still never rings there, because the carrier
+  // has nowhere to send the call — the same invisible break as an unassigned number, from the
+  // opposite end. Ordering numbers stays manual; this only wires one that already exists.
+  try {
+    const { sipId } = await pointNumberAtCartesia(normalized);
+    console.log(`[zadarma] ${normalized} now forwards to ${sipId}`);
+  } catch (err) {
+    if (err instanceof ZadarmaNotConfiguredError) {
+      console.warn("[zadarma] Skipping carrier forwarding:", err.message);
+    } else {
+      // Includes the ordinary case of a number bought from another carrier, which this account
+      // cannot configure and does not need to.
+      console.warn(`[zadarma] Could not set carrier forwarding for ${normalized}:`, err);
+      voiceAgentWarning ??=
+        "המספר נשמר וחובר לבוט, אך לא הצלחנו להגדיר את ההפניה אצל ספק הטלפוניה. אם השיחות לא נענות, צריך להגדיר אותה ידנית.";
     }
   }
 
