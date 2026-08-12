@@ -1,0 +1,112 @@
+name: Fix Cartesia agent config
+
+# The Cartesia API key lives in GitHub Secrets, which is write-only — nothing outside a workflow
+# run can read it, including the developer who set it. So the two changes that need that key run
+# here rather than from a laptop, and the secret never leaves GitHub.
+#
+# Both changes are things a call log cannot tell you and a console click can silently get wrong:
+#
+#   1. The console's own `system_prompt`. On a self-hosted agent the live prompt is built per call
+#      in voice-agent/main.py; the console copy is a second prompt that can only disagree with it.
+#      The copy found on the live agent was written in the opposite gender to TORI_AGENT_GENDER and
+#      instructed the model to call `get_context` — a tool deliberately removed, because with no
+#      tool registered the model asked a real caller, out loud, for "the number you called".
+#
+#   2. `self_hosted_deployment_url`. Unset means Cartesia's managed runtime, which scales to zero
+#      when idle: the first caller after a quiet stretch waits ~5 seconds for a cold start. That
+#      wait happens before any of our code exists to log it, so a cold managed agent and a warm
+#      self-hosted one produce identical logs once awake — the account is the only place the
+#      difference is visible.
+#
+# Manual only. Run it, read the "before" it prints, and it applies only what you asked for.
+on:
+  workflow_dispatch:
+    inputs:
+      clear_console_prompt:
+        description: "Replace the console's system_prompt with an inert marker"
+        type: boolean
+        default: true
+      deployment_url:
+        description: "Set self_hosted_deployment_url (e.g. https://tori-voice-agent.up.railway.app). Leave empty to leave it alone."
+        type: string
+        default: ""
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    env:
+      # secrets-or-vars on both: an earlier round of this repo's setup lost an afternoon to a value
+      # sitting in the "Agents" store while the workflow read "Actions", which presents as an empty
+      # string rather than an error.
+      KEY: ${{ secrets.CARTESIA_API_KEY || vars.CARTESIA_API_KEY }}
+      AGENT: ${{ secrets.CARTESIA_AGENT_ID || vars.CARTESIA_AGENT_ID }}
+      API: https://api.cartesia.ai
+      VERSION: "2026-03-01"
+      MARKER: "Self-hosted agent — the live prompt is built per call in voice-agent/main.py (build_prompt). This field is intentionally unused; do not write instructions here."
+    steps:
+      - name: Is anything configured
+        run: |
+          missing=""
+          [ -z "$KEY" ] && missing="$missing CARTESIA_API_KEY"
+          [ -z "$AGENT" ] && missing="$missing CARTESIA_AGENT_ID"
+          if [ -n "$missing" ]; then
+            echo "::error::Not set:$missing — add under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+      # Printed before anything is changed, so the run is also the diagnostic. Only named fields are
+      # extracted: the agent object is dumped nowhere, and the key is only ever an Authorization
+      # header read from the environment.
+      - name: What the agent looks like now
+        run: |
+          out=$(curl -sS "$API/agents/$AGENT" \
+            -H "Authorization: Bearer $KEY" -H "Cartesia-Version: $VERSION")
+          if echo "$out" | jq -e '.error // .message' >/dev/null 2>&1; then
+            echo "::error::Cartesia rejected the request: $(echo "$out" | jq -r '.error // .message')"
+            exit 1
+          fi
+
+          url=$(echo "$out" | jq -r '.self_hosted_deployment_url // ""')
+          if [ -n "$url" ]; then
+            echo "deployment: self-hosted → $url"
+            echo "  No managed cold start. A first-call delay now points at the Railway service sleeping."
+          else
+            echo "deployment: MANAGED"
+            echo "::warning::The first caller after an idle stretch waits ~5s for a cold start. Pass deployment_url to fix it."
+          fi
+
+          # Length only. The prompt is the salon's wording, and a workflow log is not where it belongs.
+          echo "console system_prompt: $(echo "$out" | jq -r '.system_prompt // "" | length') chars"
+
+      - name: Replace the console prompt with a marker
+        if: inputs.clear_console_prompt
+        run: |
+          # A marker rather than an empty string: an agent that somehow answers without its
+          # self-hosted URL should be visibly misconfigured, not quietly promptless.
+          out=$(curl -sS -X PATCH "$API/agents/$AGENT" \
+            -H "Authorization: Bearer $KEY" -H "Cartesia-Version: $VERSION" \
+            -H "Content-Type: application/json" \
+            --data "$(jq -nc --arg p "$MARKER" '{system_prompt: $p}')")
+          if echo "$out" | jq -e '.error // .message' >/dev/null 2>&1; then
+            echo "::error::PATCH failed: $(echo "$out" | jq -r '.error // .message')"
+            exit 1
+          fi
+          echo "console system_prompt is now $(echo "$out" | jq -r '.system_prompt // "" | length') chars (the marker)."
+
+      - name: Point the agent at the self-hosted deployment
+        if: inputs.deployment_url != ''
+        # Through the environment, never interpolated into the script body: a workflow_dispatch
+        # input is caller-supplied text, and `${{ }}` pasted inside `run:` is executed as shell.
+        env:
+          URL: ${{ inputs.deployment_url }}
+        run: |
+          out=$(curl -sS -X PATCH "$API/agents/$AGENT" \
+            -H "Authorization: Bearer $KEY" -H "Cartesia-Version: $VERSION" \
+            -H "Content-Type: application/json" \
+            --data "$(jq -nc --arg u "$URL" '{self_hosted_deployment_url: $u}')")
+          if echo "$out" | jq -e '.error // .message' >/dev/null 2>&1; then
+            echo "::error::PATCH failed: $(echo "$out" | jq -r '.error // .message')"
+            exit 1
+          fi
+          echo "deployment is now: $(echo "$out" | jq -r '.self_hosted_deployment_url // "(still managed)"')"
+          echo "Calls switch over immediately. Confirm with: curl $URL/health"
