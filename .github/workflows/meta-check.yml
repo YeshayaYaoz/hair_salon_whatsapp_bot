@@ -1,0 +1,91 @@
+name: Check Meta access
+
+# Read-only. Answers three questions that are otherwise guesswork from outside Meta's console:
+# whether the token works at all, what it is actually allowed to do, and which templates already
+# exist on the WABA. Nothing here creates, edits or sends anything.
+#
+# Manual only — this is a diagnostic, not something a push should trigger.
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      TOKEN: ${{ secrets.META_SYSTEM_USER_TOKEN }}
+      WABA: ${{ secrets.TORI_WABA_ID }}
+      APP_ID: ${{ secrets.META_APP_ID || vars.META_APP_ID }}
+      GRAPH: https://graph.facebook.com/v23.0
+    steps:
+      - name: Is anything configured
+        run: |
+          missing=""
+          [ -z "$TOKEN" ] && missing="$missing META_SYSTEM_USER_TOKEN"
+          [ -z "$WABA" ] && missing="$missing TORI_WABA_ID"
+          if [ -n "$missing" ]; then
+            echo "::error::Not set:$missing — add under Settings → Secrets and variables → Actions → Secrets."
+            exit 1
+          fi
+
+      # The first thing to establish, because the two are easy to confuse in Meta's UI: the System
+      # User's *ID* is displayed on the system user page, while the *token* is shown once, behind
+      # the "Generate token" button. Pasting the former produces an authentication error that reads
+      # like a permissions problem.
+      - name: Does the token work, and what may it do
+        run: |
+          out=$(curl -sS "$GRAPH/debug_token?input_token=$TOKEN&access_token=$TOKEN")
+          if echo "$out" | jq -e '.error' >/dev/null; then
+            echo "::error::Meta rejected the token: $(echo "$out" | jq -r '.error.message')"
+            echo "If that says the session is invalid, the value is probably the System User ID rather than a generated token."
+            exit 1
+          fi
+          echo "Token type:  $(echo "$out" | jq -r '.data.type')"
+          echo "App:         $(echo "$out" | jq -r '.data.app_id')"
+          # 0 means never expires, which is the point of a System User token — a token that expires
+          # takes the reminders down silently in sixty days.
+          echo "Expires at:  $(echo "$out" | jq -r '.data.expires_at') (0 = never)"
+          echo "Scopes:"
+          echo "$out" | jq -r '.data.scopes[]? | "  - " + .'
+          echo "$out" | jq -e '.data.scopes | index("whatsapp_business_management")' >/dev/null \
+            || echo "::warning::whatsapp_business_management is NOT granted — this token cannot create message templates."
+
+      - name: Can it see the WhatsApp account
+        run: |
+          out=$(curl -sS "$GRAPH/$WABA?fields=id,name,currency,timezone_id&access_token=$TOKEN")
+          if echo "$out" | jq -e '.error' >/dev/null; then
+            echo "::error::Cannot read the WABA: $(echo "$out" | jq -r '.error.message')"
+            echo "A token that authenticates but cannot read the WABA usually means the WhatsApp account was not assigned to the System User — assign it alongside the app."
+            exit 1
+          fi
+          echo "WABA name: $(echo "$out" | jq -r '.name')"
+
+      - name: Which phone numbers are on it
+        run: |
+          curl -sS "$GRAPH/$WABA/phone_numbers?fields=display_phone_number,verified_name,quality_rating&access_token=$TOKEN" \
+            | jq -r '.data[]? | "  - \(.display_phone_number)  \(.verified_name)  quality=\(.quality_rating // "n/a")"'
+
+      - name: Which templates already exist
+        run: |
+          out=$(curl -sS "$GRAPH/$WABA/message_templates?fields=name,status,category,language&limit=100&access_token=$TOKEN")
+          if echo "$out" | jq -e '.error' >/dev/null; then
+            echo "::error::Cannot list templates: $(echo "$out" | jq -r '.error.message')"
+            exit 1
+          fi
+          count=$(echo "$out" | jq '.data | length')
+          echo "$count template(s) on this WABA:"
+          echo "$out" | jq -r '.data[]? | "  - \(.name)  [\(.status)]  \(.category)  \(.language)"'
+
+      # Best-effort: this endpoint is not something the docs promise, and it is the one thing here
+      # that would answer the question that actually matters for onboarding — whether businesses
+      # connecting through Embedded Signup grant Tori permission to create their templates for them.
+      # Printed rather than asserted, so a missing endpoint does not fail an otherwise good check.
+      - name: What the Embedded Signup login configuration grants
+        if: env.APP_ID != ''
+        run: |
+          out=$(curl -sS "$GRAPH/$APP_ID/login_configs?access_token=$TOKEN")
+          if echo "$out" | jq -e '.error' >/dev/null; then
+            echo "Could not read login configurations: $(echo "$out" | jq -r '.error.message')"
+            echo "Check it by hand instead: business.facebook.com → Apps → the app → Facebook Login for Business → Configurations."
+          else
+            echo "$out" | jq -r '.data[]? | "  - \(.name // .id): \((.permissions // []) | join(", "))"'
+          fi
