@@ -75,8 +75,21 @@ jobs:
             echo "::warning::The first caller after an idle stretch waits ~5s for a cold start. Pass deployment_url to fix it."
           fi
 
-          # Length only. The prompt is the salon's wording, and a workflow log is not where it belongs.
-          echo "console system_prompt: $(echo "$out" | jq -r '.system_prompt // "" | length') chars"
+          # Which agent answered, so a wrong CARTESIA_AGENT_ID is visible. The id itself is a
+          # secret here and would print masked; the name is not and identifies it just as well.
+          echo "agent: $(echo "$out" | jq -r '.name // "(unnamed)"')"
+
+          # Key names, never values. The first run of this workflow guessed `system_prompt` from
+          # the field name in Cartesia's websocket start message and got "Unrecognized key" from
+          # PATCH — and, worse, a confident "0 chars" from GET, because jq on a field that does not
+          # exist is indistinguishable from jq on an empty one. Printing the keys costs one line
+          # and ends the guessing; the values are the salon's wording and stay out of the log.
+          echo "agent object keys: $(echo "$out" | jq -rc 'keys')"
+
+          for k in system_prompt prompt instructions system introduction greeting; do
+            n=$(echo "$out" | jq -r --arg k "$k" 'if has($k) then (.[$k] // "" | tostring | length) else -1 end')
+            [ "$n" -ge 0 ] && echo "  .$k: present, $n chars"
+          done
 
       - name: Replace the console prompt with a marker
         if: inputs.clear_console_prompt
