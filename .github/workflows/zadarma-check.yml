@@ -12,6 +12,10 @@ on:
         description: "Also add any missing Meta webhook fields (writes to the live app subscription)"
         type: boolean
         default: false
+      list_numbers:
+        description: "Also list Israeli numbers available to buy (read-only, no order placed)"
+        type: boolean
+        default: false
 
 jobs:
   probe:
@@ -53,3 +57,15 @@ jobs:
         run: |
           railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
             npx tsx scripts/meta-webhook-fields.ts ${APPLY:+--apply}
+
+      # Read-only. Ordering is a separate script invocation that refuses to run without --confirm,
+      # because a monthly charge is a decision rather than a step.
+      - name: Numbers available to buy
+        if: inputs.list_numbers
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+          RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+        run: |
+          railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+            npx tsx scripts/zadarma-number.ts --list IL
