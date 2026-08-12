@@ -7,6 +7,7 @@ import { logAdminAction } from "../lib/adminAudit.js";
 import { sendAdminAlertEmail, sendBusinessNoticeEmail } from "../lib/email.js";
 import { assignNumberToAgent, listHebrewVoices, CartesiaNotConfiguredError } from "../lib/cartesiaAdmin.js";
 import { captureError } from "../lib/errorMonitoring.js";
+import { syncWhatsAppProfileInBackground } from "../lib/whatsappProfile.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import { requireActiveSubscription } from "../lib/subscriptionGate.js";
 import { getAuthUrl, saveGoogleTokens, disconnectGoogleCalendar, deleteCalendarEvent, GoogleCalendarNotConfiguredError } from "../lib/googleCalendar.js";
@@ -597,6 +598,7 @@ businessRouter.post("/admin/businesses/:id/whatsapp", requireSuperAdmin, async (
     targetBusinessName: business.name,
     details: `Connected WhatsApp on their behalf (${displayNumber ?? parsed.data.phoneNumberId})`,
   });
+  syncWhatsAppProfileInBackground(business.id);
   res.json({ ok: true, displayNumber });
 });
 
@@ -753,6 +755,10 @@ businessRouter.put("/me", async (req: AuthedRequest, res) => {
   }
 
   await prisma.business.update({ where: { id: req.businessId! }, data });
+  // Only when something on the WhatsApp business card actually moved. Every settings save touches
+  // this handler — bot tone, timezone, a voice — and none of that belongs in a Graph API call.
+  const CARD_FIELDS = ["name", "address", "email", "businessType", "greetingButtonUrl"];
+  if (CARD_FIELDS.some((f) => f in parsed.data)) syncWhatsAppProfileInBackground(req.businessId!);
   res.json({ ok: true });
 });
 
@@ -918,6 +924,9 @@ businessRouter.put("/me/whatsapp", async (req: AuthedRequest, res) => {
       whatsappTokenValid: true, // freshly saved token is assumed valid
     },
   });
+  // The moment a token exists is the first moment the profile can be written, and it is also when
+  // the owner is most likely to go and look at it.
+  syncWhatsAppProfileInBackground(req.businessId!);
   res.json({ ok: true });
 });
 

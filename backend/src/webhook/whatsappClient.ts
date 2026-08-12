@@ -373,6 +373,52 @@ export async function setWhatsAppProfilePicture(params: {
   }
 }
 
+/**
+ * The business card WhatsApp shows when someone taps the business name.
+ *
+ * Same endpoint the profile picture goes to, and it was the only field being set — so a salon that
+ * had filled in its address, site and category in Tori still showed a blank card in WhatsApp, and
+ * had to retype all of it in Meta's console to fix it. Everything here is already known; there is
+ * no reason for the owner to enter it twice.
+ *
+ * Only the fields given are sent: Meta overwrites what it receives and leaves the rest alone, so
+ * passing an undefined field would be indistinguishable from clearing one the owner set by hand.
+ *
+ * `vertical` must be one of Meta's fixed categories — see WHATSAPP_VERTICALS. An unrecognised value
+ * is rejected for the whole request, which would take the address and website down with it.
+ */
+export async function setWhatsAppBusinessProfile(params: {
+  phoneNumberId: string;
+  accessToken: string;
+  address?: string;
+  email?: string;
+  websites?: string[];
+  description?: string;
+  about?: string;
+  vertical?: string;
+}): Promise<void> {
+  const { phoneNumberId, accessToken, ...fields } = params;
+  const body: Record<string, unknown> = { messaging_product: "whatsapp" };
+  for (const [k, v] of Object.entries(fields)) {
+    if (v === undefined || v === null) continue;
+    if (Array.isArray(v) ? v.length === 0 : String(v).trim() === "") continue;
+    body[k] = v;
+  }
+  // Nothing but the constant field means nothing to say. Sending it anyway is a wasted round trip
+  // on the connect path, where the owner is waiting.
+  if (Object.keys(body).length === 1) return;
+
+  const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${phoneNumberId}/whatsapp_business_profile`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+    throw new Error(`Could not update business profile: ${errBody.error?.message ?? `HTTP ${res.status}`}`);
+  }
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function send(params: SendCommon, payload: Record<string, unknown>) {
