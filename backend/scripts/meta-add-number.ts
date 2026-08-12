@@ -16,9 +16,12 @@
  * number itself. No API key substitutes for holding the line. `--request-code` sends it; a person
  * reads it and passes it to `--verify`.
  *
- * A caution specific to this deployment: a number already forwarding to Cartesia will have a voice
- * verification call answered by the voice agent, which then reads the code to nobody. Use SMS, or
- * lift the forwarding first (see docs/voice-telephony-setup.md).
+ * A number already forwarding to Cartesia has its voice verification call answered by the voice
+ * agent. That is usable rather than a problem: every call's turns are posted to
+ * /api/voice/transcript, so the spoken code lands in the conversation history and can be read from
+ * the dashboard — and Cartesia keeps its own recording. It only holds if the number is registered
+ * as some business's voicePhoneNumber; otherwise /context answers 404, the agent apologises, and
+ * our side records nothing. `--code-method VOICE` chooses that path knowingly; SMS is the default.
  */
 
 const GRAPH = "https://graph.facebook.com/v23.0";
@@ -75,9 +78,21 @@ async function main() {
 
   if (has("request-code")) {
     if (!existingId) throw new Error("Number is not on this WABA yet — add it first.");
-    // SMS rather than VOICE: a number forwarding to Cartesia answers a voice call with the agent.
-    await call(`/${existingId}/request_code`, { code_method: "SMS", language: "he" });
-    console.log("✔ Verification code requested by SMS. Read it on the phone, then re-run with --verify <code>.");
+    // VOICE is a deliberate option, not an accident. A number forwarding to Cartesia has its
+    // verification call answered by the voice agent — and because every call's turns are posted to
+    // /api/voice/transcript, the spoken code lands in the conversation history for that number and
+    // can be read from the dashboard. That only holds if the number is some business's
+    // voicePhoneNumber: otherwise /context answers 404, the agent apologises, and nothing is
+    // recorded on our side. Cartesia keeps its own recording either way.
+    const method = (arg("code-method") ?? "SMS").toUpperCase();
+    if (method !== "SMS" && method !== "VOICE") throw new Error("--code-method must be SMS or VOICE");
+    await call(`/${existingId}/request_code`, { code_method: method, language: "he" });
+    console.log(`✔ Verification code requested by ${method}.`);
+    console.log(
+      method === "VOICE"
+        ? "  The agent will answer. Read the code off the call transcript, then re-run with --verify <code>."
+        : "  Read it on the phone, then re-run with --verify <code>."
+    );
     return;
   }
 
