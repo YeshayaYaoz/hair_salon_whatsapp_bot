@@ -87,8 +87,37 @@ In Zadarma: Settings → Virtual phone numbers → the number's gear → **Exter
 If calls still do not land, suspect transport next: append `;transport=tcp` to the destination.
 Cartesia documents TCP and TLS, while most carriers send UDP by default.
 
-Zadarma's API (`/direct_numbers/order/` and friends) can
-buy numbers but exposes no endpoint for this field, so it stays a dashboard step per number.
+**This does not have to be a dashboard step.** An earlier version of this page said Zadarma's API
+could buy numbers but had no endpoint for this field, so it stayed manual per number — that was
+wrong, and it is the reason onboarding a salon still needs someone in a browser:
+
+```
+PUT /v1/direct_numbers/set_sip_id/
+  type      the number's type, as returned by GET /v1/direct_numbers/
+  number    the virtual number
+  sip_id    a SIP login, or an external server address — "+972XXXXXXXXX@sip.cartesia.ai"
+```
+
+`sip_id` set to an address rather than a SIP login *is* the External Server (SIP URI) setting. The
+leading `+` matters here for the same reason it matters in the dashboard (see the warning above).
+
+The rest of the chain is API-addressable too, which means provisioning a salon's line end to end
+needs no console at all: `GET /v1/direct_numbers/country/?country=IL` for destinations,
+`GET /v1/direct_numbers/available/<DIRECTION_ID>/` to pick a number, `POST /v1/direct_numbers/order/`
+to buy it, then `set_sip_id` to point it at Cartesia. Israeli numbers additionally require identity
+documents, which have their own endpoints (`/v1/documents/groups/create/`, `/v1/documents/upload/`)
+— that is the one part with a human in it, and it is per *account*, not per number.
+
+Auth is a signed header rather than a bearer token:
+
+```
+Authorization: <user_key>:<signature>
+signature = base64( hmac_sha1( method_path + query + md5(query), secret_key ) )
+```
+
+where `query` is the parameters sorted by key and urlencoded, and `method_path` is the path from
+the version onward (`/v1/direct_numbers/set_sip_id/`). POST and PUT bodies must be
+`application/x-www-form-urlencoded`. Keys are generated in the Zadarma account.
 
 ### 4. Save it in the dashboard
 
