@@ -90,11 +90,21 @@ async function main() {
 
   const directionId = arg("available");
   if (directionId) {
-    const body = await request("GET", `/v1/direct_numbers/available/${directionId}/`);
-    const rows = (body.info as Array<Record<string, unknown>>) ?? [];
-    console.log(`${rows.length} number(s) available on direction ${directionId}:`);
-    for (const r of rows.slice(0, 30)) console.log(`  ${String(r.number ?? r)}`);
-    if (rows.length > 30) console.log(`  … and ${rows.length - 30} more`);
+    // Comma-separated, because "which destinations actually have stock" is one question and asking
+    // it one id at a time is a round trip per id.
+    for (const id of directionId.split(",").map((s) => s.trim()).filter(Boolean)) {
+      let rows: Array<Record<string, unknown>> = [];
+      try {
+        const body = await request("GET", `/v1/direct_numbers/available/${id}/`);
+        rows = (body.info as Array<Record<string, unknown>>) ?? [];
+      } catch (err) {
+        console.log(`  direction ${id}: ${(err as Error).message}`);
+        continue;
+      }
+      console.log(`direction ${id}: ${rows.length} available`);
+      for (const r of rows.slice(0, 10)) console.log(`    ${String(r.number ?? r)}`);
+      if (rows.length > 10) console.log(`    … and ${rows.length - 10} more`);
+    }
     return;
   }
 
