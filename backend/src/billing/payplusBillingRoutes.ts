@@ -115,6 +115,12 @@ payplusBillingRouter.get("/payplus/health", requireAuth, requireSuperAdmin, asyn
     else if (gotToken) detail = `${when} — כרטיס נשמר ונקלט`;
     else if (!d.hasCustomer)
       detail = `${when} — ה-callback הגיע בלי customer_uid, אי אפשר לאתר את הכרטיס. מבנה: ${d.shape ?? "?"}`;
+    else if (d.tokenListError && /NO ACCESS/i.test(d.tokenListError))
+      // Seen live: HTTP 422 {"message":"NO ACCESS FOR THIS COMPANY"} — the company has no access
+      // to the Tokens API at all. Only PayPlus support can grant it; nothing on our side to fix.
+      detail =
+        `${when} — התשלום עבר, אבל לחשבון ה-PayPlus אין גישה ל-API הטוקנים (NO ACCESS FOR THIS COMPANY). ` +
+        `בקשו מתמיכת PayPlus להפעיל טוקניזציה — שמירת כרטיסים לחיוב עתידי + גישה ל-API של Tokens — ואז שלמו שוב דף ₪1`;
     else if (d.tokenListError) detail = `${when} — Token/List נכשל: ${d.tokenListError}`;
     else if (d.tokenListCount === 0)
       detail =
