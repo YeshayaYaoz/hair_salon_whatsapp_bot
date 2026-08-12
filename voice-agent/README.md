@@ -78,6 +78,15 @@ it as unavailable unless Cartesia support says otherwise.
 
 ### Self-hosted
 
+> **Not the current deployment — this section is the migration, not a description of production.**
+> The live agent runs on Cartesia's managed runtime, deployed by `deploy-voice-agent.yml` on every
+> push. Verified 2026-08: `GET /agents/{id}` returns an empty `self_hosted_deployment_url`, and the
+> `tori-voice-agent.up.railway.app` host used as the example below does not resolve — Railway
+> answers "Application not found". So the ~5s cold start described here is still live, and the
+> steps below are what remove it. `railway run npx tsx scripts/cartesia-probe.ts` (from `backend/`)
+> prints the current mode, and the "Fix Cartesia agent config" workflow sets the URL once a
+> service exists.
+
 Cartesia calls your server instead of hosting the code itself. Deploy this directory as its own
 Railway service — `main.py` already serves the FastAPI app on `$PORT`, which is all the `Procfile`
 does — then point the agent at it by setting `self_hosted_deployment_url`:
@@ -116,7 +125,8 @@ curl -X PATCH https://api.cartesia.ai/agents/$CARTESIA_AGENT_ID \
 `railway run npx tsx scripts/cartesia-probe.ts` (from `backend/`) reports the length of whatever is
 there and flags it when it grows back into a second prompt.
 
-**This is now the recommended route**, and the reasoning reversed on live measurement. The managed
+**This is the recommended route, and it has not been taken yet.** The reasoning reversed on live
+measurement. The managed
 runtime scales the agent to zero when idle, and the first call after a quiet stretch pays ~5
 seconds of dead air waking the container — measured on a real call, and confirmed as cold start by
 an immediate second call answering within a second. A Railway service on a paid plan never sleeps,
