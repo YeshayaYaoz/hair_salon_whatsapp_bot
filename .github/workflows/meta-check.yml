@@ -120,12 +120,26 @@ jobs:
             out=$(curl -sS "$ep?limit=100&access_token=$TOKEN")
             if echo "$out" | jq -e '.data' >/dev/null 2>&1; then
               echo "Endpoint that answered: $ep"
-              echo "Shape of one entry:"
-              echo "$out" | jq '.data[0]'
-              echo "Distinct names (appointment/booking/reminder first):"
-              echo "$out" | jq -r '[.data[]?.name] | unique | .[]' | grep -Ei 'appoint|book|remind|confirm|visit|feedback' | head -20
-              echo "…and the rest:"
-              echo "$out" | jq -r '[.data[]?.name] | unique | .[]' | head -40
+              # Entries are one per (name, language), so a single page is one template in a
+              # hundred languages. Page through, keep only Hebrew, and report the use cases —
+              # Hebrew coverage is the whole question, since an English-only library template is
+              # no use to a salon in Israel.
+              url="$ep?limit=250&access_token=$TOKEN"
+              : > /tmp/lib.json
+              for i in $(seq 1 12); do
+                page=$(curl -sS "$url")
+                echo "$page" | jq -c '.data[]?' >> /tmp/lib.json
+                nxt=$(echo "$page" | jq -r '.paging.next // empty')
+                [ -z "$nxt" ] && break
+                url="$nxt"
+              done
+              echo "Fetched $(wc -l < /tmp/lib.json) library entries across all languages."
+              echo
+              echo "Hebrew templates in Meta's library:"
+              jq -r 'select(.language=="he") | "  - \(.name)  [\(.category)]  \(.usecase)"' /tmp/lib.json | sort -u | head -40
+              echo
+              echo "Appointment/booking use cases (any language) — tells us what exists at all:"
+              jq -r '.usecase' /tmp/lib.json | sort -u | grep -Ei 'appoint|book|remind|visit|feedback|confirm' | head -20
               exit 0
             fi
           done
