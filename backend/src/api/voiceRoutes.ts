@@ -397,6 +397,9 @@ voiceRouter.post("/book", async (req, res) => {
       customerPhone: parsed.data.callerNumber,
       customerName: parsed.data.callerName,
       startTime: parseBookingTime(parsed.data.startTime, business.timezone),
+      // Marks this as the channel that leaves the customer nothing in writing, so they get a
+      // confirmation message. See bookAppointmentWithSideEffects.
+      source: "voice",
       staffId,
       staffName: parsed.data.staffName,
       ownerAlertPrefix: "📞 הזמנה חדשה (שיחת טלפון)!",
@@ -507,6 +510,7 @@ voiceRouter.post("/reschedule", async (req, res) => {
       newServiceId,
       newStaffId,
       ownerAlertPrefix: "📞 שינוי מועד (שיחת טלפון)!",
+      source: "voice",
     });
     res.json({ rescheduled: true, startTime: appointment.startTime, endTime: appointment.endTime });
   } catch (err) {

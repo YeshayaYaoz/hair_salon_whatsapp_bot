@@ -60,4 +60,35 @@ export function reviewTemplate(): TemplateConfig {
  */
 export const REMINDER_TEMPLATE_BODY =
   'שלום {{1}}! תזכורת לתור שלך ל{{2}} ב-{{3}} אצל {{4}}. לביטול יש להשיב "בטל תור".';
-export const REVIEW_TEMPLATE_BODY = "{{1}}, תודה שביקרת ב{{2}} היום! מקווים שנהנית מה{{3}}.";
+// Opens with "היי" rather than the variable. Meta rejects a body that starts or ends with a
+// parameter — a "dangling parameter" — so the previous "{{1}}, תודה שביקרת…" could never have been
+// approved, and the review requests it backs would have gone undelivered to anyone outside the 24h
+// window with no error anyone would see.
+export const REVIEW_TEMPLATE_BODY = "היי {{1}}, תודה שביקרת ב{{2}} היום. נשמח לשמוע איך היה ה{{3}} שלך.";
+
+const DEFAULT_CONFIRMATION_NAME = "tori_appointment_confirmation";
+
+/**
+ * Confirms a booking to the customer.
+ *
+ * Needed because a booking made by phone leaves the customer with nothing: the voice agent says the
+ * time out loud and hangs up, and the caller has no written record of what was booked, when, or
+ * with whom. A WhatsApp booking never had this problem — the bot's own reply is the confirmation —
+ * so the gap only appeared once the phone line existed.
+ *
+ * Body ({{n}} → param index):
+ *   {{1}} customer first name
+ *   {{2}} service name
+ *   {{3}} appointment date/time (localized string)
+ *   {{4}} business name
+ *
+ * Meta's own template library carries an approved Hebrew APPOINTMENT_CONFIRMATION template. Where
+ * one exists, point WHATSAPP_CONFIRMATION_TEMPLATE at it rather than submitting this for review:
+ * a library template is approved on creation, and cannot be rejected over wording.
+ */
+export function confirmationTemplate(): TemplateConfig {
+  return { name: process.env.WHATSAPP_CONFIRMATION_TEMPLATE || DEFAULT_CONFIRMATION_NAME, languageCode: DEFAULT_LANG };
+}
+
+export const CONFIRMATION_TEMPLATE_BODY =
+  'שלום {{1}}, התור שלך ל{{2}} נקבע ל-{{3}} אצל {{4}}. לביטול יש להשיב "בטל תור".';
