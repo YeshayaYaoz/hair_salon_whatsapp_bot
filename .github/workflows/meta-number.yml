@@ -1,0 +1,72 @@
+name: Tori number on Tori's WABA
+
+# Drives scripts/meta-add-number.ts, one step per run. The credentials are Actions secrets rather
+# than Railway env, so this needs no railway run.
+#
+# Manual only, and one step at a time on purpose: each step's outcome decides whether the next one
+# is the right thing to do at all — a display name can be declined while the line verifies fine, and
+# registering a number that failed verification just produces a confusing error.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Which step to run"
+        type: choice
+        options: [status, add, request-code, verify, register]
+        default: status
+      number:
+        description: "Number in international format"
+        default: "+972559450126"
+      name:
+        description: "Display name (add only) — Meta reviews this separately from the line"
+        default: "תורי-אונליין"
+      code:
+        description: "Six-digit code (verify only)"
+        default: ""
+      code_method:
+        description: "How to receive the code (request-code only)"
+        type: choice
+        options: [SMS, VOICE]
+        default: SMS
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+
+      - name: ${{ inputs.action }}
+        env:
+          META_SYSTEM_USER_TOKEN: ${{ secrets.META_SYSTEM_USER_TOKEN }}
+          TORI_WABA_ID: ${{ secrets.TORI_WABA_ID }}
+          ACTION: ${{ inputs.action }}
+          NUMBER: ${{ inputs.number }}
+          NAME: ${{ inputs.name }}
+          CODE: ${{ inputs.code }}
+          CODE_METHOD: ${{ inputs.code_method }}
+        run: |
+          # Single-use and short-lived, but a verification code in a build log is still a
+          # credential sitting where anyone with repo read access can find it later.
+          [ -n "$CODE" ] && echo "::add-mask::$CODE"
+
+          case "$ACTION" in
+            status)       args="" ;;
+            add)          args="--name $NAME" ;;
+            request-code) args="--request-code --code-method $CODE_METHOD" ;;
+            verify)
+              [ -z "$CODE" ] && { echo "::error::'verify' needs the code input."; exit 1; }
+              args="--verify $CODE" ;;
+            register)     args="--register" ;;
+            *)            echo "::error::Unknown action '$ACTION'"; exit 1 ;;
+          esac
+
+          npx tsx scripts/meta-add-number.ts --number "$NUMBER" $args
