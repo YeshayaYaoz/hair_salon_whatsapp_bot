@@ -234,19 +234,22 @@ async def main_():
         assert "את עונה" in p, unknown
     print("15 the agent's grammar follows the chosen voice's gender                     OK")
 
-    # The self-reference rule has to generalise, not enumerate. It used to be three examples —
-    # "אני בודקת", "אני מעבירה", "אני לא בטוחה" — and a live call came out "אני שמח לעזור" and
-    # "אני צריך לאסוף": a feminine agent in masculine forms, because the verbs it reached for were
-    # not on the list and the model would not inflect the rest on its own. Both genders now state
-    # the rule categorically and say it covers words the prompt never shows. Asserting the sentence
-    # that carries the generalisation keeps a future edit from trimming it back to examples.
+    # The self-reference rule has to generalise, not enumerate. It used to be three examples per
+    # gender — "אני בודקת", "אני מעבירה", "אני לא בטוחה" — and nothing telling the model what to do
+    # with the rest of Hebrew. A live call surfaced how narrow that is: the agent reached for
+    # "אני שמח" and "אני צריך", verbs on neither gender's list, and got them right only because the
+    # deployment's own gender happened to match. Nothing in the prompt was making that choice. Both
+    # genders now state the rule categorically and say it covers words the prompt never shows.
+    # Asserting the sentence that carries the generalisation keeps a future edit from trimming it
+    # back to examples.
     for gender, marker, wrong in (("feminine", "לשון נקבה יחיד", "אני שמח "), ("masculine", "לשון זכר יחיד", "אני שמחה")):
         STATE.update(status=200, body=dict(SALON, voiceGender=gender), seen=[])
         pre = await main.pre_call_handler(req())
         p = (await main.get_agent(None, req(meta=pre.metadata)))._config.system_prompt
         assert marker in p, (gender, p[:400])
         assert "גם על מילים שלא מופיעות" in p, (gender, p[:400])
-        # The two verbs the live call got wrong are now named outright in the right gender.
+        # The two verbs the live call reached for off-list are now named outright, in this gender
+        # and never the other one.
         assert wrong not in p, (gender, p[:400])
     print("15b the self-reference rule generalises past its own examples                 OK")
 
