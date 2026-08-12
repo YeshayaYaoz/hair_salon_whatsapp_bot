@@ -120,7 +120,12 @@ jobs:
             out=$(curl -sS "$ep?limit=100&access_token=$TOKEN")
             if echo "$out" | jq -e '.data' >/dev/null 2>&1; then
               echo "Endpoint that answered: $ep"
-              echo "$out" | jq -r '.data[]? | "  - \(.name)  [\(.category // "?")]  languages=\((.supported_languages // []) | join(","))"'
+              echo "Shape of one entry:"
+              echo "$out" | jq '.data[0]'
+              echo "Distinct names (appointment/booking/reminder first):"
+              echo "$out" | jq -r '[.data[]?.name] | unique | .[]' | grep -Ei 'appoint|book|remind|confirm|visit|feedback' | head -20
+              echo "…and the rest:"
+              echo "$out" | jq -r '[.data[]?.name] | unique | .[]' | head -40
               exit 0
             fi
           done
