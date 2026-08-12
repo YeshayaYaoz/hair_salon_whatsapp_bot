@@ -13,9 +13,13 @@ on:
         type: boolean
         default: false
       list_numbers:
-        description: "Also list Israeli numbers available to buy (read-only, no order placed)"
+        description: "Also list Israeli destinations available to buy (read-only, no order placed)"
         type: boolean
         default: false
+      direction_id:
+        description: "Show the actual free numbers on this destination id (read-only)"
+        default: ""
+
 
 jobs:
   probe:
@@ -69,3 +73,14 @@ jobs:
         run: |
           railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
             npx tsx scripts/zadarma-number.ts --list IL
+
+      - name: Free numbers on a destination
+        if: inputs.direction_id != ''
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+          RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+          DIRECTION: ${{ inputs.direction_id }}
+        run: |
+          railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+            npx tsx scripts/zadarma-number.ts --available "$DIRECTION"
