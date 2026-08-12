@@ -100,6 +100,19 @@ describe("chargeSubscriptionToken", () => {
     expect(result).toEqual({ success: false, error: "card declined" });
   });
 
+  it("sends customer_uid alongside the token when the caller knows it — as PayPlus's own example does", async () => {
+    fetchMock.mockResolvedValue(okResponse({ transaction_uid: "tr-2" }));
+    await chargeSubscriptionToken("tok-1", 1, "x", "cust-9");
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.customer_uid).toBe("cust-9");
+
+    // And never a stray undefined field when it is not known.
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValue(okResponse({ transaction_uid: "tr-3" }));
+    await chargeSubscriptionToken("tok-1", 1, "x");
+    expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)).not.toHaveProperty("customer_uid");
+  });
+
   it("reads the transaction id from either response shape PayPlus uses", async () => {
     fetchMock.mockResolvedValue(okResponse({ transaction: { uid: "tr-nested" } }));
     const result = await chargeSubscriptionToken("tok", 149, "x");

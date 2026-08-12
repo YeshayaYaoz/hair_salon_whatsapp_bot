@@ -273,7 +273,14 @@ export class PayPlusTerminalNotConfiguredError extends Error {
  * `terminal_uid` and `cashier_uid` are required by the API and are account constants, so they come
  * from the environment like the rest of the credentials.
  */
-export async function chargeSubscriptionToken(token: string, amountIls: number, description: string): Promise<{ success: boolean; transactionId?: string; error?: string }> {
+export async function chargeSubscriptionToken(
+  token: string,
+  amountIls: number,
+  description: string,
+  // Optional per the API, but PayPlus's own token-charge example sends it alongside the token —
+  // passed when the caller knows it (the health test parks it from the callback).
+  customerUid?: string
+): Promise<{ success: boolean; transactionId?: string; error?: string }> {
   const { apiKey, secretKey } = creds();
   // Env wins when set; otherwise the values the checkout webhook captured from a real callback
   // (see payplusBillingRoutes) — which means one paid checkout configures renewals by itself.
@@ -301,6 +308,7 @@ export async function chargeSubscriptionToken(token: string, amountIls: number, 
       currency_code: "ILS",
       use_token: true,
       token,
+      ...(customerUid ? { customer_uid: customerUid } : {}),
       // Same receipt behaviour as the hosted checkout page: with חשבונית+ enabled on the account,
       // PayPlus issues the invoice for renewals too, not only for first purchases.
       initial_invoice: true,

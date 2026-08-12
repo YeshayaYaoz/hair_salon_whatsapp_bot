@@ -152,8 +152,14 @@ payplusBillingRouter.post("/payplus/health/charge-token", requireAuth, requireSu
   if (!stored) {
     return res.status(409).json({ error: "אין עדיין כרטיס בדיקה שמור — שלמו קודם דף ₪1 מהכרטיס הזה." });
   }
+  const storedCustomer = await prisma.systemSetting.findUnique({ where: { key: "payplus_health_customer_uid" } });
   try {
-    const result = await chargeSubscriptionToken(decryptSecret(stored.value), 1, "תורי — בדיקת חיוב בכרטיס שמור (₪1)");
+    const result = await chargeSubscriptionToken(
+      decryptSecret(stored.value),
+      1,
+      "תורי — בדיקת חיוב בכרטיס שמור (₪1)",
+      storedCustomer?.value
+    );
     if (!result.success) return res.status(502).json({ error: `החיוב נכשל: ${explainPayPlusError(result.error ?? "")}` });
     res.json({ ok: true, transactionId: result.transactionId });
   } catch (err) {
@@ -522,6 +528,15 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
           create: { key: "payplus_health_token", value: encryptSecret(event.tokenUid) },
           update: { value: encryptSecret(event.tokenUid) },
         });
+        // PayPlus's own token-charge example sends customer_uid alongside the token, so the ₪1
+        // test does too. Not a secret — it is PayPlus's opaque id for the health-check customer.
+        if (event.customerUid) {
+          await prisma.systemSetting.upsert({
+            where: { key: "payplus_health_customer_uid" },
+            create: { key: "payplus_health_customer_uid", value: event.customerUid },
+            update: { value: event.customerUid },
+          });
+        }
         console.log("[payplus subscription webhook] Health payment token parked for the ₪1 token-charge test");
       }
       return;
