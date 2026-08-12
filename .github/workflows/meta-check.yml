@@ -75,17 +75,54 @@ jobs:
           echo "$count template(s) on this WABA:"
           echo "$out" | jq -r '.data[]? | "  - \(.name)  [\(.status)]  \(.category)  \(.language)"'
 
-      # Best-effort: this endpoint is not something the docs promise, and it is the one thing here
-      # that would answer the question that actually matters for onboarding — whether businesses
-      # connecting through Embedded Signup grant Tori permission to create their templates for them.
-      # Printed rather than asserted, so a missing endpoint does not fail an otherwise good check.
-      - name: What the Embedded Signup login configuration grants
-        if: env.APP_ID != ''
+      # Everything below asks the API what is actually true of this account, because Meta's docs
+      # describe the product rather than this WABA — and the interesting answers here are all
+      # account-specific: which tier it is on, what is switched on, what is already subscribed.
+      # All read-only, and each prints its own error rather than failing the job: a missing
+      # capability is a finding, not a broken check.
+
+      # The messaging tier is the gate on the Calling API (it needs 2,000 unique recipients/day),
+      # and it also caps how fast the pilot can grow. A new WABA starts far below it.
+      - name: What tier and quality this number is on
         run: |
-          out=$(curl -sS "$GRAPH/$APP_ID/login_configs?access_token=$TOKEN")
+          for f in "throughput" "quality_rating" "messaging_limit_tier" "status" "name_status" "code_verification_status"; do
+            v=$(curl -sS "$GRAPH/$WABA/phone_numbers?fields=$f&access_token=$TOKEN" | jq -c ".data[0].$f // \"—\"" 2>/dev/null)
+            echo "  $f: $v"
+          done
+
+      # Whether voice calling is switched on for this number at all, and on what terms.
+      - name: Are calling features enabled
+        run: |
+          pid=$(curl -sS "$GRAPH/$WABA/phone_numbers?access_token=$TOKEN" | jq -r '.data[0].id')
+          out=$(curl -sS "$GRAPH/$pid/settings?access_token=$TOKEN")
+          echo "$out" | jq '.' 2>/dev/null || echo "$out"
+
+      # Which webhook fields this app already receives. Two are worth having and easy to miss:
+      # message_template_status_update (Meta approved or rejected a template) and user_preferences
+      # (a user opted out of marketing) — the second is an authoritative opt-out signal next to the
+      # "הסר" text matching in leadfinder/inboundReplies.ts.
+      - name: Which webhooks are subscribed
+        run: |
+          app=$(curl -sS "$GRAPH/debug_token?input_token=$TOKEN&access_token=$TOKEN" | jq -r '.data.app_id')
+          out=$(curl -sS "$GRAPH/$app/subscriptions?access_token=$TOKEN")
           if echo "$out" | jq -e '.error' >/dev/null; then
-            echo "Could not read login configurations: $(echo "$out" | jq -r '.error.message')"
-            echo "Check it by hand instead: business.facebook.com → Apps → the app → Facebook Login for Business → Configurations."
+            echo "Could not read subscriptions: $(echo "$out" | jq -r '.error.message')"
           else
-            echo "$out" | jq -r '.data[]? | "  - \(.name // .id): \((.permissions // []) | join(", "))"'
+            echo "$out" | jq -r '.data[]? | "  \(.object): \([.fields[]?.name] | join(", "))"'
           fi
+
+      # Meta's own pre-written templates. If one covers appointment reminders in Hebrew, using it
+      # skips both the wording risk and the review wait — the whole rejection class we have been
+      # designing around stops applying.
+      - name: Is there a usable template in Meta's library
+        run: |
+          for ep in "$GRAPH/$WABA/template_library" "$GRAPH/$WABA/message_template_library" "$GRAPH/message_template_library"; do
+            out=$(curl -sS "$ep?limit=100&access_token=$TOKEN")
+            if echo "$out" | jq -e '.data' >/dev/null 2>&1; then
+              echo "Endpoint that answered: $ep"
+              echo "$out" | jq -r '.data[]? | "  - \(.name)  [\(.category // "?")]  languages=\((.supported_languages // []) | join(","))"'
+              exit 0
+            fi
+          done
+          echo "No template-library edge answered on this WABA. Last error:"
+          echo "$out" | jq -r '.error.message // .' 2>/dev/null | head -3
