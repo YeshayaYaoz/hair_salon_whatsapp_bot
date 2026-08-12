@@ -511,7 +511,9 @@ async def main_():
         def __init__(self, usage):
             self.usage = usage
 
-    reporter = main._UsageReporter()
+    # Built through the factory, which is what production uses: the callback class only exists once
+    # litellm is loaded, because importing it at module scope is what cost every first caller ~3.5s.
+    reporter = main._usage_reporter()
     meta = {"litellm_params": {"metadata": main._usage_metadata("+972555077941", "+972533391353")["metadata"]},
             "model": "deepseek/deepseek-chat"}
 
@@ -750,6 +752,25 @@ async def main_():
     # not "נקודה קו נקודה איי אל", which is how it came out of the TTS the first time.
     assert "נקודה co נקודה IL" in prompt, prompt
     print("37 the agent knows today's date, and quotes no website it was not given         OK")
+
+    # --- 38. nothing expensive is imported on the path to answering the phone ------------
+    # The first caller after every deploy waited about five seconds in silence, and it was not
+    # Cartesia: `import litellm` costs ~3.5s at module scope, against 0.6s for line.llm_agent, which
+    # does not pull litellm in at all. That cost was ours, paid before the phone could ring, for a
+    # callback that only fires after a call is answered. It now loads on a background thread.
+    import subprocess, sys as _sys
+    probe = subprocess.run(
+        [_sys.executable, "-c",
+         "import sys; sys.path.insert(0, '.');\n"
+         "import main;\n"
+         "print('BLOCKING' if 'litellm' in sys.modules else 'DEFERRED')"],
+        capture_output=True, text=True, timeout=120,
+        env={**os.environ, "TORI_API_URL": "", "CARTESIA_TOOL_SECRET": ""},
+    )
+    # With reporting disabled there is no reason to touch litellm at all, so its absence is the
+    # signal that nothing on the import path reaches for it.
+    assert "DEFERRED" in probe.stdout, f"litellm is imported at module scope again: {probe.stdout} {probe.stderr[-400:]}"
+    print("38 litellm stays off the startup path — the first caller does not wait for it   OK")
 
 asyncio.run(main_())
 print("\nALL CHECKS PASSED")
