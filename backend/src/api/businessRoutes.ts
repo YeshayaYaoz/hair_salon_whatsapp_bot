@@ -19,7 +19,7 @@ import {
   GoogleBusinessAccessError,
 } from "../lib/googleBusinessProfile.js";
 import { sendWhatsAppMessage, getWabaId, subscribeAppToWaba, registerPhoneNumber, getPhoneNumberStatus, getSubscribedApps, createMessageTemplate, setWhatsAppProfilePicture, type CreateTemplateResult } from "../webhook/whatsappClient.js";
-import { reminderTemplate, reviewTemplate, REMINDER_TEMPLATE_BODY, REVIEW_TEMPLATE_BODY } from "../lib/whatsappTemplates.js";
+import { reminderTemplate, reviewTemplate, confirmationTemplate, ownerAlertTemplate, REMINDER_TEMPLATE_BODY, REVIEW_TEMPLATE_BODY, CONFIRMATION_TEMPLATE_BODY, OWNER_ALERT_TEMPLATE_BODY } from "../lib/whatsappTemplates.js";
 import { notifyWaitlist, waitlistOfferText } from "../lib/waitlist.js";
 import { AFFILIATE_PROVIDERS, AFFILIATE_KINDS, recordAffiliateClick, markAffiliateConversion } from "../lib/affiliates.js";
 import { normalizeOwnerPhone } from "../lib/phone.js";
@@ -912,9 +912,31 @@ businessRouter.post("/me/apply-template", async (req: AuthedRequest, res) => {
   res.json({ ok: true, ...result });
 });
 
+/**
+ * Refuses to point a salon's bot at Tori's own outreach number.
+ *
+ * These are two different jobs on two different reputations. Outreach is cold marketing to
+ * strangers, which collects blocks and spam reports; the bot number serves paying customers and
+ * has to keep its quality rating. Sharing one number means the first bad outreach run degrades
+ * delivery for every customer of every salon on it — and the two are indistinguishable from the
+ * dashboard, so nobody would connect the drop to its cause.
+ *
+ * The database's @unique on whatsappPhoneNumberId already stops two salons sharing a number. This
+ * is the case it cannot see, because the outreach number lives in an env var rather than a row.
+ */
+function rejectIfOutreachNumber(phoneNumberId: string, res: import("express").Response): boolean {
+  const outreach = process.env.TORI_OUTREACH_PHONE_NUMBER_ID?.trim();
+  if (!outreach || outreach !== phoneNumberId.trim()) return false;
+  res.status(409).json({
+    error: "המספר הזה משמש את תורי לפניות יזומות ואי אפשר לחבר אותו כמספר של עסק. צריך מספר נפרד לבוט.",
+  });
+  return true;
+}
+
 businessRouter.put("/me/whatsapp", async (req: AuthedRequest, res) => {
   const parsed = whatsappSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  if (rejectIfOutreachNumber(parsed.data.phoneNumberId, res)) return;
 
   await prisma.business.update({
     where: { id: req.businessId! },
@@ -1027,9 +1049,16 @@ async function submitWhatsAppTemplates(
     }
     const reminder = reminderTemplate();
     const review = reviewTemplate();
+    const confirmation = confirmationTemplate();
+    const ownerAlert = ownerAlertTemplate();
     return await Promise.all([
       createMessageTemplate(wabaId, accessToken, { name: reminder.name, languageCode: reminder.languageCode, bodyText: REMINDER_TEMPLATE_BODY }),
       createMessageTemplate(wabaId, accessToken, { name: review.name, languageCode: review.languageCode, bodyText: REVIEW_TEMPLATE_BODY }),
+      // Added late: a booking taken by phone had no written confirmation, and an owner alert sent
+      // outside the owner's own 24h window had no template to fall back on — which is how a live
+      // call's lead reached nobody while every layer reported success.
+      createMessageTemplate(wabaId, accessToken, { name: confirmation.name, languageCode: confirmation.languageCode, bodyText: CONFIRMATION_TEMPLATE_BODY }),
+      createMessageTemplate(wabaId, accessToken, { name: ownerAlert.name, languageCode: ownerAlert.languageCode, bodyText: OWNER_ALERT_TEMPLATE_BODY }),
     ]);
   } catch (err) {
     console.error(`[whatsapp] Automatic template submission failed for ${businessId} (non-fatal):`, err);

@@ -92,3 +92,25 @@ export function confirmationTemplate(): TemplateConfig {
 
 export const CONFIRMATION_TEMPLATE_BODY =
   'שלום {{1}}, התור שלך ל{{2}} נקבע ל-{{3}} אצל {{4}}. לביטול יש להשיב "בטל תור".';
+
+const DEFAULT_OWNER_ALERT_NAME = "tori_owner_alert";
+
+/**
+ * Reaches the owner when the owner's own 24h window is shut.
+ *
+ * Owners are the users least likely to have an open window: they never message their own bot. A
+ * live call collected a complete lead, the alert was sent free-form, Meta accepted it with a 200
+ * and dropped it in transit (131047), and the owner was told a message had been sent. Without this
+ * template the fallback is email, which arrives — but hours later, and a lead goes cold.
+ *
+ * Read from WHATSAPP_OWNER_ALERT_TEMPLATE by ownerNotify.ts; this only names the default so the
+ * automatic submission at connect creates the same one the sender looks for.
+ */
+export function ownerAlertTemplate(): TemplateConfig {
+  return { name: process.env.WHATSAPP_OWNER_ALERT_TEMPLATE || DEFAULT_OWNER_ALERT_NAME, languageCode: DEFAULT_LANG };
+}
+
+// Text on both sides of the parameter, not just before it. Meta rejects a body that starts *or*
+// ends with one, and this template is the hardest case in the file: the whole alert arrives as a
+// single variable, so a bare "{{1}}" is both. The closing sentence is the price of that.
+export const OWNER_ALERT_TEMPLATE_BODY = "התראה חדשה מתורי: {{1}} — כל הפרטים מחכים לך בדשבורד.";
