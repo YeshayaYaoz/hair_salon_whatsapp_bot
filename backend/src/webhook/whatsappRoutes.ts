@@ -12,6 +12,7 @@ import { decryptSecret } from "../lib/crypto.js";
 import { hasActiveSubscription } from "../lib/subscriptionGate.js";
 import { rateLimit } from "../lib/rateLimit.js";
 import { prisma } from "../lib/prisma.js";
+import { handleTemplateStatusUpdate } from "./templateStatus.js";
 import { handleOutreachReply, isOutreachNumber } from "../leadfinder/inboundReplies.js";
 import { Prisma } from "@prisma/client";
 import { captureError } from "../lib/errorMonitoring.js";
@@ -215,7 +216,17 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
 
   try {
     const entry = payload?.entry?.[0];
+    const field = entry?.changes?.[0]?.field as string | undefined;
     const change = entry?.changes?.[0]?.value;
+
+    // Meta's answer to the templates we submit at connect. Arrives on its own field, with the WABA
+    // id on the entry rather than in the value — there is no phone_number_id here, so this has to
+    // be handled before the metadata lookup below discards the delivery as unrecognised.
+    if (field === "message_template_status_update" && entry?.id) {
+      await handleTemplateStatusUpdate(String(entry.id), change ?? {});
+      return;
+    }
+
     phoneNumberId = change?.metadata?.phone_number_id;
 
     // Delivery-status callbacks carry Meta's own real per-message billing category/billable flag
