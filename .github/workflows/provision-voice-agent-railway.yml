@@ -148,10 +148,14 @@ jobs:
             body=$(curl -sS --max-time 10 "https://$host/health" || true)
             if echo "$body" | jq -e '.ok' >/dev/null 2>&1; then
               echo "$body" | jq .
-              if [ "$(echo "$body" | jq -r '.tori_api')" = "true" ] && [ "$(echo "$body" | jq -r '.tool_secret')" = "true" ]; then
-                echo "::notice::Ready. Run 'Fix Cartesia agent config' with deployment_url=https://$host to remove the cold start."
+              # One field, computed by the service itself, rather than re-deriving the answer here
+              # from parts. An earlier version checked tori_api and tool_secret and would have
+              # called a service ready while it had no model key — which is a service that answers
+              # the phone and goes silent building the agent.
+              if [ "$(echo "$body" | jq -r '.ready_for_calls')" = "true" ]; then
+                echo "::notice::Ready. Run 'Fix Cartesia agent config' with deployment_url=$url to remove the cold start."
               else
-                echo "::warning::Booted but not fully configured (tori_api/tool_secret false). Do NOT point Cartesia at it yet — calls would reach a service that cannot talk to Tori."
+                echo "::warning::Booted but not ready for calls. Do NOT point Cartesia at it — the false fields above say what is missing."
               fi
               exit 0
             fi

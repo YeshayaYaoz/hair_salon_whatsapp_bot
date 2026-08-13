@@ -1217,10 +1217,20 @@ def health():
     return {
         "ok": True,
         "model": MODEL,
+        # The one variable whose absence breaks every call, and the one this endpoint used to omit.
+        # LlmAgent refuses to construct without a key, so a deployment missing it answers the phone
+        # and dies building the agent — the caller hears the line pick up and go silent. Reporting
+        # the other three as true while this was unreported made a service that cannot take a call
+        # look ready to be pointed at, which is exactly the mistake this endpoint exists to prevent.
+        # The boolean only: never the key.
+        "model_key": bool(MODEL_API_KEY),
         "gender": AGENT_GENDER or "unset (falls back to /context voiceGender)",
         "tori_api": bool(TORI_API_URL),
         "tool_secret": bool(TOOL_SECRET),
         "usage_reporting": bool(TORI_API_URL and TOOL_SECRET),
+        # Everything a call needs, in one field, so "is this safe to route calls to" is not four
+        # separate readings and an inference.
+        "ready_for_calls": bool(MODEL_API_KEY and TORI_API_URL and TOOL_SECRET),
     }
 
 
