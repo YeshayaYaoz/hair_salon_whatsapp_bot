@@ -19,6 +19,10 @@ on:
         description: "Name for the new Railway service"
         type: string
         default: "tori-voice-agent"
+      project:
+        description: "Railway project to create it in (read off `railway status`)"
+        type: string
+        default: "Tori"
       deploy:
         description: "Upload and build voice-agent/ after creating the service"
         type: boolean
@@ -62,19 +66,31 @@ jobs:
         run: npm i -g @railway/cli
 
       - name: Create the service if it does not exist
+        env:
+          PROJECT: ${{ inputs.project }}
         run: |
           # Every name anywhere in the payload: the CLI has reported "multiple services" while
           # .services.edges held one entry, so the shape is not what it looks like and a narrow
           # query here is how you end up deploying onto the wrong service.
           existing=$(railway status --json 2>/dev/null | jq -r '[.. | objects | select(has("name")) | .name] | unique | .[]' || true)
-          echo "Services visible to this token:"; echo "$existing" | sed 's/^/  - /'
+          echo "Names visible to this token:"; echo "$existing" | sed 's/^/  - /'
 
           if echo "$existing" | grep -qx "$SVC"; then
             echo "'$SVC' already exists — reusing it."
-          else
-            railway add --service "$SVC"
-            echo "Created '$SVC'."
+            exit 0
           fi
+
+          # `railway up` works off the token alone, but `railway add` does not: the first attempt
+          # answered its own prompts from the flags and then died on "Project not found. Run
+          # `railway link`". Authenticating to a project and having a project selected are separate
+          # states in this CLI, and only the second one creates services.
+          if ! railway link --project "$PROJECT" --environment "$RAILWAY_ENVIRONMENT"; then
+            echo "::error::Could not link project '$PROJECT'. Re-run with the project name exactly as `railway status` prints it — the names this token can see are listed above."
+            exit 1
+          fi
+
+          railway add --service "$SVC"
+          echo "Created '$SVC'."
 
       - name: Set the variables the agent reads
         run: |
