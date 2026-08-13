@@ -25,8 +25,8 @@ const USD_TO_ILS = 3.7;
 
 export interface StoredRow {
   /** As written by the buggy code: prompt_tokens + cache hits, where prompt_tokens already had them. */
-  inputTokens: number;
-  outputTokens: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
   cacheReadTokens: number | null;
 }
 
@@ -38,13 +38,17 @@ export interface StoredRow {
  * live path would not be.
  */
 export function recompute(row: StoredRow): { inputTokens: number; costAgorot: number } {
+  // Nullable in the database, and this script reads real rows: an event written before a field
+  // existed, or one whose provider returned no usage block, has nulls where the happy path has
+  // numbers. Treating them as zero costs nothing and keeps a single odd row from stopping a
+  // backfill over thousands.
   const hits = row.cacheReadTokens ?? 0;
   // Stored inputTokens was prompt_tokens + hits, and prompt_tokens itself already contained the
   // hits — hence subtracting them twice to recover the cache-miss portion. Clamped because a
   // handful of early rows predate cache reporting entirely and would otherwise go negative.
-  const miss = Math.max(0, row.inputTokens - 2 * hits);
+  const miss = Math.max(0, (row.inputTokens ?? 0) - 2 * hits);
   const costUsd =
-    (miss * RATE.input + row.outputTokens * RATE.output + hits * RATE.input * RATE.cacheReadMultiplier) / 1_000_000;
+    (miss * RATE.input + (row.outputTokens ?? 0) * RATE.output + hits * RATE.input * RATE.cacheReadMultiplier) / 1_000_000;
   return {
     // Stored as the full prompt (miss + hits), matching what the fixed code writes.
     inputTokens: miss + hits,

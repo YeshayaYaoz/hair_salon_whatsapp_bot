@@ -155,6 +155,8 @@ async function main() {
 
   console.log(`\n${mine.length} call(s) to ${to}, none carrying a readable code.`);
   console.log("If Meta has just called, wait for the call to end — the transcript is written then.");
+}
+
 main().catch((err) => {
   console.error("✖", (err as Error).message);
   process.exit(1);

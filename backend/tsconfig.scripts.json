@@ -1,0 +1,13 @@
+{
+  // Scripts were outside every check: the main tsconfig includes only "src", so a syntax error in
+  // scripts/ surfaced only when someone ran it — and these run against production, from CI, in the
+  // middle of doing something that matters. A truncated file got as far as a live run before
+  // anything noticed.
+  //
+  // Separate from tsconfig.json rather than folded into it: these are one-off tools that are never
+  // built or shipped, only executed by tsx, so rootDir does not apply to them.
+  "extends": "./tsconfig.json",
+  "include": ["scripts", "src"],
+  "exclude": ["src/**/*.test.ts"],
+  "compilerOptions": { "noEmit": true, "rootDir": "." }
+}
