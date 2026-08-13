@@ -1,0 +1,134 @@
+name: Provision the voice agent on Railway
+
+# Creates the Railway service that removes the managed runtime's cold start — the ~5 seconds the
+# first caller after a quiet stretch waits while Cartesia scales the agent up from zero.
+#
+# It stops deliberately short of switching the phone line over. Creating the service and pointing
+# Cartesia at it are separate acts with very different blast radii: this one adds a service that
+# nothing routes to yet, and is undone by deleting it. The switch is done by "Fix Cartesia agent
+# config" with deployment_url, and only makes sense once /health here reports a service that can
+# actually take a call.
+#
+# ‼️ The project token is scoped to the whole project, which also holds the backend. Deploying the
+# voice agent over that service would take the API down for every salon, so the service name is
+# checked against it and the job aborts rather than guessing.
+on:
+  workflow_dispatch:
+    inputs:
+      service_name:
+        description: "Name for the new Railway service"
+        type: string
+        default: "tori-voice-agent"
+      deploy:
+        description: "Upload and build voice-agent/ after creating the service"
+        type: boolean
+        default: true
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+      BACKEND_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+      SVC: ${{ inputs.service_name }}
+      # What the agent needs to answer a call. Only the first is available today; the other two are
+      # reported as missing rather than substituted, because a wrong CARTESIA_TOOL_SECRET is a
+      # service that boots, answers, and fails every tool call with an auth error.
+      TORI_API_URL: ${{ secrets.PUBLIC_BACKEND_URL || vars.PUBLIC_BACKEND_URL }}
+      CARTESIA_TOOL_SECRET: ${{ secrets.CARTESIA_TOOL_SECRET }}
+      MODEL_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      AGENT_GENDER: ${{ secrets.TORI_AGENT_GENDER || vars.TORI_AGENT_GENDER || 'masculine' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Refuse to touch the backend's service
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::error::RAILWAY_TOKEN is not set (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+          if [ -z "$SVC" ]; then
+            echo "::error::service_name is empty. An empty --service makes the CLI pick, and the project's other service is the backend."
+            exit 1
+          fi
+          if [ "$SVC" = "$BACKEND_SERVICE" ]; then
+            echo "::error::'$SVC' is the backend's service. Deploying the voice agent onto it would take the API down for every salon."
+            exit 1
+          fi
+          echo "Target service: $SVC (backend is '$BACKEND_SERVICE', untouched)"
+
+      - name: Install the Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Create the service if it does not exist
+        run: |
+          # Every name anywhere in the payload: the CLI has reported "multiple services" while
+          # .services.edges held one entry, so the shape is not what it looks like and a narrow
+          # query here is how you end up deploying onto the wrong service.
+          existing=$(railway status --json 2>/dev/null | jq -r '[.. | objects | select(has("name")) | .name] | unique | .[]' || true)
+          echo "Services visible to this token:"; echo "$existing" | sed 's/^/  - /'
+
+          if echo "$existing" | grep -qx "$SVC"; then
+            echo "'$SVC' already exists — reusing it."
+          else
+            railway add --service "$SVC"
+            echo "Created '$SVC'."
+          fi
+
+      - name: Set the variables the agent reads
+        run: |
+          args="--service $SVC --environment $RAILWAY_ENVIRONMENT --skip-deploys"
+          missing=""
+
+          if [ -n "$TORI_API_URL" ]; then railway variables --set "TORI_API_URL=$TORI_API_URL" $args
+          else missing="$missing PUBLIC_BACKEND_URL→TORI_API_URL"; fi
+
+          if [ -n "$CARTESIA_TOOL_SECRET" ]; then railway variables --set "CARTESIA_TOOL_SECRET=$CARTESIA_TOOL_SECRET" $args
+          else missing="$missing CARTESIA_TOOL_SECRET"; fi
+
+          if [ -n "$MODEL_KEY" ]; then railway variables --set "ANTHROPIC_API_KEY=$MODEL_KEY" $args
+          else missing="$missing ANTHROPIC_API_KEY"; fi
+
+          railway variables --set "TORI_AGENT_GENDER=$AGENT_GENDER" $args
+
+          if [ -n "$missing" ]; then
+            echo "::warning::Not set, because no secret holds them:$missing"
+            echo "::warning::The service will boot and fail every call until they exist. CARTESIA_TOOL_SECRET must match the backend's exactly, and neither can be guessed from here."
+          fi
+
+      - name: Upload and build voice-agent/
+        if: inputs.deploy
+        working-directory: voice-agent
+        run: railway up --ci --service "$SVC" --environment "$RAILWAY_ENVIRONMENT"
+
+      - name: Give it a public URL and report what booted
+        if: inputs.deploy
+        run: |
+          # Cartesia dials this host, so the service needs a domain before it can be pointed at.
+          railway domain --service "$SVC" --environment "$RAILWAY_ENVIRONMENT" || \
+            echo "::warning::Could not generate a domain — check the service in the Railway dashboard."
+
+          host=$(railway status --json 2>/dev/null | jq -r '[.. | strings | select(test("\\.up\\.railway\\.app$"))] | unique | .[]' | head -1 || true)
+          if [ -z "$host" ]; then
+            echo "::warning::No *.up.railway.app host found in railway status. Read the domain off the dashboard."
+            exit 0
+          fi
+
+          echo "URL: https://$host"
+          # /health exists to answer "which code is live, and is it configured" in one request.
+          # Retried: a fresh deploy is not serving the instant the build reports done.
+          for i in 1 2 3 4 5 6; do
+            body=$(curl -sS --max-time 10 "https://$host/health" || true)
+            if echo "$body" | jq -e '.ok' >/dev/null 2>&1; then
+              echo "$body" | jq .
+              if [ "$(echo "$body" | jq -r '.tori_api')" = "true" ] && [ "$(echo "$body" | jq -r '.tool_secret')" = "true" ]; then
+                echo "::notice::Ready. Run 'Fix Cartesia agent config' with deployment_url=https://$host to remove the cold start."
+              else
+                echo "::warning::Booted but not fully configured (tori_api/tool_secret false). Do NOT point Cartesia at it yet — calls would reach a service that cannot talk to Tori."
+              fi
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::warning::/health did not answer within a minute. The build may still be starting; re-check https://$host/health."
