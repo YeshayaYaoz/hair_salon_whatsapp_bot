@@ -71,6 +71,7 @@ async function main() {
       console.log(`No destinations available in ${country}.`);
       return;
     }
+    if (has("raw")) { console.log(JSON.stringify(body, null, 2).slice(0, 4000)); return; }
     console.log(`Destinations in ${country}:\n`);
     for (const r of rows) {
       // Field names vary across Zadarma's responses; print the ones present rather than assuming.
@@ -96,7 +97,15 @@ async function main() {
       let rows: Array<Record<string, unknown>> = [];
       try {
         const body = await request("GET", `/v1/direct_numbers/available/${id}/`);
-        rows = (body.info as Array<Record<string, unknown>>) ?? [];
+        if (has("raw")) { console.log(`--- direction ${id} raw:`); console.log(JSON.stringify(body).slice(0, 1500)); }
+        // The shape is not documented and has been observed to differ between endpoints; take
+        // whichever array is present rather than assuming `info`, which is what returned an empty
+        // list against a dashboard that was visibly full of numbers.
+        rows =
+          (body.info as Array<Record<string, unknown>>) ??
+          (body.numbers as Array<Record<string, unknown>>) ??
+          (body.data as Array<Record<string, unknown>>) ??
+          [];
       } catch (err) {
         console.log(`  direction ${id}: ${(err as Error).message}`);
         continue;
