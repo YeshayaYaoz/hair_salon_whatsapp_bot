@@ -19,6 +19,10 @@ on:
       direction_id:
         description: "Show the actual free numbers on this destination id (read-only)"
         default: ""
+      raw:
+        description: "Print the raw Zadarma JSON — for when a listing disagrees with the dashboard"
+        type: boolean
+        default: false
 
 
 jobs:
@@ -70,9 +74,10 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
           RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+          RAW: ${{ inputs.raw }}
         run: |
           railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
-            npx tsx scripts/zadarma-number.ts --list IL
+            npx tsx scripts/zadarma-number.ts --list IL ${RAW:+--raw}
 
       - name: Free numbers on a destination
         if: inputs.direction_id != ''
@@ -81,6 +86,7 @@ jobs:
           RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
           RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
           DIRECTION: ${{ inputs.direction_id }}
+          RAW: ${{ inputs.raw }}
         run: |
           railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
-            npx tsx scripts/zadarma-number.ts --available "$DIRECTION"
+            npx tsx scripts/zadarma-number.ts --available "$DIRECTION" ${RAW:+--raw}
