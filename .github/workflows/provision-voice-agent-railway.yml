@@ -44,8 +44,15 @@ jobs:
       # so the service came up unable to reach Tori. Not a guess and not a secret; override it with
       # the secret or variable when the API moves to its own domain.
       TORI_API_URL: ${{ secrets.PUBLIC_BACKEND_URL || vars.PUBLIC_BACKEND_URL || 'https://hairsalonwhatsappbot.up.railway.app' }}
-      CARTESIA_TOOL_SECRET: ${{ secrets.CARTESIA_TOOL_SECRET }}
-      MODEL_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      CARTESIA_TOOL_SECRET: ${{ secrets.CARTESIA_TOOL_SECRET || vars.CARTESIA_TOOL_SECRET }}
+      # Every name the agent will accept, from both stores. "Secrets and variables" is one page with
+      # two tabs and a value in the wrong one resolves to an empty string with no warning — which is
+      # exactly what happened here: the key was added, MODEL_KEY still arrived empty, and the
+      # service kept reporting model_key:false. main.py reads TORI_AGENT_API_KEY first, then
+      # ANTHROPIC_API_KEY, so both names are legitimate and both are accepted.
+      MODEL_KEY: >-
+        ${{ secrets.ANTHROPIC_API_KEY || vars.ANTHROPIC_API_KEY
+         || secrets.TORI_AGENT_API_KEY || vars.TORI_AGENT_API_KEY }}
       AGENT_GENDER: ${{ secrets.TORI_AGENT_GENDER || vars.TORI_AGENT_GENDER || 'masculine' }}
     steps:
       - uses: actions/checkout@v4
@@ -113,17 +120,34 @@ jobs:
           railway variables --set "TORI_AGENT_GENDER=$AGENT_GENDER" $args
 
           if [ -n "$missing" ]; then
-            echo "::warning::Not set, because no secret holds them:$missing"
+            echo "::warning::Not set, because no secret or variable holds them:$missing"
             echo "::warning::The service will boot and fail every call until they exist. CARTESIA_TOOL_SECRET must match the backend's exactly, and neither can be guessed from here."
+            # Which names were actually found, as booleans. A key that is present under a name
+            # nothing reads looks identical to no key at all, and the first round of this cost a
+            # deploy cycle to notice. Names only — never a value, not even a length.
+            echo "Names checked for the model key (true = found):"
+            echo "  secrets.ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY != '' }}    vars.ANTHROPIC_API_KEY=${{ vars.ANTHROPIC_API_KEY != '' }}"
+            echo "  secrets.TORI_AGENT_API_KEY=${{ secrets.TORI_AGENT_API_KEY != '' }}   vars.TORI_AGENT_API_KEY=${{ vars.TORI_AGENT_API_KEY != '' }}"
+            echo "All four false means the value is in another tab (Dependabot/Codespaces/Environment) or under a different name."
           fi
 
       - name: Upload and build voice-agent/
         if: inputs.deploy
         working-directory: voice-agent
-        run: railway up --ci --service "$SVC" --environment "$RAILWAY_ENVIRONMENT"
+        run: |
+          # `railway up --ci` exits 1 on "Failed to stream build logs" as readily as on a failed
+          # build, and the two mean opposite things: one is a broken log pipe over a build that was
+          # accepted and is running, the other is code that never shipped. Treating them alike
+          # skipped the health check — the one step that can actually tell them apart — and left
+          # the run reporting failure over a deploy that had gone out.
+          if ! railway up --ci --service "$SVC" --environment "$RAILWAY_ENVIRONMENT"; then
+            echo "::warning::'railway up' exited non-zero. If that was a log-streaming error the build is still running; the health check below is the verdict."
+          fi
 
+      # always(), so a non-zero `railway up` cannot suppress the only reading that distinguishes a
+      # failed build from a failed log stream.
       - name: Give it a public URL and report what booted
-        if: inputs.deploy
+        if: always() && inputs.deploy
         run: |
           # Cartesia dials this host, so the service needs a domain before it can be pointed at.
           out=$(railway domain --service "$SVC" --environment "$RAILWAY_ENVIRONMENT" 2>&1) || true
