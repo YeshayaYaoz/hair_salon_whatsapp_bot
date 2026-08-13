@@ -29,6 +29,16 @@ on:
       order_direction:
         description: "Destination id the ordered number belongs to"
         default: "3061"
+      forward_number:
+        description: "Point this number's calls at Cartesia (same wiring the dashboard does)"
+        default: ""
+      code_for:
+        description: "Read a six-digit verification code out of recent Cartesia calls to this number"
+        default: ""
+      discover_calls:
+        description: "Print which Cartesia call endpoints this account exposes"
+        type: boolean
+        default: false
 
 
 jobs:
@@ -111,3 +121,40 @@ jobs:
         run: |
           railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
             npx tsx scripts/zadarma-number.ts --order "$DIR" --number "$NUM" --confirm
+
+      - name: Forward a number to Cartesia
+        if: inputs.forward_number != ''
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+          RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+          FWD: ${{ inputs.forward_number }}
+        run: |
+          railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+            npx tsx scripts/zadarma-number.ts --forward "$FWD"
+
+      - name: Discover Cartesia call endpoints
+        if: inputs.discover_calls
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+          RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+        run: |
+          railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+            npx tsx scripts/cartesia-code.ts --discover
+
+      # The code is single-use and expires in minutes, but it still lands in a log anyone with repo
+      # read access can open later. Masked on the way out.
+      - name: Read the verification code from Cartesia
+        if: inputs.code_for != ''
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+          RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+          TO: ${{ inputs.code_for }}
+        run: |
+          out=$(railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+            npx tsx scripts/cartesia-code.ts --to "$TO" 2>&1) || true
+          code=$(echo "$out" | grep -oE '[0-9]{6}' | tail -1 || true)
+          [ -n "$code" ] && echo "::add-mask::$code"
+          echo "$out"
