@@ -117,6 +117,16 @@ async function main() {
     return;
   }
 
+  const forward = arg("forward");
+  if (forward) {
+    // Uses the same function the dashboard's voice-number save uses, so a number wired from here
+    // and one wired by an owner end up in exactly the same state.
+    const { pointNumberAtCartesia } = await import("../src/lib/zadarmaAdmin.js");
+    const { sipId } = await pointNumberAtCartesia(forward);
+    console.log(`✔ ${forward} now forwards to ${sipId}`);
+    return;
+  }
+
   const orderDirection = arg("order");
   if (orderDirection) {
     const wanted = arg("number");

@@ -1,0 +1,142 @@
+/**
+ * Reads a verification code out of a recent Cartesia call.
+ *
+ * Usage (from backend/, against the environment holding CARTESIA_API_KEY):
+ *   railway run npx tsx scripts/cartesia-code.ts --to +972559661420
+ *   railway run npx tsx scripts/cartesia-code.ts --to +972559661420 --discover
+ *
+ * Meta will send a WhatsApp verification code either by SMS or by calling the number and reading it
+ * aloud. An inbound SMS to a Zadarma number is billed; an inbound call is not — and the call is
+ * answered by the voice agent anyway, which means the code is spoken into a transcript we can
+ * fetch. So the cheap path and the automatable path are the same path.
+ *
+ * Cartesia's call API is not something to guess at, so `--discover` tries the plausible endpoints
+ * and prints which answer. Once one is known to work the normal run uses it directly.
+ *
+ * The code is printed. It is single-use and expires in minutes, and it lands in a CI log — which is
+ * why the workflow that runs this masks it. Do not widen that.
+ */
+
+const BASE_URL = "https://api.cartesia.ai";
+const API_VERSION = "2026-03-01";
+const apiKey = process.env.CARTESIA_API_KEY?.trim();
+const agentId = process.env.CARTESIA_AGENT_ID?.trim();
+
+if (!apiKey) {
+  console.error("CARTESIA_API_KEY is not set in this environment.");
+  process.exit(1);
+}
+
+function arg(name: string): string | undefined {
+  const i = process.argv.indexOf(`--${name}`);
+  return i >= 0 ? process.argv[i + 1] : undefined;
+}
+const has = (name: string) => process.argv.includes(`--${name}`);
+
+async function get(path: string): Promise<{ status: number; body: unknown }> {
+  try {
+    const res = await fetch(`${BASE_URL}${path}`, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Cartesia-Version": API_VERSION,
+        "Content-Type": "application/json",
+      },
+      signal: AbortSignal.timeout(20_000),
+    });
+    const text = await res.text();
+    try {
+      return { status: res.status, body: JSON.parse(text) };
+    } catch {
+      return { status: res.status, body: text };
+    }
+  } catch (err) {
+    return { status: 0, body: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Six consecutive digits, however they were spoken.
+ *
+ * Meta's robot reads the code digit by digit, so the transcript may hold "1 2 3 4 5 6", "123456",
+ * or digits separated by hyphens or commas depending on how the STT segmented it. Stripping
+ * non-digits from a window and taking the first run of six is more robust than matching a format.
+ * The Hebrew words are here because the agent's STT is configured for Hebrew and will sometimes
+ * transcribe spoken English digits into Hebrew words.
+ */
+const HEBREW_DIGITS: Record<string, string> = {
+  אפס: "0", אחת: "1", אחד: "1", שתיים: "2", שניים: "2", שלוש: "3", שלושה: "3",
+  ארבע: "4", ארבעה: "4", חמש: "5", חמישה: "5", שש: "6", שישה: "6",
+  שבע: "7", שבעה: "7", שמונה: "8", תשע: "9", תשעה: "9",
+};
+
+export function extractCode(text: string): string | null {
+  const normalized = text
+    .split(/\s+/)
+    .map((w) => HEBREW_DIGITS[w.replace(/[^֐-׿]/g, "")] ?? w)
+    .join(" ");
+  const digitsOnly = normalized.replace(/\D/g, "");
+  const m = digitsOnly.match(/\d{6}/);
+  return m ? m[0] : null;
+}
+
+/** Every string in an arbitrarily-shaped payload, so a transcript is found wherever it is nested. */
+function allText(value: unknown, out: string[] = []): string[] {
+  if (typeof value === "string") out.push(value);
+  else if (Array.isArray(value)) for (const v of value) allText(v, out);
+  else if (value && typeof value === "object") for (const v of Object.values(value)) allText(v, out);
+  return out;
+}
+
+const CANDIDATES = [
+  "/agents/calls",
+  "/calls",
+  "/agents/call-history",
+  agentId ? `/agents/${agentId}/calls` : null,
+].filter(Boolean) as string[];
+
+async function main() {
+  if (has("discover")) {
+    for (const path of CANDIDATES) {
+      const r = await get(`${path}?limit=5`);
+      const shape = typeof r.body === "string" ? r.body.slice(0, 200) : JSON.stringify(r.body).slice(0, 400);
+      console.log(`GET ${path} → ${r.status}\n    ${shape}\n`);
+    }
+    return;
+  }
+
+  const to = arg("to");
+  if (!to) throw new Error("--to is required: the number Meta called");
+  const wanted = to.replace(/\D/g, "");
+
+  for (const path of CANDIDATES) {
+    const list = await get(`${path}?limit=20`);
+    if (list.status !== 200) continue;
+
+    // Any array in the payload is the call list; the field name is not documented and the shape has
+    // already differed once between two Cartesia endpoints.
+    const body = list.body as Record<string, unknown>;
+    const calls =
+      (body?.calls as unknown[]) ?? (body?.data as unknown[]) ?? (Array.isArray(body) ? body : []);
+    if (!Array.isArray(calls) || calls.length === 0) continue;
+
+    for (const call of calls) {
+      const text = allText(call).join(" ");
+      // Only calls to the number being verified — another salon's call has digits in it too.
+      if (!text.replace(/\D/g, "").includes(wanted)) continue;
+      const code = extractCode(text);
+      if (code) {
+        console.log(`Found a six-digit code in a call on ${path}: ${code}`);
+        return;
+      }
+    }
+    console.log(`${calls.length} call(s) on ${path}, none carrying a code for ${to} yet.`);
+    return;
+  }
+
+  console.log("No Cartesia call endpoint answered. Run with --discover to see what this account exposes.");
+}
+
+main().catch((err) => {
+  console.error("✖", (err as Error).message);
+  process.exit(1);
+});
