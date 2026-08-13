@@ -1,0 +1,47 @@
+name: Benchmark the voice model
+
+# Settles, with numbers, the one assumption the model choice rests on.
+#
+# main.py runs Haiku rather than DeepSeek — which the WhatsApp bot already pays for — at roughly 7x
+# the token price, justified by "published figures put Haiku 4.5 near 100-150ms against DeepSeek's
+# 0.8-1.8s". A real call measured 590, 594, 898, 936 and 1051ms to first chunk: four to seven times
+# the figure the decision rested on. Part of that is the network and the hop through Cartesia rather
+# than the model, which is why a call log cannot settle it — the log times the whole round trip and
+# the question is about one leg.
+#
+# So this measures that leg from a neutral machine, against both providers, on the real system
+# prompt. It changes nothing: no deploy, no config, just a number to decide with.
+on:
+  workflow_dispatch:
+    inputs:
+      iterations:
+        description: "Samples per model (the spread matters more than the average)"
+        type: string
+        default: "5"
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        working-directory: voice-agent
+        run: pip install --quiet -r requirements.txt
+
+      - name: Measure
+        working-directory: voice-agent
+        env:
+          # Either or both. A model whose key is absent is skipped with a line saying so, because a
+          # one-sided run is still worth having — it is the comparison that needs both.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || secrets.TORI_AGENT_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$DEEPSEEK_API_KEY" ]; then
+            echo "::error::Neither ANTHROPIC_API_KEY nor DEEPSEEK_API_KEY is set — nothing to measure."
+            exit 1
+          fi
+          python bench_ttft.py "${{ inputs.iterations }}" | tee "$GITHUB_STEP_SUMMARY"
