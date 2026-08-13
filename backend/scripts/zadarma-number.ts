@@ -71,6 +71,7 @@ async function main() {
       console.log(`No destinations available in ${country}.`);
       return;
     }
+    if (has("raw")) { console.log(JSON.stringify(body, null, 2).slice(0, 4000)); return; }
     console.log(`Destinations in ${country}:\n`);
     for (const r of rows) {
       // Field names vary across Zadarma's responses; print the ones present rather than assuming.
@@ -96,7 +97,15 @@ async function main() {
       let rows: Array<Record<string, unknown>> = [];
       try {
         const body = await request("GET", `/v1/direct_numbers/available/${id}/`);
-        rows = (body.info as Array<Record<string, unknown>>) ?? [];
+        if (has("raw")) { console.log(`--- direction ${id} raw:`); console.log(JSON.stringify(body).slice(0, 1500)); }
+        // The shape is not documented and has been observed to differ between endpoints; take
+        // whichever array is present rather than assuming `info`, which is what returned an empty
+        // list against a dashboard that was visibly full of numbers.
+        rows =
+          (body.info as Array<Record<string, unknown>>) ??
+          (body.numbers as Array<Record<string, unknown>>) ??
+          (body.data as Array<Record<string, unknown>>) ??
+          [];
       } catch (err) {
         console.log(`  direction ${id}: ${(err as Error).message}`);
         continue;
@@ -122,6 +131,22 @@ async function main() {
       number: wanted,
     });
     console.log("✔ Ordered.", JSON.stringify(body));
+
+    // Zadarma has been observed to allocate from the pool and ignore the requested number: asking
+    // for 972555077983 returned 972559661420. Said plainly rather than buried in the JSON, because
+    // the number is what everything downstream is configured against — Meta's WABA, the carrier
+    // forwarding, whatever the business prints on a card — and quietly getting a different one is
+    // how the wrong number ends up in three places.
+    const got = String((body as { number?: unknown }).number ?? "");
+    if (got && got.replace(/\D/g, "") !== wanted.replace(/\D/g, "")) {
+      console.log(`\n⚠ Zadarma allocated ${got}, NOT the requested ${wanted}.`);
+      console.log("  Use the allocated number everywhere from here on.");
+    }
+    if (String((body as { is_activated?: unknown }).is_activated ?? "") === "false") {
+      console.log("⚠ Reserved but not activated yet — it cannot receive anything until it is.");
+      console.log("  Israeli numbers carry an address requirement; check the Zadarma account for");
+      console.log("  a pending documents or address step.");
+    }
     console.log("  Point it at Cartesia by saving it as a voice number in the dashboard, or leave");
     console.log("  it unforwarded if this one is for WhatsApp only.");
     return;

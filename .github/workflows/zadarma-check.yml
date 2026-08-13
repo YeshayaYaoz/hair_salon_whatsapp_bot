@@ -19,6 +19,16 @@ on:
       direction_id:
         description: "Show the actual free numbers on this destination id (read-only)"
         default: ""
+      raw:
+        description: "Print the raw Zadarma JSON — for when a listing disagrees with the dashboard"
+        type: boolean
+        default: false
+      order_number:
+        description: "Order this exact number (starts a monthly charge). Needs order_direction too."
+        default: ""
+      order_direction:
+        description: "Destination id the ordered number belongs to"
+        default: "3061"
 
 
 jobs:
@@ -70,9 +80,10 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
           RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+          RAW: ${{ inputs.raw }}
         run: |
           railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
-            npx tsx scripts/zadarma-number.ts --list IL
+            npx tsx scripts/zadarma-number.ts --list IL ${RAW:+--raw}
 
       - name: Free numbers on a destination
         if: inputs.direction_id != ''
@@ -81,6 +92,22 @@ jobs:
           RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
           RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
           DIRECTION: ${{ inputs.direction_id }}
+          RAW: ${{ inputs.raw }}
         run: |
           railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
-            npx tsx scripts/zadarma-number.ts --available "$DIRECTION"
+            npx tsx scripts/zadarma-number.ts --available "$DIRECTION" ${RAW:+--raw}
+
+      # The only step here that spends money. It names the exact number rather than taking whatever
+      # the listing returns first, because a phone number is a lasting identity for the business and
+      # 'whichever came back' is not a choice anyone made.
+      - name: Order a number
+        if: inputs.order_number != ''
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+          RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+          NUM: ${{ inputs.order_number }}
+          DIR: ${{ inputs.order_direction }}
+        run: |
+          railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+            npx tsx scripts/zadarma-number.ts --order "$DIR" --number "$NUM" --confirm

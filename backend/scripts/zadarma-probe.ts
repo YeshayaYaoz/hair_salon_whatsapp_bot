@@ -56,6 +56,22 @@ async function get(methodPath: string, params: Record<string, string> = {}): Pro
 const CARTESIA_HOST = process.env.CARTESIA_SIP_HOST?.trim() || "sip.cartesia.ai";
 
 async function main() {
+  // First, because it explains the state of everything below it. A number ordered against an empty
+  // balance comes back reserved but not activated — which reads as a successful order right up
+  // until nothing can call or message it.
+  try {
+    const bal = await get("/v1/info/balance/");
+    const amount = Number(bal.balance ?? 0);
+    console.log(`Balance: ${amount} ${String(bal.currency ?? "")}`);
+    if (amount <= 0) {
+      console.log("  ⚠ Nothing to charge against. Reserved numbers stay inactive, and reservations");
+      console.log("    do not last indefinitely — top up before the reservation lapses.");
+    }
+    console.log("");
+  } catch (err) {
+    console.log(`Balance: unavailable (${(err as Error).message})\n`);
+  }
+
   let numbers: Array<Record<string, unknown>>;
   try {
     const body = await get("/v1/direct_numbers/");
@@ -80,7 +96,8 @@ async function main() {
     const dest = [n.sip_id, n.sip, n.redirection, n.destination].find((v) => v);
     const points = dest ? String(dest) : null;
     const mark = !points ? "✖" : points.includes(CARTESIA_HOST) ? "✔" : "!";
-    console.log(`  ${mark} ${number}  type=${String(n.type ?? "?")}`);
+    const inactive = String(n.is_activated ?? "") === "false" || n.status === "reserved";
+    console.log(`  ${mark} ${number}  type=${String(n.type ?? "?")}${inactive ? "  [RESERVED, NOT ACTIVE]" : ""}`);
     if (!points) {
       console.log(`      no SIP destination — calls to this number reach nobody`);
     } else if (points.includes(CARTESIA_HOST)) {
