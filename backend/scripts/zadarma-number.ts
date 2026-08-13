@@ -131,6 +131,22 @@ async function main() {
       number: wanted,
     });
     console.log("✔ Ordered.", JSON.stringify(body));
+
+    // Zadarma has been observed to allocate from the pool and ignore the requested number: asking
+    // for 972555077983 returned 972559661420. Said plainly rather than buried in the JSON, because
+    // the number is what everything downstream is configured against — Meta's WABA, the carrier
+    // forwarding, whatever the business prints on a card — and quietly getting a different one is
+    // how the wrong number ends up in three places.
+    const got = String((body as { number?: unknown }).number ?? "");
+    if (got && got.replace(/\D/g, "") !== wanted.replace(/\D/g, "")) {
+      console.log(`\n⚠ Zadarma allocated ${got}, NOT the requested ${wanted}.`);
+      console.log("  Use the allocated number everywhere from here on.");
+    }
+    if (String((body as { is_activated?: unknown }).is_activated ?? "") === "false") {
+      console.log("⚠ Reserved but not activated yet — it cannot receive anything until it is.");
+      console.log("  Israeli numbers carry an address requirement; check the Zadarma account for");
+      console.log("  a pending documents or address step.");
+    }
     console.log("  Point it at Cartesia by saving it as a voice number in the dashboard, or leave");
     console.log("  it unforwarded if this one is for WhatsApp only.");
     return;
