@@ -87,20 +87,21 @@ function allText(value: unknown, out: string[] = []): string[] {
   return out;
 }
 
-const CANDIDATES = [
-  "/agents/calls",
-  "/calls",
-  "/agents/call-history",
-  agentId ? `/agents/${agentId}/calls` : null,
-].filter(Boolean) as string[];
+// Settled by --discover against the live account: /agents/calls is the endpoint, and it requires
+// agent_id as a query parameter rather than a path segment. /calls, /agents/call-history and
+// /agents/{id}/calls all 404.
+const CALLS_PATH = "/agents/calls";
+
+function callsUrl(limit: number): string {
+  if (!agentId) throw new Error("CARTESIA_AGENT_ID is required — /agents/calls takes it as a query parameter");
+  return `${CALLS_PATH}?agent_id=${encodeURIComponent(agentId)}&limit=${limit}`;
+}
 
 async function main() {
   if (has("discover")) {
-    for (const path of CANDIDATES) {
-      const r = await get(`${path}?limit=5`);
-      const shape = typeof r.body === "string" ? r.body.slice(0, 200) : JSON.stringify(r.body).slice(0, 400);
-      console.log(`GET ${path} → ${r.status}\n    ${shape}\n`);
-    }
+    const r = await get(callsUrl(5));
+    const shape = typeof r.body === "string" ? r.body.slice(0, 400) : JSON.stringify(r.body, null, 2).slice(0, 2500);
+    console.log(`GET ${callsUrl(5)} → ${r.status}\n${shape}`);
     return;
   }
 
@@ -108,32 +109,34 @@ async function main() {
   if (!to) throw new Error("--to is required: the number Meta called");
   const wanted = to.replace(/\D/g, "");
 
-  for (const path of CANDIDATES) {
-    const list = await get(`${path}?limit=20`);
-    if (list.status !== 200) continue;
-
-    // Any array in the payload is the call list; the field name is not documented and the shape has
-    // already differed once between two Cartesia endpoints.
-    const body = list.body as Record<string, unknown>;
-    const calls =
-      (body?.calls as unknown[]) ?? (body?.data as unknown[]) ?? (Array.isArray(body) ? body : []);
-    if (!Array.isArray(calls) || calls.length === 0) continue;
-
-    for (const call of calls) {
-      const text = allText(call).join(" ");
-      // Only calls to the number being verified — another salon's call has digits in it too.
-      if (!text.replace(/\D/g, "").includes(wanted)) continue;
-      const code = extractCode(text);
-      if (code) {
-        console.log(`Found a six-digit code in a call on ${path}: ${code}`);
-        return;
-      }
-    }
-    console.log(`${calls.length} call(s) on ${path}, none carrying a code for ${to} yet.`);
+  const list = await get(callsUrl(20));
+  if (list.status !== 200) {
+    console.log(`GET ${CALLS_PATH} → ${list.status}: ${JSON.stringify(list.body).slice(0, 300)}`);
     return;
   }
 
-  console.log("No Cartesia call endpoint answered. Run with --discover to see what this account exposes.");
+  // The array's field name is not documented, and Cartesia's shapes have already differed once
+  // between two endpoints on this account.
+  const body = list.body as Record<string, unknown>;
+  const calls =
+    (body?.calls as unknown[]) ?? (body?.data as unknown[]) ?? (Array.isArray(body) ? body : []);
+  if (!Array.isArray(calls) || calls.length === 0) {
+    console.log("No calls on this agent yet.");
+    return;
+  }
+
+  for (const call of calls) {
+    const text = allText(call).join(" ");
+    // Only calls involving the number being verified — another salon's call has digits in it too.
+    if (!text.replace(/\D/g, "").includes(wanted)) continue;
+    const code = extractCode(text);
+    if (code) {
+      console.log(`Found a six-digit code: ${code}`);
+      return;
+    }
+  }
+  console.log(`${calls.length} recent call(s), none carrying a code for ${to} yet.`);
+  console.log("If Meta has just called, give it a moment — the transcript is written when the call ends.");
 }
 
 main().catch((err) => {
