@@ -115,30 +115,46 @@ async function main() {
     return;
   }
 
-  // The array's field name is not documented, and Cartesia's shapes have already differed once
-  // between two endpoints on this account.
   const body = list.body as Record<string, unknown>;
-  const calls =
-    (body?.calls as unknown[]) ?? (body?.data as unknown[]) ?? (Array.isArray(body) ? body : []);
-  if (!Array.isArray(calls) || calls.length === 0) {
+  const calls = ((body?.data as unknown[]) ?? (body?.calls as unknown[]) ?? []) as Array<Record<string, unknown>>;
+  if (calls.length === 0) {
     console.log("No calls on this agent yet.");
     return;
   }
 
-  for (const call of calls) {
-    const text = allText(call).join(" ");
-    // Only calls involving the number being verified — another salon's call has digits in it too.
-    if (!text.replace(/\D/g, "").includes(wanted)) continue;
-    const code = extractCode(text);
-    if (code) {
-      console.log(`Found a six-digit code: ${code}`);
-      return;
+  // Match on the dialled number rather than "these digits appear somewhere": every call payload is
+  // full of digits, and another salon's call would match by accident.
+  const mine = calls.filter((c) => {
+    const tp = (c.telephony_params ?? {}) as Record<string, unknown>;
+    return String(tp.to ?? "").replace(/\D/g, "") === wanted;
+  });
+  if (mine.length === 0) {
+    console.log(`${calls.length} recent call(s), none to ${to}.`);
+    console.log("Meta calls only after --request-code, and the record appears when the call ends.");
+    return;
+  }
+
+  // The list carries a summary, not the words. A summary of a robot reading six digits may or may
+  // not contain them, so the transcript is fetched per call — and the sub-resource is undocumented,
+  // so the plausible ones are tried and the first that answers is used.
+  const SUBPATHS = ["", "/transcript", "/messages", "/events"];
+  for (const call of mine) {
+    const id = String(call.id ?? "");
+    // Newest first, and the summary is free to check before spending requests on sub-resources.
+    for (const sub of SUBPATHS) {
+      const detail = await get(`${CALLS_PATH}/${encodeURIComponent(id)}${sub}`);
+      if (detail.status !== 200) continue;
+      const code = extractCode(allText(detail.body).join(" "));
+      if (code) {
+        console.log(`Found a six-digit code in ${CALLS_PATH}/${id}${sub}: ${code}`);
+        return;
+      }
+      console.log(`  ${CALLS_PATH}/${id}${sub} → 200, no six-digit run in it`);
     }
   }
-  console.log(`${calls.length} recent call(s), none carrying a code for ${to} yet.`);
-  console.log("If Meta has just called, give it a moment — the transcript is written when the call ends.");
-}
 
+  console.log(`\n${mine.length} call(s) to ${to}, none carrying a readable code.`);
+  console.log("If Meta has just called, wait for the call to end — the transcript is written then.");
 main().catch((err) => {
   console.error("✖", (err as Error).message);
   process.exit(1);
