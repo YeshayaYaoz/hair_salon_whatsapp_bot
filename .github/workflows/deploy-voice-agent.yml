@@ -1,10 +1,19 @@
 name: Deploy voice agent
 
+# Deploys to wherever Cartesia is currently dialling, which since 2026-08-16 is the Railway service
+# `tori-voice-agent` rather than Cartesia's managed runtime. That switch removed the ~5s cold start
+# the first caller of the morning used to sit through, and it also moved this target: a workflow
+# still pushing to the managed runtime would report success on every commit while the code that
+# answers the phone stayed frozen at whatever shipped last. Nothing about that is visible in a call
+# log — the calls keep working, on old code.
+#
 # Cartesia has no public GitHub integration — their docs mention "push to a linked GitHub
-# repository" in one sentence and document it nowhere else, with no console page for it. So the
-# push-to-deploy loop is built here instead: the CLI is non-interactive (`cartesia auth login`
-# takes the key as an argument, `cartesia deploy --agent-id` takes the target), which is all a
-# runner needs.
+# repository" in one sentence and document it nowhere else, with no console page for it — so the
+# push-to-deploy loop is built here either way.
+#
+# To go back to managed hosting: clear `self_hosted_deployment_url` (the "Fix Cartesia agent config"
+# workflow, or the PATCH in voice-agent/README.md) and restore the `cartesia deploy` step below,
+# kept in git history at this file's previous revision.
 on:
   push:
     branches: ["claude/upload-v5aw7a"]
@@ -40,29 +49,69 @@ jobs:
           pip install --quiet 'cartesia-line>=0.2.16' 'httpx>=0.27'
           python check.py
 
-      - name: Install the Cartesia CLI
-        run: |
-          curl -fsSL https://cartesia.sh | sh
-          echo "$HOME/.cartesia/bin" >> "$GITHUB_PATH"
+      - name: Install the Railway CLI
+        run: npm i -g @railway/cli
 
-      - name: Deploy
+      - name: Deploy to the service Cartesia dials
         env:
           # Secrets first, then variables. "Secrets and variables" is one settings page with two
           # tabs, and a value put in the wrong one resolves to an empty string with no warning —
           # the workflow just fails at the point of use. Accepting both removes the guessing.
-          # The agent id is not sensitive and belongs in Variables anyway; only the key must be a
-          # secret, which is also what gets masked as *** in these logs.
-          CARTESIA_API_KEY: ${{ secrets.CARTESIA_API_KEY || vars.CARTESIA_API_KEY }}
-          CARTESIA_AGENT_ID: ${{ secrets.CARTESIA_AGENT_ID || vars.CARTESIA_AGENT_ID }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN || vars.RAILWAY_TOKEN }}
+          RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+          SVC: ${{ secrets.VOICE_AGENT_SERVICE || vars.VOICE_AGENT_SERVICE || 'tori-voice-agent' }}
+          BACKEND_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+        working-directory: voice-agent
         run: |
-          missing=""
-          [ -z "$CARTESIA_API_KEY" ] && missing="$missing CARTESIA_API_KEY"
-          [ -z "$CARTESIA_AGENT_ID" ] && missing="$missing CARTESIA_AGENT_ID"
-          if [ -n "$missing" ]; then
-            echo "::error::Not found:$missing — add them under Settings → Secrets and variables → Actions, on either tab, scoped to the Repository rather than an Environment."
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::error::RAILWAY_TOKEN is not set — add it under Settings → Secrets and variables → Actions, scoped to the Repository rather than an Environment."
             exit 1
           fi
-          cartesia auth login "$CARTESIA_API_KEY"
-          # The directory is given explicitly: without it the CLI deploys the working directory,
-          # and from the repository root that is a 386 MB archive the server rejects.
-          cartesia deploy --agent-id "$CARTESIA_AGENT_ID" voice-agent
+          # The project token reaches every service in the project, the backend included, and an
+          # empty --service makes the CLI choose one. Naming it is the whole guard.
+          if [ -z "$SVC" ] || [ "$SVC" = "$BACKEND_SERVICE" ]; then
+            echo "::error::Refusing to deploy the voice agent onto '$SVC' — that is the backend, and it would take the API down for every salon."
+            exit 1
+          fi
+
+          # `railway up --ci` exits 1 on "Failed to stream build logs" as readily as on a build that
+          # failed, and the two mean opposite things: a broken log pipe over a running build, versus
+          # code that never shipped. The health check below is what tells them apart.
+          if ! railway up --ci --service "$SVC" --environment "$RAILWAY_ENVIRONMENT"; then
+            echo "::warning::'railway up' exited non-zero. If that was a log-streaming error the build is still running; the health check below is the verdict."
+          fi
+
+      # always(), so a non-zero `railway up` cannot suppress the only reading that distinguishes a
+      # failed build from a failed log stream.
+      - name: Confirm what is live
+        if: always()
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN || vars.RAILWAY_TOKEN }}
+          RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+          SVC: ${{ secrets.VOICE_AGENT_SERVICE || vars.VOICE_AGENT_SERVICE || 'tori-voice-agent' }}
+        run: |
+          out=$(railway domain --service "$SVC" --environment "$RAILWAY_ENVIRONMENT" 2>&1) || true
+          # From `railway domain`'s own output. Scraping `railway status` for the first
+          # *.up.railway.app once returned the *backend's* host, and the check then reported health
+          # for a service nobody had asked about — green, and about the wrong thing.
+          url=$(printf '%s' "$out" | grep -oE 'https://[a-z0-9.-]+\.up\.railway\.app' | head -1 || true)
+          if [ -z "$url" ]; then
+            echo "::warning::Could not read the service domain. Check https://<service>.up.railway.app/health by hand."
+            exit 0
+          fi
+
+          for i in 1 2 3 4 5 6; do
+            body=$(curl -sS --max-time 10 "$url/health" || true)
+            if echo "$body" | jq -e '.ok' >/dev/null 2>&1; then
+              echo "$body" | jq .
+              if [ "$(echo "$body" | jq -r '.ready_for_calls')" != "true" ]; then
+                echo "::error::Deployed, but the service cannot take a call — the false fields above say what is missing. Callers reach it regardless: Cartesia is already pointed here."
+                exit 1
+              fi
+              echo "::notice::Live at $url and ready for calls."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::/health did not answer within a minute after deploying. Cartesia dials this host, so this is a phone line that may not be answering."
+          exit 1
