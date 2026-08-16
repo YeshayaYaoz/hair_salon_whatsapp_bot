@@ -349,6 +349,14 @@ def _register_usage_callback() -> None:
     try:
         import litellm  # noqa: PLC0415 — deliberately not at module scope; see the note on imports
 
+        # litellm prints a "Give Feedback / Get Help: <github issues url>" banner to stderr on
+        # every failed request, outside our logging entirely. One failure per call — a wrong key,
+        # a warm-up that could not connect — would put three lines of advertisement into the call
+        # log between the lines that say which salon answered. Set once, here, where litellm is
+        # already being imported off the startup path. It suppresses the banner only; real error
+        # messages still come through.
+        litellm.suppress_debug_info = True
+
         litellm.callbacks = [*getattr(litellm, "callbacks", []), _usage_reporter()]
         logger.info("usage reporting enabled")
     except Exception:
@@ -358,6 +366,53 @@ def _register_usage_callback() -> None:
 
 
 threading.Thread(target=_register_usage_callback, name="litellm-warmup", daemon=True).start()
+
+
+def _warm_model_connection() -> None:
+    """
+    Opens the connection to the model provider during the ring, so the caller's first turn does
+    not pay for the handshake.
+
+    In every benchmark variant the first sample is the slow one — 726ms against 621 and 632 on one
+    run, 923ms against ~650 on another — and the gap is DNS, TCP and the TLS handshake, not the
+    model. A long-lived process usually has that connection already open, so this costs nothing
+    most of the time. It matters for exactly the case that has been the problem all along: the
+    first call after a quiet stretch, where the pool has idled out and the caller is the one who
+    pays to re-establish it.
+
+    It must go through litellm rather than a bare socket. The connection pool that the agent's
+    completions use is litellm's own, so a connection opened with any other client is a different
+    connection and warms nothing.
+
+    Fire-and-forget on a thread: `litellm.completion` is blocking, and pre_call_handler is on the
+    event loop with a phone ringing on the other end. Nothing here can delay or fail the call —
+    the result is discarded and every exception is swallowed, because a failed warm-up is a call
+    that is merely as slow as it used to be.
+
+    Cost is one ~10-token request per call, against the dozens the conversation itself makes. Not
+    deduplicated across back-to-back calls for that reason: the bookkeeping would cost more than
+    the request it saves.
+    """
+    if not MODEL_API_KEY:
+        return
+
+    def _run() -> None:
+        try:
+            import litellm  # noqa: PLC0415 — same reason as the callback above
+
+            litellm.completion(
+                model=MODEL,
+                api_key=MODEL_API_KEY,
+                messages=[{"role": "user", "content": "hi"}],
+                max_tokens=1,
+                timeout=5.0,
+            )
+        except Exception:
+            # debug, not warning: this failing is invisible to the caller by design, and a
+            # warning per call would train everyone to ignore the log.
+            logger.debug("model connection warm-up failed", exc_info=True)
+
+    threading.Thread(target=_run, name="model-connection-warmup", daemon=True).start()
 
 
 def caller_number(call_request: CallRequest) -> str:
@@ -488,6 +543,10 @@ async def pre_call_handler(call_request: CallRequest) -> Optional[PreCallResult]
     # First line of the call in the logs, and the one that says whether this code is serving at all.
     # An agent whose console prompt answered instead prints nothing here.
     logger.info("pre_call_handler: to=%r from=%r call_id=%r", call_request.to, call_request.from_, call_request.call_id)
+
+    # First thing, before the context fetch: it runs on its own thread, so the earlier it starts
+    # the more of the ring it has to finish the handshake in. See `_warm_model_connection`.
+    _warm_model_connection()
 
     started = time.monotonic()
     resolved = await resolve_context(call_request)
@@ -746,10 +805,9 @@ FORMS = {
         "as_written": "אמרי אותם כפי שהם. אל תחשבי סכומים בעצמך.",
         "known": "המתקשר מוכר: {name}. פני אליו בשמו. מספר הטלפון שלו כבר ידוע למערכת ומועבר אוטומטית לבעל העסק — אל תבקשי אותו ואל תגידי שאינך רואה אותו.",
         "no_booking": "את לא סוגרת הזמנות. את נותנת מידע ומעבירה את השיחה לבעל העסק כשהמתקשר רוצה להזמין.",
-        "transfer": "השתמשי בכלי transfer_to_owner כדי להעביר.",
         "transfer_say": "מעבירה אותך לבעל העסק, רגע אחד.",
         "transfer_is_caller": "המספר של בעל העסק הוא המספר שממנו את מתקשרת, אז אי אפשר להעביר. אמרי את זה והציעי לשלוח לו הודעה עם message_owner.",
-        "can_transfer": "אם המתקשר מבקש לדבר עם אדם, עם בעל העסק או עם מישהו אחר — אל תתווכחי. השתמשי ב-transfer_to_owner. אם ההעברה לא מצליחה, השתמשי ב-message_owner.",
+        "can_transfer": "אם המתקשר מבקש לדבר עם אדם, עם בעל העסק או עם מישהו אחר — אל תתווכחי ואל תשאלי אותו שאלות קודם. השתמשי ב-transfer_to_owner מיד, עם מה שכבר ידוע לך; אם לא ידוע לך כלום, העבירי בלי סיכום. אם ההעברה לא מצליחה, השתמשי ב-message_owner.",
         "no_transfer": "אין אפשרות להעביר שיחות. אם מבקשים לדבר עם מישהו — השתמשי ב-message_owner כדי לשלוח לבעל העסק הודעה עם הבקשה, ואמרי שהוא יחזור אליהם.",
         "leave_message": "בכל מקרה שבו המתקשר רוצה משהו שאת לא יכולה לתת לו — השתמשי ב-message_owner. אל תבטיחי שמישהו יחזור אליו בלי לקרוא לכלי הזה.",
         "end_call": 'כשהשיחה נגמרה — המתקשר נפרד, אמר תודה וסיים, או אין לו עוד מה לשאול — אמרי משפט פרידה קצר ומיד אחריו קראי ל-end_call. אל תחכי שינתק. אם הוא עוד באמצע משהו, אל תסיימי.',
@@ -783,10 +841,9 @@ FORMS = {
         "as_written": "אמור אותם כפי שהם. אל תחשב סכומים בעצמך.",
         "known": "המתקשר מוכר: {name}. פנה אליו בשמו. מספר הטלפון שלו כבר ידוע למערכת ומועבר אוטומטית לבעל העסק — אל תבקש אותו ואל תגיד שאינך רואה אותו.",
         "no_booking": "אתה לא סוגר הזמנות. אתה נותן מידע ומעביר את השיחה לבעל העסק כשהמתקשר רוצה להזמין.",
-        "transfer": "השתמש בכלי transfer_to_owner כדי להעביר.",
         "transfer_say": "מעביר אותך לבעל העסק, רגע אחד.",
         "transfer_is_caller": "המספר של בעל העסק הוא המספר שממנו אתה מתקשר, אז אי אפשר להעביר. אמור את זה והצע לשלוח לו הודעה עם message_owner.",
-        "can_transfer": "אם המתקשר מבקש לדבר עם אדם, עם בעל העסק או עם מישהו אחר — אל תתווכח. השתמש ב-transfer_to_owner. אם ההעברה לא מצליחה, השתמש ב-message_owner.",
+        "can_transfer": "אם המתקשר מבקש לדבר עם אדם, עם בעל העסק או עם מישהו אחר — אל תתווכח ואל תשאל אותו שאלות קודם. השתמש ב-transfer_to_owner מיד, עם מה שכבר ידוע לך; אם לא ידוע לך כלום, העבר בלי סיכום. אם ההעברה לא מצליחה, השתמש ב-message_owner.",
         "no_transfer": "אין אפשרות להעביר שיחות. אם מבקשים לדבר עם מישהו — השתמש ב-message_owner כדי לשלוח לבעל העסק הודעה עם הבקשה, ואמור שהוא יחזור אליהם.",
         "leave_message": "בכל מקרה שבו המתקשר רוצה משהו שאתה לא יכול לתת לו — השתמש ב-message_owner. אל תבטיח שמישהו יחזור אליו בלי לקרוא לכלי הזה.",
         "end_call": 'כשהשיחה נגמרה — המתקשר נפרד, אמר תודה וסיים, או אין לו עוד מה לשאול — אמור משפט פרידה קצר ומיד אחריו קרא ל-end_call. אל תחכה שינתק. אם הוא עוד באמצע משהו, אל תסיים.',
@@ -879,7 +936,21 @@ def build_prompt(ctx: Dict[str, Any], caller_known: bool = True) -> str:
 
     if inquiry:
         # The B&B model closes bookings human-to-human. Saying otherwise invents a confirmation.
-        parts += ["", "## חשוב", f["no_booking"], f["record_first"], f["transfer"], f["leave_message"], f["end_call"]]
+        parts += ["", "## חשוב", f["no_booking"], f["record_first"]]
+        # `can_transfer`, not the bare `transfer` line this used to carry. Two bugs lived in that
+        # one word:
+        #
+        #   * A caller asking for a person is not a booking request. Without this rule the only
+        #     nearby instruction is `record_first` ("call message_owner with everything you
+        #     gathered before transferring"), and both models read it as licence to interrogate:
+        #     asked for the owner, they answered "first tell me what you want" and
+        #     "may I ask your name and what this is about". bench_quality.py's `human-please`
+        #     case is exactly this, and it failed identically on Haiku and DeepSeek — which is
+        #     what says it is the prompt and not the model.
+        #   * With no ownerTransferNumber, `build_agent` never registers transfer_to_owner, yet
+        #     this line still told the agent to use it. `no_transfer` is the honest branch.
+        parts.append(f["can_transfer"] if ctx.get("ownerTransferNumber") else f["no_transfer"])
+        parts += [f["leave_message"], f["end_call"]]
     else:
         parts += ["", "## קביעת תורים", f["booking"], f["no_invent"], f["verbatim"]]
         # A caller who asks for a person is not a booking request, and the agent used to have no
