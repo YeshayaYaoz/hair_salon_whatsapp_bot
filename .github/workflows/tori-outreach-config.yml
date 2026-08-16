@@ -1,0 +1,64 @@
+name: Configure Tori's outreach channel
+
+# Sets the three Railway variables the Lead Finder WhatsApp channel refuses to send without.
+#
+# It exists as a workflow rather than a note in a doc because two of the three values are
+# credentials: the access token is already an Actions secret, and copying it out of there by hand —
+# into a chat, a terminal, a password manager, a Railway form — is four more places it can leak from.
+# Here it moves secret-to-secret and is never printed.
+#
+# --skip-deploys on every set: three sets would otherwise be three redeploys, and the service would
+# briefly run with one variable of the three.
+on:
+  workflow_dispatch:
+    inputs:
+      phone_number_id:
+        description: "Phone number id of Tori's own number (from the meta-number 'list' action)"
+        required: true
+      template_name:
+        description: "Approved MARKETING template for cold outreach — leave blank to not set it yet"
+        default: ""
+      redeploy:
+        description: "Redeploy after setting, so the new values take effect"
+        type: boolean
+        default: true
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set the variables
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+          RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+          # The outreach token and the admin token are the same System User token today. Kept as a
+          # separate variable anyway: outreach is the one thing here pointed at strangers, and it is
+          # the credential most likely to need revoking on its own.
+          OUTREACH_TOKEN: ${{ secrets.META_SYSTEM_USER_TOKEN }}
+          PHONE_ID: ${{ inputs.phone_number_id }}
+          TEMPLATE: ${{ inputs.template_name }}
+        run: |
+          set -euo pipefail
+          if [ -z "${OUTREACH_TOKEN:-}" ]; then
+            echo "::error::META_SYSTEM_USER_TOKEN is not set — there is no token to copy."
+            exit 1
+          fi
+          npm i -g @railway/cli >/dev/null 2>&1
+
+          args=(--set "TORI_OUTREACH_PHONE_NUMBER_ID=$PHONE_ID"
+                --set "TORI_OUTREACH_ACCESS_TOKEN=$OUTREACH_TOKEN")
+          [ -n "$TEMPLATE" ] && args+=(--set "TORI_OUTREACH_TEMPLATE_NAME=$TEMPLATE")
+
+          railway variables --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+            "${args[@]}" --skip-deploys
+          echo "Set TORI_OUTREACH_PHONE_NUMBER_ID and TORI_OUTREACH_ACCESS_TOKEN${TEMPLATE:+ and TORI_OUTREACH_TEMPLATE_NAME}."
+
+      - name: Redeploy
+        if: inputs.redeploy
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+          RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+        run: |
+          railway redeploy --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" --yes
