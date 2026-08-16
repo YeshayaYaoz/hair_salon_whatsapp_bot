@@ -22,11 +22,6 @@ const API_VERSION = "2026-03-01";
 const apiKey = process.env.CARTESIA_API_KEY?.trim();
 const agentId = process.env.CARTESIA_AGENT_ID?.trim();
 
-if (!apiKey) {
-  console.error("CARTESIA_API_KEY is not set in this environment.");
-  process.exit(1);
-}
-
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
   return i >= 0 ? process.argv[i + 1] : undefined;
@@ -69,14 +64,38 @@ const HEBREW_DIGITS: Record<string, string> = {
   שבע: "7", שבעה: "7", שמונה: "8", תשע: "9", תשעה: "9",
 };
 
-export function extractCode(text: string): string | null {
-  const normalized = text
+export function extractCode(text: string, ignore: string[] = []): string | null {
+  let working = text;
+  // Remove the numbers already known to be in the payload before looking for six digits.
+  //
+  // This is the whole difficulty. A call record carries the dialled and calling numbers, and
+  // "+972559661420" contains several six-digit runs — so scanning the payload and taking the first
+  // one returns a slice of the phone number, which Meta rejects as an incorrect code. That is
+  // exactly what happened on the first live attempt, and it looks identical to a mis-transcribed
+  // code, which is the wrong thing to go and investigate.
+  for (const raw of ignore) {
+    const d = raw.replace(/\D/g, "");
+    if (d.length < 6) continue;
+    // Both as written and as bare digits: transcripts hold "+972-55-966-1420" and "972559661420".
+    working = working.split(raw).join(" ");
+    working = working.split(d).join(" ");
+  }
+
+  const normalized = working
     .split(/\s+/)
     .map((w) => HEBREW_DIGITS[w.replace(/[^֐-׿]/g, "")] ?? w)
     .join(" ");
-  const digitsOnly = normalized.replace(/\D/g, "");
-  const m = digitsOnly.match(/\d{6}/);
-  return m ? m[0] : null;
+
+  // One run at a time, never the whole string. Spaces and hyphens stay inside a run because a
+  // transcriber writes the same spoken code as "482917", "4 8 2 9 1 7" or "48-29-17"; everything
+  // else separates. Concatenating every digit in the payload instead would splice unrelated
+  // numbers — "123" and "456" in adjacent fields become a six-digit code that nobody said, and
+  // Meta rejects it with the same message a mis-heard code gets.
+  for (const chunk of normalized.split(/[^\d\s-]+/)) {
+    const digits = chunk.replace(/[\s-]+/g, "");
+    if (digits.length === 6) return digits;
+  }
+  return null;
 }
 
 /** Every string in an arbitrarily-shaped payload, so a transcript is found wherever it is nested. */
@@ -98,6 +117,13 @@ function callsUrl(limit: number): string {
 }
 
 async function main() {
+  // Checked here rather than at module scope: exiting during import makes the file unimportable,
+  // and extractCode below is pure and worth testing on its own.
+  if (!apiKey) {
+    console.error("CARTESIA_API_KEY is not set in this environment.");
+    process.exit(1);
+  }
+
   if (has("discover")) {
     const r = await get(callsUrl(5));
     const shape = typeof r.body === "string" ? r.body.slice(0, 400) : JSON.stringify(r.body, null, 2).slice(0, 2500);
@@ -144,7 +170,11 @@ async function main() {
     for (const sub of SUBPATHS) {
       const detail = await get(`${CALLS_PATH}/${encodeURIComponent(id)}${sub}`);
       if (detail.status !== 200) continue;
-      const code = extractCode(allText(detail.body).join(" "));
+      // Everything already known to be in this record is excluded, so what is left is what was
+      // spoken.
+      const tp = (call.telephony_params ?? {}) as Record<string, unknown>;
+      const known = [String(tp.to ?? ""), String(tp.from ?? ""), to, id].filter(Boolean);
+      const code = extractCode(allText(detail.body).join(" "), known);
       if (code) {
         console.log(`Found a six-digit code in ${CALLS_PATH}/${id}${sub}: ${code}`);
         return;
@@ -157,7 +187,10 @@ async function main() {
   console.log("If Meta has just called, wait for the call to end — the transcript is written then.");
 }
 
-main().catch((err) => {
-  console.error("✖", (err as Error).message);
-  process.exit(1);
-});
+// Only when run as a script. Importing this module for extractCode must not place a call.
+if (process.argv[1]?.includes("cartesia-code")) {
+  main().catch((err) => {
+    console.error("✖", (err as Error).message);
+    process.exit(1);
+  });
+}
