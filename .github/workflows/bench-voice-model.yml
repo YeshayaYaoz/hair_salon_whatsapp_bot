@@ -128,4 +128,19 @@ jobs:
             echo "::error::No key for either model — none in GitHub, and none readable from the Railway services. Nothing to measure."
             exit 1
           fi
-          python bench_ttft.py "${{ inputs.iterations }}" | tee "$GITHUB_STEP_SUMMARY"
+
+          # Both, always. Latency alone picked the current model and picked it on a figure that
+          # turned out to be wrong by a factor of five; reading speed without the quality score is
+          # how that happens again. `tee -a` because two scripts write one summary.
+          {
+            echo "## Time to first token"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          python bench_ttft.py "${{ inputs.iterations }}" | tee -a "$GITHUB_STEP_SUMMARY"
+          {
+            echo '```'
+            echo "## Hebrew and tool calling"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          python bench_quality.py | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
