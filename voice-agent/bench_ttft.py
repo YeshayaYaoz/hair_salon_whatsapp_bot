@@ -28,6 +28,7 @@ import os
 import statistics
 import sys
 import time
+from typing import Any, Dict, List, Optional
 
 # main.py reads these at import. Nothing here reaches the Tori backend — only the model providers —
 # so they exist to let the module load, exactly as in check.py.
@@ -75,8 +76,16 @@ CANDIDATES = [
 ]
 
 
-def ttft_ms(model: str, api_key: str, system: str, user: str) -> float:
-    """Milliseconds until the first chunk carrying text. Raises on provider errors."""
+def ttft_ms(model: str, api_key: str, system: str, user: str,
+            extra: Optional[Dict[str, Any]] = None) -> tuple[float, Any]:
+    """
+    Milliseconds until the first chunk carrying text, and the usage block if the stream reported one.
+
+    The usage matters as much as the time here: `cache_read_input_tokens` is the only proof that a
+    cached run was actually served from cache. Without it a "cached" measurement that quietly missed
+    is indistinguishable from one that hit and saved nothing — which is how a latency optimisation
+    gets believed in for a year.
+    """
     import litellm
 
     started = time.monotonic()
@@ -89,69 +98,183 @@ def ttft_ms(model: str, api_key: str, system: str, user: str) -> float:
         # The agent runs at 0.3; sampling does not move first-token latency, but matching it
         # removes one difference between this and production.
         temperature=0.3,
+        **(extra or {}),
     )
+    elapsed = None
+    usage = None
     for chunk in stream:
+        # Drained to the end even after the first token, both so the connection closes cleanly and
+        # because the usage block only arrives on the final chunk.
+        usage = getattr(chunk, "usage", None) or usage
         delta = (chunk.choices[0].delta.content or "") if chunk.choices else ""
-        if delta:
+        if delta and elapsed is None:
             elapsed = (time.monotonic() - started) * 1000
-            # Drain, so the connection closes cleanly and the next sample starts from scratch
-            # rather than inheriting a half-read socket.
-            for _ in stream:
-                pass
-            return elapsed
-    raise RuntimeError("stream ended with no text")
+    if elapsed is None:
+        raise RuntimeError("stream ended with no text")
+    return elapsed, usage
+
+
+def count_tokens(system: str, user: str, api_key: str) -> Optional[int]:
+    """
+    The prompt's exact token count, from Anthropic's counter rather than an estimate.
+
+    This decides whether prompt caching can work at all: Anthropic publishes a minimum
+    cacheable prefix per model — 4096 tokens on Haiku 4.5 — and a prompt below it is not
+    cached even with the cache_control marker set. There is no error and no warning; the
+    marker is simply ignored. Estimating the count would not settle the question, and
+    character-count intuition is badly wrong for Hebrew, so it is asked directly.
+    """
+    import httpx
+
+    try:
+        r = httpx.post(
+            "https://api.anthropic.com/v1/messages/count_tokens",
+            headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
+                     "content-type": "application/json"},
+            json={"model": "claude-haiku-4-5-20251001",
+                  "system": system,
+                  "messages": [{"role": "user", "content": user}]},
+            timeout=20.0,
+        )
+        return int(r.json()["input_tokens"]) if r.status_code == 200 else None
+    except Exception:
+        return None
+
+
+def cached_tokens(usage: Any) -> int:
+    """Prompt tokens served from cache, under whichever name the provider reports it."""
+    if usage is None:
+        return 0
+    for name in ("cache_read_input_tokens", "prompt_cache_hit_tokens"):
+        if getattr(usage, name, None):
+            return int(getattr(usage, name))
+    details = getattr(usage, "prompt_tokens_details", None)
+    return int(getattr(details, "cached_tokens", 0) or 0) if details else 0
+
+
+# The style rules are the largest removable block in the prompt: nine numbered speech rules plus the
+# brevity, interruption and gender paragraphs. Cutting them is the most obvious way to make the
+# prompt shorter, so this measures what that would actually buy — before anyone trades the agent's
+# Hebrew for it. `bench_quality.py` measures what it would cost.
+def trim_prompt(system: str) -> str:
+    lines = system.split("\n")
+    out, dropping = [], False
+    for line in lines:
+        if line.startswith("## איך מדברים בטלפון"):
+            dropping = True
+            out.append(line)
+            out.append("תשובה אחת, שני משפטים לכל היותר. מספרים במילים. בלי Markdown ובלי אימוג'י.")
+            continue
+        if dropping and line.startswith("## "):
+            dropping = False
+        if not dropping:
+            out.append(line)
+    return "\n".join(out)
+
+
+def measure(model: str, api_key: str, system: str, iterations: int,
+            extra: Optional[Dict[str, Any]], label: str, warmup: bool) -> Optional[List[float]]:
+    """One variant, `iterations` samples. Returns None when every sample failed."""
+    short = model.split("/")[-1]
+    if warmup:
+        # The cache-writing call, thrown away. Anthropic serves a prefix from cache only after it
+        # has stored one, so measuring the write and calling it "cached" would report the slowest
+        # call of the run as the optimisation's result.
+        try:
+            ttft_ms(model, api_key, system, TURN, extra)
+        except Exception as exc:
+            print(f"  {short:24} {label:10} warm-up FAILED — {str(exc)[:100]}")
+
+    samples, cached = [], 0
+    for i in range(iterations):
+        try:
+            ms, usage = ttft_ms(model, api_key, system, TURN, extra)
+            samples.append(ms)
+            cached = max(cached, cached_tokens(usage))
+            print(f"  {short:24} {label:10} sample {i + 1}: {ms:7.0f} ms")
+        except Exception as exc:  # provider errors are a result too, not a crash
+            print(f"  {short:24} {label:10} sample {i + 1}: FAILED — {str(exc)[:100]}")
+    if not samples:
+        return None
+    if label == "cached":
+        # Stated either way. "Cached" with zero cached tokens is the measurement that looks like a
+        # disappointing optimisation and is really a misconfigured one.
+        print(f"  {short:24} {label:10} cache served {cached} prompt tokens"
+              f"{' — NOTHING WAS CACHED' if not cached else ''}")
+    return samples
 
 
 def main_() -> int:
     iterations = int(sys.argv[1]) if len(sys.argv) > 1 else 5
     system = main.build_prompt(CONTEXT, caller_known=False)
-    print(f"System prompt: {len(system)} chars. First turn: {TURN!r}. {iterations} samples each.\n")
+    short_system = trim_prompt(system)
+    print(f"System prompt: {len(system)} chars ({len(short_system)} trimmed). "
+          f"First turn: {TURN!r}. {iterations} samples each.")
 
-    results = {}
+    # Against the published minimum, so a "cached" run that caches nothing is explained
+    # rather than merely observed. 4096 is Haiku 4.5's floor; the newest models are far
+    # lower (512-1024), so the same prompt on a different model may cache fine.
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if anthropic_key:
+        n = count_tokens(system, TURN, anthropic_key)
+        if n is not None:
+            floor = 4096
+            verdict = ("BELOW the 4096-token minimum — prompt caching cannot engage on this model"
+                       if n < floor else "above the 4096-token minimum — caching can engage")
+            print(f"Prompt size: {n} tokens, {verdict}.")
+    print()
+
+    # plain   — what the previous run measured: a cold prompt, no caching parameters at all.
+    # cached  — what production actually sends. `_latency_extra` is main.py's own function, so this
+    #           cannot drift from the agent; on DeepSeek it returns {} and the variant measures that
+    #           provider's automatic server-side prefix caching instead, which is the honest
+    #           comparison rather than an unfair one.
+    # trimmed — the prompt with its speech rules cut, to price the most obvious size reduction.
+    results: Dict[str, List[float]] = {}
     for model, key_var in CANDIDATES:
         api_key = os.environ.get(key_var, "")
         if not api_key:
             print(f"{model}\n  skipped — {key_var} is not set\n")
             continue
 
-        samples, failures = [], []
-        for i in range(iterations):
-            try:
-                ms = ttft_ms(model, api_key, system, TURN)
-                samples.append(ms)
-                print(f"  {model.split('/')[-1]:32} sample {i + 1}: {ms:7.0f} ms")
-            except Exception as exc:  # provider errors are a result too, not a crash
-                failures.append(str(exc)[:120])
-                print(f"  {model.split('/')[-1]:32} sample {i + 1}: FAILED — {str(exc)[:120]}")
-        if samples:
-            results[model] = samples
-        if failures and not samples:
-            print(f"  every sample failed for {model}")
+        for label, sys_prompt, extra, warmup in (
+            ("plain", system, None, False),
+            ("cached", system, main._latency_extra(model), True),
+            ("trimmed", short_system, main._latency_extra(model), True),
+        ):
+            samples = measure(model, api_key, sys_prompt, iterations, extra, label, warmup)
+            if samples:
+                results[f"{model} [{label}]"] = samples
         print()
 
     if not results:
         print("Nothing measured. Set ANTHROPIC_API_KEY and/or DEEPSEEK_API_KEY.")
         return 1
 
-    print(f"{'model':38} {'min':>8} {'median':>8} {'max':>8}")
-    print("-" * 64)
-    for model, samples in results.items():
-        print(f"{model:38} {min(samples):8.0f} {statistics.median(samples):8.0f} {max(samples):8.0f}")
+    print(f"{'model / variant':48} {'min':>8} {'median':>8} {'max':>8}")
+    print("-" * 74)
+    for name, samples in results.items():
+        print(f"{name:48} {min(samples):8.0f} {statistics.median(samples):8.0f} {max(samples):8.0f}")
 
     print()
-    if len(results) == 2:
-        (m1, s1), (m2, s2) = results.items()
-        gap = statistics.median(s2) - statistics.median(s1)
-        faster, slower = (m1, m2) if gap > 0 else (m2, m1)
-        print(f"{faster.split('/')[-1]} is {abs(gap):.0f} ms faster at the median than {slower.split('/')[-1]}.")
-        # The decision this informs, stated so the number is read against something.
-        print(
-            "On a phone call the threshold that matters is roughly a second: past it, callers\n"
-            "start talking over the answer. Read the max column, not the median — the slow samples\n"
-            "are the ones a caller hears as a dropped line."
-        )
-    else:
-        print("Only one model measured — set the other key to get the comparison this exists for.")
+    medians = {k: statistics.median(v) for k, v in results.items()}
+    for model, _ in CANDIDATES:
+        plain, cache = medians.get(f"{model} [plain]"), medians.get(f"{model} [cached]")
+        trim = medians.get(f"{model} [trimmed]")
+        if plain and cache:
+            print(f"{model.split('/')[-1]}: caching moves the median by {plain - cache:+.0f} ms.")
+        if cache and trim:
+            print(f"{model.split('/')[-1]}: trimming the speech rules moves it a further {cache - trim:+.0f} ms.")
+
+    fastest = min(medians, key=medians.get)
+    print(f"\nFastest configuration measured: {fastest} at {medians[fastest]:.0f} ms.")
+    # The decision this informs, stated so the number is read against something.
+    print(
+        "On a phone call the threshold that matters is roughly a second: past it, callers\n"
+        "start talking over the answer. Read the max column, not the median — the slow samples\n"
+        "are the ones a caller hears as a dropped line. And read this against bench_quality.py:\n"
+        "the trimmed prompt is only a saving if the agent still speaks the way the rules demand."
+    )
     return 0
 
 

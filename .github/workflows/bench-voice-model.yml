@@ -32,16 +32,115 @@ jobs:
         working-directory: voice-agent
         run: pip install --quiet -r requirements.txt
 
+      # Both keys already exist in the Railway project, on the services that use them: the model key
+      # on the voice agent (and on the backend, which has held it for a month), the DeepSeek key on
+      # the backend, which is what the WhatsApp bot runs on. GitHub holds neither. Stopping to ask
+      # for a pasted copy of a key that is two feet away would add a second thing to rotate and a
+      # chance to paste it wrong, for a workflow that only reads. So borrow them instead.
+      #
+      # Railway variables are per service, not per project, so each service is asked separately —
+      # that distinction is the whole reason the voice agent once reported model_key:false while the
+      # key had been in the project for a month.
+      - name: Borrow any missing key from Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN || vars.RAILWAY_TOKEN }}
+          RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+          VOICE_SERVICE: ${{ secrets.VOICE_AGENT_SERVICE || vars.VOICE_AGENT_SERVICE || 'tori-voice-agent' }}
+          BACKEND_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+          # Whatever GitHub does hold wins — an explicitly set secret is someone choosing a key on
+          # purpose, and it should not be silently replaced by whatever production runs on.
+          ANTHROPIC_API_KEY: >-
+            ${{ secrets.ANTHROPIC_API_KEY || vars.ANTHROPIC_API_KEY
+             || secrets.TORI_AGENT_API_KEY || vars.TORI_AGENT_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY || vars.DEEPSEEK_API_KEY }}
+        run: |
+          # secrets.* are masked by GitHub automatically; vars.* are not. Mask before anything can
+          # print one back into a log.
+          if [ -n "$ANTHROPIC_API_KEY" ]; then echo "::add-mask::$ANTHROPIC_API_KEY"; fi
+          if [ -n "$DEEPSEEK_API_KEY" ]; then echo "::add-mask::$DEEPSEEK_API_KEY"; fi
+
+          if [ -z "$ANTHROPIC_API_KEY" ] || [ -z "$DEEPSEEK_API_KEY" ]; then
+            if [ -z "$RAILWAY_TOKEN" ]; then
+              echo "::warning::RAILWAY_TOKEN is not set, so a missing key cannot be borrowed from the project."
+            else
+              npm i -g @railway/cli
+              voice_vars=$(railway variables --service "$VOICE_SERVICE" --environment "$RAILWAY_ENVIRONMENT" --json 2>/dev/null || echo '{}')
+              backend_vars=$(railway variables --service "$BACKEND_SERVICE" --environment "$RAILWAY_ENVIRONMENT" --json 2>/dev/null || echo '{}')
+
+              # The voice agent first for the model key: it is the service that answers the phone, so
+              # its key is the one a benchmark of that phone line should be measuring. Both names,
+              # because main.py reads TORI_AGENT_API_KEY before ANTHROPIC_API_KEY and either is a
+              # legitimate place for it to be.
+              if [ -z "$ANTHROPIC_API_KEY" ]; then
+                for src in "$voice_vars" "$backend_vars"; do
+                  for name in TORI_AGENT_API_KEY ANTHROPIC_API_KEY; do
+                    found=$(printf '%s' "$src" | jq -r --arg n "$name" '.[$n] // ""' 2>/dev/null || echo "")
+                    if [ -n "$found" ]; then
+                      echo "::add-mask::$found"
+                      ANTHROPIC_API_KEY="$found"
+                      break
+                    fi
+                  done
+                  if [ -n "$ANTHROPIC_API_KEY" ]; then break; fi
+                done
+              fi
+
+              # DeepSeek is on the backend — it is what the WhatsApp bot runs on. Without it this
+              # workflow measures one model and compares it against nothing, which is the single
+              # thing it exists not to do.
+              if [ -z "$DEEPSEEK_API_KEY" ]; then
+                for src in "$backend_vars" "$voice_vars"; do
+                  found=$(printf '%s' "$src" | jq -r '.DEEPSEEK_API_KEY // ""' 2>/dev/null || echo "")
+                  if [ -n "$found" ]; then
+                    echo "::add-mask::$found"
+                    DEEPSEEK_API_KEY="$found"
+                    break
+                  fi
+                done
+              fi
+            fi
+          fi
+
+          # Booleans. `if`, not `[ … ] && echo` — a false test as the last command of an AND-list
+          # becomes the step's exit status under `bash -e`, which has failed a step in this repo
+          # after it had done everything correctly.
+          if [ -n "$ANTHROPIC_API_KEY" ]; then echo "Anthropic key: found"; else echo "Anthropic key: none"; fi
+          if [ -n "$DEEPSEEK_API_KEY" ]; then echo "DeepSeek key:  found"; else echo "DeepSeek key:  none"; fi
+          if [ -z "$ANTHROPIC_API_KEY" ] || [ -z "$DEEPSEEK_API_KEY" ]; then
+            echo "::warning::Only one side has a key, so this run measures a model rather than comparing two."
+          fi
+
+          # Handed to the next step through the environment file, which is never echoed. API keys
+          # hold no newlines, so the plain NAME=VALUE form is safe here.
+          {
+            echo "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY"
+            echo "DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY"
+          } >> "$GITHUB_ENV"
+
       - name: Measure
         working-directory: voice-agent
-        env:
-          # Either or both. A model whose key is absent is skipped with a line saying so, because a
-          # one-sided run is still worth having — it is the comparison that needs both.
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || secrets.TORI_AGENT_API_KEY }}
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        # Deliberately no `env:` block. A step-level env overrides what the previous step exported,
+        # so re-declaring the keys here from `secrets.*` would overwrite the borrowed values with
+        # the empty strings that made borrowing necessary — and the failure would read as "the key
+        # is missing" while sitting one step below the key.
         run: |
           if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$DEEPSEEK_API_KEY" ]; then
-            echo "::error::Neither ANTHROPIC_API_KEY nor DEEPSEEK_API_KEY is set — nothing to measure."
+            echo "::error::No key for either model — none in GitHub, and none readable from the Railway services. Nothing to measure."
             exit 1
           fi
-          python bench_ttft.py "${{ inputs.iterations }}" | tee "$GITHUB_STEP_SUMMARY"
+
+          # Both, always. Latency alone picked the current model and picked it on a figure that
+          # turned out to be wrong by a factor of five; reading speed without the quality score is
+          # how that happens again. `tee -a` because two scripts write one summary.
+          {
+            echo "## Time to first token"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          python bench_ttft.py "${{ inputs.iterations }}" | tee -a "$GITHUB_STEP_SUMMARY"
+          {
+            echo '```'
+            echo "## Hebrew and tool calling"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          python bench_quality.py | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

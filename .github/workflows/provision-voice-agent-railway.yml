@@ -50,6 +50,8 @@ jobs:
       # exactly what happened here: the key was added, MODEL_KEY still arrived empty, and the
       # service kept reporting model_key:false. main.py reads TORI_AGENT_API_KEY first, then
       # ANTHROPIC_API_KEY, so both names are legitimate and both are accepted.
+      # When none of the four holds anything, the step below falls back to the key the backend
+      # service is already running on — see the note there.
       MODEL_KEY: >-
         ${{ secrets.ANTHROPIC_API_KEY || vars.ANTHROPIC_API_KEY
          || secrets.TORI_AGENT_API_KEY || vars.TORI_AGENT_API_KEY }}
@@ -108,19 +110,58 @@ jobs:
           args="--service $SVC --environment $RAILWAY_ENVIRONMENT --skip-deploys"
           missing=""
 
+          # Railway variables are per service, not per project. The model key has been in this
+          # project for a month — on the backend, which is the service that has been using it. The
+          # voice agent is a different service and was created empty, so "the key is in Railway"
+          # and "model_key: false" are both true at once, and neither is the other's contradiction.
+          #
+          # So: names present on each service, which is the evidence for that claim rather than the
+          # assertion of it. Names only. The values here are live API keys.
+          echo "Variables on '$BACKEND_SERVICE' (names only):"
+          backend_vars=$(railway variables --service "$BACKEND_SERVICE" --environment "$RAILWAY_ENVIRONMENT" --json 2>/dev/null || echo '{}')
+          printf '%s' "$backend_vars" | jq -r 'keys[]' 2>/dev/null | sed 's/^/  - /' || echo "  (could not read)"
+          echo "Variables on '$SVC' (names only):"
+          railway variables --service "$SVC" --environment "$RAILWAY_ENVIRONMENT" --json 2>/dev/null \
+            | jq -r 'keys[]' 2>/dev/null | sed 's/^/  - /' || echo "  (none yet)"
+
+          # If GitHub holds no key, take the one the backend is already using. Copying it inside the
+          # project beats asking for it again: it is the same account, the same key, and a second
+          # copy pasted by hand is a second thing to rotate and a chance to paste it wrong.
+          copied=""
+          if [ -z "$MODEL_KEY" ]; then
+            for name in TORI_AGENT_API_KEY ANTHROPIC_API_KEY; do
+              found=$(printf '%s' "$backend_vars" | jq -r --arg n "$name" '.[$n] // ""' 2>/dev/null || echo "")
+              if [ -n "$found" ]; then
+                # Before it is used anywhere. Masking is what keeps a stray CLI error message from
+                # printing the key back into a public build log.
+                echo "::add-mask::$found"
+                MODEL_KEY="$found"
+                copied="$name on $BACKEND_SERVICE"
+                break
+              fi
+            done
+          fi
+
           if [ -n "$TORI_API_URL" ]; then railway variables --set "TORI_API_URL=$TORI_API_URL" $args
           else missing="$missing PUBLIC_BACKEND_URL→TORI_API_URL"; fi
 
           if [ -n "$CARTESIA_TOOL_SECRET" ]; then railway variables --set "CARTESIA_TOOL_SECRET=$CARTESIA_TOOL_SECRET" $args
           else missing="$missing CARTESIA_TOOL_SECRET"; fi
 
-          if [ -n "$MODEL_KEY" ]; then railway variables --set "ANTHROPIC_API_KEY=$MODEL_KEY" $args
+          if [ -n "$MODEL_KEY" ]; then
+            railway variables --set "ANTHROPIC_API_KEY=$MODEL_KEY" $args
+            # `if`, not `[ … ] && echo`: a false test as the last command of an AND-list is the
+            # step's exit status under `bash -e`, which failed a step here once after it had done
+            # everything correctly.
+            if [ -n "$copied" ]; then
+              echo "::notice::Model key taken from $copied — GitHub holds none under any name the agent reads."
+            fi
           else missing="$missing ANTHROPIC_API_KEY"; fi
 
           railway variables --set "TORI_AGENT_GENDER=$AGENT_GENDER" $args
 
           if [ -n "$missing" ]; then
-            echo "::warning::Not set, because no secret or variable holds them:$missing"
+            echo "::warning::Not set, because nothing holds them — not GitHub, and not the backend service:$missing"
             echo "::warning::The service will boot and fail every call until they exist. CARTESIA_TOOL_SECRET must match the backend's exactly, and neither can be guessed from here."
             # Which names were actually found, as booleans. A key that is present under a name
             # nothing reads looks identical to no key at all, and the first round of this cost a
@@ -128,7 +169,7 @@ jobs:
             echo "Names checked for the model key (true = found):"
             echo "  secrets.ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY != '' }}    vars.ANTHROPIC_API_KEY=${{ vars.ANTHROPIC_API_KEY != '' }}"
             echo "  secrets.TORI_AGENT_API_KEY=${{ secrets.TORI_AGENT_API_KEY != '' }}   vars.TORI_AGENT_API_KEY=${{ vars.TORI_AGENT_API_KEY != '' }}"
-            echo "All four false means the value is in another tab (Dependabot/Codespaces/Environment) or under a different name."
+            echo "The backend's own variable names are listed above — if the key is there under a third name, add that name to this step."
           fi
 
       - name: Upload and build voice-agent/

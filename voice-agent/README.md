@@ -45,7 +45,9 @@ This is what made every call open with `שלום, הגעתם ל` and no business
 The agent is code that runs during calls, so Cartesia has to reach it somehow. There are three
 ways, and the choice is really "who hosts it".
 
-**Latency decides this, and it favours managed hosting.** The agent sits on the hot path of every
+**Latency decided this, and on paper it favoured managed hosting — a live call reversed it.** Read
+this section for why the trade-off is close; the answer it reaches is out of date, and the
+self-hosted section below says what production actually runs. The agent sits on the hot path of every
 single turn — caller speaks, Cartesia transcribes, *the agent* produces the reply, Cartesia speaks
 it. It does not call this repo's backend every turn: `/context` is fetched once before the
 conversation starts, and the booking tools fire only when the model uses them. So the link that
@@ -56,7 +58,7 @@ near region (call records carry `deployment_region`). Self-hosting puts the agen
 place — fine if that place is near the caller and near Cartesia, an added round trip on every turn
 if it is not. Railway defaulting to a US region while the callers are Israeli would be the bad case.
 
-### Managed, via the CLI (recommended)
+### Managed, via the CLI (no longer the deployment — kept as the way back)
 
 ```bash
 curl -fsSL https://cartesia.sh | sh
@@ -76,36 +78,44 @@ object carries `git_repository` and `git_deploy_branch` fields, so the capabilit
 but there is no published way to set them and no console page for it at the time of writing. Treat
 it as unavailable unless Cartesia support says otherwise.
 
-### Self-hosted
+### Self-hosted — **this is the current deployment**
 
-> **Not the current deployment — this section is the migration, not a description of production.**
-> The live agent runs on Cartesia's managed runtime, deployed by `deploy-voice-agent.yml` on every
-> push. Verified 2026-08: `GET /agents/{id}` returns an empty `self_hosted_deployment_url`, and the
-> `tori-voice-agent.up.railway.app` host used as the example below does not resolve — Railway
-> answers "Application not found". So the ~5s cold start described here is still live, and the
-> steps below are what remove it. `railway run npx tsx scripts/cartesia-probe.ts` (from `backend/`)
-> prints the current mode, and the "Fix Cartesia agent config" workflow sets the URL once a
-> service exists.
+> Live since 2026-08-16. Calls go to the Railway service **`tori-voice-agent`** in project `Tori`,
+> at `https://tori-voice-agent-production.up.railway.app`, which reports
+> `ready_for_calls: true`. `GET /agents/{id}` returns that host in `self_hosted_deployment_url`
+> (Cartesia stores it without the scheme). The ~5s cold start on the first call of the morning is
+> gone — that was the managed runtime scaling from zero, and nothing scales to zero now.
+>
+> Two workflows own this and neither needs a laptop: **"Provision the voice agent on Railway"**
+> creates or updates the service and prints what it booted with, and **"Fix Cartesia agent config"**
+> points Cartesia at it. `railway run npx tsx scripts/cartesia-probe.ts` (from `backend/`) prints
+> the current mode if you want a second opinion.
+>
+> `deploy-voice-agent.yml` still pushes to the managed runtime on every push, and that runtime is
+> now the thing nobody dials. Either retire it or leave it as the way back: restoring managed
+> hosting is one PATCH clearing `self_hosted_deployment_url`.
 
-Cartesia calls your server instead of hosting the code itself. Deploy this directory as its own
-Railway service — `main.py` already serves the FastAPI app on `$PORT`, which is all the `Procfile`
-does — then point the agent at it by setting `self_hosted_deployment_url`:
+Cartesia calls your server instead of hosting the code itself. This directory runs as its own
+Railway service — `main.py` serves the FastAPI app on `$PORT`, which is all the `Procfile` does —
+and the agent points at it via `self_hosted_deployment_url`:
 
 ```bash
 curl -X PATCH https://api.cartesia.ai/agents/$CARTESIA_AGENT_ID \
   -H "Authorization: Bearer $CARTESIA_API_KEY" \
   -H "Cartesia-Version: 2026-03-01" \
   -H "Content-Type: application/json" \
-  -d '{"self_hosted_deployment_url": "https://tori-voice-agent.up.railway.app"}'
+  -d '{"self_hosted_deployment_url": "https://tori-voice-agent-production.up.railway.app"}'
 ```
 
 (`cartesia connect --url …` does the same thing from the CLI.)
 
 #### Clear the console's own prompt while you are in there
 
-The agent object keeps a `system_prompt` of its own, editable in the Cartesia console. On a
-self-hosted agent it is dead weight — `build_prompt` renders the real one per call, from the
-salon's data — but it is not harmless dead weight. The copy found on the live agent was written in
+The agent object keeps an `llm_system_prompt` of its own, editable in the Cartesia console — and a
+one-line `llm_introduce` beside it. On a
+self-hosted agent both are dead weight — `build_prompt` renders the real prompt per call from the
+salon's data, and `main.py` passes its own `introduction=spoken_greeting(salon)` — but it is not
+harmless dead weight. The copy found on the live agent was written in
 the opposite gender to `TORI_AGENT_GENDER` and told the model to call `get_context`, a tool that
 was deliberately removed (see the module docstring: with no tool registered, the model asked a real
 caller out loud for "the number you called"). Two prompts that disagree is a coin toss nobody is
@@ -119,13 +129,21 @@ curl -X PATCH https://api.cartesia.ai/agents/$CARTESIA_AGENT_ID \
   -H "Authorization: Bearer $CARTESIA_API_KEY" \
   -H "Cartesia-Version: 2026-03-01" \
   -H "Content-Type: application/json" \
-  -d '{"system_prompt": "Self-hosted agent — the live prompt is built per call in voice-agent/main.py (build_prompt). This field is intentionally unused; do not write instructions here."}'
+  -d '{"llm_system_prompt": "Self-hosted agent — the live prompt is built per call in voice-agent/main.py (build_prompt). This field is intentionally unused; do not write instructions here.",
+       "llm_introduce": "Unused — the spoken greeting is built per call in voice-agent/main.py."}'
 ```
+
+**The field is `llm_system_prompt`, not `system_prompt`.** The websocket `start` message names it
+`system_prompt` and the REST object does not, so the obvious guess PATCHes to
+`Unrecognized key: "system_prompt"` — and a GET for it reports "0 chars" rather than "absent",
+because jq on a missing field looks exactly like jq on an empty one. `GET /agents/{id} | jq keys`
+settles it in one line. The "Fix Cartesia agent config" workflow does all of this with the key that
+never leaves GitHub.
 
 `railway run npx tsx scripts/cartesia-probe.ts` (from `backend/`) reports the length of whatever is
 there and flags it when it grows back into a second prompt.
 
-**This is the recommended route, and it has not been taken yet.** The reasoning reversed on live
+**This is the route now taken.** The reasoning reversed on live
 measurement. The managed
 runtime scales the agent to zero when idle, and the first call after a quiet stretch pays ~5
 seconds of dead air waking the container — measured on a real call, and confirmed as cold start by
@@ -141,16 +159,28 @@ Two further wins over the managed route, both learned the hard way:
 - **`GET /health` says which code is live** — model, gender, whether usage reporting is wired —
   answering in one curl the "which code answered that call" question that once took an evening.
 
-### Railway setup (once)
+### Railway setup
 
-1. Railway → the existing project → **New Service → GitHub repo**, same repo, and set the
-   service's **Root Directory** to `voice-agent/`. The `Procfile` (`web: python main.py`) and
-   `requirements.txt` do the rest.
-2. Set the service variables: `TORI_API_URL`, `CARTESIA_TOOL_SECRET`, `ANTHROPIC_API_KEY`,
-   `TORI_AGENT_GENDER` (and optionally `TORI_AGENT_MODEL`).
-3. `curl https://<service>.up.railway.app/health` — confirm the config it booted with.
-4. Point the agent at it (the PATCH above, or `cartesia connect --url`). Calls switch over
-   immediately; switching back is the same call with the managed deployment restored.
+Already done, and re-running it is how you redeploy. **Actions → "Provision the voice agent on
+Railway" → Run workflow** creates the service if it is missing, sets `TORI_API_URL`,
+`CARTESIA_TOOL_SECRET`, `ANTHROPIC_API_KEY` and `TORI_AGENT_GENDER`, uploads this directory, and
+finishes by printing `/health`. It refuses to run against the backend's own service name, because
+the project token can reach both and deploying the agent onto the API would take every salon down.
+
+Two things it knows that are easy to get wrong by hand:
+
+- **Railway variables are per service, not per project.** The Anthropic key had been in the project
+  for a month — on the backend, the service using it — while `tori-voice-agent` had none and
+  reported `model_key: false`. Both facts were true at once. The workflow now reads the backend's
+  key and copies it across when GitHub holds none, so there is one key to rotate rather than two.
+- **`railway up --ci` exits non-zero on a broken log stream** exactly as it does on a failed build.
+  The health check, not the exit code, is the verdict on whether a deploy shipped.
+
+Then **"Fix Cartesia agent config"** with `deployment_url` points Cartesia at it. Calls switch over
+immediately; switching back is the same call with `self_hosted_deployment_url` cleared.
+
+Set `TORI_AGENT_MODEL` by hand in the Railway dashboard if you ever want to override the model —
+the workflow does not manage it, so a value set there survives every future run.
 
 ## Environment
 
