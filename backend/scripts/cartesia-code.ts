@@ -227,19 +227,37 @@ async function main() {
   // Whisper first when asked for: the agent's own transcript is unreliable for digits, and a wrong
   // code costs a verification attempt rather than a retry.
   if (has("whisper")) {
-    for (const call of mine.slice(0, 3)) {
-      const id = String(call.id ?? "");
-      const text = await transcribeRecording(id);
-      if (!text) continue;
-      console.log(`  Whisper heard: ${text.slice(0, 300)}`);
-      const tp = (call.telephony_params ?? {}) as Record<string, unknown>;
-      const code = extractCode(text, [String(tp.to ?? ""), String(tp.from ?? ""), to, id].filter(Boolean));
-      if (code) {
-        console.log(`Found a six-digit code: ${code}`);
-        return;
-      }
+    // The newest call only, and never a fallback to an older one.
+    //
+    // Falling back is what makes this dangerous rather than merely unhelpful: when the newest
+    // call's recording is not written yet, an older call is still sitting there with a code that
+    // has already expired. Submitting it fails with "Incorrect code entered" — the same message a
+    // mis-heard code gets — and burns an attempt on a code that was never in play.
+    const call = mine[0];
+    const id = String(call.id ?? "");
+    const startedAt = String(call.start_time ?? "");
+    const ageMin = startedAt ? (Date.now() - Date.parse(startedAt)) / 60_000 : Infinity;
+    const maxAge = Number(arg("max-age-minutes") ?? 15);
+
+    console.log(`Newest call to ${to}: ${id}, started ${startedAt} (${ageMin.toFixed(1)} min ago)`);
+    if (ageMin > maxAge) {
+      console.log(`That is older than ${maxAge} minutes, so its code has expired. Request a new one.`);
+      return;
     }
-    console.log("No six-digit code in any recent recording for this number.");
+
+    const text = await transcribeRecording(id);
+    if (!text) {
+      console.log("No recording yet for that call — Cartesia writes it after the call ends. Wait and retry.");
+      return;
+    }
+    console.log(`  Whisper heard: ${text.slice(0, 300)}`);
+    const tp = (call.telephony_params ?? {}) as Record<string, unknown>;
+    const code = extractCode(text, [String(tp.to ?? ""), String(tp.from ?? ""), to, id].filter(Boolean));
+    if (code) {
+      console.log(`Found a six-digit code: ${code}`);
+      return;
+    }
+    console.log("No six-digit run in that recording.");
     return;
   }
 
