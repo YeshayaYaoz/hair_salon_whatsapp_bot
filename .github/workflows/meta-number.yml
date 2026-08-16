@@ -65,18 +65,22 @@ jobs:
           # credential sitting where anyone with repo read access can find it later.
           [ -n "$CODE" ] && echo "::add-mask::$CODE"
 
+          # An array, not a string. A display name has a space in it ("תורי אונליין"), and an
+          # unquoted string expansion splits on it — Meta received "תורי" and put *that* under
+          # review. It succeeds loudly, with the wrong value, and the only place the truth shows up
+          # is the review queue days later.
           case "$ACTION" in
-            status)       args="" ;;
-            list)         args="--list" ;;
-            add)          args="--name $NAME" ;;
-            rename)       args="--rename $NAME" ;;
+            status)       args=() ;;
+            list)         args=(--list) ;;
+            add)          args=(--name "$NAME") ;;
+            rename)       args=(--rename "$NAME") ;;
             # The script refuses on a CONNECTED or VERIFIED line regardless; --force is deliberately
             # not reachable from here, so no dispatch of this workflow can detach a working number.
-            remove)       args="--remove --confirm" ;;
-            request-code) args="--request-code --code-method $CODE_METHOD" ;;
+            remove)       args=(--remove --confirm) ;;
+            request-code) args=(--request-code --code-method "$CODE_METHOD") ;;
             verify)
               [ -z "$CODE" ] && { echo "::error::'verify' needs the code input."; exit 1; }
-              args="--verify $CODE" ;;
+              args=(--verify "$CODE") ;;
             verify-from-call)
               # The whole point of taking the code by voice: nobody reads it, types it, or pastes
               # it anywhere. It goes from Cartesia's transcript straight into Meta's verify call,
@@ -94,9 +98,11 @@ jobs:
               [ -z "$CODE" ] && { echo "::error::No six-digit code found in recent calls to $NUMBER."; exit 1; }
               echo "::add-mask::$CODE"
               echo "Read a code out of the call transcript."
-              args="--verify $CODE" ;;
-            register)     args="--register" ;;
+              args=(--verify "$CODE") ;;
+            register)     args=(--register) ;;
             *)            echo "::error::Unknown action '$ACTION'"; exit 1 ;;
           esac
 
-          npx tsx scripts/meta-add-number.ts --number "$NUMBER" ${WABA:+--waba "$WABA"} $args
+          waba_args=()
+          [ -n "$WABA" ] && waba_args=(--waba "$WABA")
+          npx tsx scripts/meta-add-number.ts --number "$NUMBER" "${waba_args[@]}" "${args[@]}"
