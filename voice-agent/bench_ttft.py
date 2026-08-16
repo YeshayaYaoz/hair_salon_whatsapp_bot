@@ -114,6 +114,33 @@ def ttft_ms(model: str, api_key: str, system: str, user: str,
     return elapsed, usage
 
 
+def count_tokens(system: str, user: str, api_key: str) -> Optional[int]:
+    """
+    The prompt's exact token count, from Anthropic's counter rather than an estimate.
+
+    This decides whether prompt caching can work at all: Anthropic publishes a minimum
+    cacheable prefix per model — 4096 tokens on Haiku 4.5 — and a prompt below it is not
+    cached even with the cache_control marker set. There is no error and no warning; the
+    marker is simply ignored. Estimating the count would not settle the question, and
+    character-count intuition is badly wrong for Hebrew, so it is asked directly.
+    """
+    import httpx
+
+    try:
+        r = httpx.post(
+            "https://api.anthropic.com/v1/messages/count_tokens",
+            headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
+                     "content-type": "application/json"},
+            json={"model": "claude-haiku-4-5-20251001",
+                  "system": system,
+                  "messages": [{"role": "user", "content": user}]},
+            timeout=20.0,
+        )
+        return int(r.json()["input_tokens"]) if r.status_code == 200 else None
+    except Exception:
+        return None
+
+
 def cached_tokens(usage: Any) -> int:
     """Prompt tokens served from cache, under whichever name the provider reports it."""
     if usage is None:
@@ -182,7 +209,20 @@ def main_() -> int:
     system = main.build_prompt(CONTEXT, caller_known=False)
     short_system = trim_prompt(system)
     print(f"System prompt: {len(system)} chars ({len(short_system)} trimmed). "
-          f"First turn: {TURN!r}. {iterations} samples each.\n")
+          f"First turn: {TURN!r}. {iterations} samples each.")
+
+    # Against the published minimum, so a "cached" run that caches nothing is explained
+    # rather than merely observed. 4096 is Haiku 4.5's floor; the newest models are far
+    # lower (512-1024), so the same prompt on a different model may cache fine.
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if anthropic_key:
+        n = count_tokens(system, TURN, anthropic_key)
+        if n is not None:
+            floor = 4096
+            verdict = ("BELOW the 4096-token minimum — prompt caching cannot engage on this model"
+                       if n < floor else "above the 4096-token minimum — caching can engage")
+            print(f"Prompt size: {n} tokens, {verdict}.")
+    print()
 
     # plain   — what the previous run measured: a cold prompt, no caching parameters at all.
     # cached  — what production actually sends. `_latency_extra` is main.py's own function, so this

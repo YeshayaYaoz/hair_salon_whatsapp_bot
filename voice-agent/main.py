@@ -294,14 +294,25 @@ def _usage_metadata(called: str, caller: str) -> Dict[str, Any]:
 
 def _latency_extra(model: str) -> Dict[str, Any]:
     """
-    LiteLLM parameters that buy time to first token, which on a phone line is the only latency
-    anyone hears.
+    LiteLLM parameters intended to buy time to first token, which on a phone line is the only
+    latency anyone hears.
 
-    Prompt caching is the big one. The system prompt carries the whole salon — services, prices,
-    hours, policy, FAQ — and is re-sent verbatim on every turn of the call, around 9,000 tokens of
-    it. `cache_control_injection_points` tells LiteLLM to mark the system message as cacheable;
-    Anthropic then serves it from cache on every turn after the first, which is documented to take
-    200-400ms off TTFT and cuts the input cost of a long call to a tenth.
+    Prompt caching was the big one, and measurement says it is currently doing nothing. The system
+    prompt carries the whole salon — services, prices, hours, policy, FAQ — and is re-sent verbatim
+    on every turn. `cache_control_injection_points` tells LiteLLM to mark the system message as
+    cacheable, and Anthropic would then serve it from cache on later turns.
+
+    ‼️ Anthropic publishes a *minimum cacheable prefix* per model, and on Haiku 4.5 it is 4096
+    tokens. A shorter prompt is not cached even with the marker set: no error, no warning, the
+    marker is simply ignored. This salon's prompt is under that floor, and `bench_ttft.py` confirms
+    it — the cached variant reports `cache_read_input_tokens: 0` on every sample and lands within
+    noise of the uncached one. So this parameter is inert today.
+
+    It is kept rather than deleted because it costs nothing to send and starts working by itself
+    the moment either side of the inequality moves: a longer prompt, or a model with a lower floor
+    (the newest are 512-1024). The docstring is the thing that had to change — it claimed
+    200-400ms and a tenth of the input cost, and a future reader would have gone on believing a
+    saving that was never being made.
 
     Anthropic-only, deliberately. The hook rewrites the message into content blocks carrying
     `cache_control`, which is Anthropic's shape — DeepSeek caches server-side on its own and has no
