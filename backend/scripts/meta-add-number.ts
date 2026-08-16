@@ -130,7 +130,23 @@ async function main() {
           "Refusing to remove it. If this is genuinely intended, pass --force as well."
       );
     }
-    await call(`/${existingId}`, undefined, "DELETE");
+    // Kept even though Meta rejects it, because the rejection is the useful part. Graph answers
+    //   "Unsupported delete request. Object with ID '…' does not exist, cannot be loaded due to
+    //    missing permissions, or does not support this operation."
+    // and the middle clause sends you off auditing the token's scopes. It is the last clause: the
+    // phone number node has no delete on it at any permission level. Detaching a number from a WABA
+    // is a WhatsApp Manager action only.
+    try {
+      await call(`/${existingId}`, undefined, "DELETE");
+    } catch (err) {
+      if (/Unsupported delete request/i.test((err as Error).message)) {
+        throw new Error(
+          "Meta does not expose deletion of a phone number over the API — it is not a token scope " +
+            "problem. Remove it in WhatsApp Manager → WhatsApp Accounts → Phone numbers."
+        );
+      }
+      throw err;
+    }
     console.log(`✔ Removed ${number} from WABA ${wabaId}.`);
     console.log("  Carrier and voice routing are untouched — this only detaches it from WhatsApp.");
     return;
