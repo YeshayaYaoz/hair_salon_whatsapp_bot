@@ -119,11 +119,27 @@ async function main() {
 
   const forward = arg("forward");
   if (forward) {
-    // Uses the same function the dashboard's voice-number save uses, so a number wired from here
-    // and one wired by an owner end up in exactly the same state.
+    // Both halves, because either alone is a number that does not ring and looks configured.
+    //
+    // Zadarma has to be told where to send the call, and Cartesia has to have the number imported
+    // against the trunk and attached to an agent. Doing only the carrier side — which is what the
+    // first run of this did — sends the call to Cartesia's SIP, where it matches no imported number
+    // and is dropped *before a call record exists*: nothing in the Cartesia dashboard, nothing in
+    // our logs, and a Zadarma listing that reads as correctly forwarded.
+    //
+    // These are the same two functions the dashboard's voice-number save calls, in the same order.
     const { pointNumberAtCartesia } = await import("../src/lib/zadarmaAdmin.js");
+    const { assignNumberToAgent } = await import("../src/lib/cartesiaAdmin.js");
+
     const { sipId } = await pointNumberAtCartesia(forward);
-    console.log(`✔ ${forward} now forwards to ${sipId}`);
+    console.log(`✔ Zadarma: ${forward} forwards to ${sipId}`);
+
+    const result = await assignNumberToAgent(forward, { label: arg("label") ?? "Tori" });
+    console.log(
+      result.changed
+        ? `✔ Cartesia: ${result.imported ? "imported and assigned" : "assigned"} ${forward} to the agent`
+        : `✔ Cartesia: ${forward} was already assigned to the agent`
+    );
     return;
   }
 
