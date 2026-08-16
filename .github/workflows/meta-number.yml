@@ -50,6 +50,7 @@ jobs:
           TORI_WABA_ID: ${{ secrets.TORI_WABA_ID }}
           CARTESIA_API_KEY: ${{ secrets.CARTESIA_API_KEY }}
           CARTESIA_AGENT_ID: ${{ secrets.CARTESIA_AGENT_ID || vars.CARTESIA_AGENT_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ACTION: ${{ inputs.action }}
           NUMBER: ${{ inputs.number }}
           NAME: ${{ inputs.name }}
@@ -71,7 +72,10 @@ jobs:
               # The whole point of taking the code by voice: nobody reads it, types it, or pastes
               # it anywhere. It goes from Cartesia's transcript straight into Meta's verify call,
               # and is masked before either step prints anything.
-              CODE=$(npx tsx scripts/cartesia-code.ts --to "$NUMBER" 2>&1 | grep -oE '[0-9]{6}' | tail -1)
+              # --whisper, not the agent's own transcript: Cartesia's Hebrew speech recognition
+              # renders Meta's English digit-by-digit reading as "9, זירו zero, 8" and scatters it
+              # over seven turns, which produced three different reconstructions of one code.
+              CODE=$(npx tsx scripts/cartesia-code.ts --to "$NUMBER" --whisper 2>&1 | grep -oE 'code: [0-9]{6}' | grep -oE '[0-9]{6}' | tail -1)
               [ -z "$CODE" ] && { echo "::error::No six-digit code found in recent calls to $NUMBER."; exit 1; }
               echo "::add-mask::$CODE"
               echo "Read a code out of the call transcript."

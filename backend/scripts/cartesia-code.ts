@@ -98,6 +98,67 @@ export function extractCode(text: string, ignore: string[] = []): string | null 
   return null;
 }
 
+/**
+ * Transcribes the call recording with Whisper, because the agent's own transcript cannot be trusted
+ * for digits.
+ *
+ * Cartesia's speech recognition is configured for Hebrew, and Meta's verification robot speaks
+ * English digit by digit. The result on a live call was "9, זירו zero, 8" — one spoken zero emitted
+ * twice, in two alphabets — with the digits scattered over seven turns and each of Meta's three
+ * repetitions mangled differently. Three plausible reconstructions, no way to choose between them,
+ * and each wrong guess burns a verification attempt.
+ *
+ * The audio still has the code in it. Whisper is told the language is English and primed to expect
+ * digits, which is exactly the case the agent's own pipeline is configured against.
+ */
+async function transcribeRecording(callId: string): Promise<string | null> {
+  const openaiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!openaiKey) {
+    console.log("OPENAI_API_KEY is not set — cannot transcribe the recording.");
+    return null;
+  }
+
+  const res = await fetch(`${BASE_URL}${CALLS_PATH}/${encodeURIComponent(callId)}/audio`, {
+    headers: { Authorization: `Bearer ${apiKey}`, "Cartesia-Version": API_VERSION },
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!res.ok) {
+    console.log(`  recording for ${callId} → HTTP ${res.status}`);
+    return null;
+  }
+  const audio = Buffer.from(await res.arrayBuffer());
+  if (audio.length === 0) {
+    console.log(`  recording for ${callId} is empty`);
+    return null;
+  }
+
+  // Whisper picks its decoder off the filename, so the container has to be named correctly rather
+  // than guessed at — a wav sent as .mp3 is rejected as corrupt.
+  const head = audio.subarray(0, 4).toString("binary");
+  const ext = head.startsWith("RIFF") ? "wav" : head.startsWith("OggS") ? "ogg" : head.startsWith("ID3") ? "mp3" : "wav";
+  console.log(`  recording: ${audio.length} bytes, sending as .${ext}`);
+
+  const form = new FormData();
+  form.append("file", new Blob([new Uint8Array(audio)]), `call.${ext}`);
+  form.append("model", "whisper-1");
+  // Meta's robot speaks English regardless of the language the code was requested in.
+  form.append("language", "en");
+  form.append("prompt", "A six-digit verification code read out one digit at a time.");
+
+  const w = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${openaiKey}` },
+    body: form,
+    signal: AbortSignal.timeout(120_000),
+  });
+  const json = (await w.json().catch(() => ({}))) as { text?: string; error?: { message?: string } };
+  if (!w.ok || json.error) {
+    console.log(`  Whisper failed: ${json.error?.message ?? `HTTP ${w.status}`}`);
+    return null;
+  }
+  return json.text ?? null;
+}
+
 /** Every string in an arbitrarily-shaped payload, so a transcript is found wherever it is nested. */
 function allText(value: unknown, out: string[] = []): string[] {
   if (typeof value === "string") out.push(value);
@@ -163,6 +224,25 @@ async function main() {
   // The list carries a summary, not the words. A summary of a robot reading six digits may or may
   // not contain them, so the transcript is fetched per call — and the sub-resource is undocumented,
   // so the plausible ones are tried and the first that answers is used.
+  // Whisper first when asked for: the agent's own transcript is unreliable for digits, and a wrong
+  // code costs a verification attempt rather than a retry.
+  if (has("whisper")) {
+    for (const call of mine.slice(0, 3)) {
+      const id = String(call.id ?? "");
+      const text = await transcribeRecording(id);
+      if (!text) continue;
+      console.log(`  Whisper heard: ${text.slice(0, 300)}`);
+      const tp = (call.telephony_params ?? {}) as Record<string, unknown>;
+      const code = extractCode(text, [String(tp.to ?? ""), String(tp.from ?? ""), to, id].filter(Boolean));
+      if (code) {
+        console.log(`Found a six-digit code: ${code}`);
+        return;
+      }
+    }
+    console.log("No six-digit code in any recent recording for this number.");
+    return;
+  }
+
   const SUBPATHS = ["", "/transcript", "/messages", "/events"];
   // Two failed verifications in a row is the point to stop refining the extractor and look at what
   // the agent actually heard. Meta's robot speaks English into a Hebrew speech recogniser, which is

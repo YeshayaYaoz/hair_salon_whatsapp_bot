@@ -23,6 +23,10 @@ on:
         description: "Print the raw Zadarma JSON — for when a listing disagrees with the dashboard"
         type: boolean
         default: false
+      whisper:
+        description: "Transcribe the call recording with Whisper instead of trusting the agent's own transcript"
+        type: boolean
+        default: false
       order_number:
         description: "Order this exact number (starts a monthly charge). Needs order_direction too."
         default: ""
@@ -153,9 +157,10 @@ jobs:
           RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
           TO: ${{ inputs.code_for }}
           DUMP: ${{ inputs.raw }}
+          WHISPER: ${{ inputs.whisper }}
         run: |
           out=$(railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
-            npx tsx scripts/cartesia-code.ts --to "$TO" ${DUMP:+--dump} 2>&1) || true
+            npx tsx scripts/cartesia-code.ts --to "$TO" ${DUMP:+--dump} ${WHISPER:+--whisper} 2>&1) || true
           code=$(echo "$out" | grep -oE '[0-9]{6}' | tail -1 || true)
           [ -n "$code" ] && echo "::add-mask::$code"
           echo "$out"
