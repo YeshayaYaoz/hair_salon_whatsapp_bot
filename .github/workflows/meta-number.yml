@@ -48,9 +48,9 @@ jobs:
         env:
           META_SYSTEM_USER_TOKEN: ${{ secrets.META_SYSTEM_USER_TOKEN }}
           TORI_WABA_ID: ${{ secrets.TORI_WABA_ID }}
-          CARTESIA_API_KEY: ${{ secrets.CARTESIA_API_KEY }}
-          CARTESIA_AGENT_ID: ${{ secrets.CARTESIA_AGENT_ID || vars.CARTESIA_AGENT_ID }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+          RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
           ACTION: ${{ inputs.action }}
           NUMBER: ${{ inputs.number }}
           NAME: ${{ inputs.name }}
@@ -75,7 +75,13 @@ jobs:
               # --whisper, not the agent's own transcript: Cartesia's Hebrew speech recognition
               # renders Meta's English digit-by-digit reading as "9, זירו zero, 8" and scatters it
               # over seven turns, which produced three different reconstructions of one code.
-              CODE=$(npx tsx scripts/cartesia-code.ts --to "$NUMBER" --whisper 2>&1 | grep -oE 'code: [0-9]{6}' | grep -oE '[0-9]{6}' | tail -1)
+              # Through railway run: CARTESIA_API_KEY and OPENAI_API_KEY live in Railway, not in
+              # Actions secrets, and duplicating them here would be two places to rotate and one to
+              # forget. Meta's own credentials stay Actions secrets because nothing else needs them.
+              npm i -g @railway/cli >/dev/null 2>&1
+              CODE=$(railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+                npx tsx scripts/cartesia-code.ts --to "$NUMBER" --whisper 2>&1 \
+                | grep -oE 'code: [0-9]{6}' | grep -oE '[0-9]{6}' | tail -1)
               [ -z "$CODE" ] && { echo "::error::No six-digit code found in recent calls to $NUMBER."; exit 1; }
               echo "::add-mask::$CODE"
               echo "Read a code out of the call transcript."
