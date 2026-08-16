@@ -12,7 +12,7 @@ on:
       action:
         description: "Which step to run"
         type: choice
-        options: [status, add, request-code, verify, register]
+        options: [status, add, request-code, verify, verify-from-call, register]
         default: status
       number:
         description: "Number in international format"
@@ -48,6 +48,8 @@ jobs:
         env:
           META_SYSTEM_USER_TOKEN: ${{ secrets.META_SYSTEM_USER_TOKEN }}
           TORI_WABA_ID: ${{ secrets.TORI_WABA_ID }}
+          CARTESIA_API_KEY: ${{ secrets.CARTESIA_API_KEY }}
+          CARTESIA_AGENT_ID: ${{ secrets.CARTESIA_AGENT_ID || vars.CARTESIA_AGENT_ID }}
           ACTION: ${{ inputs.action }}
           NUMBER: ${{ inputs.number }}
           NAME: ${{ inputs.name }}
@@ -64,6 +66,15 @@ jobs:
             request-code) args="--request-code --code-method $CODE_METHOD" ;;
             verify)
               [ -z "$CODE" ] && { echo "::error::'verify' needs the code input."; exit 1; }
+              args="--verify $CODE" ;;
+            verify-from-call)
+              # The whole point of taking the code by voice: nobody reads it, types it, or pastes
+              # it anywhere. It goes from Cartesia's transcript straight into Meta's verify call,
+              # and is masked before either step prints anything.
+              CODE=$(npx tsx scripts/cartesia-code.ts --to "$NUMBER" 2>&1 | grep -oE '[0-9]{6}' | tail -1)
+              [ -z "$CODE" ] && { echo "::error::No six-digit code found in recent calls to $NUMBER."; exit 1; }
+              echo "::add-mask::$CODE"
+              echo "Read a code out of the call transcript."
               args="--verify $CODE" ;;
             register)     args="--register" ;;
             *)            echo "::error::Unknown action '$ACTION'"; exit 1 ;;
