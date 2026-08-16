@@ -12,13 +12,16 @@ on:
       action:
         description: "Which step to run"
         type: choice
-        options: [status, add, request-code, verify, verify-from-call, register]
+        options: [status, list, add, rename, request-code, verify, verify-from-call, register]
         default: status
       number:
         description: "Number in international format"
         default: "+972559450126"
+      waba:
+        description: "WABA id — blank uses Tori's own. A customer's number lives on the customer's WABA."
+        default: ""
       name:
-        description: "Display name (add only) — Meta reviews this separately from the line"
+        description: "Display name (add / rename) — Meta reviews this separately from the line"
         default: "תורי-אונליין"
       code:
         description: "Six-digit code (verify only)"
@@ -53,6 +56,7 @@ jobs:
           RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
           ACTION: ${{ inputs.action }}
           NUMBER: ${{ inputs.number }}
+          WABA: ${{ inputs.waba }}
           NAME: ${{ inputs.name }}
           CODE: ${{ inputs.code }}
           CODE_METHOD: ${{ inputs.code_method }}
@@ -63,7 +67,9 @@ jobs:
 
           case "$ACTION" in
             status)       args="" ;;
+            list)         args="--list" ;;
             add)          args="--name $NAME" ;;
+            rename)       args="--rename $NAME" ;;
             request-code) args="--request-code --code-method $CODE_METHOD" ;;
             verify)
               [ -z "$CODE" ] && { echo "::error::'verify' needs the code input."; exit 1; }
@@ -90,4 +96,4 @@ jobs:
             *)            echo "::error::Unknown action '$ACTION'"; exit 1 ;;
           esac
 
-          npx tsx scripts/meta-add-number.ts --number "$NUMBER" $args
+          npx tsx scripts/meta-add-number.ts --number "$NUMBER" ${WABA:+--waba "$WABA"} $args

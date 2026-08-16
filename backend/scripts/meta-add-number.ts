@@ -27,7 +27,6 @@
 const GRAPH = "https://graph.facebook.com/v23.0";
 
 const token = (process.env.META_SYSTEM_USER_TOKEN ?? process.env.TORI_OUTREACH_ACCESS_TOKEN)?.trim();
-const wabaId = (process.env.TORI_WABA_ID ?? process.env.WHATSAPP_WABA_ID)?.trim();
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -35,18 +34,24 @@ function arg(name: string): string | undefined {
 }
 const has = (name: string) => process.argv.includes(`--${name}`);
 
+// A customer's number lives on the customer's WABA, not Tori's, so every step here has to be able to
+// point somewhere else. Defaulting to Tori's keeps the common case a single argument.
+const wabaId = (arg("waba") ?? process.env.TORI_WABA_ID ?? process.env.WHATSAPP_WABA_ID)?.trim();
+
 if (!token || !wabaId) {
   console.error("META_SYSTEM_USER_TOKEN and TORI_WABA_ID must both be set in this environment.");
   process.exit(1);
 }
 
 const number = arg("number");
-if (!number) {
-  console.error("--number is required, in international format, e.g. +972559450126");
+// Listing is the one action that answers a question about the WABA rather than about one line, and
+// it is also how you find the phone number id that everything else is configured against.
+if (!number && !has("list")) {
+  console.error("--number is required, in international format, e.g. +972559450126 (or --list)");
   process.exit(1);
 }
 // Meta wants the country code and the subscriber number as separate fields, not one string.
-const digits = number.replace(/\D/g, "");
+const digits = (number ?? "").replace(/\D/g, "");
 const cc = digits.startsWith("972") ? "972" : digits.slice(0, 3);
 const local = digits.slice(cc.length);
 
@@ -62,19 +67,55 @@ async function call(path: string, body?: Record<string, unknown>): Promise<Recor
   return json;
 }
 
+const FIELDS = "id,display_phone_number,verified_name,status,code_verification_status,name_status,quality_rating";
+
+function describe(r: Record<string, unknown>): string {
+  // The id is on its own line and labelled, because it is the value that gets copied into
+  // TORI_OUTREACH_PHONE_NUMBER_ID and into every customer's config — and a bare number in a log line
+  // is indistinguishable from the phone number next to it.
+  return [
+    `${r.display_phone_number} — "${r.verified_name}"`,
+    `    id ${r.id}`,
+    `    line ${r.status} / verification ${r.code_verification_status} / name ${r.name_status ?? "?"}`,
+    `    quality ${r.quality_rating ?? "?"}`,
+  ].join("\n");
+}
+
+async function listNumbers(): Promise<Array<Record<string, unknown>>> {
+  const body = await call(`/${wabaId}/phone_numbers?fields=${FIELDS}`);
+  return (body.data as Array<Record<string, unknown>>) ?? [];
+}
+
 /** The number's id on this WABA, or null if it is not on it yet. */
 async function findPhoneId(): Promise<string | null> {
-  const body = await call(`/${wabaId}/phone_numbers?fields=id,display_phone_number,verified_name,status,code_verification_status`);
-  const rows = (body.data as Array<Record<string, unknown>>) ?? [];
-  const match = rows.find((r) => String(r.display_phone_number ?? "").replace(/\D/g, "") === digits);
-  if (match) {
-    console.log(`On the WABA: ${match.display_phone_number} — name "${match.verified_name}", status ${match.status}, verification ${match.code_verification_status}`);
-  }
+  const match = (await listNumbers()).find(
+    (r) => String(r.display_phone_number ?? "").replace(/\D/g, "") === digits
+  );
+  if (match) console.log(`On the WABA:\n${describe(match)}`);
   return match ? String(match.id) : null;
 }
 
 async function main() {
+  if (has("list")) {
+    const rows = await listNumbers();
+    console.log(`WABA ${wabaId} — ${rows.length} number(s):\n`);
+    for (const r of rows) console.log(`${describe(r)}\n`);
+    return;
+  }
+
   const existingId = await findPhoneId();
+
+  if (has("rename")) {
+    if (!existingId) throw new Error("Number is not on this WABA yet — add it first.");
+    const name = arg("rename");
+    if (!name) throw new Error("--rename needs the new display name");
+    // A DECLINED name is not retried by asking again with the same name; it needs a different one,
+    // and Meta reviews the new one from scratch. The line's own verification is unaffected either
+    // way — a number can send and receive with a declined name, it just shows the raw digits.
+    await call(`/${existingId}`, { new_display_name: name });
+    console.log(`✔ Submitted "${name}" for review. name_status goes PENDING_REVIEW until a person at Meta looks at it.`);
+    return;
+  }
 
   if (has("request-code")) {
     if (!existingId) throw new Error("Number is not on this WABA yet — add it first.");
