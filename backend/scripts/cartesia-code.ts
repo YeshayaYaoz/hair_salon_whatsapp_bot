@@ -171,7 +171,7 @@ async function main() {
     for (const call of mine.slice(0, 2)) {
       const id = String(call.id ?? "");
       console.log(`\n===== call ${id}  start=${String(call.start_time ?? "?")}`);
-      for (const sub of SUBPATHS) {
+      for (const sub of [...SUBPATHS, "/recording", "/recordings", "/audio"]) {
         const detail = await get(`${CALLS_PATH}/${encodeURIComponent(id)}${sub}`);
         if (detail.status !== 200) continue;
         console.log(`--- ${sub || "(detail)"}:`);
