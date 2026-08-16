@@ -55,9 +55,13 @@ const digits = (number ?? "").replace(/\D/g, "");
 const cc = digits.startsWith("972") ? "972" : digits.slice(0, 3);
 const local = digits.slice(cc.length);
 
-async function call(path: string, body?: Record<string, unknown>): Promise<Record<string, unknown>> {
+async function call(
+  path: string,
+  body?: Record<string, unknown>,
+  method?: "GET" | "POST" | "DELETE"
+): Promise<Record<string, unknown>> {
   const res = await fetch(`${GRAPH}${path}`, {
-    method: body ? "POST" : "GET",
+    method: method ?? (body ? "POST" : "GET"),
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
@@ -86,13 +90,13 @@ async function listNumbers(): Promise<Array<Record<string, unknown>>> {
   return (body.data as Array<Record<string, unknown>>) ?? [];
 }
 
-/** The number's id on this WABA, or null if it is not on it yet. */
-async function findPhoneId(): Promise<string | null> {
+/** The number's row on this WABA, or null if it is not on it yet. */
+async function findPhone(): Promise<Record<string, unknown> | null> {
   const match = (await listNumbers()).find(
     (r) => String(r.display_phone_number ?? "").replace(/\D/g, "") === digits
   );
   if (match) console.log(`On the WABA:\n${describe(match)}`);
-  return match ? String(match.id) : null;
+  return match ?? null;
 }
 
 async function main() {
@@ -103,7 +107,34 @@ async function main() {
     return;
   }
 
-  const existingId = await findPhoneId();
+  const existing = await findPhone();
+  const existingId = existing ? String(existing.id) : null;
+
+  if (has("remove")) {
+    if (!existing) throw new Error("Number is not on this WABA — nothing to remove.");
+    if (!has("confirm")) {
+      console.log(`Would remove ${number} (id ${existingId}) from WABA ${wabaId}. Re-run with --confirm.`);
+      return;
+    }
+    // A refusal rather than a warning, and read from Meta's own state rather than from what the
+    // caller believes. The failure this prevents is removing a number that some business is actually
+    // serving customers on: the entry is gone, the business's messaging stops, and re-adding it
+    // means re-verifying a line whose owner is not sitting next to us.
+    //
+    // CONNECTED or VERIFIED means the line works. A number that neither sends nor receives is the
+    // only kind this will delete.
+    const live = existing.status === "CONNECTED" || existing.code_verification_status === "VERIFIED";
+    if (live && !has("force")) {
+      throw new Error(
+        `${number} is ${String(existing.status)}/${String(existing.code_verification_status)} — a working line. ` +
+          "Refusing to remove it. If this is genuinely intended, pass --force as well."
+      );
+    }
+    await call(`/${existingId}`, undefined, "DELETE");
+    console.log(`✔ Removed ${number} from WABA ${wabaId}.`);
+    console.log("  Carrier and voice routing are untouched — this only detaches it from WhatsApp.");
+    return;
+  }
 
   if (has("rename")) {
     if (!existingId) throw new Error("Number is not on this WABA yet — add it first.");

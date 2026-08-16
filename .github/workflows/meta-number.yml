@@ -12,7 +12,7 @@ on:
       action:
         description: "Which step to run"
         type: choice
-        options: [status, list, add, rename, request-code, verify, verify-from-call, register]
+        options: [status, list, add, rename, remove, request-code, verify, verify-from-call, register]
         default: status
       number:
         description: "Number in international format"
@@ -70,6 +70,9 @@ jobs:
             list)         args="--list" ;;
             add)          args="--name $NAME" ;;
             rename)       args="--rename $NAME" ;;
+            # The script refuses on a CONNECTED or VERIFIED line regardless; --force is deliberately
+            # not reachable from here, so no dispatch of this workflow can detach a working number.
+            remove)       args="--remove --confirm" ;;
             request-code) args="--request-code --code-method $CODE_METHOD" ;;
             verify)
               [ -z "$CODE" ] && { echo "::error::'verify' needs the code input."; exit 1; }
