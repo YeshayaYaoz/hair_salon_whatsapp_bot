@@ -164,6 +164,22 @@ async function main() {
   // not contain them, so the transcript is fetched per call — and the sub-resource is undocumented,
   // so the plausible ones are tried and the first that answers is used.
   const SUBPATHS = ["", "/transcript", "/messages", "/events"];
+  // Two failed verifications in a row is the point to stop refining the extractor and look at what
+  // the agent actually heard. Meta's robot speaks English into a Hebrew speech recogniser, which is
+  // not a combination anything here should assume the shape of.
+  if (has("dump")) {
+    for (const call of mine.slice(0, 2)) {
+      const id = String(call.id ?? "");
+      console.log(`\n===== call ${id}  start=${String(call.start_time ?? "?")}`);
+      for (const sub of SUBPATHS) {
+        const detail = await get(`${CALLS_PATH}/${encodeURIComponent(id)}${sub}`);
+        if (detail.status !== 200) continue;
+        console.log(`--- ${sub || "(detail)"}:`);
+        console.log(JSON.stringify(detail.body).slice(0, 3000));
+      }
+    }
+    return;
+  }
   for (const call of mine) {
     const id = String(call.id ?? "");
     // Newest first, and the summary is free to check before spending requests on sub-resources.
