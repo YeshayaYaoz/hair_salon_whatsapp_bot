@@ -159,6 +159,10 @@ async function main() {
     // A DECLINED name is not retried by asking again with the same name; it needs a different one,
     // and Meta reviews the new one from scratch. The line's own verification is unaffected either
     // way — a number can send and receive with a declined name, it just shows the raw digits.
+    //
+    // One review at a time: while one is pending Meta answers "Display name verification is already
+    // in progress", so a submission is not undoable by submitting again. Get the name right the
+    // first time — a typo costs however long the queue takes.
     await call(`/${existingId}`, { new_display_name: name });
     console.log(`✔ Submitted "${name}" for review. name_status goes PENDING_REVIEW until a person at Meta looks at it.`);
     return;
