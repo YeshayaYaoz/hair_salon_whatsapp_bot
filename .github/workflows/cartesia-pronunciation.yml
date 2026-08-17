@@ -1,0 +1,120 @@
+name: Register the Cartesia pronunciation dictionary
+
+# How "@" is spoken on a Hebrew call.
+#
+# A caller gives an email address out loud and the agent reads it back before sending anything. In
+# Hebrew the symbol is "שטרודל". The prompt now says so, and on the call that started all this the
+# model got the *inbound* direction right and the read-back wrong — which is the worse of the two,
+# because the caller then approves an address they never actually heard.
+#
+# A pronunciation dictionary is a search-and-replace Cartesia applies to the transcript before the
+# speech model sees it. It does not depend on the model choosing the right words, which is what
+# makes it the belt to the prompt's braces.
+#
+# Deliberately one entry. Every other symbol in an address is ordinary Hebrew punctuation, and a
+# dictionary replacing "-" would have the agent saying "מקף" in the middle of a normal sentence.
+#
+# The dictionary is created here, its id is written to the voice agent's Railway service, and
+# main.py passes it on every call through pre_call_handler's tts config.
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Write the new dictionary's id to the voice agent service (off = create and print only)"
+        type: boolean
+        default: true
+
+jobs:
+  dictionary:
+    runs-on: ubuntu-latest
+    env:
+      KEY: ${{ secrets.CARTESIA_API_KEY || vars.CARTESIA_API_KEY }}
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+      VOICE_SERVICE: ${{ secrets.VOICE_AGENT_SERVICE || vars.VOICE_AGENT_SERVICE || 'tori-voice-agent' }}
+      API: https://api.cartesia.ai
+      VERSION: "2026-03-01"
+    steps:
+      - name: Is anything configured
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::CARTESIA_API_KEY is not set (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+
+      - name: Create the dictionary
+        run: |
+          # "sounds-like" guidance rather than IPA: the replacement is Hebrew text handed to a model
+          # that already speaks Hebrew, so spelling it in Hebrew is both the simplest thing that can
+          # work and the one a person can read six months from now.
+          body=$(jq -nc '{
+            name: "tori-hebrew-symbols",
+            entries: [ { text: "@", pronunciation: "שטרודל" } ]
+          }')
+
+          code=$(curl -sS -o /tmp/dict.json -w '%{http_code}' -X POST "$API/pronunciation-dicts" \
+            -H "X-API-Key: $KEY" -H "Cartesia-Version: $VERSION" -H "Content-Type: application/json" \
+            --data "$body" || echo "000")
+          echo "POST /pronunciation-dicts → $code"
+
+          if [ "$code" != "200" ] && [ "$code" != "201" ]; then
+            # Printed in full: this is our own dictionary definition, there is nothing secret in it,
+            # and the field names are exactly what a rejection is usually about.
+            echo "  response: $(head -c 400 /tmp/dict.json)"
+            echo "::error::Cartesia rejected the dictionary. If the complaint is about a field name, the shape here was inferred from the capability guide rather than from a request schema — check /api-reference/pronunciation-dicts/create."
+            exit 1
+          fi
+
+          id=$(jq -r '.id // .dict_id // ""' /tmp/dict.json)
+          if [ -z "$id" ]; then
+            echo "  response keys: $(jq -rc 'keys' /tmp/dict.json 2>/dev/null || echo '?')"
+            echo "::error::Created, but no id in the response — cannot wire it up. Keys are above."
+            exit 1
+          fi
+          echo "DICT_ID=$id" >> "$GITHUB_ENV"
+          echo "::notice::Dictionary $id created: @ → שטרודל"
+
+      - name: Point the agent at it
+        if: inputs.apply
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::warning::RAILWAY_TOKEN is not set. The dictionary exists — set CARTESIA_PRONUNCIATION_DICT_ID=$DICT_ID on the voice service by hand."
+            exit 0
+          fi
+          npm i -g @railway/cli
+
+          out=$(railway domain --service "$VOICE_SERVICE" --environment "$RAILWAY_ENVIRONMENT" 2>&1) || true
+          url=$(printf '%s' "$out" | grep -oE 'https://[a-z0-9.-]+\.up\.railway\.app' | head -1 || true)
+          was=""
+          if [ -n "$url" ]; then
+            was=$(curl -sS --max-time 10 "$url/health" 2>/dev/null | jq -r '.started_at // ""' || true)
+          fi
+
+          railway variables --service "$VOICE_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+            --set "CARTESIA_PRONUNCIATION_DICT_ID=$DICT_ID"
+
+          if [ -z "$url" ]; then
+            echo "::warning::Variable set, but the agent's domain could not be read — confirm /health by hand."
+            exit 0
+          fi
+
+          # Waiting for the restart, not for an answer: Railway keeps the old container serving
+          # until the new one is healthy, so /health answers perfectly from a process that has never
+          # seen the variable.
+          echo "Waiting for the agent to restart…"
+          for i in $(seq 1 30); do
+            sleep 10
+            body=$(curl -sS --max-time 10 "$url/health" 2>/dev/null || true)
+            now=$(echo "$body" | jq -r '.started_at // ""' 2>/dev/null || true)
+            if echo "$body" | jq -e '.ok' >/dev/null 2>&1 && [ -n "$now" ] && [ "$now" != "$was" ]; then
+              echo "$body" | jq .
+              if [ "$(echo "$body" | jq -r '.pronunciation_dict')" = "true" ]; then
+                echo "::notice::Live. The next call will speak @ as שטרודל even if the model writes the symbol."
+              else
+                echo "::error::The agent restarted without the dictionary — the variable did not reach it."
+                exit 1
+              fi
+              exit 0
+            fi
+          done
+          echo "::warning::Could not see the agent restart within five minutes. Check $url/health for pronunciation_dict."
