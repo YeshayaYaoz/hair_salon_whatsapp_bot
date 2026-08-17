@@ -22,6 +22,10 @@ on:
         description: "Also read our own database — did the calls Cartesia lists actually land here"
         type: boolean
         default: true
+      call_id:
+        description: "Fetch one call's runtime logs (ac_...) — what a tool was actually handed, when a call did something unexpected"
+        type: string
+        default: ""
 
 jobs:
   usage:
@@ -127,4 +131,33 @@ jobs:
           npx prisma generate >/dev/null 2>&1
           railway run --service "$BACKEND_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
             npx tsx scripts/voice-usage-probe.ts 10
+
+      # Why a call did what it did, from the runtime's own log rather than from the LLM's summary of
+      # it. The summary said photos "could not be sent to email"; only this says what the tool was
+      # handed and what it answered.
+      #
+      # This log contains the conversation, including whatever a caller read out — an address, a
+      # name. It is printed only when a call is named explicitly, and only the lines that mention a
+      # tool or an error, so asking about one call does not dump a customer's conversation into a
+      # build log.
+      - name: One call's runtime logs
+        if: inputs.call_id != ''
+        env:
+          CALL_ID: ${{ inputs.call_id }}
+        run: |
+          code=$(curl -sS -o /tmp/logs.json -w '%{http_code}' "$API/agents/calls/$CALL_ID/logs" \
+            -H "Authorization: Bearer $KEY" -H "Cartesia-Version: $VERSION" || echo "000")
+          echo "GET /agents/calls/$CALL_ID/logs → $code"
+          if [ "$code" != "200" ]; then
+            echo "  $(jq -r '.title // .message // ""' /tmp/logs.json 2>/dev/null | head -c 200)"
+            exit 0
+          fi
+
+          echo "  top-level: $(jq -rc 'if type == "array" then ["(array)"] else keys end' /tmp/logs.json)"
+          # Whatever shape the logs come in, reduce to text lines and keep the ones about tools and
+          # failures. `tostring` rather than a field guess: one unknown key name should not turn
+          # this into an empty result.
+          jq -r '[.. | strings] | .[]' /tmp/logs.json 2>/dev/null \
+            | grep -iE 'send.?details|tool|error|fail|invalid|400|409|email' \
+            | head -40 || echo "  (nothing matching tool or error lines)"
 
