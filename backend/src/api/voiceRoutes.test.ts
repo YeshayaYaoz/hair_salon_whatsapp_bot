@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import request from "supertest";
 import express from "express";
 import { cachedHebrewVoices } from "../lib/cartesiaAdmin.js";
@@ -96,6 +96,42 @@ describe("POST /api/voice/context", () => {
       .set("Authorization", "Bearer wrong")
       .send({ calledNumber: "+972501111111", callerNumber: "+972502222222" });
     expect(res.status).toBe(401);
+  });
+
+  // The rotation window: the API and the voice agent hold the shared secret as a variable each, and
+  // changing a variable restarts a service, so they cannot switch over at the same instant. Without
+  // this, every tool call in between is a 401 — the bot going silent on a live caller.
+  describe("during a rotation", () => {
+    afterEach(() => {
+      delete process.env.CARTESIA_TOOL_SECRET_PREVIOUS;
+    });
+
+    async function post(bearer: string) {
+      return request(app)
+        .post("/api/voice/context")
+        .set("Authorization", `Bearer ${bearer}`)
+        .send({ calledNumber: "+972509999999", callerNumber: "+972502222222" });
+    }
+
+    it("accepts the previous secret while it is still set", async () => {
+      process.env.CARTESIA_TOOL_SECRET_PREVIOUS = "old-secret";
+      // Anything but 401 — the request reached the handler, which is all auth is being asked. What
+      // it answers there depends on a lookup this test deliberately does not stage.
+      expect((await post("old-secret")).status).not.toBe(401);
+      expect((await post("test-secret")).status).not.toBe(401);
+    });
+
+    it("stops accepting it once the rotation workflow drops it", async () => {
+      expect((await post("old-secret")).status).toBe(401);
+    });
+
+    // An unset variable reads as "" in a shell, and Railway keeps a variable set to an empty string
+    // rather than removing it — so `Bearer ` must not be a way in.
+    it("never treats a blank value as a secret", async () => {
+      process.env.CARTESIA_TOOL_SECRET_PREVIOUS = "   ";
+      expect((await post("")).status).toBe(401);
+      expect((await post("   ")).status).toBe(401);
+    });
   });
 
   it("404s when no business has that voice number configured", async () => {
