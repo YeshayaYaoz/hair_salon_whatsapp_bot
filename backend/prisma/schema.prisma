@@ -88,6 +88,15 @@ model Business {
   // own default — which is what every salon got before this existed, so leaving it unset changes
   // nothing. The agent applies it per call, so one shared agent can still sound different per salon.
   voiceId                   String?
+  // Which language the phone bot TRANSCRIBES callers in — "he", "en", or "multilingual".
+  //
+  // Not cosmetic. Speech recognition pinned to the language actually being spoken is markedly more
+  // accurate than one left to guess, and an unpinned transcriber handed Latin letters inside Hebrew
+  // speech produced a repetition loop on a real call. But a salon whose callers switch between
+  // Hebrew and English cannot be pinned to either, and for them "multilingual" — Cartesia's own
+  // auto-detect at the transcription layer — is the right trade: more forgiving, less exact.
+  // Defaults to Hebrew, which is what every existing salon is.
+  voiceLanguage             String    @default("he")
   whatsappAccessToken       String? // encrypted at rest
   whatsappTokenValid        Boolean   @default(true) // set false when Meta rejects the token (expired/revoked)
   // Captured directly off the Embedded Signup postMessage event at connect time. Re-deriving this

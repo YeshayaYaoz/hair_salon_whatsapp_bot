@@ -640,7 +640,12 @@ async def pre_call_handler(call_request: CallRequest) -> Optional[PreCallResult]
     # the words "שטרודל", "ג'ימייל" and "נקודה" entirely.
     #
     # Language is the only STT option the config exposes; the model itself cannot be chosen here.
-    stt: Dict[str, Any] = {"language": LANGUAGE}
+    #
+    # Per salon, because it is not one answer. A Hebrew-only salon transcribes best pinned to "he".
+    # A salon whose callers switch between Hebrew and English cannot be pinned to either, and for it
+    # Cartesia's own "multilingual" is the right trade — more forgiving, less exact per language.
+    # That is the owner's call, and it is a setting on their Bot page.
+    stt: Dict[str, Any] = {"language": (resolved.get("context") or {}).get("voiceLanguage") or LANGUAGE}
 
     # Still sent, in case Cartesia starts echoing it back; get_agent prefers it when present.
     return PreCallResult(metadata={"tori": resolved}, config={"tts": tts, "stt": stt})

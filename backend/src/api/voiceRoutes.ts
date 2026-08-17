@@ -208,7 +208,7 @@ voiceRouter.post("/context", async (req, res) => {
       select: {
         name: true, timezone: true, address: true, botGreeting: true, botPersonality: true,
         cancellationPolicy: true, businessType: true, bookingModel: true, availabilityInfo: true, notificationPhone: true,
-        voiceId: true,
+        voiceId: true, voiceLanguage: true,
         // Same three the WhatsApp prompt already has. Without them the agent is asked questions it
         // structurally cannot answer — "how many people fit", "how do I get there", "what about a
         // 3-night stay" — and an agent with no data and a caller waiting tends to invent one.
@@ -300,6 +300,10 @@ voiceRouter.post("/context", async (req, res) => {
     // response. Null means the agent keeps its own default, which is what every salon had before
     // the setting existed.
     voiceId: full.voiceId,
+    // Which language to transcribe the caller in. The agent passes this straight to Cartesia's STT
+    // config, so a salon serving tourists can be set to "multilingual" while a Hebrew-only one stays
+    // pinned to "he" — which transcribes Hebrew markedly better than any auto-detect.
+    voiceLanguage: full.voiceLanguage,
     /** Which gender the agent should speak about *itself* in. A feminine voice saying "אני מעביר"
      * is jarring in a way an English agent never is, because Hebrew marks gender on every verb.
      * Derived from the Cartesia catalogue rather than stored, so it always matches the voice

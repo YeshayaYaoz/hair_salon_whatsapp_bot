@@ -715,6 +715,10 @@ const profileSchema = z.object({
   // the live catalogue below — the format alone proves nothing, and an ID that does not resolve
   // fails during a call, in front of a customer.
   voiceId: z.string().max(100).nullable().optional(),
+  // An enum, not a free string: this value is passed straight to Cartesia's speech-recognition
+  // config, and an unrecognised code there fails at the worst possible moment — mid-call, on a
+  // caller the salon is trying to win.
+  voiceLanguage: z.enum(["he", "en", "multilingual"]).optional(),
 });
 
 // Hebrew voices the phone bot can speak in, for the Bot page's voice picker. Empty when Cartesia is
