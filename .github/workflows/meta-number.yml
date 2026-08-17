@@ -12,7 +12,7 @@ on:
       action:
         description: "Which step to run"
         type: choice
-        options: [status, list, templates, library, discover-templates, add, rename, remove, request-code, verify, verify-from-call, register]
+        options: [status, list, templates, library, discover-templates, wiring, add, rename, remove, request-code, verify, verify-from-call, register]
         default: status
       number:
         description: "Number in international format"
@@ -73,7 +73,7 @@ jobs:
             status)       args=() ;;
             list)         args=(--list) ;;
             # Handled further down by a different script; nothing to build here.
-            templates|library|discover-templates) args=() ;;
+            templates|library|discover-templates|wiring) args=() ;;
             add)          args=(--name "$NAME") ;;
             rename)       args=(--rename "$NAME") ;;
             # The script refuses on a CONNECTED or VERIFIED line regardless; --force is deliberately
@@ -113,6 +113,12 @@ jobs:
             templates) npx tsx scripts/meta-templates.ts "${waba_args[@]}"; exit $? ;;
             library)   npx tsx scripts/meta-templates.ts --library "${waba_args[@]}"; exit $? ;;
             discover-templates) npx tsx scripts/meta-templates.ts --discover "${waba_args[@]}"; exit $? ;;
+            # Needs the database, which lives in Railway rather than in Actions secrets.
+            wiring)
+              npm i -g @railway/cli >/dev/null 2>&1
+              railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+                npx tsx scripts/whatsapp-wiring.ts
+              exit $? ;;
           esac
 
           npx tsx scripts/meta-add-number.ts --number "$NUMBER" "${waba_args[@]}" "${args[@]}"
