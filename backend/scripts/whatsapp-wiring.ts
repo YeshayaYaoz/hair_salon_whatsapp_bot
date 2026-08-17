@@ -4,18 +4,53 @@
  * Usage (from backend/):
  *   railway run npx tsx scripts/whatsapp-wiring.ts
  *
- * The WABA listing and this table answer different questions, and confusing them is how a number
- * gets called abandoned while a customer is using it: Meta's listing says what is attached to *one*
- * WABA, and a number sitting there PENDING/NOT_VERIFIED looks abandoned. But a business can be
- * live on a different WABA, or on the WhatsApp Business *app*, which is not in the Graph API at all.
- * This table is what our own sending code reads, so it is the one that says what is in service.
+ Two different questions get confused here, and both confusions have already caused a working
+ * business to be called broken:
  *
- * Read-only. Tokens are reported as present/absent, never printed.
+ *   - A WABA listing covers ONE account. A number sitting in it PENDING/NOT_VERIFIED looks
+ *     abandoned, while the same number is live on a different WABA entirely.
+ *   - Our own columns record what OUR code did. whatsappRegisteredAt is null for every business
+ *     that connected through Embedded Signup or was set up by hand, and those are working.
+ *
+ * So this prints both sides: what we have stored, and — using each business's own token — what Meta
+ * says about that exact line. Meta's answer is the one that decides whether messages flow.
+ *
+ * Read-only. Tokens are decrypted only to authenticate the check, and never printed.
  */
 
 import { PrismaClient } from "@prisma/client";
+import { decryptSecret } from "../src/lib/crypto.js";
 
 const prisma = new PrismaClient();
+
+const GRAPH = "https://graph.facebook.com/v23.0";
+
+/**
+ * What Meta says about the line, which is the only thing that decides whether messages flow.
+ *
+ * Our own whatsappRegisteredAt records that *our* registration call ran. A business that came
+ * through Embedded Signup, or was registered by hand in WhatsApp Manager, is live with that column
+ * still null — so reading it as connectivity reports working businesses as broken. It happened
+ * twice in one session.
+ */
+async function askMeta(phoneNumberId: string, token: string): Promise<string> {
+  try {
+    const res = await fetch(
+      `${GRAPH}/${phoneNumberId}?fields=display_phone_number,verified_name,status,code_verification_status,platform_type,quality_rating`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    const error = json.error as { message?: string } | undefined;
+    if (error) return `Meta: ERROR — ${error.message}`;
+    return [
+      `Meta: ${json.display_phone_number} "${json.verified_name}"`,
+      `        line ${json.status} / verification ${json.code_verification_status}`,
+      `        platform ${json.platform_type ?? "?"} / quality ${json.quality_rating ?? "?"}`,
+    ].join("\n");
+  } catch (err) {
+    return `Meta: unreachable — ${(err as Error).message}`;
+  }
+}
 
 async function main() {
   const businesses = await prisma.business.findMany({
@@ -38,8 +73,21 @@ async function main() {
     console.log(`    whatsapp phone number id: ${b.whatsappPhoneNumberId ?? "— none —"}`);
     console.log(`    whatsapp WABA id:         ${b.whatsappWabaId ?? "— none —"}`);
     console.log(`    access token:             ${b.whatsappAccessToken ? "set" : "— none —"}${b.whatsappTokenValid ? "" : " (marked INVALID)"}`);
-    console.log(`    registered on Cloud API:  ${b.whatsappRegisteredAt?.toISOString() ?? "never"}`);
+    console.log(`    our registration call ran:  ${b.whatsappRegisteredAt?.toISOString() ?? "never (does NOT mean disconnected)"}`);
     console.log(`    voice number:             ${b.voicePhoneNumber ?? "— none —"}`);
+    if (b.whatsappPhoneNumberId && b.whatsappAccessToken) {
+      let token: string;
+      try {
+        token = decryptSecret(b.whatsappAccessToken);
+      } catch (err) {
+        console.log(`    Meta: cannot check — token will not decrypt (${(err as Error).message})`);
+        console.log("");
+        continue;
+      }
+      console.log(`    ${await askMeta(b.whatsappPhoneNumberId, token)}`);
+    } else {
+      console.log("    Meta: not checked — no phone number id or no token stored");
+    }
     console.log("");
   }
 }
