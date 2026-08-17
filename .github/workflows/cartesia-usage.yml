@@ -58,13 +58,19 @@ jobs:
               echo "   record fields: $(jq -rc 'if type == "array" then .[0] else .data[0] end | keys' /tmp/out.json)"
             fi
 
+            # Which salon a call belongs to has to come from the number that was dialled — one
+            # shared agent answers for every business — so the field carrying it is named here.
+            # Key names only: the values are real phone numbers.
+            echo "   telephony_params fields: $(jq -rc '(if type == "array" then .[0] else .data[0] end).telephony_params | if type == "object" then keys else type end' /tmp/out.json 2>/dev/null || echo '?')"
+
             if [ "${{ inputs.shape_only }}" != "true" ]; then
-              # Durations and dates only — the numbers this whole workflow is for. jq's `//` picks
-              # whichever field name the API actually uses without needing to know it in advance.
+              # There is no duration field — a call is a start_time and an end_time, and the
+              # billable minutes are the difference. That subtraction is the whole point of this.
               jq -r '
-                (if type == "array" then . elif (.data? | type) == "array" then .data else [.] end)
-                | .[]
-                | "   \(.created_at // .started_at // .date // "?")  \(.duration_seconds // .duration // .seconds // .minutes // "?")"
+                (if type == "array" then . else .data end) | .[]
+                | "   \(.start_time)  →  \(.end_time // "(open)")   \(
+                    if .end_time then ((.end_time | fromdateiso8601) - (.start_time | fromdateiso8601) | tostring + "s") else "-" end
+                  )   \(.status)/\(.end_reason // "-")"
               ' /tmp/out.json 2>/dev/null | head -20 || true
             fi
           done
