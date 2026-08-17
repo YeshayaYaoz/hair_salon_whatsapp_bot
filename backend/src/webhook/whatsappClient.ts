@@ -388,7 +388,18 @@ export async function createMessageTemplate(
     if (!deleted) {
       return { name: params.name, submitted: false, error: `Template is REJECTED and could not be deleted to resubmit` };
     }
-    return createMessageTemplate(wabaId, accessToken, params, true);
+    // Deletion at Meta is asynchronous: the DELETE returns success while the old content is still
+    // being removed, and creating in that gap answers "New Hebrew content can't be added while the
+    // existing Hebrew content is being deleted." Meta's own message says under a minute, so this
+    // waits it out rather than reporting a failure that only means "too soon".
+    const settleMs = Number(process.env.WHATSAPP_TEMPLATE_DELETE_SETTLE_MS ?? 6000);
+    let last: CreateTemplateResult | null = null;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      await new Promise((r) => setTimeout(r, settleMs));
+      last = await createMessageTemplate(wabaId, accessToken, params, true);
+      if (last.submitted || !/being deleted/i.test(last.error ?? "")) return last;
+    }
+    return last ?? { name: params.name, submitted: false, error: "Template deletion never settled" };
   }
   return { name: params.name, submitted: false, error: message };
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { createMessageTemplate, countTemplateVariables } from "./whatsappClient.js";
 
 /**
@@ -19,6 +19,8 @@ describe("countTemplateVariables", () => {
 
 describe("createMessageTemplate", () => {
   afterEach(() => vi.unstubAllGlobals());
+  // The real wait is seconds long, on purpose. Tests assert the retry happens, not how long it naps.
+  beforeEach(() => { process.env.WHATSAPP_TEMPLATE_DELETE_SETTLE_MS = "0"; });
 
   it("refuses to submit a template whose variables have no examples", async () => {
     // Meta requires one sample per variable and rejects the whole template without them. Our four
@@ -119,6 +121,33 @@ describe("createMessageTemplate", () => {
     expect(calls).toContain("DELETE byName");
     expect(result.submitted).toBe(true);
     expect(result.status).toBe("PENDING");
+  });
+
+  it("waits out an asynchronous deletion rather than failing on it", async () => {
+    // Meta's DELETE returns success while the old content is still going away, and a create in that
+    // gap is refused with a message that only means "too soon".
+    let creates = 0;
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: { method?: string }) => {
+      const method = init?.method ?? "GET";
+      if (method === "POST") {
+        creates += 1;
+        if (creates === 1) return new Response(JSON.stringify({ error: { message: "Template name already exists" } }), { status: 400 });
+        if (creates === 2) {
+          return new Response(JSON.stringify({ error: { message: "New Hebrew content can't be added while the existing Hebrew content is being deleted." } }), { status: 400 });
+        }
+        return new Response(JSON.stringify({ id: "1", status: "PENDING" }));
+      }
+      if (method === "DELETE") return new Response(JSON.stringify({ success: true }));
+      return new Response(JSON.stringify({ data: [{ status: "REJECTED", language: "he" }] }));
+    }));
+
+    const result = await createMessageTemplate("waba", "tok", {
+      name: "t", languageCode: "he", bodyText: "שלום {{1}}", bodyExample: ["נועה"],
+    });
+
+    expect(result.submitted).toBe(true);
+    expect(result.status).toBe("PENDING");
+    expect(creates).toBe(3);
   });
 
   it("leaves an APPROVED template alone", async () => {
