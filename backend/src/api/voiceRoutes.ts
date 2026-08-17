@@ -12,6 +12,8 @@ import { buildServiceDetailsMessage } from "../lib/serviceDetailsMessage.js";
 import { normalizePhone } from "../lib/phone.js";
 // The same reason phone.ts exists, for the other identifier a caller reads out loud.
 import { normalizeSpokenEmail } from "../lib/spokenEmail.js";
+// Owners quote their unit names on a sign; callers say the name inside the quotes. See serviceMatch.
+import { matchServiceName, unknownServiceMessage, ambiguousServiceMessage } from "../lib/serviceMatch.js";
 import { cachedHebrewVoices } from "../lib/cartesiaAdmin.js";
 import { notifyOwner } from "../lib/ownerNotify.js";
 import { logClaudeUsage } from "../lib/usageLedger.js";
@@ -349,11 +351,13 @@ voiceRouter.post("/check-availability", async (req, res) => {
   if (rejectIfNotEntitled(business, res)) return;
   if (rejectIfInquiry(business, res)) return;
 
-  const service = await prisma.service.findFirst({ where: { businessId: business.id, name: { equals: parsed.data.serviceName, mode: "insensitive" } } });
-  if (!service) {
-    const all = await prisma.service.findMany({ where: { businessId: business.id }, select: { name: true } });
-    return res.status(404).json({ error: "Unknown service", availableServices: all.map((s) => s.name) });
+  const allServices = await prisma.service.findMany({ where: { businessId: business.id } });
+  const svcMatch = matchServiceName(parsed.data.serviceName, allServices);
+  if (svcMatch.kind === "ambiguous") return res.status(409).json({ error: ambiguousServiceMessage(svcMatch.candidates) });
+  if (svcMatch.kind === "none") {
+    return res.status(404).json({ error: unknownServiceMessage(allServices), availableServices: allServices.map((x) => x.name) });
   }
+  const service = svcMatch.service;
 
   let staffId: string | undefined;
   if (parsed.data.staffName) {
@@ -392,8 +396,11 @@ voiceRouter.post("/book", async (req, res) => {
   if (rejectIfNotEntitled(business, res)) return;
   if (rejectIfInquiry(business, res)) return;
 
-  const service = await prisma.service.findFirst({ where: { businessId: business.id, name: { equals: parsed.data.serviceName, mode: "insensitive" } } });
-  if (!service) return res.status(404).json({ error: "Unknown service" });
+  const bookable = await prisma.service.findMany({ where: { businessId: business.id } });
+  const bookMatch = matchServiceName(parsed.data.serviceName, bookable);
+  if (bookMatch.kind === "ambiguous") return res.status(409).json({ error: ambiguousServiceMessage(bookMatch.candidates) });
+  if (bookMatch.kind === "none") return res.status(404).json({ error: unknownServiceMessage(bookable) });
+  const service = bookMatch.service;
 
   let staffId: string | null | undefined;
   if (parsed.data.staffName) {
@@ -503,7 +510,10 @@ voiceRouter.post("/reschedule", async (req, res) => {
 
   let newServiceId: string | undefined;
   if (parsed.data.newServiceName) {
-    const service = await prisma.service.findFirst({ where: { businessId: business.id, name: { equals: parsed.data.newServiceName, mode: "insensitive" } } });
+    const reschedulable = await prisma.service.findMany({ where: { businessId: business.id } });
+    const reMatch = matchServiceName(parsed.data.newServiceName, reschedulable);
+    if (reMatch.kind === "ambiguous") return res.status(409).json({ error: ambiguousServiceMessage(reMatch.candidates) });
+    const service = reMatch.kind === "none" ? null : reMatch.service;
     if (!service) return res.status(404).json({ error: "Unknown service" });
     newServiceId = service.id;
   }
@@ -623,11 +633,14 @@ voiceRouter.post("/send-details", async (req, res) => {
   if (!business) return res.status(404).json({ error: "No salon configured for this number" });
   if (rejectIfNotEntitled(business, res)) return;
 
-  const service = await prisma.service.findFirst({
-    where: { businessId: business.id, name: { equals: parsed.data.serviceName, mode: "insensitive" } },
+  const candidates = await prisma.service.findMany({
+    where: { businessId: business.id },
     select: { name: true, description: true, priceCents: true, maxGuests: true, imageUrls: true, linkUrl: true },
   });
-  if (!service) return res.status(404).json({ error: "Unknown service" });
+  const matched = matchServiceName(parsed.data.serviceName, candidates);
+  if (matched.kind === "ambiguous") return res.status(409).json({ error: ambiguousServiceMessage(matched.candidates) });
+  if (matched.kind === "none") return res.status(404).json({ error: unknownServiceMessage(candidates) });
+  const service = matched.service;
 
   const full = await prisma.business.findUniqueOrThrow({
     where: { id: business.id },
