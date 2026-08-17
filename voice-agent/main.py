@@ -1255,9 +1255,20 @@ def build_agent(resolved: Dict[str, Any], called: str, caller_num: str) -> LlmAg
         ctx,
         service_name: Annotated[str, "שם היחידה או השירות בדיוק כפי שמופיע ברשימה"],
         channel: Annotated[str, 'לאן לשלוח: "whatsapp" או "email"'],
-        to_email: Annotated[str, "כתובת המייל של המתקשר — חובה בערוץ email, אחרי שאישר אותה"] = "",
+        to_email: Annotated[str, "כתובת המייל של המתקשר — חובה בערוץ email"] = "",
+        email_confirmed: Annotated[bool, "חובה בערוץ email: האם חזרת על הכתובת בקול והמתקשר אמר שהיא נכונה? true רק אחרי שהוא אישר במילים"] = False,
     ):
         """שולח למתקשר את הפרטים והתמונות של יחידה — לוואטסאפ שלו או למייל שלו — עכשיו, בזמן השיחה."""
+        # A gate, not a request. The prompt has always said "read the address back and get a yes
+        # before sending", and on a live call the model skipped straight to the send — a prompt is
+        # advice, and advice loses to momentum. A parameter the tool refuses to work without is the
+        # difference between asking for the confirmation step and requiring it. The model can still
+        # lie, but it has to lie explicitly, which models are far worse at than merely forgetting.
+        if channel == "email" and not email_confirmed:
+            return (
+                'עצור — עוד לא שלחתי. קודם חזור על הכתובת בקול, במילים עבריות ("שטרודל" בשביל @), '
+                "וחכה שהמתקשר יגיד שהיא נכונה. רק אחרי שאישר — קרא שוב עם email_confirmed=true."
+            )
         payload: Dict[str, Any] = {"calledNumber": called, "serviceName": service_name, "channel": channel}
         if channel == "whatsapp":
             payload["callerNumber"] = caller_num
