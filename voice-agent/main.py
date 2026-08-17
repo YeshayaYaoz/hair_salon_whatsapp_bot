@@ -84,6 +84,10 @@ TOOL_SECRET = os.environ.get("CARTESIA_TOOL_SECRET", "")
 MODEL = os.environ.get("TORI_AGENT_MODEL", "anthropic/claude-haiku-4-5-20251001")
 _KEY_BY_PROVIDER = {"anthropic": "ANTHROPIC_API_KEY", "deepseek": "DEEPSEEK_API_KEY"}
 
+# Import time, so it identifies the process rather than the request. Reported by /health — see the
+# note there for what it is for.
+STARTED_AT = datetime.now(ZoneInfo("UTC")).isoformat()
+
 
 def _model_api_key(model: str) -> tuple[str, str]:
     """
@@ -1331,6 +1335,13 @@ app = VoiceAgentApp(get_agent=get_agent, pre_call_handler=pre_call_handler)
 def health():
     return {
         "ok": True,
+        # When this process booted, which is the only way to tell it apart from the one it replaced.
+        # Railway keeps the old container serving until the new one is healthy, so for a minute
+        # after a variable change /health answers perfectly — from a process that has never seen the
+        # new value. A secret rotation waiting on "is it up" got exactly that answer 200ms after
+        # setting the variable, and then failed proving the change had landed. The backend reports
+        # the same field for the same reason.
+        "started_at": STARTED_AT,
         "model": MODEL,
         # The one variable whose absence breaks every call, and the one this endpoint used to omit.
         # LlmAgent refuses to construct without a key, so a deployment missing it answers the phone
