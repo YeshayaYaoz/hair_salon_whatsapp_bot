@@ -370,7 +370,11 @@ export async function createMessageTemplate(
   if (res.ok) return { name: params.name, submitted: true, status: body.status };
 
   const message = body.error?.error_user_msg ?? body.error?.message ?? "Unknown error";
-  if (/already exists/i.test(message)) {
+  // Meta phrases the duplicate differently depending on the endpoint and the language: "Template
+  // name already exists" in some cases, "There is already Hebrew content for this template" in
+  // others. Matching only the first left the second falling through as a hard failure — which is
+  // what the reminder template did on its first real resubmission.
+  if (/already exists|already \w+ content for this template/i.test(message)) {
     // "Already exists" was treated as success, on the reasoning that the desired state is achieved.
     // It is not achieved when the existing template is REJECTED: the name is taken, nothing sends
     // under it, and the retry button reports success — which is how a live business ran for weeks

@@ -160,7 +160,10 @@ const STAY_WORDING: TemplateWording = {
     example: ["דנה", "סוויטת הגליל", "שישי 15.8", "צימר בנחת רוח"],
   },
   review: {
-    body: "היי {{1}}, תודה שהתארחתם ב{{2}}. נשמח לשמוע איך הייתה השהות ב{{3}}.",
+    // "…השהות ב{{3}}." was rejected: Meta counts a variable as ending the body even with
+    // punctuation after it, so trailing "." does not save it. The appointment variant survived only
+    // because it happens to end "…ה{{3}} שלך."
+    body: "היי {{1}}, תודה שהתארחתם ב{{2}}. נשמח לשמוע איך הייתה השהות ב{{3}} שלכם.",
     example: ["דנה", "צימר בנחת רוח", "סוויטת הגליל"],
   },
   confirmation: {

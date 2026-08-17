@@ -39,10 +39,14 @@ describe.each(BODIES)("the %s template body is submittable", (_name, body, examp
     expect(example).toHaveLength(count);
   });
 
-  it("does not start or end with a parameter", () => {
-    // Meta calls this a dangling parameter and rejects it outright.
-    expect(body.trimStart().startsWith("{{")).toBe(false);
-    expect(body.trimEnd().endsWith("}}")).toBe(false);
+  it("does not start or end with a parameter, punctuation included", () => {
+    // Meta calls this a dangling parameter and rejects it outright — and counts a trailing "." as
+    // punctuation rather than as text, so "…ב{{3}}." is still dangling. Checking the raw ends let
+    // exactly that body through, and Meta answered "Variables can't be at the start or end of the
+    // template."
+    const core = body.replace(/^[\s.,!?—–-]+/u, "").replace(/[\s.,!?—–-]+$/u, "");
+    expect(core.startsWith("{{")).toBe(false);
+    expect(core.endsWith("}}")).toBe(false);
   });
 
   it("numbers its parameters from 1 with no gaps", () => {
