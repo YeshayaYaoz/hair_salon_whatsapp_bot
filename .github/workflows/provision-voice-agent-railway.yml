@@ -27,6 +27,10 @@ on:
         description: "Upload and build voice-agent/ after creating the service"
         type: boolean
         default: true
+      model:
+        description: "TORI_AGENT_MODEL to set (blank = leave whatever the service already has)"
+        type: string
+        default: ""
 
 jobs:
   provision:
@@ -56,6 +60,8 @@ jobs:
         ${{ secrets.ANTHROPIC_API_KEY || vars.ANTHROPIC_API_KEY
          || secrets.TORI_AGENT_API_KEY || vars.TORI_AGENT_API_KEY }}
       AGENT_GENDER: ${{ secrets.TORI_AGENT_GENDER || vars.TORI_AGENT_GENDER || 'masculine' }}
+      DEEPSEEK_KEY: ${{ secrets.DEEPSEEK_API_KEY || vars.DEEPSEEK_API_KEY }}
+      MODEL_NAME: ${{ inputs.model }}
     steps:
       - uses: actions/checkout@v4
 
@@ -159,6 +165,33 @@ jobs:
           else missing="$missing ANTHROPIC_API_KEY"; fi
 
           railway variables --set "TORI_AGENT_GENDER=$AGENT_GENDER" $args
+
+          # DeepSeek's key, on the same terms as the model key: GitHub first, the backend second.
+          # The backend is where it has always lived — the WhatsApp bot runs on it — so switching
+          # the voice agent to DeepSeek does not need anyone to find and paste a key.
+          #
+          # Both keys can sit on the service at once. main.py picks the one matching the provider
+          # in TORI_AGENT_MODEL, so the idle one is inert rather than dangerous, and switching back
+          # is one variable rather than a key swap.
+          if [ -z "$DEEPSEEK_KEY" ]; then
+            found=$(printf '%s' "$backend_vars" | jq -r '.DEEPSEEK_API_KEY // ""' 2>/dev/null || echo "")
+            if [ -n "$found" ]; then
+              echo "::add-mask::$found"
+              DEEPSEEK_KEY="$found"
+              echo "::notice::DeepSeek key taken from DEEPSEEK_API_KEY on $BACKEND_SERVICE."
+            fi
+          fi
+          if [ -n "$DEEPSEEK_KEY" ]; then railway variables --set "DEEPSEEK_API_KEY=$DEEPSEEK_KEY" $args; fi
+
+          # Only when asked. Blank leaves whatever the service already has, so a routine
+          # re-provision cannot silently move the phone line onto a different model.
+          if [ -n "$MODEL_NAME" ]; then
+            railway variables --set "TORI_AGENT_MODEL=$MODEL_NAME" $args
+            echo "::notice::TORI_AGENT_MODEL set to $MODEL_NAME. /health reports model_key_from — check it names that provider's variable."
+            if [ "${MODEL_NAME#deepseek/}" != "$MODEL_NAME" ] && [ -z "$DEEPSEEK_KEY" ]; then
+              echo "::error::Switching to $MODEL_NAME with no DeepSeek key anywhere. The agent refuses to build without the key its provider needs, so the health check below will fail rather than let this answer a call."
+            fi
+          fi
 
           if [ -n "$missing" ]; then
             echo "::warning::Not set, because nothing holds them — not GitHub, and not the backend service:$missing"
