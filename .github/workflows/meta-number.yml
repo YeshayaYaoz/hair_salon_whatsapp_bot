@@ -12,7 +12,7 @@ on:
       action:
         description: "Which step to run"
         type: choice
-        options: [status, list, templates, library, discover-templates, wiring, submit-outreach-template, add, rename, remove, request-code, verify, verify-from-call, register]
+        options: [status, list, templates, library, discover-templates, wiring, submit-outreach-template, resubmit-templates, add, rename, remove, request-code, verify, verify-from-call, register]
         default: status
       number:
         description: "Number in international format"
@@ -31,6 +31,13 @@ on:
         type: choice
         options: [SMS, VOICE]
         default: SMS
+      business:
+        description: "Business id (resubmit-templates) — blank lists them"
+        default: ""
+      confirm:
+        description: "Actually submit (resubmit-templates). Unticked prints the bodies only."
+        type: boolean
+        default: false
 
 jobs:
   run:
@@ -60,6 +67,8 @@ jobs:
           NAME: ${{ inputs.name }}
           CODE: ${{ inputs.code }}
           CODE_METHOD: ${{ inputs.code_method }}
+          BUSINESS: ${{ inputs.business }}
+          CONFIRM: ${{ inputs.confirm && 'yes' || '' }}
         run: |
           # Single-use and short-lived, but a verification code in a build log is still a
           # credential sitting where anyone with repo read access can find it later.
@@ -73,7 +82,7 @@ jobs:
             status)       args=() ;;
             list)         args=(--list) ;;
             # Handled further down by a different script; nothing to build here.
-            templates|library|discover-templates|wiring|submit-outreach-template) args=() ;;
+            templates|library|discover-templates|wiring|submit-outreach-template|resubmit-templates) args=() ;;
             add)          args=(--name "$NAME") ;;
             rename)       args=(--rename "$NAME") ;;
             # The script refuses on a CONNECTED or VERIFIED line regardless; --force is deliberately
@@ -117,6 +126,13 @@ jobs:
             # the full body before sending either way.
             submit-outreach-template)
               npx tsx scripts/submit-outreach-template.ts --confirm
+              exit $? ;;
+            # Needs the database. Without --confirm it prints the four bodies and submits nothing,
+            # so a dispatch with an empty business input is a dry run rather than an accident.
+            resubmit-templates)
+              npm i -g @railway/cli >/dev/null 2>&1
+              railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+                npx tsx scripts/resubmit-templates.ts ${BUSINESS:+--business "$BUSINESS"} ${CONFIRM:+--confirm}
               exit $? ;;
             # Needs the database, which lives in Railway rather than in Actions secrets.
             wiring)
