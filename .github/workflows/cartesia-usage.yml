@@ -35,6 +35,25 @@ jobs:
             exit 1
           fi
 
+          # The account's own consumption, bucketed over time. This is the reading that did not
+          # exist anywhere in the product when the prepaid balance ran out — the calls list below
+          # says what was spent, these say how much is left to spend it from.
+          for path in "/usage/agents" "/usage/credits"; do
+            echo "── GET $path"
+            code=$(curl -sS -o /tmp/u.json -w '%{http_code}' "$API$path" \
+              -H "Authorization: Bearer $KEY" -H "Cartesia-Version: $VERSION" || echo "000")
+            echo "   HTTP $code"
+            if [ "$code" = "200" ]; then
+              echo "   keys: $(jq -rc 'if type == "array" then ["(array)"] else keys end' /tmp/u.json)"
+              # Money and counts only. Whatever the field names turn out to be, this prints the
+              # first two buckets in full — there is nothing personal in an aggregate.
+              jq -rc 'if type == "array" then .[0:2] else (.data? // .buckets? // .)[0:2]? // . end' /tmp/u.json | head -c 900
+              echo
+            else
+              echo "   $(jq -r '.title // .message // ""' /tmp/u.json 2>/dev/null | head -c 160)"
+            fi
+          done
+
           # /agents/calls is a real route — unauthenticated it answers 401, while /calls without the
           # prefix answers 404 — and with the key it answers "Missing agent ID". So the agent is a
           # parameter, and these are the two ways an API of this shape usually takes one. Both are
