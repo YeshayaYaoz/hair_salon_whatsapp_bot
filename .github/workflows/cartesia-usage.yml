@@ -1,0 +1,69 @@
+name: Read Cartesia's own usage
+
+# What Cartesia thinks we have spent, from Cartesia — as opposed to what our ledger measured.
+#
+# The account's prepaid agent dollars ran out without any warning reaching us, because the number
+# that matters (minutes of live call at $0.06 each) was only ever visible by logging into their
+# console. The API key lives in GitHub Secrets and cannot be read from a laptop, so the request
+# that answers "how close are we to the limit" runs here.
+#
+# Read-only. It never changes anything on the account.
+#
+# Caller phone numbers are personal data and are never printed: the shape of a record is dumped by
+# key name, and everything else is a count, a duration, or a date.
+on:
+  workflow_dispatch:
+    inputs:
+      shape_only:
+        description: "Print the field names of one record instead of the numbers (for wiring this into the admin panel)"
+        type: boolean
+        default: false
+
+jobs:
+  usage:
+    runs-on: ubuntu-latest
+    env:
+      KEY: ${{ secrets.CARTESIA_API_KEY || vars.CARTESIA_API_KEY }}
+      AGENT: ${{ secrets.CARTESIA_AGENT_ID || vars.CARTESIA_AGENT_ID }}
+      API: https://api.cartesia.ai
+      VERSION: "2026-03-01"
+    steps:
+      - name: Ask Cartesia
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::CARTESIA_API_KEY is not set (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+
+          # Both are real routes: unauthenticated they answer 401, while /calls and /usage without
+          # the /agents prefix answer 404. Which of them carries per-call duration is the thing this
+          # step exists to find out.
+          for path in "/agents/usage" "/agents/calls?limit=5"; do
+            echo "── GET $path"
+            code=$(curl -sS -o /tmp/out.json -w '%{http_code}' "$API$path" \
+              -H "Authorization: Bearer $KEY" -H "Cartesia-Version: $VERSION" || echo "000")
+            echo "   HTTP $code"
+            if [ "$code" != "200" ]; then
+              echo "   $(jq -r '.title // .message // ""' /tmp/out.json 2>/dev/null | head -c 200)"
+              continue
+            fi
+
+            # Names and structure, never values: one of these responses is a list of real calls
+            # from real people.
+            echo "   top-level keys: $(jq -rc 'if type == "array" then ["(array)"] else keys end' /tmp/out.json)"
+            n=$(jq -r 'if type == "array" then length elif (.data? | type) == "array" then (.data | length) else 0 end' /tmp/out.json)
+            echo "   records: $n"
+            if [ "$n" -gt 0 ]; then
+              echo "   record fields: $(jq -rc 'if type == "array" then .[0] else .data[0] end | keys' /tmp/out.json)"
+            fi
+
+            if [ "${{ inputs.shape_only }}" != "true" ]; then
+              # Durations and dates only — the numbers this whole workflow is for. jq's `//` picks
+              # whichever field name the API actually uses without needing to know it in advance.
+              jq -r '
+                (if type == "array" then . elif (.data? | type) == "array" then .data else [.] end)
+                | .[]
+                | "   \(.created_at // .started_at // .date // "?")  \(.duration_seconds // .duration // .seconds // .minutes // "?")"
+              ' /tmp/out.json 2>/dev/null | head -20 || true
+            fi
+          done
