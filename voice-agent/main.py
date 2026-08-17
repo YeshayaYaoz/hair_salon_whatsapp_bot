@@ -88,6 +88,11 @@ _KEY_BY_PROVIDER = {"anthropic": "ANTHROPIC_API_KEY", "deepseek": "DEEPSEEK_API_
 # note there for what it is for.
 STARTED_AT = datetime.now(ZoneInfo("UTC")).isoformat()
 
+# Cartesia pronunciation dictionary applied to every call — see the note in pre_call_handler.
+# Created and set by the "Register the Cartesia pronunciation dictionary" workflow. Unset is the
+# behaviour that existed before it, so an empty value is not a fault.
+PRONUNCIATION_DICT_ID = os.environ.get("CARTESIA_PRONUNCIATION_DICT_ID", "").strip()
+
 
 def _model_api_key(model: str) -> tuple[str, str]:
     """
@@ -610,6 +615,19 @@ async def pre_call_handler(call_request: CallRequest) -> Optional[PreCallResult]
     voice_id = (resolved.get("context") or {}).get("voiceId")
     if voice_id:
         tts["voice_id"] = voice_id
+
+    # How "@" is spoken, which is a thing the model cannot fix by choosing better words.
+    #
+    # A caller reads an address out; the agent has to read it back before sending anything. In
+    # Hebrew the symbol is "שטרודל", and the prompt now says so — but a prompt is a request, and the
+    # one turn where it slips is the confirmation turn, where the caller then approves an address
+    # they did not actually hear. A dictionary is a search-and-replace applied to the transcript
+    # before the speech model sees it, so it holds whatever the model writes.
+    #
+    # Only "@". Every other symbol in an address is ordinary Hebrew punctuation — replacing "-"
+    # would have the agent saying "מקף" in the middle of an ordinary sentence.
+    if PRONUNCIATION_DICT_ID:
+        tts["pronunciation_dict_id"] = PRONUNCIATION_DICT_ID
 
     # Still sent, in case Cartesia starts echoing it back; get_agent prefers it when present.
     return PreCallResult(metadata={"tori": resolved}, config={"tts": tts})
@@ -1368,6 +1386,10 @@ def health():
         # same curl that reports the model.
         "model_key_from": MODEL_API_KEY_SOURCE or "none",
         "gender": AGENT_GENDER or "unset (falls back to /context voiceGender)",
+        # A boolean and not the id: what matters is whether "@" will be spoken as "שטרודל" on the
+        # next call, and an agent with no dictionary looks identical to one whose dictionary is
+        # wrong until someone listens to a recording.
+        "pronunciation_dict": bool(PRONUNCIATION_DICT_ID),
         "tori_api": bool(TORI_API_URL),
         "tool_secret": bool(TOOL_SECRET),
         "usage_reporting": bool(TORI_API_URL and TOOL_SECRET),
