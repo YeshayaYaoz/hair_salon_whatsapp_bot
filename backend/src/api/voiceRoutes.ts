@@ -714,9 +714,25 @@ voiceRouter.post("/send-details", async (req, res) => {
       }),
     });
     // Up to four photos: enough to show the unit, few enough not to flood a phone.
-    for (const url of service.imageUrls.slice(0, 4)) {
-      await sendWhatsAppImage({ phoneNumberId: full.whatsappPhoneNumberId, accessToken, to: caller, imageUrl: url });
-    }
+    //
+    // Sent after the reply rather than before it, because the caller is on the phone. Each of these
+    // is a round trip in which Meta fetches the image from our server, and four of them in sequence
+    // is several seconds during which the agent has already decided what to say and is simply
+    // waiting — which the caller hears as the line going dead. The text message above is still
+    // awaited: its failure is the one that means nothing arrived, and it is what the agent reports.
+    //
+    // Safe as a floating promise because this is a long-lived server, the same reason notifyOwner
+    // is fired this way. A photo that fails now fails into the log rather than into the call.
+    const photos = service.imageUrls.slice(0, 4);
+    void (async () => {
+      for (const url of photos) {
+        try {
+          await sendWhatsAppImage({ phoneNumberId: full.whatsappPhoneNumberId!, accessToken, to: caller, imageUrl: url });
+        } catch (err) {
+          console.error("[voice] photo send failed:", err instanceof Error ? err.message : err);
+        }
+      }
+    })();
   } else {
     if (!parsed.data.toEmail) return res.status(400).json({ error: "toEmail is required for the email channel" });
     const toEmail = normalizeSpokenEmail(parsed.data.toEmail);
