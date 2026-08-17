@@ -625,8 +625,15 @@ async def main_():
     agent = await main.get_agent(None, req(meta=pre.metadata))
     send = next(t for t in agent._tools if (getattr(t, "__name__", None) or getattr(t, "name", "")) == "send_details")
 
+    # The confirmation gate, first: an email send without email_confirmed must not reach the API
+    # at all. On a live call the model skipped the read-back the prompt asks for and sent straight
+    # away — a prompt is advice, so the requirement moved into the tool, and this pins it there.
     STATE.update(status=200, body={"sent": True, "photos": 3}, seen=[])
     said = await send(None, "גפן", "email", to_email="y@x.test")
+    assert STATE["seen"] == [], "unconfirmed email must never reach the backend"
+    assert "עצור" in said and "email_confirmed" in said, said
+
+    said = await send(None, "גפן", "email", to_email="y@x.test", email_confirmed=True)
     path, payload, _auth = STATE["seen"][0]
     assert path == "/api/voice/send-details", path
     assert payload == {"calledNumber": "+972555077941", "serviceName": "גפן", "channel": "email", "toEmail": "y@x.test"}, payload
@@ -645,7 +652,7 @@ async def main_():
 
     # No photos configured is said honestly, not papered over.
     STATE.update(status=200, body={"sent": True, "photos": 0}, seen=[])
-    said = await send(None, "גפן", "email", to_email="y@x.test")
+    said = await send(None, "גפן", "email", to_email="y@x.test", email_confirmed=True)
     assert "אין תמונות" in said, said
     print("33 'send me pictures' is fulfilled by the agent, honestly                       OK")
 
