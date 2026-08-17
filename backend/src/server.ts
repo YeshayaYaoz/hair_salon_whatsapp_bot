@@ -17,6 +17,7 @@ import { runReminderJob, runReviewJob, runDigestJob, runRoiReportJob } from "./l
 import { runDepositExpiryJob } from "./lib/depositExpiryJob.js";
 import { runMetricSnapshotJob } from "./billing/metricSnapshotJob.js";
 import { runWhatsAppHealthJob } from "./lib/whatsappHealthJob.js";
+import { runVoiceUsageSyncJob } from "./lib/voiceUsage.js";
 import { runTrackedJob } from "./lib/jobStatus.js";
 import { runHealthDigestJob } from "./lib/healthDigest.js";
 import { runAiCostAlertJob } from "./lib/aiCostAlerts.js";
@@ -225,3 +226,10 @@ runTrackedJob("metricSnapshot", runMetricSnapshotJob);
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 setInterval(() => runTrackedJob("whatsappHealth", runWhatsAppHealthJob), SIX_HOURS);
 runTrackedJob("whatsappHealth", runWhatsAppHealthJob);
+
+// Voice minutes, read back from Cartesia's own call records. Hourly keeps the panel less than an
+// hour stale; the job re-reads a three-day window each time, so an outage of that length repairs
+// itself on the next tick rather than needing a backfill. Re-reading is safe because each call is
+// stored under Cartesia's own id with a unique index behind it.
+setInterval(() => runTrackedJob("voiceUsage", runVoiceUsageSyncJob), ONE_HOUR);
+runTrackedJob("voiceUsage", runVoiceUsageSyncJob);

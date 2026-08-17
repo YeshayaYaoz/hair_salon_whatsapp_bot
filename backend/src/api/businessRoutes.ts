@@ -119,7 +119,7 @@ businessRouter.get("/admin/businesses", requireSuperAdmin, async (_req: AuthedRe
   // own billing-status callbacks. No estimation: businesses with zero events here simply show ₪0,
   // which reflects the ledger, not a fallback guess.
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const [claudeCosts, whatsappBillable] = await Promise.all([
+  const [claudeCosts, whatsappBillable, voiceCalls] = await Promise.all([
     prisma.apiUsageEvent.groupBy({
       by: ["businessId"],
       where: { kind: "claude", createdAt: { gte: since } },
@@ -130,9 +130,20 @@ businessRouter.get("/admin/businesses", requireSuperAdmin, async (_req: AuthedRe
       where: { kind: "whatsapp", billable: true, createdAt: { gte: since } },
       _count: { _all: true },
     }),
+    // Live call minutes, from Cartesia's own records rather than our timing — and the dominant
+    // per-call cost by a wide margin. A two-minute call costs $0.12 of agent time against a few
+    // hundredths of an agora of DeepSeek tokens, so a business can look almost free in the Claude
+    // column while being the one consuming the account's prepaid balance.
+    prisma.apiUsageEvent.groupBy({
+      by: ["businessId"],
+      where: { kind: "voice_call", createdAt: { gte: since } },
+      _sum: { costAgorot: true, durationSeconds: true },
+      _count: { _all: true },
+    }),
   ]);
   const claudeByBusiness = new Map(claudeCosts.map((c) => [c.businessId, c]));
   const whatsappByBusiness = new Map(whatsappBillable.map((w) => [w.businessId, w._count._all]));
+  const voiceByBusiness = new Map(voiceCalls.map((v) => [v.businessId, v]));
 
   res.json(
     businesses.map((b) => {
@@ -153,6 +164,9 @@ businessRouter.get("/admin/businesses", requireSuperAdmin, async (_req: AuthedRe
         realClaudeCostAgorot30d: claude?._sum.costAgorot ?? 0,
         realClaudeTokens30d: (claude?._sum.inputTokens ?? 0) + (claude?._sum.outputTokens ?? 0),
         realWhatsappBillableCount30d: whatsappByBusiness.get(b.id) ?? 0,
+        realVoiceCallCount30d: voiceByBusiness.get(b.id)?._count._all ?? 0,
+        realVoiceSeconds30d: voiceByBusiness.get(b.id)?._sum.durationSeconds ?? 0,
+        realVoiceCostAgorot30d: voiceByBusiness.get(b.id)?._sum.costAgorot ?? 0,
         onboarding,
         onboardingDone,
         onboardingTotal: 4,
@@ -163,6 +177,38 @@ businessRouter.get("/admin/businesses", requireSuperAdmin, async (_req: AuthedRe
 
 // Real per-phone-number usage breakdown for one business — backs the drill-down in the
 // super-admin panel. Every row here is an actual recorded API call, not an estimate.
+/**
+ * This salon's own phone-bot minutes — what the owner sees on the Bot page.
+ *
+ * Two windows, because they answer different questions. "This month" is the one that matters
+ * commercially (the account's prepaid balance resets monthly), and 30 days is what every other
+ * usage figure in the product uses, so showing only the first would make this the odd one out.
+ *
+ * Minutes are billed by Cartesia rounded up per call, which is why the cost cannot be recomputed
+ * from the total seconds — it is summed per call, as recorded.
+ */
+businessRouter.get("/voice-usage", async (req: AuthedRequest, res) => {
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+  const window = async (since: Date) => {
+    const agg = await prisma.apiUsageEvent.aggregate({
+      where: { businessId: req.businessId!, kind: "voice_call", createdAt: { gte: since } },
+      _sum: { durationSeconds: true, costAgorot: true },
+      _count: { _all: true },
+    });
+    return {
+      calls: agg._count._all,
+      seconds: agg._sum.durationSeconds ?? 0,
+      costAgorot: agg._sum.costAgorot ?? 0,
+    };
+  };
+
+  const [month, last30d] = await Promise.all([window(monthStart), window(thirtyDaysAgo)]);
+  res.json({ month, last30d });
+});
+
 businessRouter.get("/admin/usage-by-phone", requireSuperAdmin, async (req: AuthedRequest, res) => {
   const businessId = req.query.businessId as string | undefined;
   if (!businessId) return res.status(400).json({ error: "businessId required" });

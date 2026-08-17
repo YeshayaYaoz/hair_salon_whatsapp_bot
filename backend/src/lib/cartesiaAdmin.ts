@@ -321,3 +321,59 @@ async function importAndAssign(
 
   return { changed: true, phoneNumberId: created.id, imported: true };
 }
+
+/**
+ * One live call as Cartesia recorded it.
+ *
+ * There is no duration field: a call is a start and an end, and the billable minutes are the
+ * subtraction. `telephony_params.to` is the number the caller dialled, which is the only thing
+ * that says which salon a call belongs to — one shared agent answers for all of them.
+ */
+export interface CartesiaCall {
+  id: string;
+  start_time: string;
+  end_time?: string | null;
+  status?: string | null;
+  end_reason?: string | null;
+  telephony_params?: { to?: string | null; from?: string | null; call_sid?: string | null } | null;
+}
+
+interface CallPage {
+  data: CartesiaCall[];
+  has_more?: boolean;
+  next_page?: string | null;
+}
+
+/**
+ * Every call the agent has taken since `since`, newest first.
+ *
+ * This is the account's own record of what it billed us for, and it is the only honest source for
+ * minutes: our ledger can time a call from the ring to the last thing the model said, which
+ * silently undercounts the tail, and it cannot see a call that never reached /context at all.
+ *
+ * The route takes the agent as a query parameter — `/agents/{id}/calls` is a 404 — and pages with
+ * an opaque cursor. `maxPages` is a stop, not a preference: this runs on a timer, and an account
+ * with a year of history should not turn one tick into a hundred sequential requests.
+ */
+export async function listAgentCalls(since: Date, maxPages = 20): Promise<CartesiaCall[]> {
+  const { apiKey, agentId } = creds();
+  const calls: CartesiaCall[] = [];
+  let cursor: string | null = null;
+
+  for (let page = 0; page < maxPages; page++) {
+    const query = new URLSearchParams({ agent_id: agentId, limit: "100" });
+    if (cursor) query.set("starting_after", cursor);
+    const body: CallPage = await call<CallPage>(`/agents/calls?${query}`, apiKey);
+    const rows = body.data ?? [];
+    calls.push(...rows);
+
+    // Newest first, so the first record older than the window means every later one is too. This
+    // is what keeps a routine sync to one request no matter how long the account has existed.
+    if (rows.some((c) => new Date(c.start_time).getTime() < since.getTime())) break;
+    if (!body.has_more || rows.length === 0) break;
+    cursor = body.next_page ?? rows[rows.length - 1]?.id ?? null;
+    if (!cursor) break;
+  }
+
+  return calls.filter((c) => new Date(c.start_time).getTime() >= since.getTime());
+}
