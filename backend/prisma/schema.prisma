@@ -77,6 +77,13 @@ model Business {
   // serves every salon, and an agent may hold many numbers, so this stays 1:1 without needing an
   // agent per business.
   voicePhoneNumber          String?   @unique
+  // Claimed the instant a number order starts, before the carrier is called, and never cleared on
+  // success. Ordering a number begins a recurring monthly charge, so "did we already order one for
+  // this business" cannot be answered by voicePhoneNumber alone: that is only set after the order
+  // returns, leaving a window in which a second click orders — and pays for — a second number.
+  // Claiming this column with a conditional update closes the window in the database rather than in
+  // application logic, which is the only place two concurrent requests actually agree.
+  voiceNumberOrderedAt      DateTime?
   // Cartesia voice the agent speaks in for this salon, chosen by the owner. Null means the agent's
   // own default — which is what every salon got before this existed, so leaving it unset changes
   // nothing. The agent applies it per call, so one shared agent can still sound different per salon.

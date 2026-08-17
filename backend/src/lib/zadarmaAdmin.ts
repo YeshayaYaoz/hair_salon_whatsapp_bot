@@ -12,9 +12,14 @@ import { createHash, createHmac } from "crypto";
  * That made onboarding a salon a task with a person in it, which does not survive ten salons. Every
  * other step is automatic; this was the one that was not.
  *
- * Buying numbers is deliberately NOT here. Ordering a number spends money, and money spent without
- * anyone deciding to spend it is a different class of action from configuring a line that already
- * exists. The purchase stays a decision; the wiring does not.
+ * Buying numbers lives here too, but behind a different rule from the wiring: ordering starts a
+ * recurring monthly charge, so someone has to have decided to spend it. For a paying business that
+ * decision was made when they subscribed, and making them wait on a human to click something is the
+ * manual step this whole file exists to remove. For a trial it has not been made by anyone — a
+ * signup that never converts would leave a number billing every month — so that path stops and asks.
+ *
+ * The entitlement check itself is NOT here. This module knows how to spend money, not who is
+ * allowed to; keeping the two apart means the answer to "who can order" has exactly one home.
  */
 
 const BASE_URL = "https://api.zadarma.com";
@@ -128,4 +133,67 @@ export async function pointNumberAtCartesia(
     sip_id: sipId,
   });
   return { changed: true, sipId };
+}
+
+
+/** Account balance, in the account's own currency. Zero is the usual reason an order silently fails. */
+export async function getBalance(): Promise<{ balance: number; currency: string }> {
+  const body = await request("GET", "/v1/info/balance/", {});
+  return { balance: Number(body.balance ?? 0), currency: String(body.currency ?? "") };
+}
+
+export interface AvailableNumber {
+  number: string;
+  monthlyFee?: string;
+}
+
+/**
+ * Numbers free to order on a destination.
+ *
+ * The response key is not stable across Zadarma's endpoints — `numbers` on some, `info` on others —
+ * and reading only `info` once reported an empty list against a dashboard visibly full of numbers.
+ */
+export async function listAvailableNumbers(directionId: string): Promise<AvailableNumber[]> {
+  const body = await request("GET", `/v1/direct_numbers/available/${directionId}/`, {});
+  const rows =
+    (body.numbers as Array<Record<string, unknown>>) ??
+    (body.info as Array<Record<string, unknown>>) ??
+    (body.data as Array<Record<string, unknown>>) ??
+    [];
+  return rows
+    .map((r) => ({ number: String(r.number ?? r), monthlyFee: r.monthly_fee ? String(r.monthly_fee) : undefined }))
+    .filter((r) => /^\d+$/.test(r.number));
+}
+
+export class NumberOrderError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NumberOrderError";
+  }
+}
+
+/**
+ * Orders one specific number and returns the one Zadarma actually allocated.
+ *
+ * Those differ. Asking for 972555077983 has returned 972559661420 — so the caller must configure
+ * everything downstream against the returned value, never against the requested one. Silently
+ * getting a different number is how the wrong number ends up in three places.
+ */
+export async function orderNumber(directionId: string, wanted: string): Promise<string> {
+  const digits = wanted.replace(/\D/g, "");
+  const body = await request("POST", "/v1/direct_numbers/order/", {
+    direction_id: directionId,
+    number: digits,
+  });
+  const allocated = String((body as { number?: unknown }).number ?? "").replace(/\D/g, "");
+  if (!allocated) throw new NumberOrderError("Zadarma accepted the order but returned no number");
+  // Reserved-but-inactive is what a zero balance looks like from here: the order succeeds and the
+  // line can receive nothing. Reported as a failure because a number that cannot ring is not a
+  // number the business got.
+  if (String((body as { is_activated?: unknown }).is_activated ?? "") === "false") {
+    throw new NumberOrderError(
+      `Zadarma reserved ${allocated} but has not activated it — usually a zero balance or a pending documents step`
+    );
+  }
+  return allocated;
 }

@@ -9,6 +9,7 @@ import { assignNumberToAgent, listHebrewVoices, CartesiaNotConfiguredError } fro
 import { captureError } from "../lib/errorMonitoring.js";
 import { syncWhatsAppProfileInBackground } from "../lib/whatsappProfile.js";
 import { pointNumberAtCartesia, ZadarmaNotConfiguredError } from "../lib/zadarmaAdmin.js";
+import { provisionVoiceNumber, AlreadyHasNumberError } from "../lib/numberProvisioning.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import { requireActiveSubscription } from "../lib/subscriptionGate.js";
 import { getAuthUrl, saveGoogleTokens, disconnectGoogleCalendar, deleteCalendarEvent, GoogleCalendarNotConfiguredError } from "../lib/googleCalendar.js";
@@ -1096,6 +1097,38 @@ businessRouter.put("/me/voice-phone", async (req: AuthedRequest, res) => {
   }
 
   res.json({ ok: true, ...(voiceAgentWarning ? { warning: voiceAgentWarning } : {}) });
+});
+
+/**
+ * Orders a phone number for the business and wires it, or asks the operator when they are on trial.
+ *
+ * Two different 4xx meanings are kept apart on purpose: 402 says "subscribe and this works", 409
+ * says "you already have one". Collapsing them into a generic error is how a paying customer gets
+ * told to subscribe.
+ */
+businessRouter.post("/me/voice-phone/provision", async (req: AuthedRequest, res) => {
+  try {
+    const result = await provisionVoiceNumber(req.businessId!);
+    if (result.status === "approval_requested") {
+      return res.status(402).json({
+        status: "approval_requested",
+        message: "בקשה למספר נשלחה לאישור. מנוי פעיל מאפשר לקבל מספר מיד.",
+      });
+    }
+    return res.json({ status: "ordered", number: result.number });
+  } catch (err) {
+    if (err instanceof AlreadyHasNumberError) {
+      return res.status(409).json({ error: "לעסק כבר יש מספר, או שהזמנה כבר בתהליך." });
+    }
+    if (err instanceof ZadarmaNotConfiguredError) {
+      return res.status(503).json({ error: "רכישת מספרים אינה מוגדרת כרגע. נסו שוב מאוחר יותר." });
+    }
+    // Everything else is ours to fix, and the owner cannot act on the detail — but we must be able
+    // to, because a failure here may have spent money.
+    console.error(`[provisioning] Number order failed for ${req.businessId}:`, err);
+    captureError(err, { businessId: req.businessId, phase: "provision_voice_number" });
+    return res.status(502).json({ error: "לא הצלחנו להשיג מספר כרגע. נבדוק ונחזור אליכם." });
+  }
 });
 
 businessRouter.delete("/me/voice-phone", async (req: AuthedRequest, res) => {
