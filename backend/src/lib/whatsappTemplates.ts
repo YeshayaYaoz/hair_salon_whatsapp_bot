@@ -58,13 +58,10 @@ export function reviewTemplate(): TemplateConfig {
  * Sending is unaffected either way (name and variable order are what must match), so the two can
  * safely diverge, but don't assume an edit here reaches existing businesses.
  */
-export const REMINDER_TEMPLATE_BODY =
-  'שלום {{1}}! תזכורת לתור שלך ל{{2}} ב-{{3}} אצל {{4}}. לביטול יש להשיב "בטל תור".';
 // Opens with "היי" rather than the variable. Meta rejects a body that starts or ends with a
 // parameter — a "dangling parameter" — so the previous "{{1}}, תודה שביקרת…" could never have been
 // approved, and the review requests it backs would have gone undelivered to anyone outside the 24h
 // window with no error anyone would see.
-export const REVIEW_TEMPLATE_BODY = "היי {{1}}, תודה שביקרת ב{{2}} היום. נשמח לשמוע איך היה ה{{3}} שלך.";
 
 const DEFAULT_CONFIRMATION_NAME = "tori_appointment_confirmation";
 
@@ -90,8 +87,6 @@ export function confirmationTemplate(): TemplateConfig {
   return { name: process.env.WHATSAPP_CONFIRMATION_TEMPLATE || DEFAULT_CONFIRMATION_NAME, languageCode: DEFAULT_LANG };
 }
 
-export const CONFIRMATION_TEMPLATE_BODY =
-  'שלום {{1}}, התור שלך ל{{2}} נקבע ל-{{3}} אצל {{4}}. לביטול יש להשיב "בטל תור".';
 
 const DEFAULT_OWNER_ALERT_NAME = "tori_owner_alert";
 
@@ -113,7 +108,110 @@ export function ownerAlertTemplate(): TemplateConfig {
 // Text on both sides of the parameter, not just before it. Meta rejects a body that starts *or*
 // ends with one, and this template is the hardest case in the file: the whole alert arrives as a
 // single variable, so a bare "{{1}}" is both. The closing sentence is the price of that.
-export const OWNER_ALERT_TEMPLATE_BODY = "התראה חדשה מתורי: {{1}} — כל הפרטים מחכים לך בדשבורד.";
+
+/**
+ * The same four templates, worded for the kind of business sending them.
+ *
+ * A zimmer has no "תור" and sells no "תספורת". Sending a guest "התור שלך לתספורת נקבע" reads as a
+ * message delivered to the wrong person, and Meta reviews a template against the business it is
+ * submitted for — wording that does not match the vertical is the kind of mismatch that comes back
+ * INVALID_FORMAT, which is exactly what the zimmer's reminder template did.
+ *
+ * Names and variable ORDER are identical across variants, deliberately: the sending code passes
+ * positional parameters and knows nothing about wording, so only the text may differ. A variant
+ * that reorders variables would send the guest's name where the date belongs.
+ */
+export interface TemplateText {
+  body: string;
+  example: string[];
+}
+
+export interface TemplateWording {
+  reminder: TemplateText;
+  review: TemplateText;
+  confirmation: TemplateText;
+}
+
+/**
+ * Appointments: salons, barbers, aesthetics, clinics.
+ *
+ * Each body opens with text rather than a variable — Meta rejects a body that starts or ends with
+ * one, a "dangling parameter", and the review body once did exactly that.
+ */
+const APPOINTMENT_WORDING: TemplateWording = {
+  reminder: {
+    body: 'שלום {{1}}! תזכורת לתור שלך ל{{2}} ב-{{3}} אצל {{4}}. לביטול יש להשיב "בטל תור".',
+    example: ["נועה", "תספורת", "מחר ב-14:30", "מספרת רונית"],
+  },
+  review: {
+    body: "היי {{1}}, תודה שביקרת ב{{2}} היום. נשמח לשמוע איך היה ה{{3}} שלך.",
+    example: ["נועה", "מספרת רונית", "תספורת"],
+  },
+  confirmation: {
+    body: 'שלום {{1}}, התור שלך ל{{2}} נקבע ל-{{3}} אצל {{4}}. לביטול יש להשיב "בטל תור".',
+    example: ["נועה", "תספורת", "יום שלישי 12.8 בשעה 14:30", "מספרת רונית"],
+  },
+};
+
+/** Overnight stays: zimmers and B&Bs. Bookings and guests, not appointments and clients. */
+const STAY_WORDING: TemplateWording = {
+  reminder: {
+    body: 'שלום {{1}}! מזכירים את האירוח שלכם ב{{2}} בתאריך {{3}} ב{{4}}. לביטול יש להשיב "בטל הזמנה".',
+    example: ["דנה", "סוויטת הגליל", "שישי 15.8", "צימר בנחת רוח"],
+  },
+  review: {
+    body: "היי {{1}}, תודה שהתארחתם ב{{2}}. נשמח לשמוע איך הייתה השהות ב{{3}}.",
+    example: ["דנה", "צימר בנחת רוח", "סוויטת הגליל"],
+  },
+  confirmation: {
+    body: 'שלום {{1}}, ההזמנה שלכם ל{{2}} אושרה לתאריך {{3}} ב{{4}}. לביטול יש להשיב "בטל הזמנה".',
+    example: ["דנה", "סוויטת הגליל", "שישי 15.8, צ׳ק-אין מ-15:00", "צימר בנחת רוח"],
+  },
+};
+
+/**
+ * The owner alert has one wording for everyone: it goes to the business owner, not to a customer,
+ * and carries the whole alert in a single variable — there is no domain vocabulary in it to get
+ * wrong.
+ *
+ * Text on both sides of the parameter, not just before it. This is the hardest case in the file:
+ * a bare "{{1}}" both starts and ends the body, which Meta rejects twice over. The closing
+ * sentence is the price of that.
+ */
+const OWNER_ALERT_BODY: TemplateText = {
+  body: "התראה חדשה מתורי: {{1}} — כל הפרטים מחכים לך בדשבורד.",
+  example: ["נועה כהן מעוניינת בתספורת ביום שלישי"],
+};
+
+const WORDING_BY_BUSINESS_TYPE: Record<string, TemplateWording> = {
+  salon: APPOINTMENT_WORDING,
+  barber: APPOINTMENT_WORDING,
+  aesthetics: APPOINTMENT_WORDING,
+  clinic: APPOINTMENT_WORDING,
+  bnb: STAY_WORDING,
+};
+
+/**
+ * Wording for a business type. Unknown or unset falls back to appointments, which is what most
+ * businesses are — and a template in slightly generic Hebrew still delivers, while no template at
+ * all delivers nothing.
+ */
+export function wordingFor(businessType?: string | null): TemplateWording {
+  return (businessType && WORDING_BY_BUSINESS_TYPE[businessType]) || APPOINTMENT_WORDING;
+}
+
+export const OWNER_ALERT_TEXT = OWNER_ALERT_BODY;
+
+/** Every wording variant, for tests that must cover all of them rather than only the default. */
+export const ALL_WORDINGS: Array<[string, TemplateWording]> = [
+  ["appointment", APPOINTMENT_WORDING],
+  ["stay", STAY_WORDING],
+];
+
+export const REMINDER_TEMPLATE_BODY = APPOINTMENT_WORDING.reminder.body;
+export const REVIEW_TEMPLATE_BODY = APPOINTMENT_WORDING.review.body;
+export const CONFIRMATION_TEMPLATE_BODY = APPOINTMENT_WORDING.confirmation.body;
+export const OWNER_ALERT_TEMPLATE_BODY = OWNER_ALERT_BODY.body;
 
 /**
  * Sample values Meta shows its reviewer, one per {{n}} in the matching body.
@@ -122,14 +220,11 @@ export const OWNER_ALERT_TEMPLATE_BODY = "התראה חדשה מתורי: {{1}} 
  * them. The reviewer reads the body with these substituted in, so they have to look like the real
  * thing — a plausible Hebrew name and a real-looking date, not "x" and "123", which reads as a test
  * template and gets treated as one.
- *
- * Kept beside the bodies deliberately. Adding a variable to a body without adding a sample here is
- * exactly the change that would slip through, so createMessageTemplate counts them and refuses.
  */
-export const REMINDER_TEMPLATE_EXAMPLE = ["נועה", "תספורת", "מחר ב-14:30", "מספרת רונית"];
-export const REVIEW_TEMPLATE_EXAMPLE = ["נועה", "מספרת רונית", "תספורת"];
-export const CONFIRMATION_TEMPLATE_EXAMPLE = ["נועה", "תספורת", "יום שלישי 12.8 בשעה 14:30", "מספרת רונית"];
-export const OWNER_ALERT_TEMPLATE_EXAMPLE = ["נועה כהן מעוניינת בתספורת ביום שלישי"];
+export const REMINDER_TEMPLATE_EXAMPLE = APPOINTMENT_WORDING.reminder.example;
+export const REVIEW_TEMPLATE_EXAMPLE = APPOINTMENT_WORDING.review.example;
+export const CONFIRMATION_TEMPLATE_EXAMPLE = APPOINTMENT_WORDING.confirmation.example;
+export const OWNER_ALERT_TEMPLATE_EXAMPLE = OWNER_ALERT_BODY.example;
 
 const DEFAULT_OUTREACH_NAME = "tori_outreach_intro";
 

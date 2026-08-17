@@ -20,7 +20,7 @@ import {
   GoogleBusinessAccessError,
 } from "../lib/googleBusinessProfile.js";
 import { sendWhatsAppMessage, getWabaId, subscribeAppToWaba, registerPhoneNumber, getPhoneNumberStatus, getSubscribedApps, createMessageTemplate, setWhatsAppProfilePicture, type CreateTemplateResult } from "../webhook/whatsappClient.js";
-import { reminderTemplate, reviewTemplate, confirmationTemplate, ownerAlertTemplate, REMINDER_TEMPLATE_BODY, REVIEW_TEMPLATE_BODY, CONFIRMATION_TEMPLATE_BODY, OWNER_ALERT_TEMPLATE_BODY, REMINDER_TEMPLATE_EXAMPLE, REVIEW_TEMPLATE_EXAMPLE, CONFIRMATION_TEMPLATE_EXAMPLE, OWNER_ALERT_TEMPLATE_EXAMPLE } from "../lib/whatsappTemplates.js";
+import { reminderTemplate, reviewTemplate, confirmationTemplate, ownerAlertTemplate, wordingFor, OWNER_ALERT_TEXT } from "../lib/whatsappTemplates.js";
 import { notifyWaitlist, waitlistOfferText } from "../lib/waitlist.js";
 import { AFFILIATE_PROVIDERS, AFFILIATE_KINDS, recordAffiliateClick, markAffiliateConversion } from "../lib/affiliates.js";
 import { normalizeOwnerPhone } from "../lib/phone.js";
@@ -1075,14 +1075,25 @@ async function submitWhatsAppTemplates(
     const review = reviewTemplate();
     const confirmation = confirmationTemplate();
     const ownerAlert = ownerAlertTemplate();
+
+    // A zimmer has no "תור" and sells no "תספורת". Same template names and same variable order —
+    // the sending code passes positional parameters and knows nothing about wording — but a guest
+    // reading "התור שלך לתספורת" concludes the message reached the wrong person, and Meta reviews
+    // the wording against the business it is submitted for.
+    const { businessType } = await prisma.business.findUniqueOrThrow({
+      where: { id: businessId },
+      select: { businessType: true },
+    });
+    const wording = wordingFor(businessType);
+
     return await Promise.all([
-      createMessageTemplate(wabaId, accessToken, { name: reminder.name, languageCode: reminder.languageCode, bodyText: REMINDER_TEMPLATE_BODY, bodyExample: REMINDER_TEMPLATE_EXAMPLE }),
-      createMessageTemplate(wabaId, accessToken, { name: review.name, languageCode: review.languageCode, bodyText: REVIEW_TEMPLATE_BODY, bodyExample: REVIEW_TEMPLATE_EXAMPLE }),
+      createMessageTemplate(wabaId, accessToken, { name: reminder.name, languageCode: reminder.languageCode, bodyText: wording.reminder.body, bodyExample: wording.reminder.example }),
+      createMessageTemplate(wabaId, accessToken, { name: review.name, languageCode: review.languageCode, bodyText: wording.review.body, bodyExample: wording.review.example }),
       // Added late: a booking taken by phone had no written confirmation, and an owner alert sent
       // outside the owner's own 24h window had no template to fall back on — which is how a live
       // call's lead reached nobody while every layer reported success.
-      createMessageTemplate(wabaId, accessToken, { name: confirmation.name, languageCode: confirmation.languageCode, bodyText: CONFIRMATION_TEMPLATE_BODY, bodyExample: CONFIRMATION_TEMPLATE_EXAMPLE }),
-      createMessageTemplate(wabaId, accessToken, { name: ownerAlert.name, languageCode: ownerAlert.languageCode, bodyText: OWNER_ALERT_TEMPLATE_BODY, bodyExample: OWNER_ALERT_TEMPLATE_EXAMPLE }),
+      createMessageTemplate(wabaId, accessToken, { name: confirmation.name, languageCode: confirmation.languageCode, bodyText: wording.confirmation.body, bodyExample: wording.confirmation.example }),
+      createMessageTemplate(wabaId, accessToken, { name: ownerAlert.name, languageCode: ownerAlert.languageCode, bodyText: OWNER_ALERT_TEXT.body, bodyExample: OWNER_ALERT_TEXT.example }),
     ]);
   } catch (err) {
     console.error(`[whatsapp] Automatic template submission failed for ${businessId} (non-fatal):`, err);
