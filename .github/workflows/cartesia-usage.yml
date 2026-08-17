@@ -18,6 +18,10 @@ on:
         description: "Print the field names of one record instead of the numbers (for wiring this into the admin panel)"
         type: boolean
         default: false
+      check_ledger:
+        description: "Also read our own database — did the calls Cartesia lists actually land here"
+        type: boolean
+        default: true
 
 jobs:
   usage:
@@ -27,7 +31,12 @@ jobs:
       AGENT: ${{ secrets.CARTESIA_AGENT_ID || vars.CARTESIA_AGENT_ID }}
       API: https://api.cartesia.ai
       VERSION: "2026-03-01"
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+      BACKEND_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
     steps:
+      - uses: actions/checkout@v4
+
       - name: Ask Cartesia
         run: |
           if [ -z "$KEY" ]; then
@@ -98,3 +107,24 @@ jobs:
               ' /tmp/out.json || true
             fi
           done
+
+      # The other half of the question. Reading Cartesia's API proves what Cartesia knows; it says
+      # nothing about whether the webhook landed here. `railway run` injects the backend service's
+      # own variables, so this queries the same database production does — without a copy of
+      # DATABASE_URL existing anywhere outside Railway.
+      - name: Did those calls land in our ledger
+        if: inputs.check_ledger
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::warning::RAILWAY_TOKEN is not set — cannot read our side."
+            exit 0
+          fi
+          npm i -g @railway/cli
+          cd backend
+          # Dev dependencies included on purpose: tsx and the Prisma CLI are both dev deps, and
+          # the probe is a TypeScript file run through tsx.
+          npm ci --no-audit --no-fund >/dev/null 2>&1 || npm install --no-audit --no-fund >/dev/null 2>&1
+          npx prisma generate >/dev/null 2>&1
+          railway run --service "$BACKEND_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+            npx tsx scripts/voice-usage-probe.ts 10
+
