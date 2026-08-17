@@ -32,6 +32,12 @@ interface AdminBusiness {
   realClaudeCostAgorot30d: number;
   realClaudeTokens30d: number;
   realWhatsappBillableCount30d: number;
+  // Live phone-call minutes, from Cartesia's own call records. The dominant per-call cost by a
+  // wide margin — $0.06 a minute against fractions of an agora of tokens — and the one that was
+  // invisible until it emptied the account's prepaid balance.
+  realVoiceCallCount30d: number;
+  realVoiceSeconds30d: number;
+  realVoiceCostAgorot30d: number;
   onboarding: { whatsapp: boolean; services: boolean; hours: boolean; payment: boolean };
   onboardingDone: number;
   onboardingTotal: number;
@@ -469,13 +475,14 @@ export default function AdminBusinessesPage() {
     const header = [
       "name", "email", "emailVerified", "ownerPhone", "createdAt", "subscriptionStatus", "subscriptionPlan", "billingCycle",
       "blocked", "whatsappConnected", "paymentProvider", "invoiceProvider", "walletBalanceIls",
-      "claudeCost30dIls", "appointments", "customers",
+      "claudeCost30dIls", "voiceMinutes30d", "voiceCost30dIls", "appointments", "customers",
     ];
     const lines = rows.map((b) =>
       [
         b.name, b.email, b.emailVerifiedAt ? "yes" : "no", b.notificationPhone ?? "", b.createdAt, b.subscriptionStatus, b.subscriptionPlan ?? "", b.billingCycle,
         b.blockedAt ? "yes" : "no", b.whatsappConnected ? "yes" : "no", b.paymentProvider ?? "", b.invoiceProvider ?? "",
         (b.walletBalanceAgorot / 100).toFixed(2), (b.realClaudeCostAgorot30d / 100).toFixed(2),
+        Math.round(b.realVoiceSeconds30d / 60), (b.realVoiceCostAgorot30d / 100).toFixed(2),
         b._count.appointments, b._count.customers,
       ]
         .map((v) => `"${String(v).replace(/"/g, '""')}"`)
@@ -500,6 +507,11 @@ export default function AdminBusinessesPage() {
   // Real, metered — sum of actual ApiUsageEvent Claude costs across all businesses, last 30 days.
   const realClaudeCostIls30d = all.reduce((sum, b) => sum + b.realClaudeCostAgorot30d, 0) / 100;
   const realWhatsappBillable30d = all.reduce((sum, b) => sum + b.realWhatsappBillableCount30d, 0);
+  // Rounded to whole minutes only for display. The cost beside it is summed per call as Cartesia
+  // billed it — they round each call up to a minute, so re-deriving it from these totals would
+  // come out low.
+  const voiceMinutes30d = Math.round(all.reduce((sum, b) => sum + b.realVoiceSeconds30d, 0) / 60);
+  const voiceCostIls30d = all.reduce((sum, b) => sum + b.realVoiceCostAgorot30d, 0) / 100;
   const counts = {
     trial: all.filter((b) => b.subscriptionStatus === "trial").length,
     active: all.filter((b) => b.subscriptionStatus === "active").length,
@@ -607,6 +619,15 @@ export default function AdminBusinessesPage() {
               sub={he ? "לפי Meta pricing status, בפועל" : "from Meta's own pricing status"}
             />
             <KpiCard
+              label={he ? "דקות שיחה קולית (30 יום)" : "Voice call minutes (30d)"}
+              value={`${voiceMinutes30d.toLocaleString(he ? "he-IL" : "en-US")}`}
+              sub={
+                he
+                  ? `₪${voiceCostIls30d.toFixed(2)} · $0.06 לדקה`
+                  : `₪${voiceCostIls30d.toFixed(2)} · $0.06 per minute`
+              }
+            />
+            <KpiCard
               label={he ? "בניסיון" : "In trial"}
               value={String(counts.trial)}
               sub={he ? `${counts.canceled} בוטלו` : `${counts.canceled} canceled`}
@@ -687,6 +708,7 @@ export default function AdminBusinessesPage() {
                 <th className="text-start px-4 py-3 text-gray-600 font-medium">{he ? "חשבוניות" : "Invoicing"}</th>
                 <th className="text-start px-4 py-3 text-gray-600 font-medium">{he ? "ארנק / שימוש" : "Wallet / usage"}</th>
                 <th className="text-end px-4 py-3 text-gray-600 font-medium">{he ? "עלות Claude (30 יום)" : "Claude cost (30d)"}</th>
+                <th className="text-end px-4 py-3 text-gray-600 font-medium">{he ? "שיחות קוליות (30 יום)" : "Voice calls (30d)"}</th>
                 <th className="text-end px-4 py-3 text-gray-600 font-medium">{he ? "תורים" : "Bookings"}</th>
                 <th className="text-end px-4 py-3 text-gray-600 font-medium">{he ? "לקוחות" : "Customers"}</th>
               </tr>
@@ -779,6 +801,12 @@ export default function AdminBusinessesPage() {
                   <td className="px-4 py-3 text-end tabular-nums text-gray-700">
                     ₪{(b.realClaudeCostAgorot30d / 100).toFixed(2)}
                     <span className="text-gray-600 ms-1 text-xs">· {b.realClaudeTokens30d.toLocaleString()} tok</span>
+                  </td>
+                  <td className="px-4 py-3 text-end tabular-nums text-gray-700">
+                    ₪{(b.realVoiceCostAgorot30d / 100).toFixed(2)}
+                    <span className="text-gray-600 ms-1 text-xs">
+                      · {Math.round(b.realVoiceSeconds30d / 60)} {he ? "דק׳" : "min"} / {b.realVoiceCallCount30d}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-end tabular-nums text-gray-700">{b._count.appointments}</td>
                   <td className="px-4 py-3 text-end tabular-nums text-gray-700">{b._count.customers}</td>

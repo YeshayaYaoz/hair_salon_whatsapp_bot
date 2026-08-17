@@ -289,6 +289,65 @@ function VoicePhoneSection() {
       )}
       {error && <p className="text-red-600 text-xs mt-2">{error}</p>}
       <VoiceSelect />
+      {current ? <VoiceMinutes /> : null}
+    </div>
+  );
+}
+
+interface VoiceUsageWindow {
+  calls: number;
+  seconds: number;
+  costAgorot: number;
+}
+
+/**
+ * How much the phone line has actually been used.
+ *
+ * Every other cost in this product is per message, which owners already have an intuition for. A
+ * phone call is billed by the minute, and a bot that handles calls beautifully for an hour is a
+ * real expense with nothing on screen to show for it. This is that number — shown to the owner
+ * because it is theirs, and shown as calls-and-minutes rather than only shekels because "the bot
+ * took 40 calls this month" is the part that tells them it is working.
+ */
+function VoiceMinutes() {
+  const { lang } = useLanguage();
+  const he = lang === "he";
+  const [usage, setUsage] = useState<{ month: VoiceUsageWindow; last30d: VoiceUsageWindow } | null>(null);
+
+  useEffect(() => {
+    // Silent on failure: this is a figure beside the settings, not the settings. An owner changing
+    // their number should not meet an error about a usage counter.
+    apiFetch<{ month: VoiceUsageWindow; last30d: VoiceUsageWindow }>("/api/business/voice-usage")
+      .then(setUsage)
+      .catch(() => {});
+  }, []);
+
+  if (!usage) return null;
+  const minutes = Math.round(usage.month.seconds / 60);
+
+  return (
+    <div className="mt-4 pt-4 border-t border-gray-200">
+      <div className="flex items-baseline gap-4 flex-wrap">
+        <div>
+          <div className="text-lg font-semibold text-gray-900 tabular-nums">
+            {usage.month.calls} {he ? "שיחות" : "calls"}
+          </div>
+          <div className="text-xs text-gray-600">{he ? "החודש" : "this month"}</div>
+        </div>
+        <div>
+          <div className="text-lg font-semibold text-gray-900 tabular-nums">
+            {minutes} {he ? "דקות" : "min"}
+          </div>
+          <div className="text-xs text-gray-600">
+            {he ? `${Math.round(usage.last30d.seconds / 60)} ב-30 הימים האחרונים` : `${Math.round(usage.last30d.seconds / 60)} in the last 30 days`}
+          </div>
+        </div>
+      </div>
+      <p className="text-xs text-gray-600 mt-2">
+        {he
+          ? "זמן שיחה בפועל שהבוט ענה לו, נמדד לפי רישומי הספק. מתעדכן כל שעה."
+          : "Actual talk time the bot answered, measured from the provider's own call records. Updates hourly."}
+      </p>
     </div>
   );
 }
