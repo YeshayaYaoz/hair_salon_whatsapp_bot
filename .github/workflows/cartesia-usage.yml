@@ -35,10 +35,11 @@ jobs:
             exit 1
           fi
 
-          # Both are real routes: unauthenticated they answer 401, while /calls and /usage without
-          # the /agents prefix answer 404. Which of them carries per-call duration is the thing this
-          # step exists to find out.
-          for path in "/agents/usage" "/agents/calls?limit=5"; do
+          # /agents/calls is a real route — unauthenticated it answers 401, while /calls without the
+          # prefix answers 404 — and with the key it answers "Missing agent ID". So the agent is a
+          # parameter, and these are the two ways an API of this shape usually takes one. Both are
+          # tried rather than guessed at, since a wrong guess and an empty account look alike.
+          for path in "/agents/$AGENT/calls?limit=5" "/agents/calls?agent_id=$AGENT&limit=5"; do
             echo "── GET $path"
             code=$(curl -sS -o /tmp/out.json -w '%{http_code}' "$API$path" \
               -H "Authorization: Bearer $KEY" -H "Cartesia-Version: $VERSION" || echo "000")
