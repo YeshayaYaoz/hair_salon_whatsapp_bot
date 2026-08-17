@@ -23,10 +23,20 @@ export const voiceRouter = asyncRouter();
 // configured once in the Cartesia agent's tool auth header — not a per-business webhook secret like
 // the payment webhooks, since Cartesia isn't relaying anything a customer could see or forge a
 // request from.
+//
+// CARTESIA_TOOL_SECRET_PREVIOUS exists only for the seconds-to-minutes of a rotation. The secret is
+// held by two Railway services — this one and the voice agent — and changing a variable restarts a
+// service, so the two ends cannot switch over at the same instant. Whichever order you pick, there
+// is a window where the agent presents one value and the API expects the other, and every tool call
+// in that window is a 401: a caller mid-sentence hears the bot go silent. Accepting the old value
+// alongside the new one removes the window entirely. It is set and then dropped by the rotation
+// workflow; in steady state it is unset and this behaves exactly as it did before.
 function requireCartesiaAuth(req: import("express").Request, res: import("express").Response, next: import("express").NextFunction) {
-  const secret = process.env.CARTESIA_TOOL_SECRET;
+  const accepted = [process.env.CARTESIA_TOOL_SECRET, process.env.CARTESIA_TOOL_SECRET_PREVIOUS]
+    .map((s) => s?.trim())
+    .filter((s): s is string => Boolean(s));
   const header = req.headers.authorization;
-  if (!secret || header !== `Bearer ${secret}`) return res.status(401).json({ error: "Unauthorized" });
+  if (!accepted.some((secret) => header === `Bearer ${secret}`)) return res.status(401).json({ error: "Unauthorized" });
   next();
 }
 

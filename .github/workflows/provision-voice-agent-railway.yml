@@ -151,7 +151,20 @@ jobs:
           if [ -n "$TORI_API_URL" ]; then railway variables --set "TORI_API_URL=$TORI_API_URL" $args
           else missing="$missing PUBLIC_BACKEND_URL→TORI_API_URL"; fi
 
-          if [ -n "$CARTESIA_TOOL_SECRET" ]; then railway variables --set "CARTESIA_TOOL_SECRET=$CARTESIA_TOOL_SECRET" $args
+          # The backend's live value wins over GitHub's copy — the opposite precedence to every
+          # other variable here, and deliberately so. This secret only has to *match* the backend's;
+          # its value is meaningless on its own. Once "Rotate the voice secrets" has run, GitHub's
+          # copy is a value nothing accepts any more, and taking it would re-pair the agent to a
+          # secret the API has retired: a service that boots, answers the phone, and 401s every tool
+          # call. There is exactly one authority for this, and it is the service on the other end.
+          tool_secret=$(printf '%s' "$backend_vars" | jq -r '.CARTESIA_TOOL_SECRET // ""' 2>/dev/null || echo "")
+          if [ -n "$tool_secret" ]; then
+            echo "::add-mask::$tool_secret"
+            echo "::notice::CARTESIA_TOOL_SECRET taken from $BACKEND_SERVICE — the only copy that has to match."
+          else
+            tool_secret="$CARTESIA_TOOL_SECRET"
+          fi
+          if [ -n "$tool_secret" ]; then railway variables --set "CARTESIA_TOOL_SECRET=$tool_secret" $args
           else missing="$missing CARTESIA_TOOL_SECRET"; fi
 
           if [ -n "$MODEL_KEY" ]; then
