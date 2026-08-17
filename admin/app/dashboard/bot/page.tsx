@@ -192,12 +192,19 @@ function VoicePhoneSection() {
   const [paying, setPaying] = useState(false);
   const [ordering, setOrdering] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // One approval request per visit. Every click on the trial path emails the operator, and a
+  // second click adds a duplicate to their inbox, not information.
+  const [requested, setRequested] = useState(false);
 
   useEffect(() => {
     apiFetch<{ voicePhoneNumber?: string | null; subscriptionStatus?: string }>("/api/business/me").then((me) => {
       setCurrent(me.voicePhoneNumber ?? null);
       setValue(me.voicePhoneNumber ?? "");
       setPaying(me.subscriptionStatus === "active");
+    }).catch((err) => {
+      // The skeleton is a promise that content is coming. When the load failed it never is, and
+      // the error line below the section is the honest replacement.
+      setError(err instanceof Error ? err.message : "load failed");
     });
   }, []);
 
@@ -224,6 +231,7 @@ function VoicePhoneSection() {
         return;
       }
       setNotice(result.message ?? (he ? "הבקשה נשלחה." : "Request sent."));
+      setRequested(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : he ? "ההנפקה נכשלה" : "Could not get a number");
     } finally {
@@ -339,7 +347,7 @@ function VoicePhoneSection() {
           <button
             type="button"
             onClick={provision}
-            disabled={ordering || saving}
+            disabled={ordering || saving || requested}
             className="bg-white border border-[#1B7FA0] text-[#1B7FA0] hover:bg-[#1B7FA0] hover:text-white disabled:opacity-50 text-sm font-semibold px-4 py-2 rounded-lg transition"
           >
             {ordering
@@ -439,7 +447,7 @@ function VoiceMinutes() {
                 <span className="text-gray-700">
                   {/* A call the hourly sync recorded has no summary — the provider only sends one
                       with the live event. Saying so beats an empty cell that reads as a bug. */}
-                  {c.summary || (he ? "—" : "—")}
+                  {c.summary || "—"}
                 </span>
               </li>
             ))}
@@ -482,6 +490,7 @@ export default function BotPage() {
   const [botEnabled, setBotEnabled] = useState(true);
   const [togglingBot, setTogglingBot] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -515,6 +524,10 @@ export default function BotPage() {
       setBookingModel(me.bookingModel ?? "slot");
       setBotEnabled(me.botEnabled ?? true);
       setLoaded(true);
+    }).catch((err) => {
+      // Without this the page shows skeletons forever — and worse, `fields` still holds the
+      // defaults, so a save from that state would overwrite the business's real settings.
+      setLoadError(err instanceof Error ? err.message : "load failed");
     });
     apiFetch<AiProvidersResponse>("/api/business/me/ai-providers")
       .then((res) => {
@@ -533,7 +546,7 @@ export default function BotPage() {
       await apiFetch("/api/business/me/bot-enabled", { method: "PUT", body: JSON.stringify({ enabled: next }) });
       setBotEnabled(next);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update");
+      setError(err instanceof Error ? err.message : he ? "העדכון נכשל" : "Failed to update");
     } finally {
       setTogglingBot(false);
     }
@@ -548,11 +561,17 @@ export default function BotPage() {
     setSaving(true);
     setError(null);
     try {
-      await apiFetch("/api/business/me", { method: "PUT", body: JSON.stringify(fields) });
+      // Quick replies are kept raw and positional while typing; empty boxes are dropped only here,
+      // because WhatsApp rejects an empty button.
+      const payload = {
+        ...fields,
+        quickReplies: (fields.quickReplies ?? []).map((v) => v.trim()).filter(Boolean),
+      };
+      await apiFetch("/api/business/me", { method: "PUT", body: JSON.stringify(payload) });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save");
+      setError(err instanceof Error ? err.message : he ? "השמירה נכשלה" : "Failed to save");
     } finally {
       setSaving(false);
     }
@@ -562,11 +581,18 @@ export default function BotPage() {
     return (
       <div className="animate-fade-in">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">{t.botTabTitle}</h1>
-        <div className="flex flex-col gap-4">
-          <SkeletonCard lines={3} />
-          <SkeletonCard lines={3} />
-          <SkeletonCard lines={2} />
-        </div>
+        {loadError ? (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
+            {he ? "טעינת ההגדרות נכשלה. רעננו את העמוד ונסו שוב." : "Could not load the settings. Refresh the page and try again."}
+            <span className="block text-xs text-red-500 mt-1" dir="ltr">{loadError}</span>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <SkeletonCard lines={3} />
+            <SkeletonCard lines={3} />
+            <SkeletonCard lines={2} />
+          </div>
+        )}
       </div>
     );
   }
@@ -684,11 +710,12 @@ export default function BotPage() {
                   key={i}
                   value={(fields.quickReplies ?? [])[i] ?? ""}
                   onChange={(e) => {
+                    // Stored raw and positional. Compacting here re-indexes mid-typing — text
+                    // entered in the second box jumped into the first — and trimming per keystroke
+                    // ate the space between words as it was typed. Blanks are dropped at save.
                     const next = [...(fields.quickReplies ?? [])];
                     next[i] = e.target.value;
-                    // Trailing blanks are dropped so leaving the middle box empty doesn't send an
-                    // empty button, which WhatsApp rejects.
-                    set("quickReplies", next.map((v) => (v ?? "").trim()).filter(Boolean));
+                    set("quickReplies", next);
                   }}
                   placeholder={t.quickReplyPlaceholders[i]}
                   maxLength={20}
@@ -706,7 +733,7 @@ export default function BotPage() {
             {/* WhatsApp allows one interactive attachment per message, and the webhook prefers quick
                 replies — so with any configured, this button is filled in, saved, and then never
                 sent. Silent from the owner's side, which is exactly why it is said here. */}
-            {(fields.quickReplies?.length ?? 0) > 0 && (
+            {(fields.quickReplies ?? []).some((v) => v.trim()) && (
               <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2.5">
                 {he
                   ? "הכפתור הזה לא יישלח כרגע: וואטסאפ מאפשר סוג כפתורים אחד בלבד בכל הודעה, ולכפתורי התשובה המהירה שלמעלה יש עדיפות. כדי להשתמש בכפתור הקישור — מחקו את כפתורי התשובה המהירה. אפשר להשאיר את הקישור עצמו בטקסט הברכה."
@@ -756,7 +783,7 @@ export default function BotPage() {
           {aiProviders && !aiProviders.find((p) => p.key === fields.aiProvider)?.configured && (
             <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2.5">
               {he
-                ? "הספק הנבחר לא מוגדר בשרת כרגע — הבוט ימשיך לענות עד שיוגדר מפתח API עבורו."
+                ? "הספק הנבחר לא מוגדר בשרת — הבוט לא יוכל לענות ללקוחות עד שיוגדר עבורו מפתח API."
                 : "The selected provider isn't configured on the server yet — the bot will fail to reply until an API key is set for it."}
             </div>
           )}
@@ -794,6 +821,13 @@ export default function BotPage() {
                 className="w-full"
               >
                 <option value="">{he ? "אוטומטי (מומלץ)" : "Automatic (recommended)"}</option>
+                {/* A saved model the provider's list no longer carries must still render as an
+                    option: with no matching option the browser falls back to showing "Automatic"
+                    while a specific model is actually pinned — the display lies. */}
+                {fields.aiModel &&
+                  !aiProviders?.find((p) => p.key === fields.aiProvider)?.defaultModels.includes(fields.aiModel) && (
+                    <option value={fields.aiModel}>{fields.aiModel}</option>
+                  )}
                 {aiProviders
                   ?.find((p) => p.key === fields.aiProvider)
                   ?.defaultModels.map((m) => (
