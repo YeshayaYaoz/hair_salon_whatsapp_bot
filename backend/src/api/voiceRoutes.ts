@@ -8,6 +8,7 @@ import { parseBookingTime, instantPartsInTz } from "../lib/timezone.js";
 import { TEMPLATES, isBusinessType } from "../lib/businessTemplates.js";
 // Shared with the owner-notification phone: the same "typed by a human vs formatted by a
 // machine" mismatch this was written for applies wherever those two meet. See lib/phone.ts.
+import { buildServiceDetailsMessage } from "../lib/serviceDetailsMessage.js";
 import { normalizePhone } from "../lib/phone.js";
 import { cachedHebrewVoices } from "../lib/cartesiaAdmin.js";
 import { notifyOwner } from "../lib/ownerNotify.js";
@@ -615,7 +616,10 @@ voiceRouter.post("/send-details", async (req, res) => {
 
   const full = await prisma.business.findUniqueOrThrow({
     where: { id: business.id },
-    select: { name: true, email: true, whatsappPhoneNumberId: true, whatsappAccessToken: true },
+    select: {
+      name: true, email: true, whatsappPhoneNumberId: true, whatsappAccessToken: true,
+      notifyOnDetailsSent: true,
+    },
   });
 
   const lines = [
@@ -658,7 +662,13 @@ voiceRouter.post("/send-details", async (req, res) => {
     }
     const accessToken = decryptSecret(full.whatsappAccessToken);
     await sendWhatsAppMessage({
-      phoneNumberId: full.whatsappPhoneNumberId, accessToken, to: caller, text: lines.join("\n"),
+      phoneNumberId: full.whatsappPhoneNumberId,
+      accessToken,
+      to: caller,
+      // Not lines.join("\n"): that arrived as an unbroken block, because the owner's description
+      // carries its bullets inline and a single newline is a tight wrap on WhatsApp. The email
+      // path keeps `lines` — its template does its own layout.
+      text: buildServiceDetailsMessage(service, full.name),
     });
     // Up to four photos: enough to show the unit, few enough not to flood a phone.
     for (const url of service.imageUrls.slice(0, 4)) {
@@ -677,9 +687,13 @@ voiceRouter.post("/send-details", async (req, res) => {
     });
   }
 
-  // The caller is a warm lead; the notification is what turns "the bot handled it" into an owner
-  // follow-up. Fire-and-forget — a failed heads-up must not fail the send that already happened.
-  void notifyOwner(
+  // Off unless the owner asked for it. The caller is a warm lead and this is what turns "the bot
+  // handled it" into a follow-up — but the bot *did* handle it, and a notification every time
+  // someone asks for pictures is noise in the same channel that carries paid deposits and failed
+  // transfers. An owner who learns to swipe this channel away misses those too.
+  //
+  // Fire-and-forget — a failed heads-up must not fail the send that already happened.
+  if (full.notifyOnDetailsSent) void notifyOwner(
     business.id,
     `📞 שיחת טלפון: נשלחו פרטים ותמונות של "${service.name}" ל${parsed.data.channel === "email" ? `מייל ${parsed.data.toEmail}` : `וואטסאפ ${parsed.data.callerNumber}`}.`
   );

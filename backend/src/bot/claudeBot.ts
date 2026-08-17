@@ -955,8 +955,22 @@ const NEW_CONVERSATION_GAP_MS = 24 * 60 * 60 * 1000;
 /** Whether this incoming message opens a conversation rather than continuing one. Exported for
  * testing: it decides whether the greeting button and quick replies are attached. */
 export function opensNewConversation(history: Turn[], now: Date = new Date()): boolean {
-  const last = history[history.length - 1];
-  if (!last) return true; // nothing said before — either genuinely new, or reset by the owner
+  // Typed turns only. A phone call is written into this same history deliberately — voiceRoutes
+  // /transcript stores it under the caller's number so the two channels read as one thread — but a
+  // call is not a WhatsApp message, and counting it as one is a bug the owner hit on their own
+  // line: they phoned, then wrote "שלום" hours later, and got neither the opening message nor the
+  // greeting button nor the quick replies, because the last "turn" was something they had said out
+  // loud minutes earlier.
+  //
+  // The channel column exists for exactly this class of mistake — its comment in voiceRoutes says a
+  // spoken turn "must never be mistaken for an inbound WhatsApp message" — but Turn dropped the
+  // field before any decision code could read it.
+  //
+  // Only this flag is filtered. The history handed to the model keeps the call, which is the point
+  // of recording it: the greeting goes out, and the reply underneath it still knows what was
+  // discussed on the phone.
+  const last = [...history].reverse().find((t) => t.channel !== "voice");
+  if (!last) return true; // nothing typed before — genuinely new, reset by the owner, or voice-only
   if (!last.at) return false; // undated turn: assume mid-conversation rather than re-greet
   return now.getTime() - last.at.getTime() > NEW_CONVERSATION_GAP_MS;
 }

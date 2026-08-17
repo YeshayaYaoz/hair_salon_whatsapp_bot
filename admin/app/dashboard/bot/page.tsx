@@ -18,6 +18,7 @@ interface BotProfile {
   availabilityInfo?: string;
   pricingNotes?: string;
   availabilitySuggestionsEnabled?: boolean;
+  notifyOnDetailsSent?: boolean;
   aiProvider?: string;
   aiModel?: string | null;
   /** null = use the server default. Kept nullable so the slider can express "back to normal". */
@@ -310,7 +311,7 @@ export default function BotPage() {
     botGreeting: "", botPersonality: "",
     remindersEnabled: true, reviewsEnabled: true,
     cancellationPolicy: "", referralText: "", digestEnabled: true, availabilityInfo: "",
-    pricingNotes: "", availabilitySuggestionsEnabled: true, aiProvider: "anthropic", aiModel: null, aiTemperature: null,
+    pricingNotes: "", availabilitySuggestionsEnabled: true, notifyOnDetailsSent: false, aiProvider: "anthropic", aiModel: null, aiTemperature: null,
     greetingButtonText: "", greetingButtonUrl: "", quickReplies: [],
   });
   const [bookingModel, setBookingModel] = useState<string>("slot");
@@ -338,6 +339,7 @@ export default function BotPage() {
         availabilityInfo: me.availabilityInfo ?? "",
         pricingNotes: me.pricingNotes ?? "",
         availabilitySuggestionsEnabled: me.availabilitySuggestionsEnabled ?? true,
+        notifyOnDetailsSent: me.notifyOnDetailsSent ?? false,
         aiProvider: me.aiProvider ?? "anthropic",
         aiModel: me.aiModel ?? null,
         aiTemperature: me.aiTemperature ?? null,
@@ -733,6 +735,22 @@ export default function BotPage() {
           <label className="flex items-center justify-between gap-3">
             <span className="text-xs text-gray-700">{he ? "סיכום יומי בבוקר (וואטסאפ)" : "Morning daily digest (WhatsApp)"}</span>
             <Toggle checked={fields.digestEnabled ?? true} onChange={(v) => set("digestEnabled", v)} />
+          </label>
+          <label className="flex items-start justify-between gap-3">
+            <span className="min-w-0">
+              <span className="block text-xs text-gray-700">
+                {he ? "עדכון כשהבוט הקולי שולח פרטים ותמונות" : "Alert when the voice bot sends details and photos"}
+              </span>
+              <span className="block text-[11px] text-gray-600 mt-0.5">
+                {he
+                  ? "כבוי כברירת מחדל. הבוט כבר טיפל בבקשה, והתראה על כל בקשת תמונות מרעישה את אותו ערוץ שדרכו מגיעות התראות על מקדמה ששולמה או העברה שנכשלה."
+                  : "Off by default. The bot already handled it, and an alert per photo request adds noise to the same channel that carries paid deposits and failed transfers."}
+              </span>
+            </span>
+            <Toggle
+              checked={fields.notifyOnDetailsSent ?? false}
+              onChange={(v) => set("notifyOnDetailsSent", v)}
+            />
           </label>
         </Section>
 

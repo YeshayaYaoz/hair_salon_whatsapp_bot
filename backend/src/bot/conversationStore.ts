@@ -7,6 +7,15 @@ export interface Turn {
    * reads a message from last week as if it were said just now — "מחר" in an old turn silently
    * means a date that has already passed. See claudeBot's date-stamping of stale turns. */
   at?: Date;
+  /** Which channel wrote the turn — "whatsapp" (the column default) or "voice".
+   *
+   * A phone call is recorded into this same history on purpose, so a caller who then messages is
+   * picked up mid-conversation (voiceRoutes /transcript). But "was this person in contact
+   * recently" and "is this the start of a WhatsApp conversation" are different questions, and
+   * answering the second with the first meant a caller who wrote afterwards got no opening
+   * message, no greeting button and no quick replies. Carried here so callers can tell them
+   * apart; undefined on turns built in tests, which therefore count as typed. */
+  channel?: string;
 }
 
 // Only the last MAX_TURNS are fed to the model; the full history stays in the DB
@@ -88,7 +97,7 @@ export async function getHistory(businessId: string, customerPhone: string): Pro
   // model returned no text). The Anthropic API rejects empty text content blocks outright, so a
   // single stale blank turn here would break every future call for this conversation.
   const turns: Turn[] = rows
-    .map((r) => ({ role: r.role as Turn["role"], content: r.content, at: r.createdAt }))
+    .map((r) => ({ role: r.role as Turn["role"], content: r.content, at: r.createdAt, channel: r.channel }))
     .filter((t) => t.content.trim().length > 0);
   cache.set(k, turns);
   return dropIfIdle(k, businessId, customerPhone, turns);
