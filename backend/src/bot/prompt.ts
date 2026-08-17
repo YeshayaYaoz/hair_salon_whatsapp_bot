@@ -117,9 +117,11 @@ export async function buildSystemPrompt(
   // (each owner invents their own wording), so PLACEHOLDER_RULE explains what they mean and, more
   // importantly, what to do when there is nothing to fill one in with.
   const greeting = greetingSentSeparately
-    // Already sent verbatim as its own message. Leaving the text in would get it half-repeated at
-    // the top of this reply, and the customer would read the same welcome twice in a row.
-    ? "\nהודעת פתיחה כבר נשלחה ללקוח בהודעה נפרדת, רגע לפני זו. אל תברך, אל תציג את העסק ואל תפתח ב\"שלום\" או ב\"ברוכים הבאים\" — ענה ישירות ולעניין להודעה שהלקוח כתב.\n"
+    // Already going out verbatim — either as its own message or joined to the top of this reply
+    // (see whatsappRoutes). Either way, leaving the text in here would get it half-repeated and the
+    // customer would read the same welcome twice. Worded without saying which, because the merge
+    // decision is made later, in the webhook that knows about buttons and body limits.
+    ? "\nהודעת הפתיחה של העסק כבר נמסרה ללקוח — היא נשלחת אוטומטית ואינה באחריותך. אל תברך, אל תציג את העסק ואל תפתח ב\"שלום\" או ב\"ברוכים הבאים\" — ענה ישירות ולעניין להודעה שהלקוח כתב.\n"
     : business.botGreeting
       ? `\nברכה ראשונה (השתמש בה בפתיחת שיחה חדשה):\n${business.botGreeting}\n${PLACEHOLDER_RULE}\n`
       : "";

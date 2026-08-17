@@ -106,6 +106,7 @@ businessRouter.get("/admin/businesses", requireSuperAdmin, async (_req: AuthedRe
       whatsappPhoneNumberId: true, whatsappTokenValid: true,
       paymentProvider: true, invoiceProvider: true, depositEnabled: true,
       notifyOnDetailsSent: true,
+      greetingSeparateMessage: true,
       walletBalanceAgorot: true, messagesUsedThisCycle: true,
       blockedAt: true, blockedReason: true,
       _count: { select: { appointments: true, customers: true, services: true, hours: true } },
@@ -645,6 +646,7 @@ const profileSchema = z.object({
   pricingNotes: z.string().max(600).optional(),
   availabilitySuggestionsEnabled: z.boolean().optional(),
   notifyOnDetailsSent: z.boolean().optional(),
+  greetingSeparateMessage: z.boolean().optional(),
   aiProvider: z.enum(AI_PROVIDER_SELECTION_KEYS).optional(),
   aiModel: z.string().max(100).nullable().optional(),
   // null resets to the app default rather than pinning 0 — the two are different intentions and

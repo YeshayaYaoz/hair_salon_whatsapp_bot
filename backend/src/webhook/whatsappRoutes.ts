@@ -430,20 +430,38 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
     const quickReplies = isFirstReply && business.quickReplies.length > 0 ? business.quickReplies : null;
 
     /**
-     * A new customer gets the owner's welcome as its own message, then the answer to what they
-     * actually asked.
+     * One message by default: the welcome and the answer, separated by a blank line.
      *
-     * Folded into one reply the welcome was paraphrased, trimmed or dropped outright the moment the
-     * model had a real question in front of it — someone opening with "how much for the weekend?"
-     * got straight pricing and never saw it. Sent separately it goes out exactly as written.
+     * Two messages for a single "שלום" reads as a bot talking to itself — the owner saw their own
+     * line do it. Concatenating rather than letting the model weave the welcome in keeps the
+     * original guarantee: folded into the reply by the model it was paraphrased, trimmed or dropped
+     * outright the moment there was a real question in front of it, and someone opening with "how
+     * much for the weekend?" never saw it. Joined here it still goes out exactly as written.
      *
-     * It also ends the fight over the one interactive slot. WhatsApp allows a single button type
-     * per message, so the link button and the quick replies could never both be attached, and the
-     * link button silently lost every time. Across two messages each takes one: the link sits under
-     * the greeting, where the owner put it, and the quick replies sit under the answer, which is
-     * where there is something to reply to.
+     * Two cases still split, and neither can be argued away:
+     *
+     *   * A configured greeting button. WhatsApp allows one button type per message, so a link
+     *     button and the quick replies cannot share one — merging would silently drop whichever
+     *     lost. Across two messages each takes one.
+     *   * A combined body past the interactive limit. sendWhatsAppButtons trims the body to 1024
+     *     characters, and a long welcome plus a reply can cross that: merging would cut the owner's
+     *     text mid-sentence with nothing to say it had happened.
+     *
+     * `greetingSeparateMessage` lets an owner choose the split anyway.
      */
-    if (greetingText) {
+    const INTERACTIVE_BODY_LIMIT = 1024;
+    const willBeInteractive = Boolean((offeredSlots && offeredSlots.length > 0) || quickReplies);
+    const mergedBody = greetingText ? `${greetingText}\n\n${reply}` : reply;
+    const mergeGreeting =
+      Boolean(greetingText) &&
+      !business.greetingSeparateMessage &&
+      !greetingButton &&
+      (!willBeInteractive || mergedBody.length <= INTERACTIVE_BODY_LIMIT);
+
+    // What every branch below sends. Identical to `reply` unless the welcome is riding along.
+    const bodyText = mergeGreeting ? mergedBody : reply;
+
+    if (greetingText && !mergeGreeting) {
       try {
         if (greetingButton) {
           await sendWhatsAppCtaUrl({
@@ -466,18 +484,18 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
         phoneNumberId,
         accessToken,
         to: customerPhone,
-        bodyText: reply,
+        bodyText,
         buttonText: lang === "he" ? "בחר מועד" : "Pick a time",
         sectionTitle: lang === "he" ? "מועדים פנויים" : "Available times",
         rows: buildSlotRows(offeredSlots, lang),
       });
     } else if (quickReplies) {
       try {
-        await sendWhatsAppButtons({ phoneNumberId, accessToken, to: customerPhone, body: reply, buttons: quickReplies });
+        await sendWhatsAppButtons({ phoneNumberId, accessToken, to: customerPhone, body: bodyText, buttons: quickReplies });
       } catch (btnErr) {
         console.error("[whatsapp] Quick replies failed, sending plain text instead:", btnErr);
         captureError(btnErr, { businessId: business.id, customerPhone, kind: "quickReplies" });
-        await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: reply });
+        await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: bodyText });
       }
     } else if (greetingButton && !greetingText) {
       try {
@@ -485,7 +503,7 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
           phoneNumberId,
           accessToken,
           to: customerPhone,
-          body: reply,
+          body: bodyText,
           buttonText: greetingButton.text,
           url: greetingButton.url,
         });
@@ -494,10 +512,10 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
         // must not cost the customer their first reply — fall back to plain text.
         console.error("[whatsapp] Greeting button failed, sending plain text instead:", ctaErr);
         captureError(ctaErr, { businessId: business.id, customerPhone, kind: "greetingButton" });
-        await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: reply });
+        await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: bodyText });
       }
     } else {
-      await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: reply });
+      await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: bodyText });
     }
 
     // Photos go out after the text so the customer reads the lead-in first. Sent one at a time

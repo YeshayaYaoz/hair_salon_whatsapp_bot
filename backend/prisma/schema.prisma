@@ -132,6 +132,11 @@ model Business {
   // for something the bot already handled, and the owner learns to swipe the whole channel away —
   // which is how the alerts that do need them (a paid deposit, a failed transfer) get missed too.
   notifyOnDetailsSent Boolean @default(false)
+  // When true the owner's welcome goes out as its own message, just before the reply. Off by
+  // default: two messages for one "שלום" reads as a bot talking to itself. See whatsappRoutes —
+  // a configured greeting button forces the split regardless, because WhatsApp allows only one
+  // button type per message and the link and the quick replies cannot share it.
+  greetingSeparateMessage Boolean @default(false)
   // Pricing caveats that don't fit a per-item price: package rules, seasons where a discount
   // doesn't apply, and excluded dates (e.g. "בין הזמנים — מחיר מלא לכל לילה", "לא כולל ראש השנה").
   // Deliberately separate from availabilityInfo: that answers "is there room?", this answers
