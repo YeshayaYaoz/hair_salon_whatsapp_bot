@@ -37,7 +37,10 @@ describe("greeting sent as its own message", () => {
 
     // Leaving it in would get it half-repeated at the top of the reply the customer reads next.
     expect(stable).not.toContain("שלום וברוכים הבאים לצימר מירון");
-    expect(stable).toContain("הודעת פתיחה כבר נשלחה");
+    // Worded without claiming *where* the welcome is: the webhook decides late whether it becomes
+    // its own message or the top of this same one, and the prompt must be true either way.
+    expect(stable).toContain("כבר נמסרה ללקוח");
+    expect(stable).toContain("אל תברך");
   });
 
   it("keeps the old behaviour when the greeting is not being sent separately", async () => {
@@ -45,6 +48,6 @@ describe("greeting sent as its own message", () => {
     const { stable } = await buildSystemPrompt("biz1", undefined, false);
 
     expect(stable).toContain("שלום וברוכים הבאים לצימר מירון");
-    expect(stable).not.toContain("הודעת פתיחה כבר נשלחה");
+    expect(stable).not.toContain("כבר נמסרה ללקוח");
   });
 });

@@ -19,6 +19,7 @@ interface BotProfile {
   pricingNotes?: string;
   availabilitySuggestionsEnabled?: boolean;
   notifyOnDetailsSent?: boolean;
+  greetingSeparateMessage?: boolean;
   aiProvider?: string;
   aiModel?: string | null;
   /** null = use the server default. Kept nullable so the slider can express "back to normal". */
@@ -311,7 +312,7 @@ export default function BotPage() {
     botGreeting: "", botPersonality: "",
     remindersEnabled: true, reviewsEnabled: true,
     cancellationPolicy: "", referralText: "", digestEnabled: true, availabilityInfo: "",
-    pricingNotes: "", availabilitySuggestionsEnabled: true, notifyOnDetailsSent: false, aiProvider: "anthropic", aiModel: null, aiTemperature: null,
+    pricingNotes: "", availabilitySuggestionsEnabled: true, notifyOnDetailsSent: false, greetingSeparateMessage: false, aiProvider: "anthropic", aiModel: null, aiTemperature: null,
     greetingButtonText: "", greetingButtonUrl: "", quickReplies: [],
   });
   const [bookingModel, setBookingModel] = useState<string>("slot");
@@ -340,6 +341,7 @@ export default function BotPage() {
         pricingNotes: me.pricingNotes ?? "",
         availabilitySuggestionsEnabled: me.availabilitySuggestionsEnabled ?? true,
         notifyOnDetailsSent: me.notifyOnDetailsSent ?? false,
+        greetingSeparateMessage: me.greetingSeparateMessage ?? false,
         aiProvider: me.aiProvider ?? "anthropic",
         aiModel: me.aiModel ?? null,
         aiTemperature: me.aiTemperature ?? null,
@@ -492,6 +494,22 @@ export default function BotPage() {
               className="w-full"
             />
           </Field>
+        <label className="flex items-start justify-between gap-3 mt-2">
+          <span className="min-w-0">
+            <span className="block text-xs text-gray-700">
+              {he ? "לשלוח את הפתיחה כהודעה נפרדת" : "Send the welcome as its own message"}
+            </span>
+            <span className="block text-[11px] text-gray-600 mt-0.5">
+              {he
+                ? "כבוי: הפתיחה והתשובה מגיעות יחד, כהודעה אחת — כך זה נקרא כמו אדם. דלוק: שתי הודעות, מה שמשאיר מקום גם לכפתור הקישור וגם לתשובות המהירות. אם הגדרת כפתור קישור, הפתיחה נשלחת בנפרד בכל מקרה."
+                : "Off: the welcome and the reply arrive together as one message, which reads like a person. On: two messages, leaving room for both the link button and the quick replies. If you've set a link button, the welcome is sent separately regardless."}
+            </span>
+          </span>
+          <Toggle
+            checked={fields.greetingSeparateMessage ?? false}
+            onChange={(v) => set("greetingSeparateMessage", v)}
+          />
+        </label>
           <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 flex flex-col gap-3">
             <div>
               <p className="text-xs font-semibold text-gray-800">{t.quickRepliesTitle}</p>
