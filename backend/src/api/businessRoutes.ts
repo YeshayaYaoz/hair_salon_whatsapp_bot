@@ -20,7 +20,7 @@ import {
   GoogleBusinessAccessError,
 } from "../lib/googleBusinessProfile.js";
 import { sendWhatsAppMessage, getWabaId, subscribeAppToWaba, registerPhoneNumber, getPhoneNumberStatus, getSubscribedApps, createMessageTemplate, setWhatsAppProfilePicture, type CreateTemplateResult } from "../webhook/whatsappClient.js";
-import { reminderTemplate, reviewTemplate, confirmationTemplate, ownerAlertTemplate, REMINDER_TEMPLATE_BODY, REVIEW_TEMPLATE_BODY, CONFIRMATION_TEMPLATE_BODY, OWNER_ALERT_TEMPLATE_BODY } from "../lib/whatsappTemplates.js";
+import { reminderTemplate, reviewTemplate, confirmationTemplate, ownerAlertTemplate, REMINDER_TEMPLATE_BODY, REVIEW_TEMPLATE_BODY, CONFIRMATION_TEMPLATE_BODY, OWNER_ALERT_TEMPLATE_BODY, REMINDER_TEMPLATE_EXAMPLE, REVIEW_TEMPLATE_EXAMPLE, CONFIRMATION_TEMPLATE_EXAMPLE, OWNER_ALERT_TEMPLATE_EXAMPLE } from "../lib/whatsappTemplates.js";
 import { notifyWaitlist, waitlistOfferText } from "../lib/waitlist.js";
 import { AFFILIATE_PROVIDERS, AFFILIATE_KINDS, recordAffiliateClick, markAffiliateConversion } from "../lib/affiliates.js";
 import { normalizeOwnerPhone } from "../lib/phone.js";
@@ -1072,13 +1072,13 @@ async function submitWhatsAppTemplates(
     const confirmation = confirmationTemplate();
     const ownerAlert = ownerAlertTemplate();
     return await Promise.all([
-      createMessageTemplate(wabaId, accessToken, { name: reminder.name, languageCode: reminder.languageCode, bodyText: REMINDER_TEMPLATE_BODY }),
-      createMessageTemplate(wabaId, accessToken, { name: review.name, languageCode: review.languageCode, bodyText: REVIEW_TEMPLATE_BODY }),
+      createMessageTemplate(wabaId, accessToken, { name: reminder.name, languageCode: reminder.languageCode, bodyText: REMINDER_TEMPLATE_BODY, bodyExample: REMINDER_TEMPLATE_EXAMPLE }),
+      createMessageTemplate(wabaId, accessToken, { name: review.name, languageCode: review.languageCode, bodyText: REVIEW_TEMPLATE_BODY, bodyExample: REVIEW_TEMPLATE_EXAMPLE }),
       // Added late: a booking taken by phone had no written confirmation, and an owner alert sent
       // outside the owner's own 24h window had no template to fall back on — which is how a live
       // call's lead reached nobody while every layer reported success.
-      createMessageTemplate(wabaId, accessToken, { name: confirmation.name, languageCode: confirmation.languageCode, bodyText: CONFIRMATION_TEMPLATE_BODY }),
-      createMessageTemplate(wabaId, accessToken, { name: ownerAlert.name, languageCode: ownerAlert.languageCode, bodyText: OWNER_ALERT_TEMPLATE_BODY }),
+      createMessageTemplate(wabaId, accessToken, { name: confirmation.name, languageCode: confirmation.languageCode, bodyText: CONFIRMATION_TEMPLATE_BODY, bodyExample: CONFIRMATION_TEMPLATE_EXAMPLE }),
+      createMessageTemplate(wabaId, accessToken, { name: ownerAlert.name, languageCode: ownerAlert.languageCode, bodyText: OWNER_ALERT_TEMPLATE_BODY, bodyExample: OWNER_ALERT_TEMPLATE_EXAMPLE }),
     ]);
   } catch (err) {
     console.error(`[whatsapp] Automatic template submission failed for ${businessId} (non-fatal):`, err);

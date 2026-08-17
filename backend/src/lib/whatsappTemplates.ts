@@ -114,3 +114,62 @@ export function ownerAlertTemplate(): TemplateConfig {
 // ends with one, and this template is the hardest case in the file: the whole alert arrives as a
 // single variable, so a bare "{{1}}" is both. The closing sentence is the price of that.
 export const OWNER_ALERT_TEMPLATE_BODY = "התראה חדשה מתורי: {{1}} — כל הפרטים מחכים לך בדשבורד.";
+
+/**
+ * Sample values Meta shows its reviewer, one per {{n}} in the matching body.
+ *
+ * Not decoration and not optional: a template containing variables is rejected outright without
+ * them. The reviewer reads the body with these substituted in, so they have to look like the real
+ * thing — a plausible Hebrew name and a real-looking date, not "x" and "123", which reads as a test
+ * template and gets treated as one.
+ *
+ * Kept beside the bodies deliberately. Adding a variable to a body without adding a sample here is
+ * exactly the change that would slip through, so createMessageTemplate counts them and refuses.
+ */
+export const REMINDER_TEMPLATE_EXAMPLE = ["נועה", "תספורת", "מחר ב-14:30", "מספרת רונית"];
+export const REVIEW_TEMPLATE_EXAMPLE = ["נועה", "מספרת רונית", "תספורת"];
+export const CONFIRMATION_TEMPLATE_EXAMPLE = ["נועה", "תספורת", "יום שלישי 12.8 בשעה 14:30", "מספרת רונית"];
+export const OWNER_ALERT_TEMPLATE_EXAMPLE = ["נועה כהן מעוניינת בתספורת ביום שלישי"];
+
+const DEFAULT_OUTREACH_NAME = "tori_outreach_intro";
+
+/**
+ * Cold outreach from Tori's own number to a business that has never messaged us.
+ *
+ * The only MARKETING template here, and the category is not a label — it is the rule set. A cold
+ * recipient has no open 24-hour window, so free-form text to them is refused outright (131047), and
+ * Meta holds marketing to opt-out requirements that utility messages do not carry. Sending this as
+ * UTILITY to dodge that would be reclassified by Meta anyway, and repeated attempts are what drives
+ * a number's quality rating down until sending is throttled — on the number the whole outreach
+ * channel depends on.
+ *
+ * Which is also why this lives on Tori's own WABA and never on a customer's: outreach collects
+ * blocks and spam reports by its nature, and a salon's number has paying customers to serve.
+ */
+export function outreachTemplate(): TemplateConfig {
+  return { name: process.env.TORI_OUTREACH_TEMPLATE_NAME || DEFAULT_OUTREACH_NAME, languageCode: DEFAULT_LANG };
+}
+
+/**
+ * {{1}} the business's name.
+ *
+ * Constraints this body is shaped by, each of which is a rejection if broken: it may not open or
+ * close with a variable, the variable has whitespace on both sides so it reads as a substitution
+ * rather than a fused word, and it says plainly who is writing and why — an anonymous opener is the
+ * most common reason cold Hebrew marketing templates come back rejected.
+ */
+export const OUTREACH_TEMPLATE_BODY =
+  "היי, כאן תורי אונליין. בנינו עוזר חכם שעונה ללקוחות של {{1}} בוואטסאפ ובטלפון, קובע תורים ומעדכן את היומן — גם אחרי שעות הפעילות וגם כשאתם באמצע עבודה. אפשר לשלוח פרטים קצרים?";
+
+export const OUTREACH_TEMPLATE_EXAMPLE = ["מספרת רונית"];
+
+/**
+ * The opt-out, in the footer and again as a button.
+ *
+ * Both, because they fail differently: the button is one tap and is what most people will use, and
+ * the footer still reads as an opt-out for anyone whose client renders buttons poorly. Meta weighs
+ * a visible, easy opt-out when reviewing marketing templates, and every block avoided is quality
+ * rating kept.
+ */
+export const OUTREACH_TEMPLATE_FOOTER = "לא רלוונטי? השיבו הסר ולא נפנה שוב.";
+export const OUTREACH_TEMPLATE_BUTTONS = ["הסירו אותי"];

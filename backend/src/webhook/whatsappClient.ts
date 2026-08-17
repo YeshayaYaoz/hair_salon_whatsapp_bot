@@ -298,11 +298,61 @@ export interface CreateTemplateResult {
  * templates with the same name+language are reported as an error by Meta ("already exists") —
  * treated as a benign no-op here since it means the template is already set up.
  */
+export interface CreateTemplateParams {
+  name: string;
+  languageCode: string;
+  bodyText: string;
+  category?: "UTILITY" | "MARKETING";
+  /**
+   * One sample value per {{n}}, in order. Meta rejects a template containing variables when this is
+   * absent — the reviewer is shown the body with these substituted in, and cannot judge wording
+   * against bare placeholders.
+   */
+  bodyExample?: string[];
+  /** Small grey line under the body. Takes no variables. Where the opt-out sentence belongs. */
+  footerText?: string;
+  /** Quick-reply buttons, by label. A marketing template needs an opt-out among them. */
+  quickReplies?: string[];
+}
+
+/** How many distinct {{n}} placeholders a body uses. */
+export function countTemplateVariables(bodyText: string): number {
+  const found = new Set(bodyText.match(/\{\{\s*\d+\s*\}\}/g)?.map((m) => m.replace(/\D/g, "")) ?? []);
+  return found.size;
+}
+
 export async function createMessageTemplate(
   wabaId: string,
   accessToken: string,
-  params: { name: string; languageCode: string; bodyText: string; category?: "UTILITY" | "MARKETING" }
+  params: CreateTemplateParams
 ): Promise<CreateTemplateResult> {
+  const variables = countTemplateVariables(params.bodyText);
+  // Caught here rather than at Meta, because Meta's answer for this is a generic rejection that
+  // reads like a wording problem and sends you rewriting perfectly good Hebrew.
+  if (variables > 0 && (params.bodyExample?.length ?? 0) !== variables) {
+    return {
+      name: params.name,
+      submitted: false,
+      error: `Template has ${variables} variable(s) but ${params.bodyExample?.length ?? 0} example value(s). Meta requires one example per variable.`,
+    };
+  }
+
+  const components: Record<string, unknown>[] = [
+    {
+      type: "BODY",
+      text: params.bodyText,
+      // Meta's shape is an array of rows, one row holding every variable's sample.
+      ...(variables > 0 ? { example: { body_text: [params.bodyExample] } } : {}),
+    },
+  ];
+  if (params.footerText) components.push({ type: "FOOTER", text: params.footerText });
+  if (params.quickReplies?.length) {
+    components.push({
+      type: "BUTTONS",
+      buttons: params.quickReplies.map((text) => ({ type: "QUICK_REPLY", text })),
+    });
+  }
+
   const url = `https://graph.facebook.com/${GRAPH_VERSION}/${wabaId}/message_templates`;
   const res = await fetch(url, {
     method: "POST",
@@ -311,7 +361,7 @@ export async function createMessageTemplate(
       name: params.name,
       language: params.languageCode,
       category: params.category ?? "UTILITY",
-      components: [{ type: "BODY", text: params.bodyText }],
+      components,
     }),
   });
   const body = (await res.json()) as { id?: string; status?: string; error?: { message?: string; error_user_msg?: string } };
