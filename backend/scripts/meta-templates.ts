@@ -47,6 +47,30 @@ function bodyOf(t: Record<string, unknown>): string {
 }
 
 async function main() {
+  if (has("discover")) {
+    // Graph answers "Unknown path components: /x" for an edge that does not exist and something
+    // else for one that does, so the account itself can be asked which name is real. Cheaper and
+    // more reliable than reading docs that lag the API — the first guess here,
+    // message_template_libraries, is what the docs' own examples show.
+    const candidates = [
+      "message_template_libraries",
+      "message_template_library",
+      "template_libraries",
+      "template_library",
+      "message_templates",
+    ];
+    for (const edge of candidates) {
+      try {
+        const body = await call(`/${wabaId}/${edge}?limit=1`);
+        const n = ((body.data as unknown[]) ?? []).length;
+        console.log(`✔ /${edge} — exists (${n} row on first page)`);
+      } catch (err) {
+        console.log(`✖ /${edge} — ${(err as Error).message}`);
+      }
+    }
+    return;
+  }
+
   if (has("library")) {
     const lang = arg("lang");
     // The library is a Graph edge like any other. Paging matters: the catalogue is long, and taking
