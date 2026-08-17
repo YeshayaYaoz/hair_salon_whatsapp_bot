@@ -651,6 +651,8 @@ voiceRouter.post("/send-details", async (req, res) => {
     select: {
       name: true, email: true, whatsappPhoneNumberId: true, whatsappAccessToken: true,
       notifyOnDetailsSent: true,
+      // Sent with the price, never separately — see buildServiceDetailsMessage.
+      pricingNotes: true, cancellationPolicy: true,
     },
   });
 
@@ -659,6 +661,11 @@ voiceRouter.post("/send-details", async (req, res) => {
     service.description ?? "",
     service.priceCents ? `מחיר: ${Math.round(service.priceCents / 100)} ש"ח ללילה` : "",
     service.maxGuests ? `עד ${service.maxGuests} אורחים` : "",
+    // The exclusions travel with the number, in the email as in the WhatsApp message: a rate quoted
+    // without them is what a guest books on and the owner has to correct at check-in. Only when
+    // there is a price for them to qualify.
+    service.priceCents && full.pricingNotes?.trim() ? full.pricingNotes.trim() : "",
+    service.priceCents && full.cancellationPolicy?.trim() ? `ביטולים: ${full.cancellationPolicy.trim()}` : "",
     service.linkUrl ? `פרטים נוספים: ${service.linkUrl}` : "",
   ].filter(Boolean);
 
@@ -701,7 +708,10 @@ voiceRouter.post("/send-details", async (req, res) => {
       // Not lines.join("\n"): that arrived as an unbroken block, because the owner's description
       // carries its bullets inline and a single newline is a tight wrap on WhatsApp. The email
       // path keeps `lines` — its template does its own layout.
-      text: buildServiceDetailsMessage(service, full.name),
+      text: buildServiceDetailsMessage(service, full.name, {
+        pricingNotes: full.pricingNotes,
+        cancellationPolicy: full.cancellationPolicy,
+      }),
     });
     // Up to four photos: enough to show the unit, few enough not to flood a phone.
     for (const url of service.imageUrls.slice(0, 4)) {

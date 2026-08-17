@@ -193,8 +193,13 @@ export async function buildSystemPrompt(
     ? `\nמדיניות ביטולים: ${business.cancellationPolicy}\nכאשר לקוח מבטל תור — הזכר את המדיניות בנימוס.\n`
     : "";
 
+  // "כשרלוונטי" was too soft to hold: it left the model to judge when an exclusion mattered, and
+  // the moment it always matters is the moment a number is said out loud. A rate quoted without its
+  // exclusions is what a guest books on and the owner has to correct at check-in.
   const pricingNote = `\n${PRICING_RULE}${
-    business.pricingNotes ? `\nכללי תמחור נוספים שחשוב למסור כשרלוונטי: ${business.pricingNotes}` : ""
+    business.pricingNotes
+      ? `\nכללי תמחור והחרגות: ${business.pricingNotes}\nבכל פעם שאתה מוסר מחיר — מסור גם את ההחרגות האלה באותה הודעה, גם אם לא שאלו.`
+      : ""
   }\n`;
 
   // Vertical vocabulary: tell the bot which words to use for this business's category, so a clinic
