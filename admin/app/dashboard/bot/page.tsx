@@ -361,7 +361,81 @@ function VoicePhoneSection() {
         </div>
       )}
       <VoiceSelect />
+      <VoiceLanguageSelect />
       {current ? <VoiceMinutes /> : null}
+    </div>
+  );
+}
+
+
+/**
+ * Which language the phone bot listens in.
+ *
+ * Separate from the voice, which is how it speaks. Speech recognition pinned to the language
+ * actually being spoken is markedly more accurate than one left to guess — an unpinned transcriber
+ * turned a spoken email address into a repeated number on a live call — but a salon whose callers
+ * switch between Hebrew and English cannot be pinned to either. Only the owner knows which they are.
+ */
+function VoiceLanguageSelect() {
+  const { lang } = useLanguage();
+  const he = lang === "he";
+  const [value, setValue] = useState<string | null>(null); // null = loading
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    apiFetch<{ voiceLanguage?: string }>("/api/business/me")
+      .then((me) => setValue(me.voiceLanguage ?? "he"))
+      .catch(() => setValue("he"));
+  }, []);
+
+  async function save(next: string) {
+    const previous = value;
+    setValue(next);
+    setSaving(true);
+    try {
+      await apiFetch("/api/business/me", { method: "PUT", body: JSON.stringify({ voiceLanguage: next }) });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      setValue(previous);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (value === null) return null;
+
+  const options = [
+    { key: "he", he: "עברית בלבד", en: "Hebrew only" },
+    { key: "en", he: "אנגלית בלבד", en: "English only" },
+    { key: "multilingual", he: "עברית ואנגלית", en: "Hebrew and English" },
+  ];
+
+  return (
+    <div className="mt-4 pt-4 border-t border-gray-200">
+      <label htmlFor="voice-language" className="block text-xs font-medium text-gray-600 mb-1.5">
+        {he ? "באיזו שפה מתקשרים אליך" : "What language your callers speak"}
+      </label>
+      <div className="flex items-center gap-2 flex-wrap">
+        <select
+          id="voice-language"
+          value={value}
+          disabled={saving}
+          onChange={(e) => save(e.target.value)}
+          className="flex-1 min-w-[200px] disabled:opacity-50"
+        >
+          {options.map((o) => (
+            <option key={o.key} value={o.key}>{he ? o.he : o.en}</option>
+          ))}
+        </select>
+        {saved && <SavedBadge text={he ? "נשמר" : "Saved"} />}
+      </div>
+      <p className="text-xs text-gray-600 mt-2">
+        {he
+          ? "כשהבוט יודע מראש באיזו שפה ידברו איתו, הוא מבין הרבה יותר טוב — במיוחד מספרים, שמות וכתובות מייל. בחר בשתי השפות רק אם באמת מתקשרים אליך בשתיהן: זה גמיש יותר, אבל קצת פחות מדויק בכל אחת."
+          : "The bot understands far more when it knows in advance which language it will hear — especially numbers, names and email addresses. Choose both languages only if callers really do use both: it is more flexible, and slightly less accurate in each."}
+      </p>
     </div>
   );
 }
