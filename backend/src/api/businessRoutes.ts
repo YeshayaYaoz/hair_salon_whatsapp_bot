@@ -205,8 +205,19 @@ businessRouter.get("/voice-usage", async (req: AuthedRequest, res) => {
     };
   };
 
+  // The last handful of calls, with Cartesia's own summary of each. This is what the owner opens
+  // the page for once the numbers stop being new: not "40 calls" but "what did they want".
+  // Only calls the webhook delivered carry a summary — a row written by the hourly sync has none,
+  // and shows as a call with a duration and no description rather than being hidden.
+  const recent = await prisma.apiUsageEvent.findMany({
+    where: { businessId: req.businessId!, kind: "voice_call" },
+    select: { createdAt: true, durationSeconds: true, summary: true },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+  });
+
   const [month, last30d] = await Promise.all([window(monthStart), window(thirtyDaysAgo)]);
-  res.json({ month, last30d });
+  res.json({ month, last30d, recent });
 });
 
 businessRouter.get("/admin/usage-by-phone", requireSuperAdmin, async (req: AuthedRequest, res) => {

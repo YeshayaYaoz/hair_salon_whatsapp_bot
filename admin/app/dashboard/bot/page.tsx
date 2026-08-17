@@ -300,6 +300,12 @@ interface VoiceUsageWindow {
   costAgorot: number;
 }
 
+interface RecentVoiceCall {
+  createdAt: string;
+  durationSeconds: number | null;
+  summary: string | null;
+}
+
 /**
  * How much the phone line has actually been used.
  *
@@ -312,12 +318,18 @@ interface VoiceUsageWindow {
 function VoiceMinutes() {
   const { lang } = useLanguage();
   const he = lang === "he";
-  const [usage, setUsage] = useState<{ month: VoiceUsageWindow; last30d: VoiceUsageWindow } | null>(null);
+  const [usage, setUsage] = useState<{
+    month: VoiceUsageWindow;
+    last30d: VoiceUsageWindow;
+    recent: RecentVoiceCall[];
+  } | null>(null);
 
   useEffect(() => {
     // Silent on failure: this is a figure beside the settings, not the settings. An owner changing
     // their number should not meet an error about a usage counter.
-    apiFetch<{ month: VoiceUsageWindow; last30d: VoiceUsageWindow }>("/api/business/voice-usage")
+    apiFetch<{ month: VoiceUsageWindow; last30d: VoiceUsageWindow; recent: RecentVoiceCall[] }>(
+      "/api/business/voice-usage"
+    )
       .then(setUsage)
       .catch(() => {});
   }, []);
@@ -345,11 +357,41 @@ function VoiceMinutes() {
       </div>
       <p className="text-xs text-gray-600 mt-2">
         {he
-          ? "זמן שיחה בפועל שהבוט ענה לו, נמדד לפי רישומי הספק. מתעדכן כל שעה."
-          : "Actual talk time the bot answered, measured from the provider's own call records. Updates hourly."}
+          ? "זמן שיחה בפועל שהבוט ענה לו, נמדד לפי רישומי הספק."
+          : "Actual talk time the bot answered, measured from the provider's own call records."}
       </p>
+
+      {usage.recent.length > 0 && (
+        <div className="mt-4">
+          <h3 className="text-xs font-semibold text-gray-900 mb-2">
+            {he ? "השיחות האחרונות" : "Recent calls"}
+          </h3>
+          <ul className="space-y-2">
+            {usage.recent.map((c, i) => (
+              <li key={i} className="flex items-start gap-3 text-xs">
+                <span className="text-gray-600 tabular-nums whitespace-nowrap shrink-0">
+                  {new Date(c.createdAt).toLocaleDateString(he ? "he-IL" : "en-GB", { day: "numeric", month: "short" })}
+                  {" · "}
+                  {formatDuration(c.durationSeconds)}
+                </span>
+                <span className="text-gray-700">
+                  {/* A call the hourly sync recorded has no summary — the provider only sends one
+                      with the live event. Saying so beats an empty cell that reads as a bug. */}
+                  {c.summary || (he ? "—" : "—")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
+}
+
+/** m:ss — a phone call is minutes and seconds to everyone who has ever been on one. */
+function formatDuration(seconds: number | null): string {
+  if (!seconds) return "0:00";
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
 type BotTab = "personality" | "ai" | "policy" | "automated" | "voice";

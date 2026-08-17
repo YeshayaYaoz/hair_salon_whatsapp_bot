@@ -335,7 +335,23 @@ export interface CartesiaCall {
   end_time?: string | null;
   status?: string | null;
   end_reason?: string | null;
+  summary?: string | null;
   telephony_params?: { to?: string | null; from?: string | null; call_sid?: string | null } | null;
+  /**
+   * Present on webhook deliveries and on Get Call. Each entry is one utterance, and the two timing
+   * fields are the only place the agent's live latency is reported — `tts_ttfb` is seconds to the
+   * agent's first audio, which is the number the whole benchmark was trying to approximate offline.
+   */
+  transcript?: CartesiaTurn[] | null;
+}
+
+export interface CartesiaTurn {
+  id?: number;
+  role?: string;
+  text?: string | null;
+  was_interrupted?: boolean | null;
+  stt_ttfb?: number | null;
+  tts_ttfb?: number | null;
 }
 
 interface CallPage {
@@ -376,4 +392,17 @@ export async function listAgentCalls(since: Date, maxPages = 20): Promise<Cartes
   }
 
   return calls.filter((c) => new Date(c.start_time).getTime() >= since.getTime());
+}
+
+/**
+ * One call by id, with its transcript.
+ *
+ * Needed because webhook events can arrive out of order: `post_call_analysis` carries a summary
+ * for a call whose `call_completed` may not have landed yet, and a summary written against a row
+ * that does not exist is a summary lost. Fetching the call closes that gap without waiting for the
+ * hourly sync to invent the row.
+ */
+export async function getAgentCall(callId: string): Promise<CartesiaCall> {
+  const { apiKey } = creds();
+  return call<CartesiaCall>(`/agents/calls/${encodeURIComponent(callId)}`, apiKey);
 }

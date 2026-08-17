@@ -18,11 +18,13 @@ import { runDepositExpiryJob } from "./lib/depositExpiryJob.js";
 import { runMetricSnapshotJob } from "./billing/metricSnapshotJob.js";
 import { runWhatsAppHealthJob } from "./lib/whatsappHealthJob.js";
 import { runVoiceUsageSyncJob } from "./lib/voiceUsage.js";
+import { runVoiceBudgetAlertJob } from "./lib/voiceBudgetAlert.js";
 import { runTrackedJob } from "./lib/jobStatus.js";
 import { runHealthDigestJob } from "./lib/healthDigest.js";
 import { runAiCostAlertJob } from "./lib/aiCostAlerts.js";
 import { leadFinderRouter } from "./leadfinder/routes.js";
 import { voiceRouter } from "./api/voiceRoutes.js";
+import { cartesiaWebhookRouter } from "./webhook/cartesiaWebhookRoutes.js";
 import { UPLOADS_ROUTE, UPLOADS_ROOT, UnsupportedImageError, MAX_UPLOAD_BYTES, checkUploadsDir } from "./lib/storage.js";
 import multer from "multer";
 
@@ -93,6 +95,11 @@ app.use("/api/business", businessRouter);
 app.use("/api/billing", payplusBillingRouter);
 app.use("/api/leadfinder", leadFinderRouter);
 app.use("/api/voice", voiceRouter);
+// Mounted apart from voiceRouter on purpose: everything under /api/voice sits behind
+// requireCartesiaAuth and our own shared secret, which Cartesia's webhook does not send — it
+// authenticates with its own secret in x-webhook-secret. Hanging it off the same router would mean
+// either poking a hole in that middleware or rejecting every delivery.
+app.use("/api/cartesia", cartesiaWebhookRouter);
 
 /**
  * Answers "is it up" and — the part that matters — "which code is up".
@@ -233,3 +240,10 @@ runTrackedJob("whatsappHealth", runWhatsAppHealthJob);
 // stored under Cartesia's own id with a unique index behind it.
 setInterval(() => runTrackedJob("voiceUsage", runVoiceUsageSyncJob), ONE_HOUR);
 runTrackedJob("voiceUsage", runVoiceUsageSyncJob);
+
+// Straight after the sync, so it reads a ledger that was just brought up to date rather than one
+// an hour behind. Cartesia's prepaid balance cannot be read from the API — the endpoints that would
+// answer it want a console session — so this is the only warning that exists before the phone line
+// simply stops answering.
+setInterval(() => runTrackedJob("voiceBudget", runVoiceBudgetAlertJob), ONE_HOUR);
+runTrackedJob("voiceBudget", runVoiceBudgetAlertJob);
