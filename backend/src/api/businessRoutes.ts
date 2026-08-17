@@ -1102,17 +1102,21 @@ businessRouter.put("/me/voice-phone", async (req: AuthedRequest, res) => {
 /**
  * Orders a phone number for the business and wires it, or asks the operator when they are on trial.
  *
- * Two different 4xx meanings are kept apart on purpose: 402 says "subscribe and this works", 409
- * says "you already have one". Collapsing them into a generic error is how a paying customer gets
- * told to subscribe.
+ * A trial gets 200 with an approval_requested status rather than an error: the call worked, and the
+ * outcome is that a person will look at it. Only genuine failures are non-2xx — 409 for a business
+ * that already has a number, 503 when the carrier is not configured, 502 for anything else.
  */
 businessRouter.post("/me/voice-phone/provision", async (req: AuthedRequest, res) => {
   try {
     const result = await provisionVoiceNumber(req.businessId!);
+    // 200, not 402. The request succeeded — it was accepted and recorded, and someone will act on
+    // it; "not a paying customer" describes the outcome, not a failed call. The shared apiFetch
+    // throws on any non-2xx and keeps only the message, so a 4xx here would reach the owner as
+    // "הבקשה נכשלה (402)" — an error for something that worked.
     if (result.status === "approval_requested") {
-      return res.status(402).json({
+      return res.json({
         status: "approval_requested",
-        message: "בקשה למספר נשלחה לאישור. מנוי פעיל מאפשר לקבל מספר מיד.",
+        message: "הבקשה נשלחה לאישור ונחזור אליכם. עם מנוי פעיל המספר מונפק מיד.",
       });
     }
     return res.json({ status: "ordered", number: result.number });

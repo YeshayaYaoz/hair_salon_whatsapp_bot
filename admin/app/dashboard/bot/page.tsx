@@ -187,13 +187,49 @@ function VoicePhoneSection() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Shapes the wording only. The server decides who may order — duplicating that rule here would
+  // give it two homes, and the copy is the half that would quietly fall out of date.
+  const [paying, setPaying] = useState(false);
+  const [ordering, setOrdering] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch<{ voicePhoneNumber?: string | null }>("/api/business/me").then((me) => {
+    apiFetch<{ voicePhoneNumber?: string | null; subscriptionStatus?: string }>("/api/business/me").then((me) => {
       setCurrent(me.voicePhoneNumber ?? null);
       setValue(me.voicePhoneNumber ?? "");
+      setPaying(me.subscriptionStatus === "active");
     });
   }, []);
+
+  async function provision() {
+    // A number is a recurring monthly charge, so the click that starts one is confirmed. The
+    // confirm text names the cost rather than asking "are you sure", which tells nobody anything.
+    const confirmText = he
+      ? "להנפיק מספר טלפון חדש לעסק? המספר כרוך בתשלום חודשי ויתחיל לענות לשיחות מיד."
+      : "Get a new phone number for the business? It carries a monthly charge and will start answering calls right away.";
+    if (paying && !window.confirm(confirmText)) return;
+
+    setOrdering(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await apiFetch<{ status: string; number?: string; message?: string }>(
+        "/api/business/me/voice-phone/provision",
+        { method: "POST" }
+      );
+      if (result.status === "ordered" && result.number) {
+        setCurrent(result.number);
+        setValue(result.number);
+        setNotice(he ? `המספר ${result.number} הונפק וחובר.` : `Number ${result.number} is live.`);
+        return;
+      }
+      setNotice(result.message ?? (he ? "הבקשה נשלחה." : "Request sent."));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : he ? "ההנפקה נכשלה" : "Could not get a number");
+    } finally {
+      setOrdering(false);
+    }
+  }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -288,6 +324,32 @@ function VoicePhoneSection() {
         </form>
       )}
       {error && <p className="text-red-600 text-xs mt-2">{error}</p>}
+      {notice && <p className="text-green-700 text-xs mt-2">{notice}</p>}
+      {current === null && (
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <p className="text-xs text-gray-600 mb-2">
+            {he
+              ? paying
+                ? "אין לכם מספר נפרד? אפשר להנפיק אחד עכשיו — הוא יחובר לבוט אוטומטית."
+                : "אין לכם מספר נפרד? אפשר לבקש אחד. עם מנוי פעיל המספר מונפק מיד, אחרת הבקשה עוברת לאישור."
+              : paying
+                ? "No separate line? Get one now — it is connected to the bot automatically."
+                : "No separate line? Request one. With an active subscription it is issued immediately, otherwise it goes for approval."}
+          </p>
+          <button
+            type="button"
+            onClick={provision}
+            disabled={ordering || saving}
+            className="bg-white border border-[#1B7FA0] text-[#1B7FA0] hover:bg-[#1B7FA0] hover:text-white disabled:opacity-50 text-sm font-semibold px-4 py-2 rounded-lg transition"
+          >
+            {ordering
+              ? he ? "מנפיק..." : "Getting a number..."
+              : paying
+                ? he ? "הנפיקו לי מספר" : "Get me a number"
+                : he ? "בקשו מספר" : "Request a number"}
+          </button>
+        </div>
+      )}
       <VoiceSelect />
       {current ? <VoiceMinutes /> : null}
     </div>
