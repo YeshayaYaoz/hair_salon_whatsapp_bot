@@ -97,13 +97,20 @@ function VoiceSelect() {
     }
   }
 
+  // Male and female only. Cartesia's catalogue also carries gender_neutral and unlabelled voices,
+  // but the agent inflects its Hebrew from the chosen voice's gender, and Hebrew has no neutral
+  // register to inflect into — a "neutral" voice still ends up speaking as one or the other, just
+  // unpredictably. So the choice offered is the choice that actually exists.
   const groups: { key: string; labelHe: string; labelEn: string }[] = [
-    { key: "feminine", labelHe: "קול נשי", labelEn: "Female voice" },
-    { key: "masculine", labelHe: "קול גברי", labelEn: "Male voice" },
-    { key: "gender_neutral", labelHe: "קול ניטרלי", labelEn: "Neutral voice" },
+    { key: "feminine", labelHe: "נקבה", labelEn: "Female" },
+    { key: "masculine", labelHe: "זכר", labelEn: "Male" },
   ];
-  // Voices Cartesia gives no gender for still have to be reachable, or they simply vanish.
-  const ungrouped = (voices ?? []).filter((v) => !groups.some((g) => g.key === v.gender));
+  // A voice picked before this narrowing (or set by us directly) may fall outside the two groups.
+  // It must stay visible while selected: with no matching option the browser displays "default"
+  // while a specific voice is actually pinned — and saving anything else keeps that hidden pin.
+  const chosenOutside = (voices ?? []).find(
+    (v) => v.id === selected && !groups.some((g) => g.key === v.gender)
+  );
 
   if (voices === null) {
     return (
@@ -146,13 +153,7 @@ function VoiceSelect() {
                   </optgroup>
                 );
               })}
-              {ungrouped.length > 0 && (
-                <optgroup label={he ? "אחר" : "Other"}>
-                  {ungrouped.map((v) => (
-                    <option key={v.id} value={v.id}>{v.name}</option>
-                  ))}
-                </optgroup>
-              )}
+              {chosenOutside && <option value={chosenOutside.id}>{chosenOutside.name}</option>}
             </select>
             {saved && <SavedBadge text={he ? "נשמר" : "Saved"} />}
           </div>
@@ -225,9 +226,10 @@ function VoicePhoneSection() {
         { method: "POST" }
       );
       if (result.status === "ordered" && result.number) {
+        const shown = result.number.startsWith("+") ? result.number : `+${result.number}`;
         setCurrent(result.number);
-        setValue(result.number);
-        setNotice(he ? `המספר ${result.number} הונפק וחובר.` : `Number ${result.number} is live.`);
+        setValue(shown);
+        setNotice(he ? `המספר ${shown} הונפק וחובר.` : `Number ${shown} is live.`);
         return;
       }
       setNotice(result.message ?? (he ? "הבקשה נשלחה." : "Request sent."));
