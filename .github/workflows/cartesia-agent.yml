@@ -102,6 +102,12 @@ jobs:
           # Cartesia's own words for the thing the caller experiences as dead air.
           echo "is_live=$(echo "$out" | jq -r '.is_live // "?"')  stopped_for_inactivity=$(echo "$out" | jq -r '.stopped_for_inactivity // "?"')"
 
+          # The speech settings, which decide whether a Hebrew caller is understood at all and are
+          # set on the account rather than in this repo — so they are invisible to every other
+          # check we have. `ink-2` is documented as English-only; a Hebrew line on it would
+          # transcribe callers into nonsense while every log stayed green. Model names, not secrets.
+          echo "speech: stt=$(echo "$out" | jq -r '.stt_preset // "(unset)"')  tts=$(echo "$out" | jq -r '.tts_model // "(unset)"')  lang=$(echo "$out" | jq -r '.tts_language // "(unset)"')  noise_suppression=$(echo "$out" | jq -r '.noise_suppression_level // "(unset)"')"
+
       - name: Replace the console prompt and greeting with markers
         if: inputs.clear_console_prompt
         run: |
