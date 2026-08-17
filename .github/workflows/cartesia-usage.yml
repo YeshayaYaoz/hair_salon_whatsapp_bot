@@ -66,11 +66,16 @@ jobs:
             if [ "${{ inputs.shape_only }}" != "true" ]; then
               # There is no duration field — a call is a start_time and an end_time, and the
               # billable minutes are the difference. That subtraction is the whole point of this.
+              #
+              # fromdateiso8601 parses exactly "…:SSZ": it rejects the fractional seconds and the
+              # "+00:00" offset these timestamps actually carry, and jq's failure there is silent
+              # enough that the first run of this printed a column of "?" instead of an error.
               jq -r '
-                (if type == "array" then . else .data end) | .[]
-                | "   \(.start_time)  →  \(.end_time // "(open)")   \(
-                    if .end_time then ((.end_time | fromdateiso8601) - (.start_time | fromdateiso8601) | tostring + "s") else "-" end
-                  )   \(.status)/\(.end_reason // "-")"
-              ' /tmp/out.json 2>/dev/null | head -20 || true
+                def secs: sub("\\.[0-9]+"; "") | sub("\\+00:00$"; "Z") | fromdateiso8601;
+                (if type == "array" then . else .data end)
+                | map(select(.end_time) | { start: .start_time, d: ((.end_time | secs) - (.start_time | secs)), s: "\(.status)/\(.end_reason // "-")" })
+                | (.[] | "   \(.start)  \(.d)s  \(.s)"),
+                  "   ── \(length) ended call(s), \(map(.d) | add // 0)s total, $\((map(.d / 60 | ceil) | add // 0) * 0.06 | . * 100 | round / 100)"
+              ' /tmp/out.json || true
             fi
           done
