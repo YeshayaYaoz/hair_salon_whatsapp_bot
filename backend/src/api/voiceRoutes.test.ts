@@ -499,7 +499,6 @@ describe("POST /api/voice/check-availability", () => {
 
   it("404s for an unknown service and lists the real ones", async () => {
     mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
-    mockPrisma.service.findFirst.mockResolvedValue(null);
     mockPrisma.service.findMany.mockResolvedValue([{ name: "Haircut" }]);
 
     const res = await request(app)
@@ -513,7 +512,7 @@ describe("POST /api/voice/check-availability", () => {
 
   it("returns slots with a formatted local time", async () => {
     mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
-    mockPrisma.service.findFirst.mockResolvedValue({ id: "svc1", durationMin: 30 });
+    mockPrisma.service.findMany.mockResolvedValue([{ id: "svc1", name: "Haircut", durationMin: 30 }]);
     mockFindAvailableSlots.mockResolvedValue([{ startTime: "2026-08-01T10:00:00.000Z", endTime: "2026-08-01T10:30:00.000Z", staffId: null }]);
 
     const res = await request(app)
@@ -540,7 +539,7 @@ describe("POST /api/voice/book", () => {
 
   it("books and returns the appointment id", async () => {
     mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
-    mockPrisma.service.findFirst.mockResolvedValue({ id: "svc1", name: "Haircut" });
+    mockPrisma.service.findMany.mockResolvedValue([{ id: "svc1", name: "Haircut" }]);
     mockBookAppointmentWithSideEffects.mockResolvedValue({
       id: "appt1",
       startTime: new Date("2026-08-01T10:00:00Z"),
@@ -563,7 +562,7 @@ describe("POST /api/voice/book", () => {
 
   it("returns 409 when the slot was taken concurrently", async () => {
     mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
-    mockPrisma.service.findFirst.mockResolvedValue({ id: "svc1", name: "Haircut" });
+    mockPrisma.service.findMany.mockResolvedValue([{ id: "svc1", name: "Haircut" }]);
     const { SlotUnavailableError } = await import("../booking/availability.js");
     mockBookAppointmentWithSideEffects.mockRejectedValue(new SlotUnavailableError());
 
@@ -754,7 +753,7 @@ describe("POST /api/voice/send-details", () => {
     app.use("/api/voice", voiceRouter);
 
     mockPrisma.business.findMany.mockResolvedValue([voiceBusiness()]);
-    mockPrisma.service.findFirst.mockResolvedValue(unit);
+    mockPrisma.service.findMany.mockResolvedValue([unit]);
     mockPrisma.business.findUniqueOrThrow.mockResolvedValue({
       name: "בנחת רוח", email: "owner@zimmer.test", whatsappPhoneNumberId: "pn1", whatsappAccessToken: "enc",
     });
@@ -800,7 +799,7 @@ describe("POST /api/voice/send-details", () => {
   });
 
   it("404s an unknown unit rather than sending something vague", async () => {
-    mockPrisma.service.findFirst.mockResolvedValue(null);
+    mockPrisma.service.findMany.mockResolvedValue([]);
     expect((await post({ channel: "email", toEmail: "caller@x.test" })).status).toBe(404);
   });
 });
