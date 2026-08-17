@@ -77,6 +77,8 @@ async function main() {
     console.log();
   }
 
+  await printServiceNames();
+
   const status = await voiceBudgetStatus();
   console.log(
     `Month to date: ${status.calls} call(s), ${status.billedMinutes} billed minute(s), ` +
@@ -90,3 +92,29 @@ main()
     process.exitCode = 1;
   })
   .finally(() => prisma.$disconnect());
+
+/**
+ * Service names as stored, next to what a voice tool would have to send to match them.
+ *
+ * A live call failed four times on `Unknown service` for a unit that plainly exists, and the lookup
+ * is an exact case-insensitive equals. So the question is not "is it there" but "is the string the
+ * agent sends the same string" — and the differences that break an equals are the ones you cannot
+ * see: a trailing space, a directional mark, a curly quote. Hence the codepoints.
+ */
+export async function printServiceNames() {
+  const businesses = await prisma.business.findMany({
+    where: { voicePhoneNumber: { not: null } },
+    select: { id: true, name: true, services: { select: { name: true } } },
+  });
+
+  console.log("\nVoice-enabled businesses and their service names:");
+  for (const b of businesses) {
+    console.log(`\n  ${b.name}`);
+    for (const s of b.services) {
+      const codes = [...s.name].map((ch) => ch.codePointAt(0)!.toString(16).padStart(4, "0")).join(" ");
+      const suspicious = /^\s|\s$|[‎‏‪-‮⁦-⁩"'׳״]/.test(s.name);
+      console.log(`    ${JSON.stringify(s.name)}${suspicious ? "   ← has whitespace, quotes or a bidi mark" : ""}`);
+      console.log(`      U+ ${codes}`);
+    }
+  }
+}

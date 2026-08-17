@@ -10,6 +10,8 @@ import { TEMPLATES, isBusinessType } from "../lib/businessTemplates.js";
 // machine" mismatch this was written for applies wherever those two meet. See lib/phone.ts.
 import { buildServiceDetailsMessage } from "../lib/serviceDetailsMessage.js";
 import { normalizePhone } from "../lib/phone.js";
+// The same reason phone.ts exists, for the other identifier a caller reads out loud.
+import { normalizeSpokenEmail } from "../lib/spokenEmail.js";
 import { cachedHebrewVoices } from "../lib/cartesiaAdmin.js";
 import { notifyOwner } from "../lib/ownerNotify.js";
 import { logClaudeUsage } from "../lib/usageLedger.js";
@@ -609,7 +611,10 @@ voiceRouter.post("/send-details", async (req, res) => {
       serviceName: z.string().min(1),
       channel: z.enum(["whatsapp", "email"]),
       callerNumber: z.string().optional(),
-      toEmail: z.string().email().optional(),
+      // Not .email() — see normalizeSpokenEmail. What arrives here was said out loud on a phone
+      // call, so rejecting it at the schema is how a real caller ended up with no photos and a bot
+      // saying it had failed. It is validated below, after being read as speech.
+      toEmail: z.string().optional(),
     })
     .safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Invalid send-details payload" });
@@ -640,6 +645,7 @@ voiceRouter.post("/send-details", async (req, res) => {
     service.linkUrl ? `פרטים נוספים: ${service.linkUrl}` : "",
   ].filter(Boolean);
 
+  let sentToEmail: string | null = null;
   if (parsed.data.channel === "whatsapp") {
     const caller = parsed.data.callerNumber?.trim();
     if (!caller || caller === "unknown") {
@@ -686,8 +692,18 @@ voiceRouter.post("/send-details", async (req, res) => {
     }
   } else {
     if (!parsed.data.toEmail) return res.status(400).json({ error: "toEmail is required for the email channel" });
+    const toEmail = normalizeSpokenEmail(parsed.data.toEmail);
+    sentToEmail = toEmail;
+    if (!toEmail) {
+      // Phrased for the agent, which is the only reader: it needs to know what to do next on a live
+      // call, not that a regular expression did not match.
+      return res.status(400).json({
+        error:
+          "לא הצלחתי לקרוא את כתובת המייל. בקש מהמתקשר לאיית אותה אות-אות, או שלח לוואטסאפ שלו במקום.",
+      });
+    }
     await sendUnitDetailsEmail({
-      to: parsed.data.toEmail,
+      to: toEmail,
       replyTo: full.email,
       businessName: full.name,
       unitName: service.name,
@@ -705,7 +721,9 @@ voiceRouter.post("/send-details", async (req, res) => {
   // Fire-and-forget — a failed heads-up must not fail the send that already happened.
   if (full.notifyOnDetailsSent) void notifyOwner(
     business.id,
-    `📞 שיחת טלפון: נשלחו פרטים ותמונות של "${service.name}" ל${parsed.data.channel === "email" ? `מייל ${parsed.data.toEmail}` : `וואטסאפ ${parsed.data.callerNumber}`}.`
+    // The normalized address, not what was dictated: the owner needs the mailbox the message
+    // actually reached, which is the point of writing it down for them at all.
+    `📞 שיחת טלפון: נשלחו פרטים ותמונות של "${service.name}" ל${parsed.data.channel === "email" ? `מייל ${sentToEmail}` : `וואטסאפ ${parsed.data.callerNumber}`}.`
   );
 
   res.json({ sent: true, photos: Math.min(service.imageUrls.length, 4) });
