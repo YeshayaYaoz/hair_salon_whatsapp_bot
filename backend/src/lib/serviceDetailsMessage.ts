@@ -46,11 +46,23 @@ export interface ServiceDetails {
   linkUrl?: string | null;
 }
 
+/** The business's own rules, carried alongside the unit so the price never travels without them. */
+export interface PricingContext {
+  /** e.g. "המחירים לא כוללים ראש השנה ולג בעומר" — exclusions the quoted price does not cover. */
+  pricingNotes?: string | null;
+  /** Shown with the price because that is when someone decides, not when they cancel. */
+  cancellationPolicy?: string | null;
+}
+
 /**
  * Sections separated by a blank line, because WhatsApp renders a single newline as a tight wrap and
  * the eye reads the whole thing as one paragraph.
  */
-export function buildServiceDetailsMessage(service: ServiceDetails, businessName: string): string {
+export function buildServiceDetailsMessage(
+  service: ServiceDetails,
+  businessName: string,
+  pricing: PricingContext = {}
+): string {
   const sections: string[] = [`${bold(service.name)} — ${businessName}`];
 
   const description = service.description?.trim();
@@ -63,6 +75,20 @@ export function buildServiceDetailsMessage(service: ServiceDetails, businessName
   if (service.priceCents) facts.push(bold(`מחיר: ${Math.round(service.priceCents / 100)} ש"ח ללילה`));
   if (service.maxGuests) facts.push(`עד ${service.maxGuests} אורחים`);
   if (facts.length) sections.push(facts.join("\n"));
+
+  // The rules that qualify the number above, attached to it rather than left to be asked for.
+  //
+  // A price quoted without its exclusions is not a quote, it is the start of an argument: the guest
+  // who books Rosh Hashanah at the ordinary rate finds out at check-in, and the owner has to be the
+  // one to tell them. The same message is what a warm lead reads while deciding, which is the only
+  // moment the cancellation terms can still affect a decision rather than a dispute — so both live
+  // here, under the price, and only when there is a price to qualify.
+  if (facts.length) {
+    const notes = pricing.pricingNotes?.trim();
+    const policy = pricing.cancellationPolicy?.trim();
+    if (notes) sections.push(notes);
+    if (policy) sections.push(`ביטולים: ${policy}`);
+  }
 
   // Labelled "פרטים נוספים" rather than "קישור": owners put prose in this field as often as a URL
   // (one live business has its multi-night pricing rule there), and a prose value under a link
