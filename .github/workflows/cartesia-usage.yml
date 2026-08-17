@@ -26,6 +26,10 @@ on:
         description: "Fetch one call's runtime logs (ac_...) — what a tool was actually handed, when a call did something unexpected"
         type: string
         default: ""
+      include_transcript:
+        description: "Also print what the caller was transcribed as saying. Personal data — only for a call you placed yourself."
+        type: boolean
+        default: false
 
 jobs:
   usage:
@@ -162,6 +166,15 @@ jobs:
               # Tool calls only — never the turn text. The arguments are what the model built out of
               # what it heard, which is the whole question; the conversation around them is not.
               jq -rc '[.transcript[]? | select(.tool_calls) | .tool_calls[]?] | if length == 0 then "(no tool calls recorded on this call)" else .[] end' /tmp/call.json | head -20
+
+              # Off by default and named as personal data, because it is: this is what a real
+              # person said on a real phone call. It is worth having for exactly one question —
+              # what did speech-to-text actually hear — which no other field answers, since the
+              # tool arguments show only what the model made of it afterwards.
+              if [ "${{ inputs.include_transcript }}" = "true" ]; then
+                echo "── transcript (caller turns only)"
+                jq -r '[.transcript[]? | select(.role == "user") | .text] | .[] // "(no user turns)"' /tmp/call.json | head -30
+              fi
             fi
             exit 0
           fi
