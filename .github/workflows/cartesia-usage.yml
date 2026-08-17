@@ -150,6 +150,19 @@ jobs:
           echo "GET /agents/calls/$CALL_ID/logs → $code"
           if [ "$code" != "200" ]; then
             echo "  $(jq -r '.title // .message // ""' /tmp/logs.json 2>/dev/null | head -c 200)"
+            # "Call logs not available" is the answer for a self-hosted agent: the runtime is our
+            # Railway service, so those logs were never Cartesia's to keep. The call's own
+            # transcript is, and each turn carries the tool calls made in it — which is the part
+            # that actually answers "what was this tool handed".
+            echo "── falling back to the transcript's tool calls"
+            ccode=$(curl -sS -o /tmp/call.json -w '%{http_code}' "$API/agents/calls/$CALL_ID" \
+              -H "Authorization: Bearer $KEY" -H "Cartesia-Version: $VERSION" || echo "000")
+            echo "GET /agents/calls/$CALL_ID → $ccode"
+            if [ "$ccode" = "200" ]; then
+              # Tool calls only — never the turn text. The arguments are what the model built out of
+              # what it heard, which is the whole question; the conversation around them is not.
+              jq -rc '[.transcript[]? | select(.tool_calls) | .tool_calls[]?] | if length == 0 then "(no tool calls recorded on this call)" else .[] end' /tmp/call.json | head -20
+            fi
             exit 0
           fi
 
