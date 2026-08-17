@@ -4,7 +4,7 @@
  * Usage (from backend/):
  *   railway run npx tsx scripts/whatsapp-wiring.ts
  *
- Two different questions get confused here, and both confusions have already caused a working
+ * Two different questions get confused here, and both confusions have already caused a working
  * business to be called broken:
  *
  *   - A WABA listing covers ONE account. A number sitting in it PENDING/NOT_VERIFIED looks
