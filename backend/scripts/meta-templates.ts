@@ -2,17 +2,19 @@
  * Reads what templates a WABA has, and what Meta's pre-approved Template Library offers.
  *
  * Usage (from backend/):
- *   npx tsx scripts/meta-templates.ts                     # our templates on Tori's WABA
- *   npx tsx scripts/meta-templates.ts --library           # Meta's ready-made catalogue
- *   npx tsx scripts/meta-templates.ts --library --lang he # only the Hebrew ones
- *   npx tsx scripts/meta-templates.ts --waba <id>         # a customer's WABA instead
+ *   npx tsx scripts/meta-templates.ts             # this WABA's templates, with status and body
+ *   npx tsx scripts/meta-templates.ts --waba <id> # a customer's WABA instead of Tori's
+ *   npx tsx scripts/meta-templates.ts --discover  # which template edges Graph actually exposes
  *
- * Why the library matters: a template we write ourselves goes into a review queue and can come back
- * REJECTED for reasons that are not visible from the body text — and every rejection is days. A
- * library template is pre-approved, so adopting one is instant. The catch is that the body is fixed;
- * it cannot be edited, only adopted as-is.
+ * The question this was written to answer was whether Meta's pre-approved Template Library — which
+ * would let a business skip the review queue entirely — can be reached from code. It cannot: see
+ * the probe results recorded under --library. It is a WhatsApp Manager screen only.
  *
- * Read-only. Adopting a library template is a separate, deliberate action.
+ * That settles the design rather than blocking it. A library template would have to be adopted by
+ * hand on every customer's WABA; templates we submit ourselves go through /message_templates, which
+ * is already what runs automatically when a business connects. The manual option is the worse one.
+ *
+ * Read-only.
  */
 
 const GRAPH = "https://graph.facebook.com/v23.0";
@@ -72,33 +74,20 @@ async function main() {
   }
 
   if (has("library")) {
-    const lang = arg("lang");
-    // The library is a Graph edge like any other. Paging matters: the catalogue is long, and taking
-    // only the first page would silently answer "there is no marketing template" when there is one
-    // three pages in.
-    let path = `/${wabaId}/message_template_libraries?limit=100`;
-    let page = 0;
-    let shown = 0;
-    while (path && page < 20) {
-      const body = await call(path);
-      const rows = (body.data as Array<Record<string, unknown>>) ?? [];
-      for (const t of rows) {
-        const langs = (t.supported_languages as string[]) ?? [];
-        if (lang && !langs.includes(lang)) continue;
-        shown += 1;
-        console.log(`${t.name}`);
-        console.log(`    category ${t.category ?? "?"}  languages ${langs.join(", ") || "?"}`);
-        const text = bodyOf(t);
-        if (text) console.log(`    body: ${text}`);
-        console.log("");
-      }
-      const paging = body.paging as { next?: string; cursors?: { after?: string } } | undefined;
-      const after = paging?.cursors?.after;
-      path = paging?.next && after ? `/${wabaId}/message_template_libraries?limit=100&after=${after}` : "";
-      page += 1;
-    }
-    console.log(`${shown} library template(s)${lang ? ` supporting ${lang}` : ""}.`);
-    return;
+    // Probed against the live WABA on 2026-08-17, every candidate spelling:
+    //   /message_template_libraries  → Unknown path components
+    //   /message_template_library    → (#100) Tried accessing nonexisting field
+    //   /template_libraries          → Unknown path components
+    //   /template_library            → Unknown path components
+    //   /message_templates           → exists
+    // The Template Library is a WhatsApp Manager screen, not a Graph edge. Adopting a pre-approved
+    // template is therefore a manual click per WABA — which for us means per customer, and so worse
+    // than submitting our own, which /message_templates does accept and which already runs at
+    // connect time for every business.
+    throw new Error(
+      "Meta does not expose the Template Library over the API — it exists only in WhatsApp Manager. " +
+        "Run with --discover to re-check whether that has changed."
+    );
   }
 
   const body = await call(`/${wabaId}/message_templates?limit=100&fields=name,status,category,language,components,rejected_reason`);
