@@ -1,0 +1,125 @@
+name: Register the Cartesia call webhook
+
+# Turns on live call events: minutes land in the ledger seconds after a caller hangs up instead of
+# up to an hour later, each delivery carries the call's transcript — the only place the agent's real
+# time-to-first-audio and its interruptions are reported — and Cartesia's own summary of what the
+# caller wanted arrives with it.
+#
+# Three things have to agree, and no two of them live in the same place, which is why this is one
+# workflow and not three console steps:
+#
+#   1. A webhook object on the Cartesia account, holding the URL and the secret.
+#   2. `webhook_id` on the agent, which is what actually starts delivery.
+#   3. `CARTESIA_WEBHOOK_SECRET` on the backend's Railway service, which is what makes the backend
+#      accept a delivery — it is the whole proof of origin, since Cartesia sends no signature.
+#
+# The secret is generated here and never printed. Nobody needs to know it: both ends are set by this
+# run. Re-running is the rotation — a fresh secret is registered and stored, in that order, so the
+# backend is never the stale half.
+on:
+  workflow_dispatch:
+    inputs:
+      backend_url:
+        description: "Backend base URL (blank = the PUBLIC_BACKEND_URL secret, or the known Railway host)"
+        type: string
+        default: ""
+      attach:
+        description: "Attach it to the agent — this is what starts delivery"
+        type: boolean
+        default: true
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    env:
+      KEY: ${{ secrets.CARTESIA_API_KEY || vars.CARTESIA_API_KEY }}
+      AGENT: ${{ secrets.CARTESIA_AGENT_ID || vars.CARTESIA_AGENT_ID }}
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+      BACKEND_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+      DEFAULT_BACKEND_URL: ${{ secrets.PUBLIC_BACKEND_URL || vars.PUBLIC_BACKEND_URL || 'https://hairsalonwhatsappbot.up.railway.app' }}
+      API: https://api.cartesia.ai
+      VERSION: "2026-03-01"
+      URL_INPUT: ${{ inputs.backend_url }}
+    steps:
+      - name: Is everything configured
+        run: |
+          missing=""
+          if [ -z "$KEY" ]; then missing="$missing CARTESIA_API_KEY"; fi
+          if [ -z "$AGENT" ]; then missing="$missing CARTESIA_AGENT_ID"; fi
+          if [ -z "$RAILWAY_TOKEN" ]; then missing="$missing RAILWAY_TOKEN"; fi
+          if [ -n "$missing" ]; then
+            echo "::error::Not set:$missing — add under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          npm i -g @railway/cli
+
+      # The endpoint must exist before Cartesia is told about it. A webhook registered against a
+      # deploy that does not serve /api/cartesia/call yet produces deliveries that 404 — and a 404
+      # is a permanent failure in their retry policy, not a retryable one, so those events are gone.
+      - name: Check the endpoint is live first
+        run: |
+          url="${URL_INPUT:-$DEFAULT_BACKEND_URL}"
+          url="${url%/}"
+          echo "BACKEND_URL=$url" >> "$GITHUB_ENV"
+          echo "Endpoint: $url/api/cartesia/call"
+
+          # No secret sent, so 401 is the *right* answer: it proves the route is there and that it
+          # refuses an unverified body. A 404 means the deploy predates it.
+          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 -X POST "$url/api/cartesia/call" \
+            -H "Content-Type: application/json" --data '{"type":"ping"}' || echo "000")
+          echo "unauthenticated POST → $code"
+          case "$code" in
+            401) echo "Route is live and rejecting unverified deliveries, as it should." ;;
+            404) echo "::error::The deploy serving $url has no /api/cartesia/call. Deploy first, then re-run."; exit 1 ;;
+            *)   echo "::error::Unexpected $code. Not registering a webhook against an endpoint that behaves unexpectedly."; exit 1 ;;
+          esac
+
+      - name: Create the webhook and store its secret
+        run: |
+          secret=$(openssl rand -hex 32)
+          echo "::add-mask::$secret"
+
+          out=$(curl -sS -X POST "$API/agents/webhooks" \
+            -H "X-API-Key: $KEY" -H "Cartesia-Version: $VERSION" -H "Content-Type: application/json" \
+            --data "$(jq -nc --arg u "$BACKEND_URL/api/cartesia/call" --arg s "$secret" '{url: $u, secret: $s}')")
+          id=$(echo "$out" | jq -r '.id // ""')
+          if [ -z "$id" ]; then
+            echo "::error::Cartesia rejected the webhook: $(echo "$out" | jq -r '.title // .message // .' | head -c 200)"
+            exit 1
+          fi
+          echo "WEBHOOK_ID=$id" >> "$GITHUB_ENV"
+          echo "Registered webhook $id"
+
+          # Stored before the agent is attached, so there is no window in which Cartesia is
+          # delivering events the backend cannot verify. Changing the variable restarts the service;
+          # the attach step below waits for that restart before it starts the flow.
+          was=$(curl -sS --max-time 10 "$BACKEND_URL/health" 2>/dev/null | jq -r '.startedAt // ""' || true)
+          railway variables --service "$BACKEND_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+            --set "CARTESIA_WEBHOOK_SECRET=$secret"
+
+          echo "Waiting for the API to restart holding the new secret…"
+          for i in $(seq 1 30); do
+            sleep 10
+            body=$(curl -sS --max-time 10 "$BACKEND_URL/health" 2>/dev/null || true)
+            now=$(echo "$body" | jq -r '.startedAt // ""' 2>/dev/null || true)
+            if echo "$body" | jq -e '.ok' >/dev/null 2>&1 && [ -n "$now" ] && [ "$now" != "$was" ]; then
+              echo "API restarted: $(echo "$body" | jq -rc '{commit, startedAt}')"
+              exit 0
+            fi
+          done
+          echo "::error::The API did not restart within five minutes. The webhook exists but is NOT attached, so nothing is being delivered yet — re-run once the service is healthy."
+          exit 1
+
+      - name: Attach it to the agent
+        if: inputs.attach
+        run: |
+          out=$(curl -sS -X PATCH "$API/agents/$AGENT" \
+            -H "X-API-Key: $KEY" -H "Cartesia-Version: $VERSION" -H "Content-Type: application/json" \
+            --data "$(jq -nc --arg w "$WEBHOOK_ID" '{webhook_id: $w}')")
+          if [ "$(echo "$out" | jq -r '.webhook_id // ""')" != "$WEBHOOK_ID" ]; then
+            echo "::error::PATCH did not take: $(echo "$out" | jq -r '.title // .message // .' | head -c 200)"
+            exit 1
+          fi
+          echo "::notice::Live. The next call that ends will deliver call_completed, and its summary shortly after."
+          echo "The hourly sync stays on as the backstop — a missed webhook must not become a missing charge."
