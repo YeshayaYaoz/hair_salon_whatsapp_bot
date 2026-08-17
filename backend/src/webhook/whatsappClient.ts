@@ -370,6 +370,13 @@ export async function createMessageTemplate(
   if (res.ok) return { name: params.name, submitted: true, status: body.status };
 
   const message = body.error?.error_user_msg ?? body.error?.message ?? "Unknown error";
+  // A deletion still in flight — ours from a moment ago, or one from an earlier run that had not
+  // finished. It arrives on the very first create, outside the duplicate branch, so handling it
+  // only there meant the retry never ran and the whole thing failed in nine seconds.
+  if (/being deleted/i.test(message) && !replacedAlready) {
+    return waitForDeletionThenCreate(wabaId, accessToken, params);
+  }
+
   // Meta phrases the duplicate differently depending on the endpoint and the language: "Template
   // name already exists" in some cases, "There is already Hebrew content for this template" in
   // others. Matching only the first left the second falling through as a hard failure — which is
@@ -388,20 +395,34 @@ export async function createMessageTemplate(
     if (!deleted) {
       return { name: params.name, submitted: false, error: `Template is REJECTED and could not be deleted to resubmit` };
     }
-    // Deletion at Meta is asynchronous: the DELETE returns success while the old content is still
-    // being removed, and creating in that gap answers "New Hebrew content can't be added while the
-    // existing Hebrew content is being deleted." Meta's own message says under a minute, so this
-    // waits it out rather than reporting a failure that only means "too soon".
-    const settleMs = Number(process.env.WHATSAPP_TEMPLATE_DELETE_SETTLE_MS ?? 6000);
-    let last: CreateTemplateResult | null = null;
-    for (let attempt = 0; attempt < 8; attempt += 1) {
-      await new Promise((r) => setTimeout(r, settleMs));
-      last = await createMessageTemplate(wabaId, accessToken, params, true);
-      if (last.submitted || !/being deleted/i.test(last.error ?? "")) return last;
-    }
-    return last ?? { name: params.name, submitted: false, error: "Template deletion never settled" };
+    return waitForDeletionThenCreate(wabaId, accessToken, params);
   }
   return { name: params.name, submitted: false, error: message };
+}
+
+/**
+ * Retries a create until Meta has finished removing the old content of the same name.
+ *
+ * Meta's DELETE answers success immediately while the removal continues in the background, and any
+ * create landing in that window is refused with a message that only means "too soon". Its own text
+ * says under a minute; the ceiling here is generous because the alternative — reporting a failure —
+ * costs a person a full review cycle to discover it was nothing.
+ */
+async function waitForDeletionThenCreate(
+  wabaId: string,
+  accessToken: string,
+  params: CreateTemplateParams
+): Promise<CreateTemplateResult> {
+  const settleMs = Number(process.env.WHATSAPP_TEMPLATE_DELETE_SETTLE_MS ?? 15000);
+  let last: CreateTemplateResult | null = null;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    await new Promise((r) => setTimeout(r, settleMs));
+    last = await createMessageTemplate(wabaId, accessToken, params, true);
+    if (last.submitted || !/being deleted/i.test(last.error ?? "")) return last;
+  }
+  return (
+    last ?? { name: params.name, submitted: false, error: "Meta never finished deleting the old template" }
+  );
 }
 
 /** The named template on this WABA, or null. Language-matched, since one name can hold several. */

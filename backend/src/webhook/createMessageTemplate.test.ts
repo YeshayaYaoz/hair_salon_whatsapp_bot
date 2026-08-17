@@ -150,6 +150,27 @@ describe("createMessageTemplate", () => {
     expect(creates).toBe(3);
   });
 
+  it("retries when the deleting state arrives on the very first create", async () => {
+    // An earlier run's deletion can still be in flight, so this error shows up outside the
+    // duplicate branch entirely. Handling it only there meant the retry never ran.
+    let creates = 0;
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: { method?: string }) => {
+      if ((init?.method ?? "GET") !== "POST") return new Response(JSON.stringify({ data: [] }));
+      creates += 1;
+      if (creates === 1) {
+        return new Response(JSON.stringify({ error: { message: "New Hebrew content can't be added while the existing Hebrew content is being deleted." } }), { status: 400 });
+      }
+      return new Response(JSON.stringify({ id: "1", status: "PENDING" }));
+    }));
+
+    const result = await createMessageTemplate("waba", "tok", {
+      name: "t", languageCode: "he", bodyText: "שלום {{1}}", bodyExample: ["נועה"],
+    });
+
+    expect(result.submitted).toBe(true);
+    expect(creates).toBe(2);
+  });
+
   it("leaves an APPROVED template alone", async () => {
     const fetchMock = vi.fn(async (url: string, init?: { method?: string }) => {
       if ((init?.method ?? "GET") === "POST") {
