@@ -73,3 +73,45 @@ describe("normalizeSpokenEmail", () => {
     }
   });
 });
+
+describe("digits dictated as Hebrew words", () => {
+  // The live call this came from: Y28112000 spoken as twenty-eight, one, one, two thousand.
+  it("reads the address the caller actually dictated", () => {
+    expect(normalizeSpokenEmail("Y עשרים ושמונה אחת אחת אלפיים שטרודל ג'ימייל נקודה קום")).toBe(
+      "y28112000@gmail.com"
+    );
+  });
+
+  it("knows the standalone number words", () => {
+    expect(normalizeSpokenEmail("a אלפיים שטרודל gmail")).toBe("a2000@gmail.com");
+    expect(normalizeSpokenEmail("a חמישים שטרודל gmail")).toBe("a50@gmail.com");
+    expect(normalizeSpokenEmail("a מאה שטרודל gmail")).toBe("a100@gmail.com");
+    expect(normalizeSpokenEmail("a מאתיים שטרודל gmail")).toBe("a200@gmail.com");
+  });
+
+  // "עשרים ושמונה" is one number; "אחת אחת" is two dictated digits. The ו' is what separates the
+  // cases, and merging bare neighbours would turn a real address into a different one.
+  it("joins with a vav and never without one", () => {
+    expect(normalizeSpokenEmail("a עשרים ושמונה שטרודל gmail")).toBe("a28@gmail.com");
+    expect(normalizeSpokenEmail("a אחת אחת שטרודל gmail")).toBe("a11@gmail.com");
+    expect(normalizeSpokenEmail("a שתיים שלוש שטרודל gmail")).toBe("a23@gmail.com");
+  });
+
+  it("takes both genders of a digit, since dictation uses whichever comes out", () => {
+    expect(normalizeSpokenEmail("a שתיים שטרודל gmail")).toBe("a2@gmail.com");
+    expect(normalizeSpokenEmail("a שניים שטרודל gmail")).toBe("a2@gmail.com");
+  });
+
+  it("reads the composed teen as one number", () => {
+    expect(normalizeSpokenEmail("a שתים עשרה שטרודל gmail")).toBe("a12@gmail.com");
+  });
+
+  it("multiplies the hundreds form", () => {
+    expect(normalizeSpokenEmail("a חמש מאות שטרודל gmail")).toBe("a500@gmail.com");
+  });
+
+  // A number word inside an unrelated Hebrew sentence must not leak digits into a rejection.
+  it("still refuses a sentence that merely contains number words", () => {
+    expect(normalizeSpokenEmail("יש לי שתיים שאלות")).toBeNull();
+  });
+});

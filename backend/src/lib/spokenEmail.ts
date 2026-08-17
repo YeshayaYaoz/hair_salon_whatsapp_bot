@@ -82,6 +82,102 @@ const BARE_DOMAIN: Record<string, string> = {
   walla: "walla.co.il",
 };
 
+/**
+ * Hebrew number words, spoken the way digits in an address actually are.
+ *
+ * A caller dictating Y28112000 does not say nine digits — they say "עשרים ושמונה, אחת, אחת,
+ * אלפיים": twenty-eight, one, one, two thousand. On a live call the model passed the words through
+ * untranslated and the address failed. The grouping matters as much as the words: "עשרים ושמונה"
+ * is one number (28), while "אחת אחת" is two separate ones (11 by concatenation, never 2).
+ *
+ * The rule that separates the two cases is the ו' prefix. A number word joined with ו to a larger
+ * magnitude adds to it ("עשרים ושמונה" = 28, "מאה ועשרים" = 120); a number word standing alone
+ * starts a new group. That is also how the language works, which is why callers say it that way.
+ *
+ * Both genders of every unit, because digits are dictated in whichever gender comes out — Hebrew
+ * numbers agree with a counted noun and a bare digit has none.
+ */
+const UNITS: Record<string, number> = {
+  "אפס": 0,
+  "אחת": 1, "אחד": 1,
+  "שתיים": 2, "שניים": 2, "שתים": 2, "שנים": 2,
+  "שלוש": 3, "שלושה": 3, "שלושת": 3,
+  "ארבע": 4, "ארבעה": 4, "ארבעת": 4,
+  "חמש": 5, "חמישה": 5, "חמשת": 5,
+  "שש": 6, "שישה": 6, "ששת": 6,
+  "שבע": 7, "שבעה": 7, "שבעת": 7,
+  "שמונה": 8, "שמונת": 8,
+  "תשע": 9, "תשעה": 9, "תשעת": 9,
+};
+const TENS: Record<string, number> = {
+  "עשר": 10, "עשרה": 10,
+  "עשרים": 20, "שלושים": 30, "ארבעים": 40, "חמישים": 50,
+  "שישים": 60, "ששים": 60, "שבעים": 70, "שמונים": 80, "תשעים": 90,
+};
+/** Standalone words that are a complete number by themselves. */
+const WHOLE: Record<string, number> = { "מאה": 100, "מאתיים": 200, "אלף": 1000, "אלפיים": 2000 };
+/** Multipliers that follow a unit: "חמש מאות" = 500, "שלושת אלפים" = 3000. */
+const MULTIPLIERS: Record<string, number> = { "מאות": 100, "אלפים": 1000 };
+
+/**
+ * Number-word runs replaced with digits; everything else untouched.
+ *
+ * Teens are the composed form Hebrew actually uses — "שתים עשרה" is 12, not "2 10" — so a unit
+ * followed by bare עשר/עשרה composes. Beyond that, only ו-joined continuations extend a group.
+ */
+function hebrewNumbersToDigits(text: string): string {
+  const tokens = text.split(/\s+/);
+  const out: string[] = [];
+  let i = 0;
+
+  const wordValue = (raw: string): { value: number; kind: "unit" | "tens" | "whole" } | null => {
+    if (raw in UNITS) return { value: UNITS[raw], kind: "unit" };
+    if (raw in TENS) return { value: TENS[raw], kind: "tens" };
+    if (raw in WHOLE) return { value: WHOLE[raw], kind: "whole" };
+    return null;
+  };
+
+  while (i < tokens.length) {
+    const first = wordValue(tokens[i]);
+    if (!first) {
+      out.push(tokens[i]);
+      i++;
+      continue;
+    }
+
+    let value = first.value;
+    let kind = first.kind;
+    i++;
+
+    // "חמש מאות" / "שלושת אלפים" — a unit multiplied by what follows it.
+    if (kind === "unit" && i < tokens.length && tokens[i] in MULTIPLIERS) {
+      value *= MULTIPLIERS[tokens[i]];
+      kind = "whole";
+      i++;
+    }
+    // "שתים עשרה" — the composed teen. Only after a unit, and only bare עשר/עשרה.
+    else if (kind === "unit" && i < tokens.length && (tokens[i] === "עשרה" || tokens[i] === "עשר")) {
+      value += 10;
+      kind = "tens";
+      i++;
+    }
+
+    // ו-joined continuations extend the group: "עשרים ושמונה", "מאה ועשרים", "אלפיים וחמש".
+    // A bare number word does NOT — "אחת אחת" is two dictated digits, and merging them would turn
+    // a real address into a different one.
+    while (i < tokens.length && tokens[i].startsWith("ו")) {
+      const next = wordValue(tokens[i].slice(1));
+      if (!next || next.value >= value) break;
+      value += next.value;
+      i++;
+    }
+
+    out.push(String(value));
+  }
+
+  return out.join(" ");
+}
+
 /** Conservative, and deliberately not RFC-complete: it is a gate, not a parser. */
 const LOOKS_LIKE_EMAIL = /^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 
@@ -105,6 +201,10 @@ export function normalizeSpokenEmail(raw: string): string | null {
 
   for (const [pattern, replacement] of SEPARATORS) s = s.replace(pattern, replacement);
   for (const [pattern, replacement] of PROVIDERS) s = s.replace(pattern, replacement);
+
+  // After the separators and providers, so their words are already consumed — and before the
+  // space collapse, which is what joins the dictated groups into one run of digits.
+  s = hebrewNumbersToDigits(s);
 
   // Spoken text arrives spaced around every symbol; an address has no spaces at all.
   s = s.replace(/\s+/g, "");
