@@ -3,6 +3,27 @@
 import { useEffect, useRef, useState } from "react";
 import { jsonLd } from "../lib/jsonLd";
 
+/* Same stroke-icon set as the Hebrew page. Replaces the emoji that served as feature and section
+   icons — emoji stay only inside the chat mockups, where they are what WhatsApp actually looks like. */
+function Icon({ name, size = 20 }: { name: string; size?: number }) {
+  const paths: Record<string, React.ReactNode> = {
+    chat: <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" />,
+    calendar: <><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></>,
+    bell: <><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 01-3.4 0" /></>,
+    chart: <><path d="M18 20V10M12 20V4M6 20v-6" /></>,
+    clock: <><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></>,
+    list: <><path d="M8 6h13M8 12h13M8 18h13" /><path d="M3 6h.01M3 12h.01M3 18h.01" /></>,
+    bot: <><rect x="4" y="8" width="16" height="12" rx="2" /><path d="M12 8V4M8 14h.01M16 14h.01" /></>,
+    phone: <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" />,
+    wave: <path d="M2 12h2M6 8v8M10 4v16M14 8v8M18 10v4M22 12h-1" />,
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      {paths[name]}
+    </svg>
+  );
+}
+
 export default function LandingPageEN() {
   const tiltEl = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -446,7 +467,7 @@ export default function LandingPageEN() {
         @media (max-width: 600px) { .lp-feats-grid { grid-template-columns: 1fr; } }
         .lp-feat { background: #fff; border: 1px solid #EBEBEB; border-radius: 16px; padding: 28px; transition: box-shadow 0.2s, border-color 0.2s; }
         .lp-feat:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.08); border-color: #DDD; }
-        .lp-feat-icon { font-size: 26px; margin-bottom: 14px; }
+        .lp-feat-icon { margin-bottom: 14px; color: #0F8043; }
         .lp-feat-title { font-size: 15px; font-weight: 700; color: #111; margin-bottom: 8px; }
         .feat-desc { font-size: 13.5px; color: #666; line-height: 1.6; }
 
@@ -723,7 +744,9 @@ export default function LandingPageEN() {
             </div>
             <div className="ht-live">
               <div className="ht-dot" />
-              <span className="ht-live-label">Live</span>
+              {/* These notifications are invented examples — labeling them "Live" made the mockup
+                  a fabricated record. */}
+              <span className="ht-live-label">Demo</span>
             </div>
           </div>
           <div className="lp-hero">
@@ -834,46 +857,45 @@ export default function LandingPageEN() {
         <div className="lp-trust-bar">
           <div className="lp-trust-bar-inner">
             <span className="lp-trust-label">Works with</span>
+            {/* The real stack. The previous list credited ElevenLabs and Twilio, neither of which
+                this product uses — a trust bar naming vendors we don't run on is a false claim. */}
             {[
-              { emoji: "💬", text: "WhatsApp Business" },
-              { emoji: "📅", text: "Google Calendar" },
-              { emoji: "🤖", text: "Claude AI" },
-              { emoji: "🔊", text: "ElevenLabs" },
-              { emoji: "🔗", text: "OpenAI" },
-              { emoji: "📲", text: "Twilio" },
-            ].map(({ emoji, text }) => (
+              { icon: "chat", text: "WhatsApp Business" },
+              { icon: "calendar", text: "Google Calendar" },
+              { icon: "bot", text: "Claude AI" },
+              { icon: "wave", text: "Cartesia Voice" },
+              { icon: "chart", text: "OpenAI" },
+            ].map(({ icon, text }) => (
               <div key={text} className="lp-trust-logo">
-                <span style={{ fontSize: 18 }}>{emoji}</span>
+                <Icon name={icon} size={18} />
                 <span className="lp-trust-logo-text">{text}</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* MARQUEE */}
+        {/* MARQUEE — facts about the product, not quotes. The previous version scrolled five-star
+            reviews from people who don't exist; invented testimonials are both a legal exposure and
+            the fastest way for a visitor to write the whole page off. Every line here is something
+            the product verifiably does. (Duplicated once because the CSS loop translates -50%.) */}
         <div className="lp-marquee">
           <div className="marquee-track">
-            {[
-              { q: "\"Saved two hours a day on booking management\"", name: "Dana K., Tel Aviv" },
-              { q: "\"Customers love that the bot replies at 2am\"", name: "Michelle L., Jerusalem" },
-              { q: "\"10-minute setup, Google Calendar syncs itself\"", name: "Joe H., Haifa" },
-              { q: "\"No-shows dropped 80% since we started\"", name: "Sarah M., Ramat Gan" },
-              { q: "\"The bot replies faster than I do\"", name: "Amir K., Beer Sheva" },
-              { q: "\"Best thing I've done for my salon\"", name: "Rachel B., Netanya" },
-            ].concat([
-              { q: "\"Saved two hours a day on booking management\"", name: "Dana K., Tel Aviv" },
-              { q: "\"Customers love that the bot replies at 2am\"", name: "Michelle L., Jerusalem" },
-              { q: "\"10-minute setup, Google Calendar syncs itself\"", name: "Joe H., Haifa" },
-              { q: "\"No-shows dropped 80% since we started\"", name: "Sarah M., Ramat Gan" },
-              { q: "\"The bot replies faster than I do\"", name: "Amir K., Beer Sheva" },
-              { q: "\"Best thing I've done for my salon\"", name: "Rachel B., Netanya" },
-            ]).map((m, i) => (
-              <div key={i} className="marquee-item">
-                <span className="star">★★★★★</span>
-                <span>{m.q}</span>
-                <strong>— {m.name}</strong>
-              </div>
-            ))}
+            {(() => {
+              const facts = [
+                "Answers customers on WhatsApp 24/7",
+                "Syncs every appointment to Google Calendar",
+                "Sends automatic reminders before every appointment",
+                "Understands natural language — no menus",
+                "Manages a waitlist and refills cancellations",
+                "Answers phone calls too (Premium)",
+              ];
+              return facts.concat(facts).map((f, i) => (
+                <div key={i} className="marquee-item">
+                  <span className="star">●</span>
+                  <span>{f}</span>
+                </div>
+              ));
+            })()}
           </div>
         </div>
 
@@ -882,9 +904,9 @@ export default function LandingPageEN() {
           <div className="lp-stats-band-inner">
             {[
               { n: 24, sup: "/7", l: "Available even while you sleep — day and night" },
-              { n: 3,  sup: " min", l: "Average setup time until the bot goes live" },
+              { n: 10, sup: " min", l: "From signup until the bot is live and answering" },
               { n: 0,  sup: "$", l: "Staff training cost — it's fully automated" },
-              { n: 100, sup: "%", l: "Of WhatsApp messages answered within seconds" },
+              { n: 14, sup: " days", l: "Free trial, no credit card required" },
             ].map(({ n, sup, l }, i) => (
               <div key={i} className="lp-stat-cell reveal">
                 <div className="lp-stat-n">
@@ -904,25 +926,25 @@ export default function LandingPageEN() {
             <div className="lp-title reveal" style={{ textAlign: "center" }}>Everything connected. You don't have to do anything.</div>
             <div className="lp-flow-steps reveal">
               <div className="lp-flow-node">
-                <div className="lp-flow-icon wa">💬<div className="lp-flow-ping green" /></div>
+                <div className="lp-flow-icon wa" style={{ color: "#15803D" }}><Icon name="chat" size={30} /><div className="lp-flow-ping green" /></div>
                 <div className="lp-flow-label">WhatsApp</div>
                 <div className="lp-flow-sub">Customer sends a message</div>
               </div>
               <div className="lp-flow-arrow">→</div>
               <div className="lp-flow-node">
-                <div className="lp-flow-icon ai">🤖<div className="lp-flow-ping blue" /></div>
+                <div className="lp-flow-icon ai" style={{ color: "#4F46E5" }}><Icon name="bot" size={30} /><div className="lp-flow-ping blue" /></div>
                 <div className="lp-flow-label">Tori AI</div>
                 <div className="lp-flow-sub">Understands, replies, books</div>
               </div>
               <div className="lp-flow-arrow">→</div>
               <div className="lp-flow-node">
-                <div className="lp-flow-icon cal">📅</div>
+                <div className="lp-flow-icon cal" style={{ color: "#B45309" }}><Icon name="calendar" size={30} /></div>
                 <div className="lp-flow-label">Google Calendar</div>
                 <div className="lp-flow-sub">Updated automatically</div>
               </div>
               <div className="lp-flow-arrow">→</div>
               <div className="lp-flow-node">
-                <div className="lp-flow-icon voice">🎙️</div>
+                <div className="lp-flow-icon voice" style={{ color: "#B91C1C" }}><Icon name="phone" size={30} /></div>
                 <div className="lp-flow-label">AI Calls</div>
                 <div className="lp-flow-sub">Answers phone too (Premium)</div>
               </div>
@@ -960,15 +982,15 @@ export default function LandingPageEN() {
             <div className="lp-title reveal">Every tool your business needs — and nothing you don't.</div>
             <div className="lp-feats-grid">
               {[
-                { icon: "💬", title: "WhatsApp Bot", desc: "Understands natural language, replies 24/7, and manages the conversation from first message to confirmed booking." },
-                { icon: "📅", title: "Google Calendar Sync", desc: "One-time connection. Every booked appointment goes into your calendar automatically with all the details." },
-                { icon: "🔔", title: "Automatic Reminders", desc: "The bot sends a reminder to each customer before their appointment. Fewer no-shows, fewer calls." },
-                { icon: "📊", title: "Management Dashboard", desc: "Revenue, appointments, customers and popular services — all on one screen, in real time." },
-                { icon: "⏰", title: "Flexible Hours", desc: "Set days and hours per service and staff. The bot won't offer times that don't fit your schedule." },
-                { icon: "📋", title: "Waitlist", desc: "No availability? The bot adds them to the waitlist and notifies you when a slot opens up." },
+                { icon: "chat", title: "WhatsApp Bot", desc: "Understands natural language, replies 24/7, and manages the conversation from first message to confirmed booking." },
+                { icon: "calendar", title: "Google Calendar Sync", desc: "One-time connection. Every booked appointment goes into your calendar automatically with all the details." },
+                { icon: "bell", title: "Automatic Reminders", desc: "The bot sends a reminder to each customer before their appointment. Fewer no-shows, fewer calls." },
+                { icon: "chart", title: "Management Dashboard", desc: "Revenue, appointments, customers and popular services — all on one screen, in real time." },
+                { icon: "clock", title: "Flexible Hours", desc: "Set days and hours per service and staff. The bot won't offer times that don't fit your schedule." },
+                { icon: "list", title: "Waitlist", desc: "No availability? The bot adds them to the waitlist and notifies you when a slot opens up." },
               ].map((f) => (
                 <div key={f.title} className="lp-feat reveal">
-                  <div className="lp-feat-icon">{f.icon}</div>
+                  <div className="lp-feat-icon"><Icon name={f.icon} size={26} /></div>
                   <div className="lp-feat-title">{f.title}</div>
                   <div className="feat-desc">{f.desc}</div>
                 </div>
@@ -1076,31 +1098,23 @@ export default function LandingPageEN() {
           </div>
         </section>
 
-        {/* TESTIMONIALS */}
+        {/* WHAT CHANGES DAY-TO-DAY — replaces a scrolling track of five-star quotes from invented
+            customers. Until there are real quotes with permission to publish, the honest version of
+            this section is concrete scenarios of what the product does. */}
         <section className="lp-testimonials">
           <div className="lp-testimonials-inner">
-            <div className="lp-label reveal" style={{ textAlign: "center" }}>What our customers say</div>
-            <div className="lp-title reveal" style={{ textAlign: "center" }}>Business owners already doing it with Tori.</div>
-          </div>
-          <div className="lp-testi-track-wrap">
-            <div className="lp-testi-track">
+            <div className="lp-label reveal" style={{ textAlign: "center" }}>Day to day</div>
+            <div className="lp-title reveal" style={{ textAlign: "center" }}>What actually changes when the bot works for you.</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginTop: 16 }}>
               {[
-                { q: "\"Saved two hours a day on appointment management\"", name: "Dana K., Tel Aviv" },
-                { q: "\"Customers are amazed the bot replies at 2am\"", name: "Michelle L., Jerusalem" },
-                { q: "\"10 minutes to set up, Google Calendar updates itself\"", name: "Joe H., Haifa" },
-                { q: "\"No-shows dropped 80% since we started\"", name: "Sarah M., Ramat Gan" },
-                { q: "\"The bot replies faster than I do\"", name: "Amir K., Beer Sheva" },
-                { q: "\"Best thing I've done for my business\"", name: "Rachel B., Netanya" },
-                { q: "\"Saved two hours a day on appointment management\"", name: "Dana K., Tel Aviv" },
-                { q: "\"Customers are amazed the bot replies at 2am\"", name: "Michelle L., Jerusalem" },
-                { q: "\"10 minutes to set up, Google Calendar updates itself\"", name: "Joe H., Haifa" },
-                { q: "\"No-shows dropped 80% since we started\"", name: "Sarah M., Ramat Gan" },
-                { q: "\"The bot replies faster than I do\"", name: "Amir K., Beer Sheva" },
-                { q: "\"Best thing I've done for my business\"", name: "Rachel B., Netanya" },
-              ].map((t, i) => (
-                <div key={i} className="lp-testi-card">
-                  <div className="lp-testi-quote">{t.q}</div>
-                  <div className="lp-testi-author">— {t.name}</div>
+                { icon: "clock", title: "A midnight message doesn't wait for morning", body: "A customer writes at 11:40pm asking for tomorrow — the bot checks the calendar, offers open slots and books it. You see it in the morning, already on your calendar." },
+                { icon: "bell", title: "Reminders go out without you remembering", body: "The day before every appointment, a WhatsApp reminder goes out automatically. If someone cancels, the slot is offered to the waitlist instead of going unused." },
+                { icon: "calendar", title: "Your calendar keeps itself in order", body: "Every booking, change and cancellation syncs to Google Calendar the moment it happens — customer name, service and end time included. No double entry." },
+              ].map((t) => (
+                <div key={t.title} className="lp-testi-card" style={{ width: "auto" }}>
+                  <div style={{ color: "#0F8043", marginBottom: 10 }}><Icon name={t.icon} size={22} /></div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#111", marginBottom: 8 }}>{t.title}</div>
+                  <div className="lp-testi-quote">{t.body}</div>
                 </div>
               ))}
             </div>
@@ -1218,7 +1232,7 @@ export default function LandingPageEN() {
                 <div className="lp-plan-per">per month · no contract</div>
                 <div className="lp-plan-divider" />
                 <div className="lp-plan-features">
-                  {["Everything in Standard","Incoming phone call handling","Natural AI voice (ElevenLabs)","Automatic call transcription","Sync call appointments to Google Calendar","Priority WhatsApp support","4-hour SLA"].map((f) => (
+                  {["Everything in Standard","Incoming phone call handling","Natural AI voice","Automatic call transcription","Sync call appointments to Google Calendar","Priority WhatsApp support","4-hour SLA"].map((f) => (
                     <div key={f} className="lp-plan-feat">{f}</div>
                   ))}
                 </div>
@@ -1340,7 +1354,7 @@ export default function LandingPageEN() {
           </div>
           <div className="lp-footer-bottom">
             <span className="lp-footer-copy">© 2026 torionline.com · All rights reserved · <a href="/privacy" className="lp-footer-copy-link">Privacy Policy</a></span>
-            <span className="lp-footer-copy">Made with ❤️ for small business owners</span>
+            <span className="lp-footer-copy">Built in Israel for small businesses</span>
           </div>
         </footer>
 

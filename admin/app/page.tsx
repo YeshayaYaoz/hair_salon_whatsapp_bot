@@ -5,6 +5,31 @@ import { jsonLd } from "./lib/jsonLd";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
+/* Small stroke-icon set, one style across the page. Replaces the emoji that served as feature and
+   section icons — emoji stay only inside the chat mockups, where they are what WhatsApp actually
+   looks like. */
+function Icon({ name, size = 20 }: { name: string; size?: number }) {
+  const paths: Record<string, React.ReactNode> = {
+    chat: <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" />,
+    calendar: <><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></>,
+    bell: <><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 01-3.4 0" /></>,
+    chart: <><path d="M18 20V10M12 20V4M6 20v-6" /></>,
+    clock: <><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></>,
+    list: <><path d="M8 6h13M8 12h13M8 18h13" /><path d="M3 6h.01M3 12h.01M3 18h.01" /></>,
+    bot: <><rect x="4" y="8" width="16" height="12" rx="2" /><path d="M12 8V4M8 14h.01M16 14h.01" /></>,
+    phone: <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" />,
+    x: <><circle cx="12" cy="12" r="10" /><path d="M15 9l-6 6M9 9l6 6" /></>,
+    check: <><circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-6" /></>,
+    calendarPlus: <><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18M12 14v4M10 16h4" /></>,
+    wave: <path d="M2 12h2M6 8v8M10 4v16M14 8v8M18 10v4M22 12h-1" />,
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      {paths[name]}
+    </svg>
+  );
+}
+
 export default function LandingPage() {
   const tiltEl = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -43,13 +68,15 @@ export default function LandingPage() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [demoMsgs]);
 
-  // Live social proof — real counts with a credible baseline so early numbers still read well.
+  // Live social proof — the real counts, or nothing. The line only renders once the numbers are
+  // big enough to help; padding them with an invented baseline made every visible number a claim
+  // we couldn't stand behind.
   useEffect(() => {
     if (!API_URL) return;
     fetch(`${API_URL}/api/public/stats/summary`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d) setSocial({ businesses: 120 + (d.businesses ?? 0), appointments: 8500 + (d.appointments ?? 0) });
+        if (d && (d.businesses ?? 0) >= 10) setSocial({ businesses: d.businesses, appointments: d.appointments ?? 0 });
       })
       .catch(() => {});
   }, []);
@@ -556,7 +583,7 @@ export default function LandingPage() {
         .lp-feats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 52px; }
         .lp-feat { background: #fff; border: 1px solid #E8E8E8; border-radius: 12px; padding: 28px 24px; transition: transform 0.18s ease, box-shadow 0.18s ease; cursor: default; transform-style: preserve-3d; }
         .lp-feat:hover { box-shadow: 0 16px 40px rgba(0,0,0,0.08); }
-        .lp-feat-icon { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; font-size: 20px; background: #F0FFF4; }
+        .lp-feat-icon { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; background: #F0FFF4; color: #0F8043; }
         .lp-feat-title { font-size: 15px; font-weight: 700; color: #111; margin-bottom: 7px; letter-spacing: -0.2px; }
         .lp-feat-desc { font-size: 16px; color: #666; line-height: 1.65; }
 
@@ -1015,7 +1042,7 @@ export default function LandingPage() {
                 <a className="btn-outline" href="#how">איך זה עובד?</a>
               </div>
               <div className="lp-hero-types">
-                {["💇 סלוני שיער","💅 ציפורניים","🏥 קליניקות","💆 עיסוי","🦷 שיניים","🐕 גרוומינג","🧖 אסתטיקה","🥊 כושר"].map((t) => (
+                {["סלוני שיער","ציפורניים","קליניקות","עיסוי","שיניים","גרומינג","אסתטיקה","כושר"].map((t) => (
                   <span key={t} className="lp-type-pill">{t}</span>
                 ))}
               </div>
@@ -1127,7 +1154,9 @@ export default function LandingPage() {
                 </div>
                 <div className="ht-live">
                   <div className="ht-dot" />
-                  <span className="ht-live-label">חי</span>
+                  {/* These notifications are invented examples — labeling them "live" made the
+                      mockup a fabricated record. */}
+                  <span className="ht-live-label">הדגמה</span>
                 </div>
               </div>
             </div>
@@ -1166,13 +1195,15 @@ export default function LandingPage() {
               </svg>
               Claude AI
             </div>
-            {/* ElevenLabs */}
+            {/* Cartesia — the actual voice stack. The previous list credited ElevenLabs and Twilio,
+                neither of which this product uses; a trust bar naming vendors we don't run on is a
+                false claim sitting on the most-read strip of the page. */}
             <div className="lp-trust-item">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <rect width="24" height="24" rx="6" fill="#111"/>
-                <path d="M8 7v10M12 4v16M16 7v10" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M6 12h1.5M9.5 8.5v7M13 5.5v13M16.5 9v6M19 11v2" stroke="#F59E0B" strokeWidth="1.8" strokeLinecap="round"/>
               </svg>
-              ElevenLabs Voice
+              Cartesia Voice AI
             </div>
             {/* Railway */}
             <div className="lp-trust-item">
@@ -1190,18 +1221,6 @@ export default function LandingPage() {
               </svg>
               OpenAI
             </div>
-            {/* Twilio */}
-            <div className="lp-trust-item">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <rect width="24" height="24" rx="6" fill="#F22F46"/>
-                <circle cx="12" cy="12" r="4" stroke="white" strokeWidth="2" fill="none"/>
-                <circle cx="10" cy="10" r="1.2" fill="white"/>
-                <circle cx="14" cy="10" r="1.2" fill="white"/>
-                <circle cx="10" cy="14" r="1.2" fill="white"/>
-                <circle cx="14" cy="14" r="1.2" fill="white"/>
-              </svg>
-              Twilio SMS
-            </div>
           </div>
         </div>
 
@@ -1212,30 +1231,28 @@ export default function LandingPage() {
           </svg>
         </div>
 
-        {/* MARQUEE */}
+        {/* MARQUEE — facts about the product, not quotes. The previous version scrolled five-star
+            reviews from people who don't exist; invented testimonials are both a legal exposure and
+            the fastest way for a visitor to write the whole page off. Every line here is something
+            the product verifiably does. (Duplicated once because the CSS loop translates -50%.) */}
         <div className="lp-marquee">
           <div className="marquee-track">
-            {[
-              { q: "\"חסכתי שעתיים ביום על ניהול תורים\"", name: "דנה כ., תל אביב" },
-              { q: "\"הלקוחות מתפעלים שהבוט עונה ב-2 בלילה\"", name: "מיכל ל., ירושלים" },
-              { q: "\"10 דקות הקמה, הגוגל קלנדר מתעדכן לבד\"", name: "יוסי ה., חיפה" },
-              { q: "\"no-shows ירדו ב-80% מאז שהתחלנו\"", name: "שרה מ., רמת גן" },
-              { q: "\"הבוט עונה יותר מהר ממני\"", name: "אמיר כ., באר שבע" },
-              { q: "\"הכי טוב שעשיתי לסלון שלי\"", name: "רחל ב., נתניה" },
-            ].concat([
-              { q: "\"חסכתי שעתיים ביום על ניהול תורים\"", name: "דנה כ., תל אביב" },
-              { q: "\"הלקוחות מתפעלים שהבוט עונה ב-2 בלילה\"", name: "מיכל ל., ירושלים" },
-              { q: "\"10 דקות הקמה, הגוגל קלנדר מתעדכן לבד\"", name: "יוסי ה., חיפה" },
-              { q: "\"no-shows ירדו ב-80% מאז שהתחלנו\"", name: "שרה מ., רמת גן" },
-              { q: "\"הבוט עונה יותר מהר ממני\"", name: "אמיר כ., באר שבע" },
-              { q: "\"הכי טוב שעשיתי לסלון שלי\"", name: "רחל ב., נתניה" },
-            ]).map((m, i) => (
-              <div key={i} className="marquee-item">
-                <span className="star">★★★★★</span>
-                <span>{m.q}</span>
-                <strong>— {m.name}</strong>
-              </div>
-            ))}
+            {(() => {
+              const facts = [
+                "עונה ללקוחות בוואטסאפ 24/7",
+                "מסנכרן כל תור לגוגל קלנדר",
+                "שולח תזכורות אוטומטיות לפני כל תור",
+                "מבין עברית חופשית — בלי תפריטים",
+                "מנהל רשימת המתנה וממלא ביטולים",
+                "עונה גם לשיחות טלפון (פרמיום)",
+              ];
+              return facts.concat(facts).map((f, i) => (
+                <div key={i} className="marquee-item">
+                  <span className="star">●</span>
+                  <span>{f}</span>
+                </div>
+              ));
+            })()}
           </div>
         </div>
 
@@ -1244,9 +1261,9 @@ export default function LandingPage() {
           <div className="lp-stats-band-inner">
             {[
               { n: 24, sup: "/7", l: "זמין גם כשאתה ישן — גם באמצע הלילה" },
-              { n: 3,  sup: " דק׳", l: "זמן הקמה ממוצע עד שהבוט חי" },
+              { n: 10, sup: " דק׳", l: "מההרשמה ועד שהבוט חי ועונה" },
               { n: 0,  sup: "₪", l: "עלות הכשרה לצוות — הכל אוטומטי" },
-              { n: 100, sup: "%", l: "ממסרי הוואטסאפ נענים תוך שנייה" },
+              { n: 14, sup: " יום", l: "ניסיון חינם, בלי כרטיס אשראי" },
             ].map((s, i) => (
               <div key={i} className="lp-stat-cell reveal">
                 <div className="lp-stat-n">
@@ -1334,8 +1351,8 @@ export default function LandingPage() {
             <div className="lp-title reveal" style={{ textAlign: "center" }}>הכל מחובר. אתה לא צריך לעשות כלום.</div>
             <div className="lp-flow-steps reveal">
               <div className="lp-flow-node">
-                <div className="lp-flow-icon wa">
-                  💬
+                <div className="lp-flow-icon wa" style={{ color: "#15803D" }}>
+                  <Icon name="chat" size={30} />
                   <div className="lp-flow-ping green" />
                 </div>
                 <div className="lp-flow-label">WhatsApp</div>
@@ -1343,8 +1360,8 @@ export default function LandingPage() {
               </div>
               <div className="lp-flow-arrow">→</div>
               <div className="lp-flow-node">
-                <div className="lp-flow-icon ai">
-                  🤖
+                <div className="lp-flow-icon ai" style={{ color: "#4F46E5" }}>
+                  <Icon name="bot" size={30} />
                   <div className="lp-flow-ping blue" />
                 </div>
                 <div className="lp-flow-label">תורי AI</div>
@@ -1352,8 +1369,8 @@ export default function LandingPage() {
               </div>
               <div className="lp-flow-arrow">→</div>
               <div className="lp-flow-node">
-                <div className="lp-flow-icon cal">
-                  📅
+                <div className="lp-flow-icon cal" style={{ color: "#B45309" }}>
+                  <Icon name="calendar" size={30} />
                   <div className="lp-flow-ping amber" />
                 </div>
                 <div className="lp-flow-label">Google Calendar</div>
@@ -1361,8 +1378,8 @@ export default function LandingPage() {
               </div>
               <div className="lp-flow-arrow">→</div>
               <div className="lp-flow-node">
-                <div className="lp-flow-icon phone">
-                  📞
+                <div className="lp-flow-icon phone" style={{ color: "#B91C1C" }}>
+                  <Icon name="phone" size={30} />
                   <div className="lp-flow-ping red" />
                 </div>
                 <div className="lp-flow-label">שיחות AI</div>
@@ -1413,15 +1430,15 @@ export default function LandingPage() {
             <div className="lp-title reveal">כל הכלים שהעסק שלך צריך.</div>
             <div className="lp-feats-grid">
               {[
-                { icon: "💬", title: "בוט WhatsApp בעברית", desc: "מבין שפה טבעית, עונה ב-24/7, ומנהל שיחה מתחילה ועד אישור התור.", descShort: "מבין עברית, עונה 24/7, סוגר תור לבד.", d: "d1" },
-                { icon: "📅", title: "סנכרון גוגל קלנדר", desc: "חיבור חד-פעמי. כל תור שנקבע נכנס ליומן אוטומטית עם כל הפרטים.", descShort: "חיבור חד-פעמי, כל תור נכנס ליומן לבד.", d: "d2" },
-                { icon: "🔔", title: "תזכורות אוטומטיות", desc: "הבוט שולח תזכורת ללקוח לפני כל תור. פחות no-shows, פחות שיחות.", descShort: "תזכורת אוטומטית לפני כל תור.", d: "d3" },
-                { icon: "📊", title: "דשבורד ניהול", desc: "הכנסות, תורים, לקוחות ושירותים פופולריים — הכל במסך אחד, בזמן אמת.", descShort: "הכנסות, תורים ולקוחות במסך אחד.", d: "d4" },
-                { icon: "⏰", title: "שעות פתיחה גמישות", desc: "הגדר ימים ושעות לכל שירות וצוות. הבוט לא יציע זמנים שלא מתאימים.", descShort: "שעות מותאמות לכל שירות וצוות.", d: "d5" },
-                { icon: "📋", title: "רשימת המתנה", desc: "אין זמינות? הבוט מוסיף לרשימת המתנה ומיידע אותך כשמשהו מתפנה.", descShort: "ממלא מקומות פנויים מרשימת המתנה.", d: "d6" },
+                { icon: "chat", title: "בוט WhatsApp בעברית", desc: "מבין שפה טבעית, עונה ב-24/7, ומנהל שיחה מתחילה ועד אישור התור.", descShort: "מבין עברית, עונה 24/7, סוגר תור לבד.", d: "d1" },
+                { icon: "calendar", title: "סנכרון גוגל קלנדר", desc: "חיבור חד-פעמי. כל תור שנקבע נכנס ליומן אוטומטית עם כל הפרטים.", descShort: "חיבור חד-פעמי, כל תור נכנס ליומן לבד.", d: "d2" },
+                { icon: "bell", title: "תזכורות אוטומטיות", desc: "הבוט שולח תזכורת ללקוח לפני כל תור. פחות no-shows, פחות שיחות.", descShort: "תזכורת אוטומטית לפני כל תור.", d: "d3" },
+                { icon: "chart", title: "דשבורד ניהול", desc: "הכנסות, תורים, לקוחות ושירותים פופולריים — הכל במסך אחד, בזמן אמת.", descShort: "הכנסות, תורים ולקוחות במסך אחד.", d: "d4" },
+                { icon: "clock", title: "שעות פתיחה גמישות", desc: "הגדר ימים ושעות לכל שירות וצוות. הבוט לא יציע זמנים שלא מתאימים.", descShort: "שעות מותאמות לכל שירות וצוות.", d: "d5" },
+                { icon: "list", title: "רשימת המתנה", desc: "אין זמינות? הבוט מוסיף לרשימת המתנה ומיידע אותך כשמשהו מתפנה.", descShort: "ממלא מקומות פנויים מרשימת המתנה.", d: "d6" },
               ].map((f) => (
                 <div key={f.title} className={`lp-feat reveal ${f.d}`}>
-                  <div className="lp-feat-icon">{f.icon}</div>
+                  <div className="lp-feat-icon"><Icon name={f.icon} /></div>
                   <div className="lp-feat-title">{f.title}</div>
                   <div className="lp-feat-desc">
                     <span className="only-desktop">{f.desc}</span>
@@ -1448,7 +1465,7 @@ export default function LandingPage() {
             <div className="lp-ba-grid">
               <div className="lp-ba-card before reveal d1">
                 <div className="lp-ba-header">
-                  <div className="lp-ba-icon">😓</div>
+                  <div className="lp-ba-icon" style={{ color: "#F87171" }}><Icon name="x" size={22} /></div>
                   <div className="lp-ba-tag">לפני תורי</div>
                 </div>
                 <div className="lp-ba-items">
@@ -1468,7 +1485,7 @@ export default function LandingPage() {
               </div>
               <div className="lp-ba-card after reveal d2">
                 <div className="lp-ba-header">
-                  <div className="lp-ba-icon">✨</div>
+                  <div className="lp-ba-icon" style={{ color: "#4ADE80" }}><Icon name="check" size={22} /></div>
                   <div className="lp-ba-tag">עם תורי</div>
                 </div>
                 <div className="lp-ba-items">
@@ -1497,29 +1514,24 @@ export default function LandingPage() {
           </svg>
         </div>
 
-        {/* TESTIMONIALS */}
+        {/* WHAT CHANGES DAY-TO-DAY — replaces a testimonial grid quoting five-star reviews from
+            invented customers. Until there are real quotes with permission to publish, the honest
+            version of this section is concrete scenarios of what the product does. */}
         <section className="lp-testi">
           <div className="lp-testi-inner">
-            <div className="lp-label reveal">מה אומרים לקוחותינו</div>
-            <div className="lp-title reveal">בעלי עסקים שכבר עושים את זה עם תורי.</div>
+            <div className="lp-label reveal">ביום-יום</div>
+            <div className="lp-title reveal">מה משתנה בפועל כשהבוט עובד בשבילך.</div>
             <div className="lp-testi-grid">
               {[
-                { quote: "לפני תורי הייתי מפספסת הודעות כל הזמן. עכשיו הבוט עונה מיידית ואני מקבלת התראה רק על תורים שנקבעו. חסכתי שעתיים ביום.", quoteShort: "הבוט עונה מיידית, וחסכתי שעתיים ביום.", name: "דנה כ.", role: "סלון שיער, תל אביב", color: "#2A9BBF", initial: "ד" },
-                { quote: "הלקוחות שלי מתפעלים שהבוט עונה ב-2 בלילה. כמה מהם אמרו שזה גרם להם לבחור בי על פני סלון אחר.", quoteShort: "לקוחות מתפעלים שהבוט עונה גם ב-2 בלילה.", name: "מיכל ל.", role: "קליניקת יופי, ירושלים", color: "#EC4899", initial: "מ" },
-                { quote: "ניסיתי כמה מערכות לניהול תורים — זו הכי פשוטה להתקנה. 10 דקות ואני חי. הגוגל קלנדר מתעדכן לבד, זה שינה לי את החיים.", quoteShort: "הכי פשוטה להתקנה — 10 דקות ואני חי.", name: "יוסי ה.", role: "ברבר, חיפה", color: "#F59E0B", initial: "י" },
+                { icon: "clock", title: "הודעה בלילה לא מחכה לבוקר", body: "לקוח כותב ב-23:40 \"יש מקום מחר?\" — הבוט בודק את היומן, מציע שעות פנויות וסוגר את התור. אתה רואה את זה רק בבוקר, ביומן.", color: "#2A9BBF" },
+                { icon: "bell", title: "תזכורת יוצאת בלי שנזכרת", body: "יום לפני כל תור נשלחת תזכורת אוטומטית בוואטסאפ. לקוח שמבטל — מקומו מוצע לרשימת ההמתנה, והחריץ לא הולך לאיבוד.", color: "#EC4899" },
+                { icon: "calendar", title: "היומן מסתדר לבד", body: "כל תור שנקבע, מוזז או מבוטל מסונכרן לגוגל קלנדר ברגע שזה קורה — עם שם הלקוח, השירות ושעת הסיום. אין הקלדה כפולה.", color: "#F59E0B" },
               ].map((t) => (
-                <div key={t.name} className="lp-testi-card reveal">
-                  <div className="lp-testi-stars">{[1,2,3,4,5].map((s) => <span key={s} className="lp-testi-star">★</span>)}</div>
-                  <div className="lp-testi-quote">
-                    <span className="only-desktop">&ldquo;{t.quote}&rdquo;</span>
-                    <span className="only-mobile">&ldquo;{t.quoteShort}&rdquo;</span>
-                  </div>
-                  <div className="lp-testi-footer">
-                    <div className="lp-testi-avatar" style={{ background: t.color }}>{t.initial}</div>
-                    <div>
-                      <div className="lp-testi-name">{t.name}</div>
-                      <div className="lp-testi-role">{t.role}</div>
-                    </div>
+                <div key={t.title} className="lp-testi-card reveal">
+                  <div className="lp-testi-avatar" style={{ background: t.color }}><Icon name={t.icon} size={18} /></div>
+                  <div>
+                    <div className="lp-testi-name" style={{ fontSize: 16, marginBottom: 8 }}>{t.title}</div>
+                    <div className="lp-testi-quote">{t.body}</div>
                   </div>
                 </div>
               ))}
@@ -1627,7 +1639,7 @@ export default function LandingPage() {
                 <>
                   <div className="lp-roi-headline reveal">
                     <div className="lp-roi-headline-label">
-                      💰 ככה תורי חוסך לך כסף — על בסיס כ-{monthlyAppts} תורים בחודש ({AVG_WEEKLY_APPTS} בשבוע):
+                      ככה תורי חוסך לך כסף — על בסיס כ-{monthlyAppts} תורים בחודש ({AVG_WEEKLY_APPTS} בשבוע):
                     </div>
                     <div className="lp-roi-headline-num">₪{monthlyRevenue.toLocaleString("he-IL")}</div>
                     <div className="lp-roi-headline-sub">בחיסכון והכנסה נוספת, כל חודש</div>
@@ -1642,12 +1654,12 @@ export default function LandingPage() {
 
                   <div className="lp-roi-grid">
                     <div className="lp-roi-cell">
-                      <div className="lp-roi-icon">🕐</div>
+                      <div className="lp-roi-icon" style={{ color: "#25D366" }}><Icon name="clock" size={22} /></div>
                       <div className="lp-roi-n"><span className="accent">{hoursPerMonth}</span></div>
                       <div className="lp-roi-l">שעות פנויות בחודש, שלא מוקדשות לתיאום תורים בטלפון</div>
                     </div>
                     <div className="lp-roi-cell">
-                      <div className="lp-roi-icon">📅</div>
+                      <div className="lp-roi-icon" style={{ color: "#25D366" }}><Icon name="calendarPlus" size={22} /></div>
                       <div className="lp-roi-n"><span className="accent">{savedBookings}</span></div>
                       <div className="lp-roi-l">תורים נוספים בחודש שנשמרים בזכות תזכורות ומענה 24/7</div>
                     </div>
@@ -1701,7 +1713,7 @@ export default function LandingPage() {
                 <div className="lp-plan-per">לחודש · ללא חוזה</div>
                 <div className="lp-plan-divider" />
                 <div className="lp-plan-features">
-                  {["כל מה שיש ב-Standard","מענה לשיחות טלפון נכנסות","קול AI טבעי (ElevenLabs)","תמלול שיחות אוטומטי","סנכרון תורים משיחות לגוגל קלנדר","תמיכה מועדפת בוואטסאפ","SLA של 4 שעות"].map((f) => (
+                  {["כל מה שיש ב-Standard","מענה לשיחות טלפון נכנסות","קול AI טבעי בעברית","תמלול שיחות אוטומטי","סנכרון תורים משיחות לגוגל קלנדר","תמיכה מועדפת בוואטסאפ","SLA של 4 שעות"].map((f) => (
                     <div key={f} className="lp-plan-feat"><span className="check">✓</span>{f}</div>
                   ))}
                 </div>
@@ -1836,7 +1848,7 @@ export default function LandingPage() {
           </div>
           <div className="lp-footer-bottom">
             <span className="lp-footer-copy">© 2026 torionline.com · כל הזכויות שמורות · <a href="/privacy" className="lp-footer-copy-link">מדיניות פרטיות</a></span>
-            <span className="lp-footer-copy">עשוי באהבה לבעלי עסקים קטנים 🇮🇱</span>
+            <span className="lp-footer-copy">נבנה בישראל, לעסקים קטנים 🇮🇱</span>
           </div>
         </footer>
 
