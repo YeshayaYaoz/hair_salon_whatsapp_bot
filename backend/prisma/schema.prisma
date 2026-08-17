@@ -127,6 +127,11 @@ model Business {
   // availabilityInfo or characterise how busy a period is, and always defers to the owner. For
   // businesses where only the owner knows the real calendar, any hint from the bot is a liability.
   availabilitySuggestionsEnabled Boolean @default(true)
+  // Whether the owner gets a WhatsApp heads-up when the voice agent sends a caller unit details or
+  // photos. Off by default: on a busy line every "customer asked for pictures" is a notification
+  // for something the bot already handled, and the owner learns to swipe the whole channel away —
+  // which is how the alerts that do need them (a paid deposit, a failed transfer) get missed too.
+  notifyOnDetailsSent Boolean @default(false)
   // Pricing caveats that don't fit a per-item price: package rules, seasons where a discount
   // doesn't apply, and excluded dates (e.g. "בין הזמנים — מחיר מלא לכל לילה", "לא כולל ראש השנה").
   // Deliberately separate from availabilityInfo: that answers "is there room?", this answers
