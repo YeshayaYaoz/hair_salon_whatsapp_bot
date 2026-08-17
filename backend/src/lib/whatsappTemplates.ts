@@ -32,7 +32,12 @@ export interface TemplateConfig {
 }
 
 const DEFAULT_LANG = process.env.WHATSAPP_TEMPLATE_LANG || "he";
-const DEFAULT_REMINDER_NAME = "tori_appointment_reminder";
+// "_2" is not a version bump for fun. The original name is unusable: its rejected template was
+// deleted, and Meta blocks a deleted template's name from reuse — the API answers "content is being
+// deleted, try again in less than 1 minute" indefinitely (observed 7+ hours), while the real block
+// is on the order of weeks. No WABA holds an approved template under the old name (both live WABAs
+// were checked), so the rename strands nothing; sending and submission both read this constant.
+const DEFAULT_REMINDER_NAME = "tori_appointment_reminder_2";
 const DEFAULT_REVIEW_NAME = "tori_review_request";
 
 /** Returns the reminder template config. Falls back to the default name if not overridden via env. */
