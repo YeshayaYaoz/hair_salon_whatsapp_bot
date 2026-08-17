@@ -629,8 +629,21 @@ async def pre_call_handler(call_request: CallRequest) -> Optional[PreCallResult]
     if PRONUNCIATION_DICT_ID:
         tts["pronunciation_dict_id"] = PRONUNCIATION_DICT_ID
 
+    # Speech recognition, which until now was never configured at all.
+    #
+    # PreCallResult takes an "stt" block beside the "tts" one, and this agent only ever sent the
+    # second — so the transcriber ran without being told what language it was listening to. On a
+    # Hebrew call where the caller reads out an email address, letter by letter, that is the worst
+    # case there is: `ink-2` is English-only, so a Hebrew line is served by `ink-whisper`, and an
+    # unpinned Whisper handed Latin letters inside Hebrew speech does what Whisper does — it loops.
+    # A real call transcribed one spoken address as "2022" repeated twenty-five times, and dropped
+    # the words "שטרודל", "ג'ימייל" and "נקודה" entirely.
+    #
+    # Language is the only STT option the config exposes; the model itself cannot be chosen here.
+    stt: Dict[str, Any] = {"language": LANGUAGE}
+
     # Still sent, in case Cartesia starts echoing it back; get_agent prefers it when present.
-    return PreCallResult(metadata={"tori": resolved}, config={"tts": tts})
+    return PreCallResult(metadata={"tori": resolved}, config={"tts": tts, "stt": stt})
 
 
 # Hebrew numbers agree in gender with what they count, and the model cannot know which noun a bare
