@@ -854,7 +854,7 @@ FORMS = {
         "ask_phone": "לפני שאת קובעת תור, שאלי את המתקשר מה מספר הטלפון שלו והעבירי אותו ב-caller_phone.",
         "confirm_number": 'אם מתקשר מכתיב לך מספר טלפון — חזרי עליו ספרה-ספרה ובקשי אישור לפני שאת משתמשת בו. תמלול קולי טועה במספרים.',
         "no_media": 'כשמבקשים תמונות או פרטים — השתמשי ב-send_details ושלחי לוואטסאפ של המתקשר. אל תבקשי כתובת מייל: המספר שלו כבר ידוע והוואטסאפ הוא ברירת המחדל. רק אם הוא אומר שאין לו וואטסאפ, או מבקש מייל במפורש — בקשי כתובת מייל, חזרי עליה ובקשי אישור, ואז שלחי במייל. אל תגידי "נשלח" לפני שהכלי החזיר שהשליחה הצליחה.',
-        "spoken_email": 'כשמכתיבים לך כתובת מייל בעל פה: "שטרודל" זה @, "נקודה" זה ., "מקף" זה -, "קו תחתון" זה _. "ג\'ימייל" זה gmail.com, "וואלה" זה walla.co.il, "הוטמייל" זה hotmail.com. העבירי ל-send_details את הכתובת כמו שהיא נכתבת באנגלית — לא את המילים שנאמרו. חזרי עליה באנגלית לאישור לפני השליחה, ואם לא הצלחת להבין — בקשי שיאיית אות-אות, או הציעי וואטסאפ.',
+        "spoken_email": 'כתובת מייל בשיחה עוברת בשני כיוונים, ואל תבלבלי ביניהם. כששומעים אותה: "שטרודל" זה @, "נקודה" זה ., "מקף" זה -, "קו תחתון" זה _, "ג\'ימייל" זה gmail.com, "וואלה" זה walla.co.il, "הוטמייל" זה hotmail.com — ול-send_details תעבירי את הכתובת הכתובה, למשל yeshaya@gmail.com. כשאת חוזרת עליה בקול לאישור: תגידי אותה במילים עבריות ולא בסימנים — "ישעיה, שטרודל, ג\'ימייל נקודה קום". לעולם אל תאמרי "at" ואל תקריאי את הסימן @ עצמו. אם לא הצלחת להבין — בקשי שיאיית אות-אות, או הציעי לשלוח לוואטסאפ.',
         "record_first": 'לפני שאת מעבירה שיחה או מסיימת אותה — קראי ל-message_owner עם כל מה שאספת: שם, יחידה, תאריכים, מספר לילות, מספר אנשים וכל בקשה מיוחדת. תמיד, גם אם את מעבירה. העברה יכולה להיכשל בלי שאף אחד ידע, וההודעה היא הדבר היחיד שנשאר אם היא נכשלה.',
         "rules": [
             'מספרים אמרי במילים ולא כספרות: "מאה ועשרים שקל".',
@@ -891,7 +891,7 @@ FORMS = {
         "ask_phone": "לפני שאתה קובע תור, שאל את המתקשר מה מספר הטלפון שלו והעבר אותו ב-caller_phone.",
         "confirm_number": 'אם מתקשר מכתיב לך מספר טלפון — חזור עליו ספרה-ספרה ובקש אישור לפני שאתה משתמש בו. תמלול קולי טועה במספרים.',
         "no_media": 'כשמבקשים תמונות או פרטים — השתמש ב-send_details ושלח לוואטסאפ של המתקשר. אל תבקש כתובת מייל: המספר שלו כבר ידוע והוואטסאפ הוא ברירת המחדל. רק אם הוא אומר שאין לו וואטסאפ, או מבקש מייל במפורש — בקש כתובת מייל, חזור עליה ובקש אישור, ואז שלח במייל. אל תגיד "נשלח" לפני שהכלי החזיר שהשליחה הצליחה.',
-        "spoken_email": 'כשמכתיבים לך כתובת מייל בעל פה: "שטרודל" זה @, "נקודה" זה ., "מקף" זה -, "קו תחתון" זה _. "ג\'ימייל" זה gmail.com, "וואלה" זה walla.co.il, "הוטמייל" זה hotmail.com. העבר ל-send_details את הכתובת כמו שהיא נכתבת באנגלית — לא את המילים שנאמרו. חזור עליה באנגלית לאישור לפני השליחה, ואם לא הצלחת להבין — בקש שיאיית אות-אות, או הצע וואטסאפ.',
+        "spoken_email": 'כתובת מייל בשיחה עוברת בשני כיוונים, ואל תבלבל ביניהם. כששומעים אותה: "שטרודל" זה @, "נקודה" זה ., "מקף" זה -, "קו תחתון" זה _, "ג\'ימייל" זה gmail.com, "וואלה" זה walla.co.il, "הוטמייל" זה hotmail.com — ול-send_details תעביר את הכתובת הכתובה, למשל yeshaya@gmail.com. כשאתה חוזר עליה בקול לאישור: תגיד אותה במילים עבריות ולא בסימנים — "ישעיה, שטרודל, ג\'ימייל נקודה קום". לעולם אל תאמר "at" ואל תקריא את הסימן @ עצמו. אם לא הצלחת להבין — בקש שיאיית אות-אות, או הצע לשלוח לוואטסאפ.',
         "record_first": 'לפני שאתה מעביר שיחה או מסיים אותה — קרא ל-message_owner עם כל מה שאספת: שם, יחידה, תאריכים, מספר לילות, מספר אנשים וכל בקשה מיוחדת. תמיד, גם אם אתה מעביר. העברה יכולה להיכשל בלי שאף אחד ידע, וההודעה היא הדבר היחיד שנשאר אם היא נכשלה.',
         "rules": [
             'מספרים אמור במילים ולא כספרות: "מאה ועשרים שקל".',
@@ -937,11 +937,15 @@ def build_prompt(ctx: Dict[str, Any], caller_known: bool = True) -> str:
         *f["rules"],
         f["confirm_number"],
         f["no_media"],
-        # Only when the email branch is actually reachable. A caller reads an address out loud in a
-        # form no model reliably decodes — "שטרודל" is Israeli slang for @ and appears nowhere in an
-        # address — and the first live call to hit it ended with the bot telling a warm lead it had
-        # failed. The API repairs what it can (lib/spokenEmail.ts); this is the half that stops the
-        # wrong string being built in the first place.
+        # An address crosses this call twice and the two crossings are not the same problem.
+        # Inbound, "שטרודל" has to become @ — Israeli slang for the symbol, appearing nowhere in an
+        # address. Outbound, reading it back for confirmation, @ has to become "שטרודל" again: a
+        # Hebrew sentence with a bare @ in it gives the speech model nothing to say, and the caller
+        # confirms an address they never actually heard. The first version of this told the agent to
+        # read it back "באנגלית", which is precisely the wrong instruction for the second half.
+        #
+        # The API repairs the inbound side too (lib/spokenEmail.ts). Nothing but this can fix the
+        # outbound one — the model writes what gets spoken.
         f["spoken_email"],
         "",
         "## היום",
