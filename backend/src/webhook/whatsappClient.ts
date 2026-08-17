@@ -324,7 +324,9 @@ export function countTemplateVariables(bodyText: string): number {
 export async function createMessageTemplate(
   wabaId: string,
   accessToken: string,
-  params: CreateTemplateParams
+  params: CreateTemplateParams,
+  /** Set on the internal retry after a rejected template was deleted, so this cannot loop. */
+  replacedAlready = false
 ): Promise<CreateTemplateResult> {
   const variables = countTemplateVariables(params.bodyText);
   // Caught here rather than at Meta, because Meta's answer for this is a generic rejection that
@@ -368,10 +370,45 @@ export async function createMessageTemplate(
   if (res.ok) return { name: params.name, submitted: true, status: body.status };
 
   const message = body.error?.error_user_msg ?? body.error?.message ?? "Unknown error";
-  // Meta reports duplicates as an error rather than idempotently succeeding — treat "already
-  // exists" as success from the caller's point of view, since the desired state is achieved.
-  if (/already exists/i.test(message)) return { name: params.name, submitted: true, status: "EXISTING" };
+  if (/already exists/i.test(message)) {
+    // "Already exists" was treated as success, on the reasoning that the desired state is achieved.
+    // It is not achieved when the existing template is REJECTED: the name is taken, nothing sends
+    // under it, and the retry button reports success — which is how a live business ran for weeks
+    // with a rejected reminder template and no signal anywhere.
+    const existing = await findMessageTemplate(wabaId, accessToken, params.name, params.languageCode);
+    if (existing?.status !== "REJECTED" || replacedAlready) {
+      return { name: params.name, submitted: true, status: existing?.status ?? "EXISTING" };
+    }
+    // Meta has no edit for a rejected template; the name has to be freed first.
+    const deleted = await deleteMessageTemplate(wabaId, accessToken, params.name);
+    if (!deleted) {
+      return { name: params.name, submitted: false, error: `Template is REJECTED and could not be deleted to resubmit` };
+    }
+    return createMessageTemplate(wabaId, accessToken, params, true);
+  }
   return { name: params.name, submitted: false, error: message };
+}
+
+/** The named template on this WABA, or null. Language-matched, since one name can hold several. */
+export async function findMessageTemplate(
+  wabaId: string,
+  accessToken: string,
+  name: string,
+  languageCode?: string
+): Promise<{ status?: string; language?: string } | null> {
+  const url = `https://graph.facebook.com/${GRAPH_VERSION}/${wabaId}/message_templates?name=${encodeURIComponent(name)}&fields=name,status,language`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const body = (await res.json().catch(() => ({}))) as { data?: Array<{ status?: string; language?: string }> };
+  const rows = body.data ?? [];
+  return rows.find((r) => !languageCode || r.language === languageCode) ?? rows[0] ?? null;
+}
+
+/** Frees a template name. Returns whether Meta accepted the deletion. */
+export async function deleteMessageTemplate(wabaId: string, accessToken: string, name: string): Promise<boolean> {
+  const url = `https://graph.facebook.com/${GRAPH_VERSION}/${wabaId}/message_templates?name=${encodeURIComponent(name)}`;
+  const res = await fetch(url, { method: "DELETE", headers: { Authorization: `Bearer ${accessToken}` } });
+  const body = (await res.json().catch(() => ({}))) as { success?: boolean };
+  return res.ok && body.success !== false;
 }
 
 /**

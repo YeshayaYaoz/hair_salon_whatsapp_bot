@@ -90,6 +90,54 @@ describe("createMessageTemplate", () => {
     });
   });
 
+  it("replaces a REJECTED template instead of reporting success", async () => {
+    // The failure this closes: the zimmer ran for weeks with tori_appointment_reminder REJECTED.
+    // Every retry hit "already exists", which was read as success, so the retry button reported
+    // that everything was fine while no reminder outside the 24h window could ever be delivered.
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: { method?: string }) => {
+        const method = init?.method ?? "GET";
+        calls.push(`${method} ${String(url).includes("name=") ? "byName" : "create"}`);
+        if (method === "POST" && calls.filter((c) => c === "POST create").length === 1) {
+          return new Response(JSON.stringify({ error: { message: "Template name already exists" } }), { status: 400 });
+        }
+        if (method === "GET") return new Response(JSON.stringify({ data: [{ status: "REJECTED", language: "he" }] }));
+        if (method === "DELETE") return new Response(JSON.stringify({ success: true }));
+        return new Response(JSON.stringify({ id: "1", status: "PENDING" }));
+      })
+    );
+
+    const result = await createMessageTemplate("waba", "tok", {
+      name: "tori_appointment_reminder",
+      languageCode: "he",
+      bodyText: "שלום {{1}}",
+      bodyExample: ["נועה"],
+    });
+
+    expect(calls).toContain("DELETE byName");
+    expect(result.submitted).toBe(true);
+    expect(result.status).toBe("PENDING");
+  });
+
+  it("leaves an APPROVED template alone", async () => {
+    const fetchMock = vi.fn(async (url: string, init?: { method?: string }) => {
+      if ((init?.method ?? "GET") === "POST") {
+        return new Response(JSON.stringify({ error: { message: "Template name already exists" } }), { status: 400 });
+      }
+      return new Response(JSON.stringify({ data: [{ status: "APPROVED", language: "he" }] }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await createMessageTemplate("waba", "tok", {
+      name: "t", languageCode: "he", bodyText: "שלום {{1}}", bodyExample: ["נועה"],
+    });
+
+    expect(result.status).toBe("APPROVED");
+    expect(fetchMock.mock.calls.some((c) => c[1]?.method === "DELETE")).toBe(false);
+  });
+
   it("omits the example key entirely when there are no variables", async () => {
     // An empty example array is itself a rejection; absent is the correct shape.
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ id: "1", status: "PENDING" })));
