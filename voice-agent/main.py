@@ -82,13 +82,46 @@ TOOL_SECRET = os.environ.get("CARTESIA_TOOL_SECRET", "")
 # price is roughly 7x higher and it is still the right trade here; the WhatsApp bot keeps DeepSeek,
 # where the wait costs nothing.
 MODEL = os.environ.get("TORI_AGENT_MODEL", "anthropic/claude-haiku-4-5-20251001")
-# LlmAgent raises if this is empty, so a missing key fails at deploy rather than mid-call. The
-# variable follows the provider in MODEL — swap both together.
-MODEL_API_KEY = (
-    os.environ.get("TORI_AGENT_API_KEY")
-    or os.environ.get("ANTHROPIC_API_KEY")
-    or os.environ.get("DEEPSEEK_API_KEY", "")
-)
+_KEY_BY_PROVIDER = {"anthropic": "ANTHROPIC_API_KEY", "deepseek": "DEEPSEEK_API_KEY"}
+
+
+def _model_api_key(model: str) -> tuple[str, str]:
+    """
+    The key belonging to the provider named in MODEL, and the variable it came from.
+
+    This used to be a flat `TORI_AGENT_API_KEY or ANTHROPIC_API_KEY or DEEPSEEK_API_KEY`, with a
+    comment telling whoever changed the model to swap the key too. That instruction cannot be
+    followed on a service that holds both keys — and this one does, because provisioning copies
+    the model key across. Setting TORI_AGENT_MODEL to a DeepSeek model would have handed DeepSeek
+    an Anthropic key, and the failure mode is the bad one: the service boots, /health reports
+    model_key true, the phone is answered, and every single turn dies on an auth error the caller
+    hears as silence.
+
+    So the provider decides, and there is deliberately no cross-provider fallback: a missing key
+    for the configured provider yields an empty string, LlmAgent refuses to construct, /health
+    reports model_key false, and the deploy workflow's gate fails the run. Loud and before any
+    caller, rather than quiet and during every call.
+
+    TORI_AGENT_API_KEY still wins outright and stays provider-agnostic — it is the explicit
+    override, and someone who sets it has already decided.
+    """
+    explicit = os.environ.get("TORI_AGENT_API_KEY")
+    if explicit:
+        return explicit, "TORI_AGENT_API_KEY"
+    name = _KEY_BY_PROVIDER.get(model.split("/", 1)[0] if "/" in model else "")
+    if name:
+        return os.environ.get(name, ""), name
+    # A provider we have no mapping for: nothing to be principled about, so try both rather than
+    # refuse to start on a model that might work fine.
+    for fallback in ("ANTHROPIC_API_KEY", "DEEPSEEK_API_KEY"):
+        value = os.environ.get(fallback)
+        if value:
+            return value, fallback
+    return "", ""
+
+
+# LlmAgent raises if this is empty, so a missing key fails at deploy rather than mid-call.
+MODEL_API_KEY, MODEL_API_KEY_SOURCE = _model_api_key(MODEL)
 
 # Israeli salons and B&Bs; the STT and TTS both need telling, and the voice picked in the dashboard
 # is Hebrew-capable by construction (the picker filters on it).
@@ -1306,6 +1339,11 @@ def health():
         # look ready to be pointed at, which is exactly the mistake this endpoint exists to prevent.
         # The boolean only: never the key.
         "model_key": bool(MODEL_API_KEY),
+        # Which variable it came from — the name, never the value. `model` and `model_key` were
+        # both true while the key belonged to the other provider, which is a service that answers
+        # the phone and fails every turn on auth. This is the field that makes that visible in the
+        # same curl that reports the model.
+        "model_key_from": MODEL_API_KEY_SOURCE or "none",
         "gender": AGENT_GENDER or "unset (falls back to /context voiceGender)",
         "tori_api": bool(TORI_API_URL),
         "tool_secret": bool(TOOL_SECRET),
