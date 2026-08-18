@@ -68,12 +68,14 @@ export const jsonLd = {
           },
         },
       ],
-      aggregateRating: {
-        "@type": "AggregateRating",
-        ratingValue: "4.9",
-        reviewCount: "47",
-        bestRating: "5",
-      },
+      // No `aggregateRating` here. It previously claimed 4.9 from 47 reviews — a rating nobody
+      // ever left, on a page that carries no reviews at all. Two separate problems: Google's
+      // structured-data policy requires a self-serving rating to correspond to reviews visible
+      // on the same page (otherwise the rich result is dropped and the site is exposed to a
+      // manual action), and the visible page had already, deliberately, dropped its invented
+      // testimonials as a legal exposure. Leaving the claim in the JSON-LD just moved the same
+      // fabrication somewhere only crawlers read. Restore it when real reviews exist and render
+      // on the page.
     },
     {
       "@type": "WebSite",

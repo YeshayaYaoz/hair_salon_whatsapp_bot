@@ -139,6 +139,11 @@ export default function BillingPage() {
   const [whatsappConnected, setWhatsappConnected] = useState(false);
   const [createdAt, setCreatedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Confirmation of a charge that already happened. This used to be a bare window.alert(): an
+  // unbranded OS dialog, gone the instant it's dismissed, reporting real money leaving someone's
+  // card. A charge notice is exactly the thing an owner wants to re-read, screenshot, or check
+  // against their statement — so it stays on the page until they dismiss it.
+  const [notice, setNotice] = useState<string | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [plan, setPlan] = useState<PlanKey>("standard");
   const [currentPlan, setCurrentPlan] = useState<string | null>(null);
@@ -190,7 +195,7 @@ export default function BillingPage() {
         return;
       }
       if (result.creditedIls) {
-        alert(
+        setNotice(
           lang === "he"
             ? `הועברת למנוי שנתי. חויבת ₪${result.chargedIls} — בקיזוז ₪${result.creditedIls} ששילמת כבר על התקופה הנוכחית.`
             : `Switched to annual. Charged ₪${result.chargedIls}, after deducting ₪${result.creditedIls} you had already paid for the current period.`
@@ -255,8 +260,11 @@ export default function BillingPage() {
       });
       setCurrentPlan(newPlan);
       if (result.proratedChargeIls) {
-        // no dedicated toast system on this page — a brief confirmation is enough here
-        alert(lang === "he" ? `חויבת ₪${result.proratedChargeIls} עבור יתרת התקופה` : `Charged ₪${result.proratedChargeIls} for the remainder of this period`);
+        setNotice(
+          lang === "he"
+            ? `חויבת ₪${result.proratedChargeIls} עבור יתרת התקופה`
+            : `Charged ₪${result.proratedChargeIls} for the remainder of this period`
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not change plan");
@@ -303,6 +311,30 @@ export default function BillingPage() {
         <h1 className="text-2xl font-bold text-gray-900">{t.billingTitle}</h1>
         <p className="text-gray-600 text-sm mt-1">{t.billingSubtitle}</p>
       </div>
+
+      {/* role="status" so a screen reader announces the charge too — it is otherwise a silent
+          visual change on a page the user has just navigated within. */}
+      {notice && (
+        <div
+          role="status"
+          className="bg-green-50 border border-green-200 text-green-800 text-sm rounded-xl px-4 py-3 mb-4 flex items-start gap-3"
+        >
+          <svg className="w-4 h-4 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+          <span className="flex-1">{notice}</span>
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            aria-label={lang === "he" ? "סגירת ההודעה" : "Dismiss"}
+            className="shrink-0 text-green-800/60 hover:text-green-900 transition row-action"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {!whatsappConnected && status !== null && (
         <div className="bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-xl px-4 py-3 mb-4">

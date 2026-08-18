@@ -551,7 +551,8 @@ export default function LandingPageEN() {
         /* Pricing */
         .lp-pricing { padding: 100px 40px; background: #fff; }
         .lp-pricing-inner { max-width: 780px; margin: 0 auto; }
-        .lp-plans { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        .lp-plans { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; }
+        @media (max-width: 900px) { .lp-plans { grid-template-columns: 1fr; } }
         @media (max-width: 640px) { .lp-plans { grid-template-columns: 1fr; } }
         .lp-plan { border: 1.5px solid #EBEBEB; border-radius: 20px; padding: 36px 32px; }
         .lp-plan.highlight { border-color: #F59E0B; box-shadow: 0 0 0 4px rgba(245,158,11,0.08); }
@@ -923,7 +924,7 @@ export default function LandingPageEN() {
         <section className="lp-flow" id="how">
           <div className="lp-flow-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>Integrations</div>
-            <div className="lp-title reveal" style={{ textAlign: "center" }}>Everything connected. You don't have to do anything.</div>
+            <h2 className="lp-title reveal" style={{ textAlign: "center" }}>Everything connected. You don't have to do anything.</h2>
             <div className="lp-flow-steps reveal">
               <div className="lp-flow-node">
                 <div className="lp-flow-icon wa" style={{ color: "#15803D" }}><Icon name="chat" size={30} /><div className="lp-flow-ping green" /></div>
@@ -956,7 +957,7 @@ export default function LandingPageEN() {
         <section className="lp-steps">
           <div className="lp-steps-inner">
             <div className="lp-label reveal">Process</div>
-            <div className="lp-title reveal">Three steps, then everything runs itself.</div>
+            <h2 className="lp-title reveal">Three steps, then everything runs itself.</h2>
             <div className="lp-steps-list">
               {[
                 { title: "Customer sends a WhatsApp message", desc: "They write naturally — \"I'd like a haircut Thursday\". The bot understands and replies within a second, in plain English." },
@@ -979,7 +980,7 @@ export default function LandingPageEN() {
         <section className="lp-features" id="features">
           <div className="lp-features-inner">
             <div className="lp-label reveal">What's included</div>
-            <div className="lp-title reveal">Every tool your business needs — and nothing you don't.</div>
+            <h2 className="lp-title reveal">Every tool your business needs — and nothing you don't.</h2>
             <div className="lp-feats-grid">
               {[
                 { icon: "chat", title: "WhatsApp Bot", desc: "Understands natural language, replies 24/7, and manages the conversation from first message to confirmed booking." },
@@ -1064,7 +1065,7 @@ export default function LandingPageEN() {
         <section className="lp-ba">
           <div className="lp-ba-inner">
             <div className="lp-label reveal" style={{ color: "#F87171" }}>Before & After</div>
-            <div className="lp-title reveal" style={{ color: "#fff" }}>What changed for businesses that switched to Tori.</div>
+            <h2 className="lp-title reveal" style={{ color: "#fff" }}>What changed for businesses that switched to Tori.</h2>
             <div className="lp-ba-grid">
               <div className="lp-ba-card before reveal">
                 <div className="lp-ba-tag">Before Tori</div>
@@ -1104,7 +1105,7 @@ export default function LandingPageEN() {
         <section className="lp-testimonials">
           <div className="lp-testimonials-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>Day to day</div>
-            <div className="lp-title reveal" style={{ textAlign: "center" }}>What actually changes when the bot works for you.</div>
+            <h2 className="lp-title reveal" style={{ textAlign: "center" }}>What actually changes when the bot works for you.</h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginTop: 16 }}>
               {[
                 { icon: "clock", title: "A midnight message doesn't wait for morning", body: "A customer writes at 11:40pm asking for tomorrow — the bot checks the calendar, offers open slots and books it. You see it in the morning, already on your calendar." },
@@ -1182,7 +1183,7 @@ export default function LandingPageEN() {
         <section className="lp-roi" id="roi">
           <div className="lp-roi-inner">
             <div className="lp-label reveal" style={{ textAlign: "center", color: "#F59E0B" }}>Savings calculator</div>
-            <div className="lp-title reveal" style={{ color: "#fff", textAlign: "center" }}>How much does Tori save you?</div>
+            <h2 className="lp-title reveal" style={{ color: "#fff", textAlign: "center" }}>How much does Tori save you?</h2>
             <div className="lp-roi-sub reveal">Based on an average business with about {AVG_WEEKLY_APPTS} appointments/week</div>
             <div className="lp-roi-grid">
               <div className="lp-roi-cell">
@@ -1210,12 +1211,17 @@ export default function LandingPageEN() {
         <section className="lp-pricing" id="pricing">
           <div className="lp-pricing-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>Pricing</div>
-            <div className="lp-title reveal" style={{ textAlign: "center" }}>Simple. Transparent. No surprises.</div>
+            <h2 className="lp-title reveal" style={{ textAlign: "center" }}>Simple. Transparent. No surprises.</h2>
+            {/* Prices are quoted in shekels, matching PLAN_PRICES_ILS in the billing code, because
+                shekels are what the card is actually charged — billing runs through an Israeli
+                provider and has no USD path. This block previously advertised $39 / $79 and listed
+                no Ultra plan at all: it was simply missed when pricing moved to ₪189 / ₪449 / ₪849,
+                so an English-speaking visitor was quoted a price we would never charge them. */}
             <div className="lp-plans">
               <div className="lp-plan">
                 <div className="lp-plan-tag">Standard</div>
                 <div className="lp-plan-name">Standard</div>
-                <div className="lp-plan-price">$39</div>
+                <div className="lp-plan-price">₪189</div>
                 <div className="lp-plan-per">per month · 14-day free trial</div>
                 <div className="lp-plan-divider" />
                 <div className="lp-plan-features">
@@ -1228,7 +1234,7 @@ export default function LandingPageEN() {
               <div className="lp-plan highlight">
                 <div className="lp-plan-tag">Premium</div>
                 <div className="lp-plan-name">Premium</div>
-                <div className="lp-plan-price">$79</div>
+                <div className="lp-plan-price">₪449</div>
                 <div className="lp-plan-per">per month · no contract</div>
                 <div className="lp-plan-divider" />
                 <div className="lp-plan-features">
@@ -1238,6 +1244,24 @@ export default function LandingPageEN() {
                 </div>
                 <a className="lp-plan-btn amber" href="/login">Start Free Trial</a>
               </div>
+              <div className="lp-plan">
+                <div className="lp-plan-tag">Ultra</div>
+                <div className="lp-plan-name">Ultra</div>
+                <div className="lp-plan-price">₪849</div>
+                <div className="lp-plan-per">per month · for high-volume businesses</div>
+                <div className="lp-plan-divider" />
+                <div className="lp-plan-features">
+                  {["Everything in Premium","Up to 3,000 outbound messages a month — 3×","Personal onboarding","Top-priority support","Custom tailoring for your business"].map((f) => (
+                    <div key={f} className="lp-plan-feat">{f}</div>
+                  ))}
+                </div>
+                <a
+                  className="lp-plan-btn dark"
+                  href="mailto:y28112000@gmail.com?subject=Ultra%20plan%20enquiry"
+                >
+                  Talk to us
+                </a>
+              </div>
             </div>
           </div>
         </section>
@@ -1246,7 +1270,7 @@ export default function LandingPageEN() {
         <section className="lp-compare">
           <div className="lp-compare-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>Comparison</div>
-            <div className="lp-title reveal" style={{ textAlign: "center" }}>Why Tori and not something else?</div>
+            <h2 className="lp-title reveal" style={{ textAlign: "center" }}>Why Tori and not something else?</h2>
             <table className="compare-table">
               <thead>
                 <tr>
@@ -1284,7 +1308,7 @@ export default function LandingPageEN() {
         <section className="lp-faq" id="faq">
           <div className="lp-faq-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>FAQ</div>
-            <div className="lp-title reveal" style={{ textAlign: "center" }}>Questions? We have answers.</div>
+            <h2 className="lp-title reveal" style={{ textAlign: "center" }}>Questions? We have answers.</h2>
             <div>
               {[
                 { q: "Does the bot understand natural language?", a: "Yes. The bot is powered by Claude AI by Anthropic and understands natural language completely — including abbreviations, typos, and informal phrasing. Customers don't need to type in any special format." },
@@ -1310,7 +1334,7 @@ export default function LandingPageEN() {
 
         {/* CTA */}
         <section className="lp-cta reveal">
-          <div className="lp-cta-title">Stop answering everyone yourself.</div>
+          <h2 className="lp-cta-title">Stop answering everyone yourself.</h2>
           <div className="lp-cta-sub">Try free for 14 days — no credit card, no risk.</div>
           <div className="lp-cta-row">
             <a className="btn-green" href="/login">Start Free Now</a>
@@ -1350,10 +1374,11 @@ export default function LandingPageEN() {
               <a href="/login">Dashboard</a>
               <a href="/privacy">Privacy Policy</a>
               <a href="/terms">Terms of Service</a>
+              <a href="/accessibility">Accessibility</a>
             </div>
           </div>
           <div className="lp-footer-bottom">
-            <span className="lp-footer-copy">© 2026 torionline.com · All rights reserved · <a href="/privacy" className="lp-footer-copy-link">Privacy Policy</a></span>
+            <span className="lp-footer-copy">© 2026 torionline.com · All rights reserved · <a href="/privacy" className="lp-footer-copy-link">Privacy Policy</a> · <a href="/accessibility" className="lp-footer-copy-link">Accessibility</a></span>
             <span className="lp-footer-copy">Built in Israel for small businesses</span>
           </div>
         </footer>

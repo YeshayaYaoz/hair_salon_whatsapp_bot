@@ -92,6 +92,7 @@ function GoogleCalendarSection() {
   const { lang } = useLanguage();
   const he = lang === "he";
   const [connected, setConnected] = useState<boolean | null>(null);
+  const [connectError, setConnectError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -111,7 +112,10 @@ function GoogleCalendarSection() {
       body: JSON.stringify({ code }),
     })
       .then(() => setConnected(true))
-      .catch((err) => alert("Google Calendar connection failed: " + err.message));
+      // Was a window.alert() with a hardcoded English string, on a page a Hebrew owner reaches by
+      // being redirected back from Google. An OS dialog is also the wrong shape for this: the
+      // failure belongs next to the Connect button they need to press again.
+      .catch((err: unknown) => setConnectError(err instanceof Error ? err.message : null));
   }, []);
 
   async function connect() {
@@ -176,6 +180,13 @@ function GoogleCalendarSection() {
           )}
         </div>
       </div>
+
+      {connectError && (
+        <p role="alert" className="text-red-600 text-xs mt-3">
+          {he ? "החיבור לגוגל קלנדר נכשל: " : "Google Calendar connection failed: "}
+          {connectError}
+        </p>
+      )}
     </div>
   );
 }

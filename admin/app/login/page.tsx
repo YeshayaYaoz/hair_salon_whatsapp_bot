@@ -273,41 +273,30 @@ export default function LoginPage() {
         .login-left-stat-n span { color: #5BB8D4; }
         .login-left-stat-l { font-size: 11.5px; color: rgba(255,255,255,0.42); letter-spacing: 0.03em; }
 
-        /* Testimonial card, laid out like a real review (author + rating up top, quote below) —
-           previously led with an oversized decorative quotation mark and put the author at the
-           bottom, which reads more like a generic placeholder than an actual review. */
-        .login-left-testimonial {
+        /* What's waiting inside, stated as capabilities. This slot used to hold a five-star review
+           from "שרה לוי, מספרת שרה, תל אביב" — complete with a verification tick — alongside stats
+           claiming 2,400 active businesses and a 4.9 rating. None of that was real, and the
+           landing page had already dropped its invented testimonials for exactly that reason. A
+           fabricated review with a verified badge on the page where people hand over an email is
+           the worst place in the product to keep one. Replaced with things the product verifiably
+           does; restore a quote here when there is a real customer willing to be named. */
+        .login-left-highlights {
           position: relative; z-index: 1; overflow: hidden;
           background: rgba(255,255,255,0.04);
           border: 1px solid rgba(255,255,255,0.08);
           border-radius: 16px;
           padding: 14px 18px;
           backdrop-filter: blur(6px);
+          display: flex; flex-direction: column; gap: 9px;
         }
-        .login-left-testimonial::before {
-          content: '“';
-          position: absolute; bottom: -34px; left: 10px;
-          font-size: 90px; font-weight: 800; line-height: 1;
-          color: rgba(91,184,212,0.05);
-          font-family: Georgia, serif; pointer-events: none;
-        }
-        .login-left-author { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-        .login-left-avatar {
-          width: 32px; height: 32px; border-radius: 50%;
-          background: linear-gradient(135deg, #1B7FA0, #145F78);
-          display: flex; align-items: center; justify-content: center;
-          font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0;
-          box-shadow: 0 0 0 2px rgba(91,184,212,0.25);
-        }
-        .login-left-author-name-row { display: flex; align-items: center; gap: 6px; }
-        .login-left-author-name { font-size: 14px; font-weight: 600; color: #fff; }
-        .login-left-author-verified {
-          width: 13px; height: 13px; border-radius: 50%; background: #5BB8D4; flex-shrink: 0;
+        .login-left-highlight { display: flex; align-items: flex-start; gap: 10px; }
+        .login-left-highlight-tick {
+          width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; margin-top: 1px;
+          background: rgba(37,211,102,0.16); border: 1px solid rgba(37,211,102,0.3);
           display: flex; align-items: center; justify-content: center;
         }
-        .login-left-author-role { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 1px; }
-        .login-left-stars { color: #F59E0B; font-size: 10px; letter-spacing: 1.5px; flex-shrink: 0; }
-        .login-left-quote { position: relative; font-size: 14px; color: rgba(255,255,255,0.78); line-height: 1.55; }
+        .login-left-highlight-text { font-size: 13.5px; color: rgba(255,255,255,0.78); line-height: 1.5; }
+        .login-left-highlight-text b { color: #fff; font-weight: 600; }
 
         /* ══════════════ RIGHT / FORM PANEL ══════════════ */
         .login-right {
@@ -366,9 +355,8 @@ export default function LoginPage() {
           .login-left-stat { padding: 7px 10px; }
           .login-left-stat-icon { margin-bottom: 2px; }
           .login-left-stat-n { font-size: 17px; margin-bottom: 1px; }
-          .login-left-testimonial { padding: 10px 14px; }
-          .login-left-author { margin-bottom: 5px; }
-          .login-left-quote { font-size: 12px; -webkit-line-clamp: 2; display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+          .login-left-highlights { padding: 10px 14px; gap: 6px; }
+          .login-left-highlight-text { font-size: 12px; }
           .login-card { padding: 14px 30px 10px; }
           .login-form-brand { margin-bottom: 5px; }
           .login-form-brand img { width: 36px !important; height: 36px !important; }
@@ -379,10 +367,10 @@ export default function LoginPage() {
           .login-trust { margin-top: 6px; }
         }
         /* Very short viewports (e.g. a maximized 1080p browser with chrome eating into the
-           viewport) — drop the testimonial entirely rather than keep shrinking text to
+           viewport) — drop the highlights entirely rather than keep shrinking text to
            illegibility; the demo mockup + stats carry the panel's persuasion on their own. */
         @media (max-height: 740px) {
-          .login-left-testimonial { display: none; }
+          .login-left-highlights { display: none; }
           .login-left { gap: 10px; }
           .login-right { padding: 10px 28px; }
           .login-card { padding: 10px 30px 8px; }
@@ -640,44 +628,49 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {/* Every number and claim in this block is something the product does, checkable against
+              the product itself — not a usage statistic we'd have to have earned. */}
           <div className="login-left-bottom">
             <div className="login-left-stats">
               <div className="login-left-stat">
-                <div className="login-left-stat-icon">🏪</div>
-                <div className="login-left-stat-n"><span>+</span>2,400</div>
-                <div className="login-left-stat-l">{he ? "עסקים פעילים" : "active businesses"}</div>
+                <div className="login-left-stat-icon">🕒</div>
+                <div className="login-left-stat-n">24<span>/7</span></div>
+                <div className="login-left-stat-l">{he ? "מענה ללקוחות" : "answering customers"}</div>
               </div>
               <div className="login-left-stat">
-                <div className="login-left-stat-icon">💬</div>
-                <div className="login-left-stat-n"><span>98</span>%</div>
-                <div className="login-left-stat-l">{he ? "שיעור מענה" : "response rate"}</div>
+                <div className="login-left-stat-icon">⚡</div>
+                <div className="login-left-stat-n">10<span>{he ? " דק׳" : " min"}</span></div>
+                <div className="login-left-stat-l">{he ? "עד שהבוט חי" : "until the bot is live"}</div>
               </div>
               <div className="login-left-stat">
-                <div className="login-left-stat-icon">⭐</div>
-                <div className="login-left-stat-n"><span>4.9</span>★</div>
-                <div className="login-left-stat-l">{he ? "דירוג לקוחות" : "customer rating"}</div>
+                <div className="login-left-stat-icon">🎁</div>
+                <div className="login-left-stat-n">14<span>{he ? " יום" : " days"}</span></div>
+                <div className="login-left-stat-l">{he ? "ניסיון חינם" : "free trial"}</div>
               </div>
             </div>
 
-            <div className="login-left-testimonial">
-              <div className="login-left-author">
-                <div className="login-left-avatar">{he ? "ש" : "S"}</div>
-                <div>
-                  <div className="login-left-author-name-row">
-                    <span className="login-left-author-name">{he ? "שרה לוי" : "Sarah Levi"}</span>
-                    <span className="login-left-author-verified">
-                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#0D2A38" strokeWidth={3.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                    </span>
-                  </div>
-                  <div className="login-left-author-role">{he ? "מספרת שרה, תל אביב" : "Sarah's Salon, Tel Aviv"}</div>
+            <div className="login-left-highlights">
+              {(he
+                ? [
+                    ["מבין עברית חופשית", " — בלי תפריטים ובלי מילות קסם"],
+                    ["מסנכרן לגוגל קלנדר", " — כל תור, ברגע שנקבע"],
+                    ["שולח תזכורות לבד", " — לפני כל תור, בלי שתזכרו"],
+                  ]
+                : [
+                    ["Understands natural Hebrew", " — no menus, no magic words"],
+                    ["Syncs to Google Calendar", " — every booking, the moment it's made"],
+                    ["Sends reminders on its own", " — before every appointment"],
+                  ]
+              ).map(([lead, rest]) => (
+                <div key={lead} className="login-left-highlight">
+                  <span className="login-left-highlight-tick" aria-hidden="true">
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" strokeWidth={3.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </span>
+                  <span className="login-left-highlight-text"><b>{lead}</b>{rest}</span>
                 </div>
-                <span className="login-left-stars">★★★★★</span>
-              </div>
-              <div className="login-left-quote">
-                {he
-                  ? "מאז שהתחלתי להשתמש בתורי, הפסקתי לאבד לקוחות בגלל שלא עניתי לטלפונים. הבוט עובד גם ב-2 בלילה."
-                  : "Since I started using Tori, I stopped losing customers over unanswered calls. The bot works even at 2am."}
-              </div>
+              ))}
             </div>
           </div>
         </div>
@@ -719,7 +712,7 @@ export default function LoginPage() {
               {mode === "login"
                 ? (he ? "מתחברים ורואים מה קורה בעסק" : "Sign in and see what's happening")
                 : signupStep === 1
-                ? (he ? "מצטרפים לאלפי עסקים שכבר עובדים עם תורי" : "Join thousands of businesses already using Tori")
+                ? (he ? "14 יום ניסיון — בלי כרטיס אשראי" : "14-day trial — no credit card needed")
                 : (he ? "עוד פרט אחד ואתם באוויר" : "One more detail and you're live")}
             </p>
 
