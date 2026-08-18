@@ -14,6 +14,7 @@
  */
 import { prisma } from "../src/lib/prisma.js";
 import { voiceBudgetStatus } from "../src/lib/voiceBudgetAlert.js";
+import { listAgentCalls, CartesiaNotConfiguredError } from "../src/lib/cartesiaAdmin.js";
 
 /** Last four digits only — enough to match a row against a call you made, and nothing more. */
 function maskPhone(phone: string): string {
@@ -78,6 +79,17 @@ async function main() {
   }
 
   await printServiceNames();
+
+  // The service's own CARTESIA_API_KEY, exercised against the real API. After a key rotation this
+  // is the line that says whether the Railway copy was updated: the hourly sync fails quietly into
+  // a job log, and a stale key would otherwise surface as "minutes stopped arriving" days later.
+  try {
+    const recent = await listAgentCalls(new Date(Date.now() - 24 * 60 * 60 * 1000), 1);
+    console.log(`Cartesia key on this service: OK (${recent.length} call(s) visible in the last 24h)`);
+  } catch (err) {
+    if (err instanceof CartesiaNotConfiguredError) console.log("Cartesia key on this service: not configured");
+    else console.log(`Cartesia key on this service: FAILING — ${err instanceof Error ? err.message : err}`);
+  }
 
   const status = await voiceBudgetStatus();
   console.log(
