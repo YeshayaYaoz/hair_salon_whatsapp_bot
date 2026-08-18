@@ -13,6 +13,7 @@ import { prisma } from "./prisma.js";
 export const MESSAGE_QUOTA_BY_PLAN: Record<string, number> = {
   standard: 300,
   premium: 1000,
+  ultra: 3000,
 };
 const DEFAULT_QUOTA = MESSAGE_QUOTA_BY_PLAN.standard;
 

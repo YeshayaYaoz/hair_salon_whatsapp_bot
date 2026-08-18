@@ -671,7 +671,7 @@ export default function LandingPage() {
         /* PRICING */
         .lp-pricing { padding: 100px 40px; background: #fff; }
         .lp-pricing-inner { max-width: 860px; margin: 0 auto; }
-        .lp-pricing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 52px; }
+        .lp-pricing-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 52px; }
         .lp-plan { border-radius: 16px; padding: 36px; border: 1px solid #E8E8E8; position: relative; transition: box-shadow 0.2s; }
         .lp-plan:hover { box-shadow: 0 16px 48px rgba(0,0,0,0.08); }
         .lp-plan.featured { border-color: #111; background: #0A0A0A; }
@@ -1715,7 +1715,7 @@ export default function LandingPage() {
               <div className="lp-plan featured reveal d2">
                 <div className="lp-plan-tag">פרמיום</div>
                 <div className="lp-plan-name">Premium</div>
-                <div className="lp-plan-price">₪380</div>
+                <div className="lp-plan-price">₪449</div>
                 <div className="lp-plan-per">לחודש · ללא חוזה</div>
                 <div className="lp-plan-divider" />
                 <div className="lp-plan-features">
@@ -1724,6 +1724,19 @@ export default function LandingPage() {
                   ))}
                 </div>
                 <a className="lp-plan-btn amber" href="/login">התחל ניסיון חינם</a>
+              </div>
+              <div className="lp-plan reveal d3">
+                <div className="lp-plan-tag">אולטרה</div>
+                <div className="lp-plan-name">Ultra</div>
+                <div className="lp-plan-price">₪849</div>
+                <div className="lp-plan-per">לחודש · לעסקים עם נפח גבוה</div>
+                <div className="lp-plan-divider" />
+                <div className="lp-plan-features">
+                  {["כל מה שיש ב-Premium","עד 3,000 הודעות יזומות בחודש — פי 3","ליווי הקמה אישי","עדיפות עליונה בתמיכה","התאמות אישיות לעסק"].map((f) => (
+                    <div key={f} className="lp-plan-feat"><span className="check">✓</span>{f}</div>
+                  ))}
+                </div>
+                <a className="lp-plan-btn dark" href="/login">דברו איתנו</a>
               </div>
             </div>
           </div>

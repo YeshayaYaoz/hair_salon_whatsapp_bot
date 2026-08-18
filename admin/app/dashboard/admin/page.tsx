@@ -74,9 +74,9 @@ interface MrrSnapshot {
 type StatusFilter = "all" | "trial" | "active" | "past_due" | "canceled" | "blocked" | "attention" | "onboarding";
 
 // Must match MESSAGE_QUOTA_BY_PLAN in backend/src/lib/wallet.ts — display-only, not authoritative.
-const MESSAGE_QUOTA_BY_PLAN: Record<string, number> = { standard: 300, premium: 1000 };
+const MESSAGE_QUOTA_BY_PLAN: Record<string, number> = { standard: 300, premium: 1000, ultra: 3000 };
 // Must match PLAN_PRICES_ILS in backend/src/billing/payplusSubscription.ts.
-const PLAN_PRICES_ILS: Record<string, number> = { standard: 189, premium: 380 };
+const PLAN_PRICES_ILS: Record<string, number> = { standard: 189, premium: 449, ultra: 849 };
 const ANNUAL_MONTHS_CHARGED = 10;
 
 function monthlyRevenueIls(b: AdminBusiness): number {
@@ -1092,6 +1092,7 @@ export default function AdminBusinessesPage() {
                 >
                   <option value="standard">{he ? "סטנדרט" : "Standard"} (₪{PLAN_PRICES_ILS.standard})</option>
                   <option value="premium">{he ? "פרימיום" : "Premium"} (₪{PLAN_PRICES_ILS.premium})</option>
+                  <option value="ultra">{he ? "אולטרה" : "Ultra"} (₪{PLAN_PRICES_ILS.ultra})</option>
                 </select>
                 <button
                   disabled={actionBusy}

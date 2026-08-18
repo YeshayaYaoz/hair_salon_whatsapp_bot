@@ -173,7 +173,7 @@ payplusBillingRouter.post("/payplus/health/charge-token", requireAuth, requireSu
 /** Creates a PayPlus checkout link that charges the first period AND captures a recurring token. */
 payplusBillingRouter.post("/payplus/checkout", requireAuth, async (req: AuthedRequest, res) => {
   const parsed = z
-    .object({ plan: z.enum(["standard", "premium"]), returnUrl: z.string().url(), cycle: z.enum(["monthly", "annual"]).optional() })
+    .object({ plan: z.enum(["standard", "premium", "ultra"]), returnUrl: z.string().url(), cycle: z.enum(["monthly", "annual"]).optional() })
     .safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
@@ -302,7 +302,7 @@ payplusBillingRouter.post("/payplus/wallet/topup", requireAuth, async (req: Auth
 /** Upgrades/downgrades the plan and charges a prorated top-up immediately for the remainder of
  * the current billing period — the next scheduled charge picks up the new plan price automatically. */
 payplusBillingRouter.put("/payplus/plan", requireAuth, async (req: AuthedRequest, res) => {
-  const parsed = z.object({ plan: z.enum(["standard", "premium"]) }).safeParse(req.body);
+  const parsed = z.object({ plan: z.enum(["standard", "premium", "ultra"]) }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! } });

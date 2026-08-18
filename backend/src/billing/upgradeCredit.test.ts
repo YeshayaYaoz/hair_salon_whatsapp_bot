@@ -22,8 +22,8 @@ describe("unusedCreditIls", () => {
   });
 
   it("credits the untouched part of a monthly period", () => {
-    // 27 of 30 days left on ₪380 = ₪342.
-    expect(unusedCreditIls(monthly(inDays(27)), NOW)).toBe(342);
+    // 27 of 30 days left on ₪449 ≈ ₪404.
+    expect(unusedCreditIls(monthly(inDays(27)), NOW)).toBe(404);
   });
 
   it("credits nothing on the last day of the period", () => {
@@ -50,9 +50,9 @@ describe("unusedCreditIls", () => {
       { subscriptionPlan: "premium", billingCycle: "annual", nextBillingDate: inDays(182) },
       NOW
     );
-    // Half a year of a 10-month charge (₪3,800 annual → ≈₪1,895).
-    expect(half).toBeGreaterThan(1850);
-    expect(half).toBeLessThan(1950);
+    // Half a year of a 10-month charge (₪4,490 annual → ≈₪2,239).
+    expect(half).toBeGreaterThan(2200);
+    expect(half).toBeLessThan(2280);
   });
 
   it("returns 0 with no period end rather than guessing", () => {
@@ -66,7 +66,7 @@ describe("unusedCreditIls", () => {
 
 describe("chargeAfterCredit", () => {
   it("subtracts the credit", () => {
-    expect(chargeAfterCredit(3800, 342)).toBe(3458);
+    expect(chargeAfterCredit(4490, 404)).toBe(4086);
   });
 
   it("never produces an amount PayPlus would reject", () => {

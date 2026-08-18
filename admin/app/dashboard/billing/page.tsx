@@ -12,13 +12,16 @@ const STATUS_COLORS: Record<string, string> = {
   canceled: "bg-gray-100 text-gray-600 border-gray-200",
 };
 
-const PLAN_PRICES: Record<"standard" | "premium", number> = { standard: 189, premium: 380 };
+type PlanKey = "standard" | "premium" | "ultra";
+const PLANS: PlanKey[] = ["standard", "premium", "ultra"];
+const PLAN_LABEL: Record<PlanKey, string> = { standard: "Standard", premium: "Premium", ultra: "Ultra" };
+const PLAN_PRICES: Record<PlanKey, number> = { standard: 189, premium: 449, ultra: 849 };
 // Must match ANNUAL_MONTHS_CHARGED in backend/src/billing/payplusSubscription.ts — the annual term
 // charges this many months for 12 months of service.
 const ANNUAL_MONTHS_CHARGED = 10;
 
 // Must match MESSAGE_QUOTA_BY_PLAN in backend/src/lib/wallet.ts — display-only, not authoritative.
-const MESSAGE_QUOTA_BY_PLAN: Record<"standard" | "premium", number> = { standard: 300, premium: 1000 };
+const MESSAGE_QUOTA_BY_PLAN: Record<PlanKey, number> = { standard: 300, premium: 1000, ultra: 3000 };
 
 // Features shared by both plans — everything below is what actually differs, so the comparison
 // is honest about what a Premium upgrade buys today rather than padding the list.
@@ -137,7 +140,7 @@ export default function BillingPage() {
   const [createdAt, setCreatedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
-  const [plan, setPlan] = useState<"standard" | "premium">("standard");
+  const [plan, setPlan] = useState<PlanKey>("standard");
   const [currentPlan, setCurrentPlan] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<string>("monthly");
   const [loyaltyDiscountIls, setLoyaltyDiscountIls] = useState(0);
@@ -156,7 +159,7 @@ export default function BillingPage() {
     setWhatsappConnected(me.whatsappConnected);
     setCreatedAt(me.createdAt);
     setCurrentPlan(me.subscriptionPlan ?? null);
-    if (me.subscriptionPlan === "premium" || me.subscriptionPlan === "standard") setPlan(me.subscriptionPlan);
+    if (me.subscriptionPlan && (PLANS as string[]).includes(me.subscriptionPlan)) setPlan(me.subscriptionPlan as PlanKey);
     setBillingCycle(me.billingCycle ?? "monthly");
     setLoyaltyDiscountIls(me.loyaltyDiscountIls ?? 0);
     setWalletBalanceAgorot(me.walletBalanceAgorot ?? 0);
@@ -222,7 +225,7 @@ export default function BillingPage() {
     }
   }
 
-  async function subscribe(planToCheckout: "standard" | "premium" = plan) {
+  async function subscribe(planToCheckout: PlanKey = plan) {
     setError(null);
     setPlan(planToCheckout);
     setCheckoutLoading(true);
@@ -240,7 +243,7 @@ export default function BillingPage() {
     }
   }
 
-  async function changePlan(newPlan: "standard" | "premium") {
+  async function changePlan(newPlan: PlanKey) {
     setError(null);
     setPlan(newPlan);
     if (status !== "active" || !currentPlan) return; // just a pre-checkout selection, nothing to charge yet
@@ -282,7 +285,12 @@ export default function BillingPage() {
   // The annual term charges ANNUAL_MONTHS_CHARGED months for 12 months of service, so an annual
   // subscriber's effective monthly cost is lower than the list price. Omitting that overstated
   // their cost by ~17% and therefore understated the savings from the very discount they bought.
-  const activePlan = (status === "active" && currentPlan === "premium" ? "premium" : status === "active" ? "standard" : plan) as "standard" | "premium";
+  const activePlan: PlanKey =
+    status === "active" && currentPlan && (PLANS as string[]).includes(currentPlan)
+      ? (currentPlan as PlanKey)
+      : status === "active"
+        ? "standard"
+        : plan;
   const listMonthlyPrice =
     billingCycle === "annual"
       ? (PLAN_PRICES[activePlan] * ANNUAL_MONTHS_CHARGED) / 12
@@ -346,7 +354,7 @@ export default function BillingPage() {
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-semibold text-gray-900">
-                    {currentPlan === "premium" ? "Premium" : "Standard"}
+                    {PLAN_LABEL[activePlan]}
                   </span>
                   <div className="flex items-baseline gap-1">
                     {loyaltyDiscountIls > 0 && (
@@ -368,21 +376,28 @@ export default function BillingPage() {
                   </p>
                 )}
               </div>
-              <button
-                onClick={() => changePlan(activePlan === "premium" ? "standard" : "premium")}
-                disabled={checkoutLoading}
-                className="inline-flex items-center justify-center gap-1.5 bg-gray-50 hover:bg-gray-100 disabled:opacity-50 text-gray-700 border border-gray-200 text-sm font-semibold px-4 py-2 rounded-lg transition"
-              >
-                {checkoutLoading
-                  ? t.redirecting
-                  : activePlan === "premium"
-                    ? (lang === "he" ? "עבור ל-Standard" : "Switch to Standard")
-                    : (lang === "he" ? "שדרג ל-Premium" : "Upgrade to Premium")}
-              </button>
+              <div className="flex gap-2 flex-wrap">
+                {/* One button per plan they are not on. With three plans a binary toggle stopped
+                    meaning anything; naming the destination is what makes the click informed. */}
+                {PLANS.filter((p) => p !== activePlan).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => changePlan(p)}
+                    disabled={checkoutLoading}
+                    className="inline-flex items-center justify-center gap-1.5 bg-gray-50 hover:bg-gray-100 disabled:opacity-50 text-gray-700 border border-gray-200 text-sm font-semibold px-4 py-2 rounded-lg transition"
+                  >
+                    {checkoutLoading
+                      ? t.redirecting
+                      : PLAN_PRICES[p] > PLAN_PRICES[activePlan]
+                        ? (lang === "he" ? `שדרג ל-${PLAN_LABEL[p]}` : `Upgrade to ${PLAN_LABEL[p]}`)
+                        : (lang === "he" ? `עבור ל-${PLAN_LABEL[p]}` : `Switch to ${PLAN_LABEL[p]}`)}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
-          <div className="grid sm:grid-cols-2 gap-4">
-            {(["standard", "premium"] as const).map((p) => {
+          <div className="grid sm:grid-cols-3 gap-4">
+            {PLANS.map((p) => {
               const isCurrent = currentPlan === p && status === "active";
               const isSelected = plan === p;
               const priceAfterDiscount = Math.max(0, PLAN_PRICES[p] - (p === plan ? loyaltyDiscountIls : 0));
@@ -404,7 +419,7 @@ export default function BillingPage() {
                     </span>
                   )}
 
-                  <span className="text-sm font-bold text-gray-900 mb-2">{p === "standard" ? "Standard" : "Premium"}</span>
+                  <span className="text-sm font-bold text-gray-900 mb-2">{PLAN_LABEL[p]}</span>
                   <div className="flex items-baseline gap-1 mb-1">
                     {p === plan && loyaltyDiscountIls > 0 && (
                       <span className="text-base text-gray-600 line-through tabular-nums">₪{PLAN_PRICES[p]}</span>
@@ -435,7 +450,15 @@ export default function BillingPage() {
                         ? `עד ${MESSAGE_QUOTA_BY_PLAN[p].toLocaleString()} הודעות תזכורת/ביקורת בחודש`
                         : `Up to ${MESSAGE_QUOTA_BY_PLAN[p].toLocaleString()} reminder/review messages/month`}
                     </li>
-                    {p === "premium" && (
+                    {p === "ultra" && (
+                      <li className="flex items-center gap-2 text-sm text-gray-900 font-medium">
+                        <svg className="w-4 h-4 text-[#197492] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        {lang === "he" ? "תמיכה מועדפת וליווי הקמה אישי" : "Priority support and personal onboarding"}
+                      </li>
+                    )}
+                    {p !== "standard" && (
                       <li className="flex items-center gap-2 text-sm text-gray-600">
                         <span className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-amber-700">🔜</span>
                         <span>
