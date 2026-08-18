@@ -34,11 +34,11 @@ export const jsonLd = {
         {
           "@type": "Offer",
           name: "Standard",
-          price: "149",
+          price: "189",
           priceCurrency: "ILS",
           priceSpecification: {
             "@type": "UnitPriceSpecification",
-            price: "149",
+            price: "189",
             priceCurrency: "ILS",
             billingDuration: "P1M",
           },
@@ -46,11 +46,11 @@ export const jsonLd = {
         {
           "@type": "Offer",
           name: "Premium",
-          price: "299",
+          price: "380",
           priceCurrency: "ILS",
           priceSpecification: {
             "@type": "UnitPriceSpecification",
-            price: "299",
+            price: "380",
             priceCurrency: "ILS",
             billingDuration: "P1M",
           },

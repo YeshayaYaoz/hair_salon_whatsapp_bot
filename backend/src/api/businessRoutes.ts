@@ -877,7 +877,7 @@ businessRouter.get("/me/setup-status", async (req: AuthedRequest, res) => {
   // because that gap is invisible from every other screen.
   const needsPayments = business.depositEnabled && business.depositAmountIls > 0;
 
-  // The voice bot is what Premium is sold on (₪299 against Standard's ₪149), but the only way to
+  // The voice bot is what Premium is sold on (₪380 against Standard's ₪189), but the only way to
   // turn it on is a field on the Bot page that nothing points at — so a salon can pay the higher
   // price for months and never have a working phone line, with no screen ever mentioning it.
   //

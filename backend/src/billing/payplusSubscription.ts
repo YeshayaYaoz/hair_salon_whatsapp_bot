@@ -20,7 +20,7 @@ const BASE_URL =
     ? `https://restapidev.payplus.co.il/api/${GRAPH_VERSION}`
     : `https://restapi.payplus.co.il/api/${GRAPH_VERSION}`;
 
-export const PLAN_PRICES_ILS: Record<string, number> = { standard: 149, premium: 299 };
+export const PLAN_PRICES_ILS: Record<string, number> = { standard: 189, premium: 380 };
 // Annual plan: 10 months' worth charged upfront (2 months free) — a common SaaS annual incentive.
 export const ANNUAL_MONTHS_CHARGED = 10;
 export const BILLING_PERIOD_DAYS: Record<string, number> = { monthly: 30, annual: 365 };
