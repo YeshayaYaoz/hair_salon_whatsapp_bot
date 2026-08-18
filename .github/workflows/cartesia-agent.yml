@@ -30,6 +30,10 @@ on:
         description: "Set self_hosted_deployment_url (e.g. https://tori-voice-agent.up.railway.app). Leave empty to leave it alone."
         type: string
         default: ""
+      tts_model:
+        description: "Pin the agent's tts_model (e.g. sonic-3.5). A live call spoke Chinese over a transcript with zero CJK characters — the speech layer drifted, and the per-call config pin was not enough. Empty = leave alone."
+        type: string
+        default: ""
 
 jobs:
   configure:
@@ -125,6 +129,23 @@ jobs:
           fi
           echo "llm_system_prompt is now $(echo "$out" | jq -r '.llm_system_prompt // "" | length') chars (the marker)."
           echo "llm_introduce   is now $(echo "$out" | jq -r '.llm_introduce // "" | length') chars (the marker)."
+
+      - name: Pin the voice model on the agent itself
+        if: inputs.tts_model != ''
+        # Belt to the per-call config's braces. pre_call_handler already sends tts.model on every
+        # call, and a call four minutes after that deploy still came out in Chinese over a
+        # transcript containing no CJK at all — so either the per-call field is ignored for the
+        # model, or the drift happens upstream of it. The agent-level field is the one the console
+        # displays and the one their runtime cannot miss.
+        env:
+          TTS_MODEL: ${{ inputs.tts_model }}
+        run: |
+          out=$(curl -sS -X PATCH "$API/agents/$AGENT"             -H "Authorization: Bearer $KEY" -H "Cartesia-Version: $VERSION"             -H "Content-Type: application/json"             --data "$(jq -nc --arg m "$TTS_MODEL" '{tts_model: $m}')")
+          if echo "$out" | jq -e '.error // .message' >/dev/null 2>&1; then
+            echo "::error::PATCH failed: $(echo "$out" | jq -r '.error // .message')"
+            exit 1
+          fi
+          echo "tts_model is now: $(echo "$out" | jq -r '.tts_model // "(unset)"')  language: $(echo "$out" | jq -r '.tts_language // "?"')"
 
       - name: Point the agent at the self-hosted deployment
         if: inputs.deployment_url != ''
