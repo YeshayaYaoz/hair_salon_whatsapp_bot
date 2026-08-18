@@ -17,7 +17,7 @@ import { sendAdminAlertEmail } from "./email.js";
  * Share of a plan's revenue we're willing to spend on inference before it's worth a look.
  *
  * 25% is a threshold, not a target — real usage sits far below it (152 calls cost ₪6.44 against
- * ₪380 of premium revenue, under 2%), so crossing this means something changed, not that the
+ * ₪449 of premium revenue, under 2%), so crossing this means something changed, not that the
  * margin is merely thin.
  */
 const AI_BUDGET_SHARE_OF_REVENUE = 0.25;
@@ -28,7 +28,8 @@ const AI_BUDGET_SHARE_OF_REVENUE = 0.25;
  */
 export const AI_BUDGET_AGOROT_BY_PLAN: Record<string, number> = {
   standard: Math.round(189 * 100 * AI_BUDGET_SHARE_OF_REVENUE), // ₪47.25
-  premium: Math.round(380 * 100 * AI_BUDGET_SHARE_OF_REVENUE), // ₪95
+  premium: Math.round(449 * 100 * AI_BUDGET_SHARE_OF_REVENUE), // ₪112.25
+  ultra: Math.round(849 * 100 * AI_BUDGET_SHARE_OF_REVENUE), // ₪212.25
 };
 /** Used for trials and for any plan name not in the table, so a new plan can't silently opt out. */
 export const AI_BUDGET_AGOROT_DEFAULT = 2000; // ₪20

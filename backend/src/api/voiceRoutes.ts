@@ -77,7 +77,7 @@ async function resolveBusinessByCalledNumber(calledNumber: string): Promise<Reso
  *
  * Every other tenant surface goes through requireActiveSubscription (see businessRoutes.ts), but
  * this router only ever checked the shared Cartesia secret — which authenticates *Cartesia*, not
- * the salon. So a business on Standard (₪189 against Premium's ₪380, which is sold on exactly this)
+ * the salon. So a business on Standard (₪189 against Premium's ₪449, which is sold on exactly this)
  * got the full voice agent by putting a number in a text box, and a cancelled account kept it
  * indefinitely, while its WhatsApp bot had already stopped answering.
  *
@@ -95,7 +95,7 @@ function rejectIfNotEntitled(business: ResolvedVoiceBusiness, res: import("expre
   }
   // Trials get voice so it can actually be evaluated before the plan is chosen; a paid account has
   // to be on the plan that includes it.
-  if (business.subscriptionStatus === "active" && business.subscriptionPlan !== "premium") {
+  if (business.subscriptionStatus === "active" && !["premium", "ultra"].includes(business.subscriptionPlan ?? "")) {
     res.status(402).json({
       error: "Voice calling is not included in this business's plan. Apologize, say you can't take the booking by phone, and ask the caller to message the business on WhatsApp instead.",
     });

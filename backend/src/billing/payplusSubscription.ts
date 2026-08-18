@@ -20,7 +20,7 @@ const BASE_URL =
     ? `https://restapidev.payplus.co.il/api/${GRAPH_VERSION}`
     : `https://restapi.payplus.co.il/api/${GRAPH_VERSION}`;
 
-export const PLAN_PRICES_ILS: Record<string, number> = { standard: 189, premium: 380 };
+export const PLAN_PRICES_ILS: Record<string, number> = { standard: 189, premium: 449, ultra: 849 };
 // Annual plan: 10 months' worth charged upfront (2 months free) — a common SaaS annual incentive.
 export const ANNUAL_MONTHS_CHARGED = 10;
 export const BILLING_PERIOD_DAYS: Record<string, number> = { monthly: 30, annual: 365 };
@@ -129,7 +129,7 @@ export async function createSubscriptionCheckoutLink(
 ): Promise<string> {
   const fullPrice = planPriceForCycle(plan, cycle);
   const amountIls = amountOverrideIls ?? fullPrice;
-  const planLabel = plan === "premium" ? "Premium" : "Standard";
+  const planLabel = plan === "ultra" ? "Ultra" : plan === "premium" ? "Premium" : "Standard";
   const cycleLabel = cycle === "annual" ? "שנתי" : "חודשי";
   // Named on the payment page so the owner can see why it is not the list price.
   const credited = amountIls < fullPrice ? ` — בקיזוז ₪${fullPrice - amountIls} ששולמו כבר` : "";
