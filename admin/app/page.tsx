@@ -541,7 +541,10 @@ export default function LandingPage() {
         .lp-stats-band { background: #0A0A0A; padding: 72px 40px; }
         .lp-stats-band-inner { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
         .lp-stat-cell { padding: 48px 36px; background: #141414; border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; }
-        .lp-stat-n { font-size: 52px; font-weight: 800; letter-spacing: -3px; line-height: 1; color: #fff; margin-bottom: 6px; font-variant-numeric: tabular-nums; display: flex; align-items: flex-end; gap: 2px; }
+        /* direction:ltr, on an RTL page: the number is built from two spans (count-up + suffix), and
+           RTL flex order rendered "24/7" as "7/24" clipped at the cell edge. flex-end keeps it on
+           the right edge, where RTL readers expect the leading element. */
+        .lp-stat-n { font-size: 52px; font-weight: 800; letter-spacing: -3px; line-height: 1; color: #fff; margin-bottom: 6px; font-variant-numeric: tabular-nums; display: flex; align-items: flex-end; gap: 2px; direction: ltr; justify-content: flex-end; }
         .lp-stat-n .accent { color: #B45309; font-size: 32px; padding-bottom: 6px; }
         .lp-stat-n .count-up { display: inline-block; }
         .lp-stat-l { font-size: 14px; color: rgba(255,255,255,0.72); line-height: 1.5; }
@@ -828,6 +831,9 @@ export default function LandingPage() {
           .lp-h1 { max-width: 100%; margin-bottom: 14px; }
           .lp-hero-sub { max-width: 100%; }
           .lp-hero-ctas { justify-content: center; }
+          /* Centered like the rest of the stacked hero — otherwise a lone pill on the wrap line
+             sticks to the edge and reads as a layout break. */
+          .lp-hero-types { justify-content: center; }
           .lp-hero-phone { display: none; }
         }
         @media (max-width: 900px) {
