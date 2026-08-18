@@ -335,8 +335,7 @@ export default function LandingPage() {
         .lp-h1 .green { color: #0F8043; }
         .lp-hero-sub { font-size: clamp(16px, 1.5vw, 18px); color: #666; line-height: 1.75; max-width: 420px; margin-bottom: 36px; animation: fadeUp 0.7s ease 0.4s both; }
         .lp-hero-ctas { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 40px; animation: fadeUp 0.7s ease 0.5s both; }
-        .lp-hero-types { display: flex; flex-wrap: wrap; gap: 7px; animation: fadeUp 0.6s ease 0.65s both; }
-        .lp-type-pill { display: flex; align-items: center; gap: 5px; background: #F5F5F5; border: 1px solid #E8E8E8; border-radius: 20px; padding: 5px 12px; font-size: 11.5px; color: #555; font-weight: 500; }
+        .lp-hero-types { font-size: 13px; color: #767676; line-height: 1.8; max-width: 420px; animation: fadeUp 0.6s ease 0.65s both; }
         .lp-social-proof { display: flex; align-items: center; gap: 8px; margin-top: 20px; font-size: 13px; color: #555; animation: fadeUp 0.6s ease 0.8s both; }
         .lp-social-proof strong { color: #0A0A0A; font-weight: 700; }
         .lp-social-dot { width: 8px; height: 8px; border-radius: 50%; background: #25D366; flex-shrink: 0; animation: pulse-green 2s infinite; }
@@ -545,7 +544,9 @@ export default function LandingPage() {
            RTL flex order rendered "24/7" as "7/24" clipped at the cell edge. flex-end keeps it on
            the right edge, where RTL readers expect the leading element. */
         .lp-stat-n { font-size: 52px; font-weight: 800; letter-spacing: -3px; line-height: 1; color: #fff; margin-bottom: 6px; font-variant-numeric: tabular-nums; display: flex; align-items: flex-end; gap: 2px; direction: ltr; justify-content: flex-end; }
-        .lp-stat-n .accent { color: #B45309; font-size: 32px; padding-bottom: 6px; }
+        /* #F59E0B — the amber the rest of the page uses (premium badge, buttons). The previous
+           #B45309 was a darker brown-orange that existed nowhere else on the site. */
+        .lp-stat-n .accent { color: #F59E0B; font-size: 32px; padding-bottom: 6px; }
         .lp-stat-n .count-up { display: inline-block; }
         .lp-stat-l { font-size: 14px; color: rgba(255,255,255,0.72); line-height: 1.5; }
 
@@ -831,9 +832,7 @@ export default function LandingPage() {
           .lp-h1 { max-width: 100%; margin-bottom: 14px; }
           .lp-hero-sub { max-width: 100%; }
           .lp-hero-ctas { justify-content: center; }
-          /* Centered like the rest of the stacked hero — otherwise a lone pill on the wrap line
-             sticks to the edge and reads as a layout break. */
-          .lp-hero-types { justify-content: center; }
+          .lp-hero-types { text-align: center; margin: 0 auto; }
           .lp-hero-phone { display: none; }
         }
         @media (max-width: 900px) {
@@ -1047,10 +1046,10 @@ export default function LandingPage() {
                 <a className="btn-green" href="/login">נסה חינם — 14 יום</a>
                 <a className="btn-outline" href="#how">איך זה עובד?</a>
               </div>
+              {/* One quiet line instead of a row of gray pills — the pills wrapped unevenly at most
+                  widths and a lone orphan on the second row read as a layout break. */}
               <div className="lp-hero-types">
-                {["סלוני שיער","ציפורניים","קליניקות","עיסוי","שיניים","גרומינג","אסתטיקה","כושר"].map((t) => (
-                  <span key={t} className="lp-type-pill">{t}</span>
-                ))}
+                מתאים לסלוני שיער · ציפורניים · קליניקות · עיסוי · שיניים · גרומינג · אסתטיקה · כושר
               </div>
               {social && (
                 <div className="lp-social-proof">

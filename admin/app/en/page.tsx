@@ -419,7 +419,8 @@ export default function LandingPageEN() {
         .lp-stats-band-inner { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
         .lp-stat-cell { padding: 48px 36px; background: #141414; border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; }
         .lp-stat-n { font-size: 52px; font-weight: 800; letter-spacing: -3px; line-height: 1; color: #fff; margin-bottom: 6px; font-variant-numeric: tabular-nums; display: flex; align-items: flex-end; gap: 2px; }
-        .lp-stat-n .accent { color: #B45309; font-size: 32px; padding-bottom: 6px; }
+        /* #F59E0B — the amber the rest of the page uses; #B45309 existed nowhere else on the site. */
+        .lp-stat-n .accent { color: #F59E0B; font-size: 32px; padding-bottom: 6px; }
         .lp-stat-n .count-up { display: inline-block; }
         .lp-stat-l { font-size: 14px; color: rgba(255,255,255,0.72); line-height: 1.5; }
         @media (max-width: 768px) { .lp-stats-band-inner { grid-template-columns: repeat(2,1fr); } }
