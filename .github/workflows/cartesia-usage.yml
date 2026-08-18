@@ -167,6 +167,18 @@ jobs:
               # what it heard, which is the whole question; the conversation around them is not.
               jq -rc '[.transcript[]? | select(.tool_calls) | .tool_calls[]?] | if length == 0 then "(no tool calls recorded on this call)" else .[] end' /tmp/call.json | head -20
 
+              # Which side wrote any Chinese. A call that comes out in Chinese has two entirely
+              # different suspects: the voice model drifting (an accent problem, fixed by pinning
+              # TTS) or the language model writing Chinese text the voice then reads faithfully —
+              # DeepSeek is a Chinese-trained model and emitting CJK tokens under pressure is its
+              # known failure mode. Counting CJK codepoints per role decides it without printing a
+              # word of the conversation.
+              echo "── CJK characters per role (a nonzero assistant count means the LLM wrote them)"
+              jq -r '
+                [.transcript[]? | {role, cjk: ((.text // "") | [scan("[\u4e00-\u9fff\u3040-\u30ff]")] | length)}]
+                | group_by(.role) | .[] | "   \(.[0].role): \(map(.cjk) | add) CJK chars in \(length) turn(s)"
+              ' /tmp/call.json || true
+
               # Off by default and named as personal data, because it is: this is what a real
               # person said on a real phone call. It is worth having for exactly one question —
               # what did speech-to-text actually hear — which no other field answers, since the
