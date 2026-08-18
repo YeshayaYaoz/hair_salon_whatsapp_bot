@@ -12,7 +12,7 @@ const STATUS_COLORS: Record<string, string> = {
   canceled: "bg-gray-100 text-gray-600 border-gray-200",
 };
 
-const PLAN_PRICES: Record<"standard" | "premium", number> = { standard: 149, premium: 299 };
+const PLAN_PRICES: Record<"standard" | "premium", number> = { standard: 189, premium: 380 };
 // Must match ANNUAL_MONTHS_CHARGED in backend/src/billing/payplusSubscription.ts — the annual term
 // charges this many months for 12 months of service.
 const ANNUAL_MONTHS_CHARGED = 10;

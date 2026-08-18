@@ -1640,7 +1640,7 @@ export default function LandingPage() {
               const savedBookings = Math.round(monthlyAppts * 0.15 * 0.8); // recovered from reminders/24-7 answering, out of the MONTHLY total
               const monthlyRevenue = savedBookings * 180; // avg service price
               const hoursPerMonth = Math.round((monthlyAppts * 4 / 60) * 10) / 10;
-              const roiMultiple = Math.max(1, Math.round(monthlyRevenue / 149));
+              const roiMultiple = Math.max(1, Math.round(monthlyRevenue / 189));
               return (
                 <>
                   <div className="lp-roi-headline reveal">
@@ -1650,7 +1650,7 @@ export default function LandingPage() {
                     <div className="lp-roi-headline-num">₪{monthlyRevenue.toLocaleString("he-IL")}</div>
                     <div className="lp-roi-headline-sub">בחיסכון והכנסה נוספת, כל חודש</div>
                     <div className="lp-roi-multiple-badge">
-                      <span className="text">עולה לך רק <span className="cost">₪149/חודש</span> — תורי מחזיר את עצמו</span>
+                      <span className="text">עולה לך רק <span className="cost">₪189/חודש</span> — תורי מחזיר את עצמו</span>
                       <div className="multiple">
                         <b>{roiMultiple}×</b>
                         <span>מעל העלות</span>
@@ -1702,7 +1702,7 @@ export default function LandingPage() {
               <div className="lp-plan reveal d1">
                 <div className="lp-plan-tag">סטנדרט</div>
                 <div className="lp-plan-name">Standard</div>
-                <div className="lp-plan-price">₪149</div>
+                <div className="lp-plan-price">₪189</div>
                 <div className="lp-plan-per">לחודש · ניסיון 14 יום חינם</div>
                 <div className="lp-plan-divider" />
                 <div className="lp-plan-features">
@@ -1715,7 +1715,7 @@ export default function LandingPage() {
               <div className="lp-plan featured reveal d2">
                 <div className="lp-plan-tag">פרמיום</div>
                 <div className="lp-plan-name">Premium</div>
-                <div className="lp-plan-price">₪299</div>
+                <div className="lp-plan-price">₪380</div>
                 <div className="lp-plan-per">לחודש · ללא חוזה</div>
                 <div className="lp-plan-divider" />
                 <div className="lp-plan-features">
