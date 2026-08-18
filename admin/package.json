@@ -11,6 +11,7 @@
   "dependencies": {
     "@sentry/browser": "^10.63.0",
     "lottie-web": "^5.13.0",
+    "lucide-react": "^1.32.0",
     "next": "^15.5.22",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

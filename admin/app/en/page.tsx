@@ -1,27 +1,28 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  MessageCircle, Calendar, Bell, BarChart3, Clock, ClipboardList, Bot, Phone,
+  AudioLines, type LucideIcon,
+} from "lucide-react";
 import { jsonLd } from "../lib/jsonLd";
 
-/* Same stroke-icon set as the Hebrew page. Replaces the emoji that served as feature and section
-   icons — emoji stay only inside the chat mockups, where they are what WhatsApp actually looks like. */
+/* Lucide (MIT) — same professionally drawn stroke-icon set as the Hebrew page. Emoji stay only
+   inside the chat mockups, where they are what WhatsApp actually looks like. */
 function Icon({ name, size = 20 }: { name: string; size?: number }) {
-  const paths: Record<string, React.ReactNode> = {
-    chat: <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" />,
-    calendar: <><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></>,
-    bell: <><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 01-3.4 0" /></>,
-    chart: <><path d="M18 20V10M12 20V4M6 20v-6" /></>,
-    clock: <><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></>,
-    list: <><path d="M8 6h13M8 12h13M8 18h13" /><path d="M3 6h.01M3 12h.01M3 18h.01" /></>,
-    bot: <><rect x="4" y="8" width="16" height="12" rx="2" /><path d="M12 8V4M8 14h.01M16 14h.01" /></>,
-    phone: <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" />,
-    wave: <path d="M2 12h2M6 8v8M10 4v16M14 8v8M18 10v4M22 12h-1" />,
+  const icons: Record<string, LucideIcon> = {
+    chat: MessageCircle,
+    calendar: Calendar,
+    bell: Bell,
+    chart: BarChart3,
+    clock: Clock,
+    list: ClipboardList,
+    bot: Bot,
+    phone: Phone,
+    wave: AudioLines,
   };
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      {paths[name]}
-    </svg>
-  );
+  const C = icons[name] ?? MessageCircle;
+  return <C size={size} strokeWidth={1.8} aria-hidden />;
 }
 
 export default function LandingPageEN() {
