@@ -44,6 +44,7 @@ const COPY = {
     holdWarning: "בלי התשלום המועד ישוחרר אוטומטית וייפתח לאחרים.",
     poweredBy: "מופעל על ידי",
     minutesShort: "דק׳",
+    today: "היום",
   },
   en: {
     steps: ["Service", "Date", "Time", "Details"],
@@ -71,6 +72,7 @@ const COPY = {
     holdWarning: "Without payment the slot is released automatically and opens up to others.",
     poweredBy: "Powered by",
     minutesShort: "min",
+    today: "Today",
   },
 } as const;
 
@@ -341,8 +343,13 @@ export default function BookPage() {
               {c.back}
             </button>
             <h2 className="text-sm font-semibold text-gray-900 mb-4">{c.chooseDateFor}<span className="text-[#197492]">{service.name}</span></h2>
+            {/* Starts at 0, i.e. today. It used to start at tomorrow, which quietly made the one
+                request a salon hears most often — "יש מקום היום?" — the one thing this page could
+                not do, while the WhatsApp bot answered it fine. Offering today is safe because
+                findAvailableSlots already drops any slot starting before now, so a day that is
+                over simply comes back empty rather than bookable in the past. */}
             <div className="grid grid-cols-4 gap-2">
-              {Array.from({ length: 14 }, (_, i) => i + 1).map((offset) => {
+              {Array.from({ length: 14 }, (_, i) => i).map((offset) => {
                 // Anchored at noon on the same calendar date `isoDate` sends to the API, so the
                 // label can never name a different day than the one being requested. No timeZone
                 // here on purpose: this is a plain calendar date, not an instant.
@@ -353,7 +360,9 @@ export default function BookPage() {
                     onClick={() => pickDate(offset)}
                     className="flex flex-col items-center py-2.5 rounded-xl border border-gray-200 hover:border-[#5BB8D4] hover:bg-[#E0F5FB] transition"
                   >
-                    <span className="text-gray-500 text-xs">{d.toLocaleDateString(locale, { weekday: "short" })}</span>
+                    <span className="text-gray-500 text-xs">
+                      {offset === 0 ? c.today : d.toLocaleDateString(locale, { weekday: "short" })}
+                    </span>
                     <span className="text-gray-800 font-semibold text-sm">{d.getDate()}</span>
                   </button>
                 );
@@ -414,14 +423,14 @@ export default function BookPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#5BB8D4] focus:border-transparent"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#5BB8D4] focus:border-transparent"
               />
               <input
                 placeholder={c.phonePlaceholder}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 required
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#5BB8D4] focus:border-transparent"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#5BB8D4] focus:border-transparent"
               />
               {error && <p className="text-red-500 text-xs">{error}</p>}
               <button

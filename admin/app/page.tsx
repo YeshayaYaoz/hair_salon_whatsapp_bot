@@ -34,7 +34,13 @@ function Icon({ name, size = 20 }: { name: string; size?: number }) {
 export default function LandingPage() {
   const tiltEl = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const AVG_WEEKLY_APPTS = 40; // industry-average estimate the ROI section calculates against, no slider input
+  // The nav calls this section "מחשבון חיסכון" and its heading asks "כמה תורי חוסך לך?" — but it
+  // had been reduced to a hard-coded 40, so it answered for an average salon and never for the
+  // person reading it. All the slider styling was still in the stylesheet, unused. Restoring the
+  // input costs one piece of state and turns the section back into the thing it is named after:
+  // a visitor who drags this has committed a number about their own business, which is a far
+  // stronger position to read a price from than a static claim.
+  const [weeklyAppts, setWeeklyAppts] = useState(40);
   const [social, setSocial] = useState<{ businesses: number; appointments: number } | null>(null);
   const [demoMsgs, setDemoMsgs] = useState<{ role: "user" | "bot"; text: string }[]>([
     { role: "bot", text: "היי! 👋 אני תורי, העוזר של סלון דנה. אפשר לקבוע לך תור — נסה לכתוב לי משהו כמו \"רוצה תספורת מחר\"" },
@@ -1354,7 +1360,7 @@ export default function LandingPage() {
         <section className="lp-flow" id="how">
           <div className="lp-flow-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>אינטגרציות</div>
-            <div className="lp-title reveal" style={{ textAlign: "center" }}>הכל מחובר. אתה לא צריך לעשות כלום.</div>
+            <h2 className="lp-title reveal" style={{ textAlign: "center" }}>הכל מחובר. אתה לא צריך לעשות כלום.</h2>
             <div className="lp-flow-steps reveal">
               <div className="lp-flow-node">
                 <div className="lp-flow-icon wa" style={{ color: "#15803D" }}>
@@ -1399,7 +1405,7 @@ export default function LandingPage() {
         <div style={{ background: "#F8F8F8", borderTop: "1px solid #EBEBEB", borderBottom: "1px solid #EBEBEB", padding: "100px 40px" }}>
           <div style={{ maxWidth: 1080, margin: "0 auto" }}>
             <div className="lp-label reveal">תהליך</div>
-            <div className="lp-title reveal">3 צעדים, ואחרי זה הכל קורה לבד.</div>
+            <h2 className="lp-title reveal">3 צעדים, ואחרי זה הכל קורה לבד.</h2>
             <div className="lp-steps-grid">
               <div className="lp-step reveal d1">
                 <div className="lp-step-num">01</div>
@@ -1433,7 +1439,7 @@ export default function LandingPage() {
         <section className="lp-features" id="features">
           <div className="lp-features-inner">
             <div className="lp-label reveal">מה כלול</div>
-            <div className="lp-title reveal">כל הכלים שהעסק שלך צריך.</div>
+            <h2 className="lp-title reveal">כל הכלים שהעסק שלך צריך.</h2>
             <div className="lp-feats-grid">
               {[
                 { icon: "chat", title: "בוט WhatsApp בעברית", desc: "מבין שפה טבעית, עונה ב-24/7, ומנהל שיחה מתחילה ועד אישור התור.", descShort: "מבין עברית, עונה 24/7, סוגר תור לבד.", d: "d1" },
@@ -1467,7 +1473,7 @@ export default function LandingPage() {
         <section className="lp-ba">
           <div className="lp-ba-inner">
             <div className="lp-label reveal">לפני ואחרי</div>
-            <div className="lp-title reveal">מה השתנה לבעלי העסקים שעברו לתורי.</div>
+            <h2 className="lp-title reveal">מה השתנה לבעלי העסקים שעברו לתורי.</h2>
             <div className="lp-ba-grid">
               <div className="lp-ba-card before reveal d1">
                 <div className="lp-ba-header">
@@ -1526,7 +1532,7 @@ export default function LandingPage() {
         <section className="lp-testi">
           <div className="lp-testi-inner">
             <div className="lp-label reveal">ביום-יום</div>
-            <div className="lp-title reveal">מה משתנה בפועל כשהבוט עובד בשבילך.</div>
+            <h2 className="lp-title reveal">מה משתנה בפועל כשהבוט עובד בשבילך.</h2>
             <div className="lp-testi-grid">
               {[
                 { icon: "clock", title: "הודעה בלילה לא מחכה לבוקר", body: "לקוח כותב ב-23:40 \"יש מקום מחר?\" — הבוט בודק את היומן, מציע שעות פנויות וסוגר את התור. אתה רואה את זה רק בבוקר, ביומן.", color: "#2A9BBF" },
@@ -1557,7 +1563,7 @@ export default function LandingPage() {
           <div className="lp-premium-inner">
             <div className="reveal">
               <div className="lp-premium-badge">★ פרמיום</div>
-              <div className="lp-premium-title">גם שיחות טלפון —<br /><span className="amber">הבוט עונה.</span></div>
+              <h2 className="lp-premium-title">גם שיחות טלפון —<br /><span className="amber">הבוט עונה.</span></h2>
               <div className="lp-premium-desc">לקוח מתקשר. סוכן AI עונה בקול טבעי, מנהל שיחה, קובע תור ומסנכרן לגוגל קלנדר — בלי שהרמת אצבע.</div>
               <div className="lp-premium-note">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -1627,16 +1633,35 @@ export default function LandingPage() {
         <section className="lp-roi" id="roi">
           <div className="lp-roi-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>מחשבון חיסכון</div>
-            <div className="lp-title reveal" style={{ color: "#fff", textAlign: "center" }}>כמה תורי חוסך לך?</div>
+            <h2 className="lp-title reveal" style={{ color: "#fff", textAlign: "center" }}>כמה תורי חוסך לך?</h2>
 
             <div className="lp-roi-card reveal">
+
+            <div className="lp-roi-slider-wrap">
+              <label className="roi-slider-label" htmlFor="roi-appts">
+                <span>כמה תורים בשבוע יש לך?</span>
+                <span className="roi-slider-val" aria-hidden="true">{weeklyAppts}</span>
+              </label>
+              <input
+                id="roi-appts"
+                className="roi-slider"
+                type="range"
+                min={5}
+                max={150}
+                step={5}
+                value={weeklyAppts}
+                onChange={(e) => setWeeklyAppts(Number(e.target.value))}
+                aria-valuetext={`${weeklyAppts} תורים בשבוע`}
+              />
+            </div>
+            <div className="lp-roi-divider" />
 
             {(() => {
               // Single source of truth for every number below, so the headline and the two
               // supporting stats always agree with each other (previously each of 4 cards
               // computed its own thing inline, several combining metrics in ways that were
               // hard to trace back to the slider).
-              const monthlyAppts = AVG_WEEKLY_APPTS * 4; // everything below is monthly, on a simple ×4
+              const monthlyAppts = weeklyAppts * 4; // everything below is monthly, on a simple ×4
               const savedBookings = Math.round(monthlyAppts * 0.15 * 0.8); // recovered from reminders/24-7 answering, out of the MONTHLY total
               const monthlyRevenue = savedBookings * 180; // avg service price
               const hoursPerMonth = Math.round((monthlyAppts * 4 / 60) * 10) / 10;
@@ -1645,7 +1670,7 @@ export default function LandingPage() {
                 <>
                   <div className="lp-roi-headline reveal">
                     <div className="lp-roi-headline-label">
-                      ככה תורי חוסך לך כסף — על בסיס כ-{monthlyAppts} תורים בחודש ({AVG_WEEKLY_APPTS} בשבוע):
+                      ככה תורי חוסך לך כסף — על בסיס כ-{monthlyAppts} תורים בחודש ({weeklyAppts} בשבוע):
                     </div>
                     <div className="lp-roi-headline-num">₪{monthlyRevenue.toLocaleString("he-IL")}</div>
                     <div className="lp-roi-headline-sub">בחיסכון והכנסה נוספת, כל חודש</div>
@@ -1697,7 +1722,7 @@ export default function LandingPage() {
         <section className="lp-pricing" id="pricing">
           <div className="lp-pricing-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>מחירים</div>
-            <div className="lp-title reveal" style={{ textAlign: "center" }}>פשוט. שקוף. ללא הפתעות.</div>
+            <h2 className="lp-title reveal" style={{ textAlign: "center" }}>פשוט. שקוף. ללא הפתעות.</h2>
             <div className="lp-pricing-grid">
               <div className="lp-plan reveal d1">
                 <div className="lp-plan-tag">סטנדרט</div>
@@ -1736,7 +1761,15 @@ export default function LandingPage() {
                     <div key={f} className="lp-plan-feat"><span className="check">✓</span>{f}</div>
                   ))}
                 </div>
-                <a className="lp-plan-btn dark" href="/login">דברו איתנו</a>
+                {/* The label promised a conversation and the href delivered a login form. Ultra is
+                    the plan sold on personal onboarding, so the mismatch landed on exactly the
+                    buyer least willing to self-serve. Points at a real inbox now. */}
+                <a
+                  className="lp-plan-btn dark"
+                  href="mailto:y28112000@gmail.com?subject=%D7%94%D7%AA%D7%A2%D7%A0%D7%99%D7%99%D7%A0%D7%95%D7%AA%20%D7%91%D7%AA%D7%95%D7%9B%D7%A0%D7%99%D7%AA%20Ultra"
+                >
+                  דברו איתנו
+                </a>
               </div>
             </div>
           </div>
@@ -1753,7 +1786,7 @@ export default function LandingPage() {
         <section className="lp-faq" id="faq">
           <div className="lp-faq-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>שאלות נפוצות</div>
-            <div className="lp-title reveal" style={{ textAlign: "center" }}>שאלות? יש לנו תשובות.</div>
+            <h2 className="lp-title reveal" style={{ textAlign: "center" }}>שאלות? יש לנו תשובות.</h2>
             <div className="lp-faq-list reveal">
               {[
                 { q: "האם הבוט מבין עברית טבעית?", a: "כן. הבוט מבוסס על Claude AI של Anthropic ומבין עברית טבעית לחלוטין — כולל ניבים, קיצורים ואיות לא מדויק. לא צריך ללמד את הלקוחות להקליד בצורה מיוחדת." },
@@ -1802,7 +1835,7 @@ export default function LandingPage() {
 
         {/* CTA */}
         <section className="lp-cta reveal">
-          <div className="lp-cta-title">תפסיק לענות לכולם בעצמך.</div>
+          <h2 className="lp-cta-title">תפסיק לענות לכולם בעצמך.</h2>
           <div className="lp-cta-sub">נסה 14 יום בחינם — ללא כרטיס אשראי, ללא סיכון.</div>
           <div className="lp-cta-row">
             <a className="btn-green" href="/login">התחל עכשיו בחינם</a>
@@ -1847,6 +1880,7 @@ export default function LandingPage() {
               <a href="/login">כניסה לדשבורד</a>
               <a href="/privacy">מדיניות פרטיות</a>
               <a href="/terms">תנאי שימוש</a>
+              <a href="/accessibility">הצהרת נגישות</a>
               <a href="/en">English</a>
             </div>
             <div className="lp-footer-col">
@@ -1866,7 +1900,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="lp-footer-bottom">
-            <span className="lp-footer-copy">© 2026 torionline.com · כל הזכויות שמורות · <a href="/privacy" className="lp-footer-copy-link">מדיניות פרטיות</a></span>
+            <span className="lp-footer-copy">© 2026 torionline.com · כל הזכויות שמורות · <a href="/privacy" className="lp-footer-copy-link">מדיניות פרטיות</a> · <a href="/accessibility" className="lp-footer-copy-link">הצהרת נגישות</a></span>
             <span className="lp-footer-copy">נבנה בישראל, לעסקים קטנים 🇮🇱</span>
           </div>
         </footer>
