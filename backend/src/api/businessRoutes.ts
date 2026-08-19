@@ -9,7 +9,7 @@ import { assignNumberToAgent, listHebrewVoices, CartesiaNotConfiguredError } fro
 import { captureError } from "../lib/errorMonitoring.js";
 import { syncWhatsAppProfileInBackground } from "../lib/whatsappProfile.js";
 import { pointNumberAtCartesia, ZadarmaNotConfiguredError } from "../lib/zadarmaAdmin.js";
-import { provisionVoiceNumber, AlreadyHasNumberError } from "../lib/numberProvisioning.js";
+import { provisionVoiceNumber, listNumberChoices, AlreadyHasNumberError } from "../lib/numberProvisioning.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import { requireActiveSubscription } from "../lib/subscriptionGate.js";
 import { getAuthUrl, saveGoogleTokens, disconnectGoogleCalendar, deleteCalendarEvent, GoogleCalendarNotConfiguredError } from "../lib/googleCalendar.js";
@@ -1113,9 +1113,30 @@ businessRouter.put("/me/voice-phone", async (req: AuthedRequest, res) => {
  * outcome is that a person will look at it. Only genuine failures are non-2xx — 409 for a business
  * that already has a number, 503 when the carrier is not configured, 502 for anything else.
  */
+/**
+ * The numbers on offer, so an owner can pick one rather than be handed whatever came first.
+ *
+ * Read-only and spends nothing — the order is a separate, confirmed action.
+ */
+businessRouter.get("/me/voice-phone/available", async (_req: AuthedRequest, res) => {
+  try {
+    return res.json({ numbers: await listNumberChoices() });
+  } catch (err) {
+    if (err instanceof ZadarmaNotConfiguredError) {
+      return res.status(503).json({ error: "רכישת מספרים אינה מוגדרת כרגע." });
+    }
+    // Not an error the owner can act on, and the picker degrades to "choose for me" without it.
+    console.error("[provisioning] Could not list available numbers:", err);
+    return res.json({ numbers: [] });
+  }
+});
+
 businessRouter.post("/me/voice-phone/provision", async (req: AuthedRequest, res) => {
   try {
-    const result = await provisionVoiceNumber(req.businessId!);
+    // Digits only, and only ever used to look up a match in the carrier's own list — never
+    // interpolated into a request on its own.
+    const requested = z.object({ number: z.string().regex(/^\d{6,15}$/).optional() }).safeParse(req.body ?? {});
+    const result = await provisionVoiceNumber(req.businessId!, requested.success ? requested.data.number : undefined);
     // 200, not 402. The request succeeded — it was accepted and recorded, and someone will act on
     // it; "not a paying customer" describes the outcome, not a failed call. The shared apiFetch
     // throws on any non-2xx and keeps only the message, so a 4xx here would reach the owner as

@@ -150,6 +150,38 @@ describe("provisionVoiceNumber", () => {
     expect(release.where).toMatchObject({ voicePhoneNumber: null });
   });
 
+  it("orders the number the owner picked", async () => {
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue(business());
+    listAvailableNumbers.mockResolvedValue([
+      { number: "972559661420" }, { number: "972559661421" }, { number: "972559661422" },
+    ]);
+
+    await provisionVoiceNumber("b1", "972559661422");
+
+    expect(orderNumber).toHaveBeenCalledWith(expect.any(String), "972559661422");
+  });
+
+  it("falls back to an available number when the pick is already gone", async () => {
+    // Availability changes between drawing the list and clicking. Ordering a number the carrier no
+    // longer has fails with an error that says nothing about why — the same outcome as "choose for
+    // me" is better than a dead end.
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue(business());
+    listAvailableNumbers.mockResolvedValue([{ number: "972559661420" }]);
+
+    await provisionVoiceNumber("b1", "972500000999");
+
+    expect(orderNumber).toHaveBeenCalledWith(expect.any(String), "972559661420");
+  });
+
+  it("tells the operator which number a trial asked for", async () => {
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue(business({ subscriptionStatus: "trial" }));
+
+    await provisionVoiceNumber("b1", "972559661422");
+
+    expect(sendAdminAlertEmail).toHaveBeenCalledWith(expect.any(String), expect.stringContaining("972559661422"));
+    expect(orderNumber).not.toHaveBeenCalled();
+  });
+
   it("uses the number Zadarma allocated, not the one requested", async () => {
     // Asking for one number and getting another is documented Zadarma behaviour, and configuring
     // the requested one is how the wrong number ends up in three places.

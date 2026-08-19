@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SavedBadge } from "../../lib/SavedBadge";
+import { NumberProvisionOffer } from "../../lib/NumberProvisionOffer";
 
 declare global {
   interface Window {
@@ -593,6 +594,13 @@ export default function WhatsAppPage() {
                 {error}
               </div>
             )}
+
+            {/* Meta's flow asks for a phone number to send a verification code to, and a business
+                that has no spare line simply cannot get past that screen — which makes it a dead
+                end for the whole product, since nothing here works before WhatsApp is connected.
+                So the way out is offered at the wall itself, not on the voice-bot settings page
+                where it used to live alone. Renders nothing for a business that already has one. */}
+            <NumberProvisionOffer context="whatsapp" />
           </>
         )}
       </div>

@@ -54,6 +54,20 @@ export interface ProvisionResult {
 }
 
 /**
+ * The numbers an owner may choose from.
+ *
+ * Capped, because the carrier returns hundreds and a picker with hundreds of near-identical digit
+ * strings is a worse experience than no picker at all — the point is "pick one you like the sound
+ * of", not "search a catalogue".
+ */
+const CHOICE_COUNT = 12;
+
+export async function listNumberChoices(): Promise<{ number: string }[]> {
+  const available = await listAvailableNumbers(DEFAULT_DIRECTION_ID);
+  return available.slice(0, CHOICE_COUNT).map((n) => ({ number: n.number }));
+}
+
+/**
  * Orders a number for a paying business and wires it end to end; asks the operator for a trial.
  *
  * The claim on voiceNumberOrderedAt happens before the carrier is called and is never rolled back
@@ -61,7 +75,11 @@ export interface ProvisionResult {
  * number" check — voicePhoneNumber is only set after the order returns — and the business would be
  * billed monthly for two numbers, one of which nothing points at.
  */
-export async function provisionVoiceNumber(businessId: string): Promise<ProvisionResult> {
+export async function provisionVoiceNumber(
+  businessId: string,
+  /** A number the owner picked from listNumberChoices. Omitted means "any" — see orderAndWire. */
+  preferredNumber?: string
+): Promise<ProvisionResult> {
   const business = await prisma.business.findUniqueOrThrow({
     where: { id: businessId },
     select: {
@@ -85,7 +103,7 @@ export async function provisionVoiceNumber(businessId: string): Promise<Provisio
   }
 
   if (!mayOrderNumber(business)) {
-    await requestOperatorApproval(business);
+    await requestOperatorApproval(business, preferredNumber);
     return { status: "approval_requested" };
   }
 
@@ -102,7 +120,7 @@ export async function provisionVoiceNumber(businessId: string): Promise<Provisio
   }
 
   try {
-    const number = await orderAndWire(business.id, business.name);
+    const number = await orderAndWire(business.id, business.name, preferredNumber);
     return { status: "ordered", number };
   } catch (err) {
     // Released only on failure. On success it stays set forever — it is the record that this
@@ -120,7 +138,7 @@ export async function provisionVoiceNumber(businessId: string): Promise<Provisio
   }
 }
 
-async function orderAndWire(businessId: string, businessName: string): Promise<string> {
+async function orderAndWire(businessId: string, businessName: string, preferredNumber?: string): Promise<string> {
   // Checked first because a zero balance turns the order into a reservation that can never ring,
   // and the failure that follows says nothing about money.
   const { balance, currency } = await getBalance();
@@ -133,9 +151,19 @@ async function orderAndWire(businessId: string, businessName: string): Promise<s
     throw new Error(`No numbers are available to order on destination ${DEFAULT_DIRECTION_ID}.`);
   }
 
+  // The owner's pick, if it is still on the carrier's list — availability changes between the
+  // moment the list was drawn and the moment they click, and ordering a number that is gone fails
+  // with a carrier error that says nothing about why. Falling back to a random one is the same
+  // outcome they would have got by choosing "any", rather than a dead end.
+  const chosen =
+    (preferredNumber && available.find((n) => n.number === preferredNumber)?.number) ??
+    // Random rather than available[0]: the first entry is the same number for every business that
+    // asks at the same moment, so concurrent orders would all contend for it.
+    available[Math.floor(Math.random() * available.length)].number;
+
   // Zadarma can allocate a different number from the one requested, so everything downstream uses
   // what came back.
-  const allocated = await orderNumber(DEFAULT_DIRECTION_ID, available[0].number);
+  const allocated = await orderNumber(DEFAULT_DIRECTION_ID, chosen);
   const e164 = allocated.startsWith("+") ? allocated : `+${allocated}`;
 
   await prisma.business.update({ where: { id: businessId }, data: { voicePhoneNumber: allocated } });
@@ -154,13 +182,16 @@ async function orderAndWire(businessId: string, businessName: string): Promise<s
  * "no" with no path forward is not an answer, and this is exactly the moment a trial is worth
  * converting.
  */
-async function requestOperatorApproval(business: {
-  id: string;
-  name: string;
-  email: string;
-  subscriptionStatus: string;
-  subscriptionPlan: string | null;
-}): Promise<void> {
+async function requestOperatorApproval(
+  business: {
+    id: string;
+    name: string;
+    email: string;
+    subscriptionStatus: string;
+    subscriptionPlan: string | null;
+  },
+  preferredNumber?: string
+): Promise<void> {
   try {
     await sendAdminAlertEmail(
       `Number request — ${business.name} (${business.subscriptionStatus})`,
@@ -170,6 +201,7 @@ async function requestOperatorApproval(business: {
           <li>Business id: <code>${business.id}</code></li>
           <li>Email: ${business.email}</li>
           <li>Subscription: <strong>${business.subscriptionStatus}</strong>${business.subscriptionPlan ? ` (${business.subscriptionPlan})` : ""}</li>
+          ${preferredNumber ? `<li>They picked: <strong>${preferredNumber}</strong></li>` : "<li>No preference — any number.</li>"}
         </ul>
         <p>They are not on a paying plan, so nothing was ordered. To order one for them, run the
         <code>resubmit</code>-style number workflow, or ask them to subscribe first.</p>
