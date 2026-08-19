@@ -217,3 +217,17 @@ The telephony add-on applies only to Cartesia's own numbers, so a trunk avoids i
 - The agent-side line that applies each salon's chosen voice:
   `yield AgentUpdateCall(voice_id=ctx["voiceId"])`. The agent lives in Cartesia, not this repo.
   Until it exists, `voiceId` rides along in `/context` and is ignored — harmlessly.
+
+## Parked: background sound on calls (decided 2026-08-19, not implemented)
+
+Cartesia supports per-agent background/ambient audio, configured in the Agent Builder
+(Playground) — custom files can be uploaded there and are mixed into the call stream on
+Cartesia's side, so there is no extra per-call server dependency. The Line SDK exposes no
+audio channel, so mixing it ourselves is not possible (and hosting the file ourselves would
+add a dependency, not remove one).
+
+Before enabling, remember:
+- One shared agent serves every business — the same ambience plays for all of them.
+- The WhatsApp auto-setup transcribes Meta's verification call with Whisper to extract the
+  code; background noise in the recording may break that. Test a verification call first.
+- Background audio disables the `as_available` low-latency audio delivery mode.

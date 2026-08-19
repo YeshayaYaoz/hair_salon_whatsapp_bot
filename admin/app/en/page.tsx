@@ -1433,7 +1433,7 @@ export default function LandingPageEN() {
                 <div className="lp-plan-per">per month · 14-day free trial</div>
                 <div className="lp-plan-divider" />
                 <div className="lp-plan-features">
-                  {["WhatsApp bot, 24/7","Google Calendar auto-sync","Automatic reminders","Full management dashboard","Flexible services, staff & hours","Waitlist","Email support"].map((f) => (
+                  {["A Hebrew-fluent WhatsApp bot that closes bookings on its own, 24/7","Every appointment lands in Google Calendar — zero typing","Reminders the day before — fewer no-shows","A review request after every visit — your Google rating climbs by itself","Collect card deposits the moment a booking is made","Answers customer questions: prices, parking, policy","Sends photos of your work right in the chat","A waitlist that refills cancellations the moment a slot opens","Live dashboard: revenue, customers, stats"].map((f) => (
                     <div key={f} className="lp-plan-feat">{f}</div>
                   ))}
                 </div>
@@ -1446,7 +1446,7 @@ export default function LandingPageEN() {
                 <div className="lp-plan-per">per month · no contract</div>
                 <div className="lp-plan-divider" />
                 <div className="lp-plan-features">
-                  {["Everything in Standard","Incoming phone call handling","Natural AI voice","Automatic call transcription","Sync call appointments to Google Calendar","Priority WhatsApp support","4-hour SLA"].map((f) => (
+                  {["Everything in Standard","The phone stops interrupting: an AI agent answers every incoming call","Natural Hebrew voice — pick male or female","Appointments booked by phone land in your calendar like any other","Every call transcribed — read what was said without replaying it","No spare line? We issue and connect a number for you","Priority WhatsApp support · 4-hour response"].map((f) => (
                     <div key={f} className="lp-plan-feat">{f}</div>
                   ))}
                 </div>
@@ -1459,7 +1459,7 @@ export default function LandingPageEN() {
                 <div className="lp-plan-per">per month · for high-volume businesses</div>
                 <div className="lp-plan-divider" />
                 <div className="lp-plan-features">
-                  {["Everything in Premium","Up to 3,000 outbound messages a month — 3×","Personal onboarding","Top-priority support","Custom tailoring for your business"].map((f) => (
+                  {["Everything in Premium","Up to 3,000 outbound messages a month — 3× — to fill quiet hours","Personal onboarding: we set everything up with you, step by step","Front of the line on every support request","Custom tailoring — the bot speaks exactly like your business"].map((f) => (
                     <div key={f} className="lp-plan-feat">{f}</div>
                   ))}
                 </div>
