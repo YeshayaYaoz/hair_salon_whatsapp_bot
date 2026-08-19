@@ -36,15 +36,26 @@ const JOB_LABELS: Record<string, { he: string; en: string }> = {
   reviews: { he: "בקשות ביקורת", en: "Review requests" },
   digest: { he: "סיכום יומי", en: "Daily digest" },
   retention: { he: "ניקוי נתונים", en: "Data retention cleanup" },
+  aiCostAlert: { he: "התראת עלויות AI", en: "AI cost alert" },
+  billingReminder: { he: "תזכורות חיוב", en: "Billing reminders" },
+  depositExpiry: { he: "שחרור מקדמות שפגו", en: "Deposit expiry" },
+  healthDigest: { he: "דוח בריאות למפעיל", en: "Operator health digest" },
+  metricSnapshot: { he: "צילום מדדים", en: "Metric snapshot" },
 };
 
 function SystemStatusSection() {
   const { lang } = useLanguage();
   const he = lang === "he";
   const [jobs, setJobs] = useState<JobStatus[] | null>(null);
+  // The per-job list is operator information: names like aiCostAlert and metricSnapshot mean
+  // nothing to a salon owner, and a failure in them is OURS to fix — showing it to the owner
+  // hands them a worry they can do nothing about. Owners get one plain sentence; the operator
+  // account keeps the full table.
+  const [isOperator, setIsOperator] = useState(false);
 
   useEffect(() => {
     apiFetch<JobStatus[]>("/api/business/system-status").then(setJobs).catch(() => setJobs([]));
+    apiFetch<{ isSuperAdmin?: boolean }>("/api/business/me").then((me) => setIsOperator(Boolean(me.isSuperAdmin))).catch(() => {});
   }, []);
 
   function relativeTime(iso: string): string {
@@ -58,38 +69,77 @@ function SystemStatusSection() {
     return he ? `לפני ${days} ימים` : `${days}d ago`;
   }
 
+  if (jobs === null || jobs.length === 0) return null;
+
+  const allOk = jobs.every((j) => j.lastStatus === "ok");
+
+  // The owner's view: one sentence about the things they actually rely on, in their language.
+  // No raw job names, no error strings, no table — a failure here is Tori's to fix, and the only
+  // thing an owner needs to know is whether their reminders and summaries are going out.
+  if (!isOperator) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
+        <div className="flex items-center gap-3">
+          <span
+            className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+              allOk ? "bg-green-50 text-green-600" : "bg-amber-50 text-amber-600"
+            }`}
+            aria-hidden
+          >
+            {allOk ? (
+              <svg className="w-4.5 h-4.5" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+            ) : (
+              <svg className="w-4.5 h-4.5" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
+            )}
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">
+              {allOk
+                ? he ? "הכל פועל כרגיל" : "Everything is running normally"
+                : he ? "זיהינו תקלה זמנית — אנחנו מטפלים" : "We've spotted a temporary issue — we're on it"}
+            </p>
+            <p className="text-xs text-gray-600 mt-0.5">
+              {allOk
+                ? he
+                  ? "תזכורות, בקשות ביקורת והסיכום היומי נשלחים בזמן."
+                  : "Reminders, review requests and the daily summary are going out on time."
+                : he
+                  ? "ייתכן עיכוב בתזכורות או בסיכומים. אין צורך לעשות כלום — זה בטיפול שלנו."
+                  : "Reminders or summaries may be delayed. Nothing for you to do — it's ours to fix."}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // The operator's view: the full table, raw names included — this is the debugging surface.
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
       <h2 className="text-sm font-semibold text-gray-900 mb-0.5">{he ? "בריאות המערכת" : "System health"}</h2>
       <p className="text-xs text-gray-600 mb-4">
-        {he ? "מעקב אחרי תהליכים אוטומטיים שרצים ברקע" : "Status of automated jobs running in the background"}
+        {he ? "תהליכי הרקע של תורי (מוצג רק לחשבון המפעיל)" : "Tori's background jobs (operator account only)"}
       </p>
-      {jobs === null ? (
-        <SkeletonCard lines={4} />
-      ) : jobs.length === 0 ? (
-        <p className="text-xs text-gray-600">{he ? "עדיין אין נתונים — הריצה הראשונה עוד לא הושלמה" : "No data yet — jobs haven't completed a first run"}</p>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {jobs.map((j) => {
-            const label = JOB_LABELS[j.jobName] ?? { he: j.jobName, en: j.jobName };
-            const ok = j.lastStatus === "ok";
-            return (
-              <div key={j.jobName} className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg bg-gray-50/60 border border-gray-100">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${ok ? "bg-green-500" : "bg-red-500"}`} />
-                  <span className="text-sm text-gray-700 font-medium truncate">{he ? label.he : label.en}</span>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {!ok && j.lastError && (
-                    <span className="text-[11px] text-red-500 max-w-[200px] truncate" title={j.lastError}>{j.lastError}</span>
-                  )}
-                  <span className="text-xs text-gray-600 tabular-nums">{relativeTime(j.lastRunAt)}</span>
-                </div>
+      <div className="flex flex-col gap-1.5">
+        {jobs.map((j) => {
+          const label = JOB_LABELS[j.jobName] ?? { he: j.jobName, en: j.jobName };
+          const ok = j.lastStatus === "ok";
+          return (
+            <div key={j.jobName} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-gray-50/60 border border-gray-100">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${ok ? "bg-green-500" : "bg-red-500"}`} />
+                <span className="text-sm text-gray-700 font-medium truncate">{he ? label.he : label.en}</span>
               </div>
-            );
-          })}
-        </div>
-      )}
+              <div className="flex items-center gap-2 shrink-0">
+                {!ok && j.lastError && (
+                  <span className="text-[11px] text-red-500 max-w-[200px] truncate" title={j.lastError}>{j.lastError}</span>
+                )}
+                <span className="text-xs text-gray-600 tabular-nums">{relativeTime(j.lastRunAt)}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
