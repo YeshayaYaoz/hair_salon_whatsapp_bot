@@ -333,7 +333,7 @@ function VoicePhoneSection() {
               disabled={saving}
               className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50 transition px-2 py-2"
             >
-              {he ? "נתק" : "Disconnect"}
+              {he ? "ניתוק" : "Disconnect"}
             </button>
           )}
           {saved && <SavedBadge text={he ? "נשמר" : "Saved"} />}
@@ -443,7 +443,7 @@ function VoiceLanguageSelect() {
       </div>
       <p className="text-xs text-gray-600 mt-2">
         {he
-          ? "כשהבוט יודע מראש באיזו שפה ידברו איתו, הוא מבין הרבה יותר טוב — במיוחד מספרים, שמות וכתובות מייל. בחר בשתי השפות רק אם באמת מתקשרים אליך בשתיהן: זה גמיש יותר, אבל קצת פחות מדויק בכל אחת."
+          ? "כשהבוט יודע מראש באיזו שפה ידברו איתו, הוא מבין הרבה יותר טוב — במיוחד מספרים, שמות וכתובות מייל. בחרו בשתי השפות רק אם באמת מתקשרים אליכם בשתיהן: זה גמיש יותר, אבל קצת פחות מדויק בכל אחת."
           : "The bot understands far more when it knows in advance which language it will hear — especially numbers, names and email addresses. Choose both languages only if callers really do use both: it is more flexible, and slightly less accurate in each."}
       </p>
     </div>
@@ -714,7 +714,7 @@ export default function BotPage() {
         <p className="text-xs text-gray-600 flex-1 min-w-[12rem]">
           {botEnabled
             ? (he ? "הבוט עונה ללקוחות בוואטסאפ ומקבל תורים." : "The bot answers customers on WhatsApp and takes bookings.")
-            : (he ? "הבוט לא עונה לאף לקוח. ההודעות עדיין נשמרות ותוכל לענות ידנית." : "The bot answers no one. Messages are still saved so you can reply manually.")}
+            : (he ? "הבוט לא עונה לאף לקוח. ההודעות עדיין נשמרות ותוכלו לענות ידנית." : "The bot answers no one. Messages are still saved so you can reply manually.")}
         </p>
         <button
           type="button"
@@ -726,7 +726,7 @@ export default function BotPage() {
               : "bg-[#1B7FA0] hover:bg-[#2A9BBF] text-white"
           }`}
         >
-          {togglingBot ? "..." : botEnabled ? (he ? "השהה בוט" : "Pause bot") : (he ? "הפעל בוט" : "Resume bot")}
+          {togglingBot ? "..." : botEnabled ? (he ? "השהה בוט" : "Pause bot") : (he ? "הפעלת הבוט" : "Resume bot")}
         </button>
       </div>
 
@@ -976,7 +976,7 @@ export default function BotPage() {
             hint={he ? "נוסף להודעת הביקורת אחרי הביקור" : "Appended to the post-visit review message"}
           >
             <input
-              placeholder={he ? "לדוגמה: הזמן חבר וקבל 10% הנחה בביקור הבא!" : "e.g. Refer a friend and get 10% off your next visit!"}
+              placeholder={he ? "לדוגמה: הזמינו חבר וקבלו 10% הנחה בביקור הבא!" : "e.g. Refer a friend and get 10% off your next visit!"}
               value={fields.referralText}
               onChange={(e) => set("referralText", e.target.value)}
               className="w-full"
@@ -1159,7 +1159,7 @@ function TemperatureSlider({
       {ignored && (
         <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-2">
           {he
-            ? "המודל שנבחר לא תומך בהגדרה הזאת ומתעלם ממנה. כדי לשלוט במגוון הניסוח, בחר מודל אחר."
+            ? "המודל שנבחר לא תומך בהגדרה הזאת ומתעלם ממנה. כדי לשלוט במגוון הניסוח, בחרו מודל אחר."
             : "The selected model doesn't support this setting and ignores it. Pick a different model to control wording variety."}
         </p>
       )}

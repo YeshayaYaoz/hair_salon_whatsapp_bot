@@ -134,7 +134,7 @@ export default function OnboardingPage() {
         >
           {applying
             ? (he ? "מגדיר..." : "Setting up...")
-            : (he ? "המשך והגדר את תורי" : "Continue & set up Tori")}
+            : (he ? "המשיכו להגדרת תורי" : "Continue & set up Tori")}
         </button>
       </div>
     </div>

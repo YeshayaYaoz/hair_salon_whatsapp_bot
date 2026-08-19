@@ -3,12 +3,12 @@ export type Lang = "en" | "he";
 const translations = {
   en: {
     nav: {
-      analytics: "Analytics", appointments: "Appointments", customers: "Customers",
-      waitlist: "Waitlist", services: "Pricing & Services", staff: "Staff", hours: "Schedule",
+      analytics: "Home", appointments: "Appointments", customers: "Customers",
+      waitlist: "Waitlist", services: "Pricing & Services", staff: "Staff", hours: "Opening hours",
       blocked: "Time off", conversations: "Conversations",
-      whatsapp: "WhatsApp", bot: "Bot", payments: "Payments", faq: "FAQ", settings: "Settings", billing: "My subscription", logout: "Log out",
+      whatsapp: "WhatsApp", bot: "Bot settings", payments: "Payments", faq: "FAQ", settings: "Settings", billing: "My subscription", logout: "Log out",
     },
-    navGroups: { setup: "Get started", overview: "Home", operations: "Day-to-day", business: "My business", account: "Setup & account" },
+    navGroups: { setup: "Get started", overview: "Overview", operations: "Day-to-day", business: "My business", account: "Setup & account" },
     sectionTabsLabel: "Sections in this area",
     // Bottom-tab labels. The full nav names are written for the sidebar and overflow a ~56px tab
     // ("Pricing & Services" / "מחירים ושירותים" truncated to an ellipsis), so the four tabs get
@@ -23,7 +23,7 @@ const translations = {
     brandTagline: "WhatsApp appointment booking", leadFinder: "Lead Finder", adminSection: "Admin",
 
     // Analytics
-    analyticsTitle: "Analytics", analyticsSubtitle: "Overview of your salon's performance",
+    analyticsTitle: "Home", analyticsSubtitle: "Overview of your salon's performance",
     thisMonth: "This month", revenue: "Revenue this month",
     newCustomers: "New customers", allTime: "All-time bookings",
     last7Days: "Last 7 days", topServices: "Top services",
@@ -75,7 +75,7 @@ const translations = {
     noStaff: "No staff members yet. Add one below.", remove: "Remove",
 
     // Hours
-    hoursTitle: "Schedule", hoursSubtitle: "Set when your salon is open for bookings",
+    hoursTitle: "Opening hours", hoursSubtitle: "Set when your salon is open for bookings",
     saveHours: "Save hours", to: "to",
 
     // WhatsApp
@@ -175,12 +175,12 @@ const translations = {
 
   he: {
     nav: {
-      analytics: "סטטיסטיקות", appointments: "תורים", customers: "לקוחות",
-      waitlist: "רשימת המתנה", services: "מחירים ושירותים", staff: "צוות", hours: "לוח זמנים",
+      analytics: "ראשי", appointments: "תורים", customers: "לקוחות",
+      waitlist: "רשימת המתנה", services: "מחירים ושירותים", staff: "צוות", hours: "שעות פעילות",
       blocked: "חופשות", conversations: "שיחות",
-      whatsapp: "וואטסאפ", bot: "בוט", payments: "סליקה וחשבוניות", faq: "שאלות נפוצות", settings: "הגדרות", billing: "המנוי שלי", logout: "התנתקות",
+      whatsapp: "וואטסאפ", bot: "הגדרות הבוט", payments: "סליקה וחשבוניות", faq: "שאלות נפוצות", settings: "הגדרות", billing: "המנוי שלי", logout: "התנתקות",
     },
-    navGroups: { setup: "הפעלה ראשונית", overview: "ראשי", operations: "ניהול יומי", business: "העסק שלי", account: "הגדרות וחשבון" },
+    navGroups: { setup: "הפעלה ראשונית", overview: "מבט על העסק", operations: "ניהול יומי", business: "העסק שלי", account: "הגדרות וחשבון" },
     sectionTabsLabel: "מדורים באזור הזה",
     navShort: { analytics: "ראשי", appointments: "תורים", customers: "לקוחות", services: "מחירים" },
     days: ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"],
@@ -192,7 +192,7 @@ const translations = {
     brandTagline: "הזמנת תורים בוואטסאפ", leadFinder: "מציאת לידים", adminSection: "ניהול",
 
     // Analytics
-    analyticsTitle: "סטטיסטיקות", analyticsSubtitle: "מה קורה בעסק — במבט אחד",
+    analyticsTitle: "ראשי", analyticsSubtitle: "מה קורה בעסק — במבט אחד",
     thisMonth: "החודש", revenue: "הכנסות החודש",
     newCustomers: "לקוחות חדשים", allTime: "סה\"כ תורים",
     last7Days: "7 הימים האחרונים", topServices: "השירותים הכי מבוקשים",
@@ -210,8 +210,8 @@ const translations = {
     exportCsv: "ייצוא CSV",
 
     // Analytics stat subtitles
-    subCancelled: "בוטלו", subRevenue: "מהזמנות מאושרות",
-    subNewCustomers: "הזמינו החודש", subAllTime: "סה\"כ מאושרות",
+    subCancelled: "בוטלו", subRevenue: "מתורים שאושרו",
+    subNewCustomers: "הזמינו החודש", subAllTime: "סה\"כ שאושרו",
 
     // Services
     servicesTitle: "מחירים ושירותים", addService: "הוספת שירות",
@@ -244,7 +244,7 @@ const translations = {
     noStaff: "עוד אין אנשי צוות. מוסיפים למטה 👇", remove: "הסרה",
 
     // Hours
-    hoursTitle: "לוח זמנים", hoursSubtitle: "מתי אתם פתוחים? הבוט יקבע תורים רק בשעות האלה.",
+    hoursTitle: "שעות פעילות", hoursSubtitle: "מתי אתם פתוחים? הבוט יקבע תורים רק בשעות האלה.",
     saveHours: "שמירת שעות", to: "עד",
 
     // WhatsApp
@@ -253,7 +253,7 @@ const translations = {
     phoneNumberId: "מזהה מספר הטלפון", accessToken: "טוקן גישה",
     phoneNumberIdPlaceholder: "לדוג׳ 123456789012345",
     accessTokenPlaceholder: "טוקן גישה קבוע ממטא",
-    whatsappHint: "ניתן למצוא את הפרטים בממשק מטא תחת WhatsApp › API Setup. השתמש בטוקן קבוע.",
+    whatsappHint: "אפשר למצוא את הפרטים בממשק מטא תחת WhatsApp › API Setup. השתמשו בטוקן קבוע.",
 
     // FAQ
     faqTitle: "שאלות נפוצות",
@@ -278,7 +278,7 @@ const translations = {
     settingsTitle: "הגדרות", settingsSubtitle: "פרופיל הסלון ופרטי העסק",
     businessProfile: "פרופיל העסק", businessProfileDesc: "מידע בסיסי שמוצג ללקוחות דרך הבוט.",
     bookingNotifications: "התראות הזמנה",
-    bookingNotificationsDesc: "קבל הודעת וואטסאפ בכל פעם שלקוח קובע תור.",
+    bookingNotificationsDesc: "קבלו הודעת וואטסאפ בכל פעם שלקוח קובע תור.",
 
     // Bot
     botTabTitle: "בוט", botTabSubtitle: "איך הבוט מדבר, ומה הוא שולח אוטומטית",
@@ -287,7 +287,7 @@ const translations = {
     salonName: "שם הסלון", address: "כתובת", timezone: "אזור זמן", loginEmail: "אימייל כניסה",
     notifPhone: "המספר האישי שלך (בעל/ת העסק) — לא מספר הבוט", notifPhoneHint: "זהו מספר הוואטסאפ האישי שלך, שאליו יגיעו התראות על תורים חדשים ובקשות מלקוחות. זה שונה מהמספר העסקי שהבוט עונה עליו. כולל קידומת מדינה, לדוג׳ 972501234567.",
     accessibilityContact: "איש קשר לנושא נגישות", accessibilityContactHint: "מתפרסם בהצהרת הנגישות של דף ההזמנות שלכם. החוק בישראל מחייב כל עסק שנותן שירות אונליין לפרסם הצהרת נגישות עם פרטי איש קשר לנושא — והחובה הזאת היא שלכם ולא שלנו, כי אתם נותני השירות. אנחנו מייצרים לכם את ההצהרה; זה החלק היחיד שאנחנו לא יכולים למלא במקומכם. אם תשאירו ריק, ההצהרה תפנה את הגולשים אליכם בדרכי ההתקשרות הרגילות של העסק.",
-    googleMapsUrl: "קישור Google Maps", googleMapsUrlHint: "משמש לשני דברים: הבוט שולח אותו כשלקוחות מבקשים הוראות הגעה או ניווט, והוא מצורף להודעות התודה אחרי הביקור. מצא אותו בפרופיל העסק Google ← שתף ← העתק קישור.",
+    googleMapsUrl: "קישור Google Maps", googleMapsUrlHint: "משמש לשני דברים: הבוט שולח אותו כשלקוחות מבקשים הוראות הגעה או ניווט, והוא מצורף להודעות התודה אחרי הביקור. מצאו אותו בפרופיל העסק ב-Google ← שיתוף ← העתקת קישור.",
     greeting: "ברכת פתיחה", personality: "אישיות וטון",
     greetingPlaceholder: "לדוג׳ שלום! ברוכים הבאים לסלון שיר 💇‍♀️ במה אוכל לעזור?",
     quickRepliesTitle: "כפתורי תשובה מהירה",
@@ -302,8 +302,8 @@ const translations = {
     personalityPlaceholder: "לדוג׳ היה ידידותי ותשתמש באמוג׳ים מדי פעם. תמיד ענה בעברית.",
 
     // Customers
-    sendMessage: "שלח הודעה", messagePlaceholder: "הקלד הודעה לשליחה בוואטסאפ…",
-    send: "שלח", sending: "שולח…", messageSent: "ההודעה נשלחה",
+    sendMessage: "שליחת הודעה", messagePlaceholder: "כתבו הודעה לשליחה בוואטסאפ…",
+    send: "שליחה", sending: "שולח…", messageSent: "ההודעה נשלחה",
 
     // Appointments view toggle
     listView: "רשימה", calendarView: "לוח שנה",
@@ -317,7 +317,7 @@ const translations = {
     subscribeCta: "להרשמה",
 
     // Settings: reminders / reviews toggles + template warning
-    automatedMessages: "הודעות אוטומטיות", automatedMessagesDesc: "שלוט אילו הודעות הבוט שולח אוטומטית.",
+    automatedMessages: "הודעות אוטומטיות", automatedMessagesDesc: "כאן בוחרים אילו הודעות הבוט שולח מעצמו.",
     remindersLabel: "תזכורות 24 שעות לפני תור",
     reviewsLabel: "בקשות ביקורת לאחר הביקור",
     templateWarning: "וואטסאפ מאפשר הודעות יזומות רק ללקוחות שכתבו לכם ב-24 השעות האחרונות. תזכורות ובקשות ביקורת עלולות להיחסם בשקט עבור לקוחות אחרים.",
@@ -337,9 +337,9 @@ const translations = {
     },
 
     // Common
-    save: "שמור שינויים", saving: "שומר…", saved: "נשמר",
-    loading: "טוען…", cancel: "ביטול", delete: "מחק", add: "הוסף", edit: "עריכה",
-    search: "חיפוש…", noBookings: "אין הזמנות עדיין.",
+    save: "שמירת שינויים", saving: "שומר…", saved: "נשמר",
+    loading: "טוען…", cancel: "ביטול", delete: "מחיקה", add: "הוספה", edit: "עריכה",
+    search: "חיפוש…", noBookings: "אין תורים עדיין.",
   },
 } as const;
 

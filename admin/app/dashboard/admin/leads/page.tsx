@@ -434,7 +434,7 @@ function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => 
                   className="px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50"
                   style={{ background: "#1B7FA0" }}
                 >
-                  {editSaving ? "שומר…" : "שמור"}
+                  {editSaving ? "שומר…" : "שמירה"}
                 </button>
                 <button onClick={() => setEditing(null)} className="px-4 py-2 rounded-lg text-sm text-gray-600">ביטול</button>
               </div>

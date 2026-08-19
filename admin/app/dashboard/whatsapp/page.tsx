@@ -422,7 +422,7 @@ export default function WhatsAppPage() {
             </p>
             <p className="text-xs text-amber-700 mt-0.5">
               {lang === "he"
-                ? "אישור הגישה פג תוקף או בוטל, והבוט אינו יכול לשלוח הודעות. חבר מחדש כדי להמשיך לקבל הזמנות."
+                ? "אישור הגישה פג תוקף או בוטל, והבוט אינו יכול לשלוח הודעות. חברו מחדש כדי להמשיך לקבל תורים."
                 : "The access token expired or was revoked, so the bot can't send messages. Reconnect to keep receiving bookings."}
             </p>
           </div>
@@ -465,7 +465,7 @@ export default function WhatsAppPage() {
                 className="text-xs text-[#197492] hover:text-[#2A9BBF] disabled:opacity-50 transition font-medium"
                 title={lang === "he" ? "שולח הודעת בדיקה אמיתית למספר ההתראות שלך" : "Sends a real test message to your notification phone"}
               >
-                {testing ? "..." : (lang === "he" ? "שלח הודעת בדיקה" : "Send test message")}
+                {testing ? "..." : (lang === "he" ? "שליחת הודעת בדיקה" : "Send test message")}
               </button>
               <button
                 onClick={runDiagnostics}
@@ -480,15 +480,43 @@ export default function WhatsAppPage() {
                 disabled={disconnecting}
                 className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50 transition font-medium"
               >
-                {disconnecting ? "..." : (lang === "he" ? "נתק" : "Disconnect")}
+                {disconnecting ? "..." : (lang === "he" ? "ניתוק" : "Disconnect")}
               </button>
             </div>
           )}
         </div>
         {diagnostics && (
           <div className="mt-3 bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs">
+            {/* A verdict in plain language, before the raw fields. The list below is the truth from
+                Meta and support needs every line of it — but it is English jargon a salon owner
+                cannot act on, so on its own this button answered a question nobody asked. */}
+            {(() => {
+              const willProcess = diagnostics.ourRecord?.webhookWillProcess;
+              const overrides = (diagnostics.metaSubscribedApps?.overrides ?? []).length > 0;
+              const ok = willProcess && !overrides;
+              const he = lang === "he";
+              return (
+                <div
+                  className={`mb-2 rounded-md px-2.5 py-2 font-semibold ${
+                    ok ? "bg-green-50 text-green-800" : "bg-red-50 text-red-700"
+                  }`}
+                >
+                  {ok
+                    ? he
+                      ? "✓ הכל תקין — הודעות שלקוחות שולחים מגיעות לבוט."
+                      : "✓ All good — messages customers send reach the bot."
+                    : overrides
+                      ? he
+                        ? "✗ אפליקציה אחרת חוטפת את ההודעות שלכם. לחצו \"תיקון חיבור\"; אם זה חוזר, פנו אלינו."
+                        : "✗ Another app is intercepting your messages. Click \"Fix connection\"; if it comes back, contact us."
+                      : he
+                        ? "✗ הודעות מלקוחות לא מגיעות לבוט. לחצו \"תיקון חיבור\" — זה פותר את זה ברוב המקרים."
+                        : "✗ Customer messages are not reaching the bot. Click \"Fix connection\" — that resolves it in most cases."}
+                </div>
+              );
+            })()}
             <p className="font-semibold text-gray-700 mb-1">
-              {lang === "he" ? "מצב אמיתי מול מטא:" : "Live status from Meta:"}
+              {lang === "he" ? "פרטים טכניים (לתמיכה):" : "Technical details (for support):"}
             </p>
             <ul className="text-gray-600 space-y-0.5" dir="ltr">
               <li>status: <b>{diagnostics.metaPhoneStatus?.status ?? "—"}</b></li>
@@ -515,7 +543,7 @@ export default function WhatsAppPage() {
         {connected && (
           <p className="text-xs text-gray-600 mt-2">
             {lang === "he"
-              ? "הבוט לא עונה בוואטסאפ למרות שהחיבור מוצג כתקין? נסה \"תיקון חיבור\" — לפעמים ההרשמה לקבלת הודעות נכשלת בשקט."
+              ? "הבוט לא עונה בוואטסאפ למרות שהחיבור מוצג כתקין? נסו \"תיקון חיבור\" — לפעמים ההרשמה לקבלת הודעות נכשלת בשקט."
               : "Bot not answering on WhatsApp even though this shows connected? Try \"Fix connection\" — the subscription to receive messages can silently fail."}
           </p>
         )}
@@ -523,7 +551,7 @@ export default function WhatsAppPage() {
         {testResult && (
           <div className="bg-green-50 border border-green-200 text-green-800 text-xs rounded-lg px-4 py-3 mt-3">
             {lang === "he"
-              ? `✅ נשלחה הודעת בדיקה אל ${testResult} — בדוק את הוואטסאפ שלך. אם היא הגיעה, השליחה עובדת.`
+              ? `✅ נשלחה הודעת בדיקה אל ${testResult} — בדקו את הוואטסאפ שלכם. אם היא הגיעה, השליחה עובדת.`
               : `✅ Test message sent to ${testResult} — check your WhatsApp. If it arrived, sending works.`}
           </div>
         )}
@@ -538,7 +566,7 @@ export default function WhatsAppPage() {
           <>
             <p className="text-sm text-gray-600 leading-relaxed mt-3 mb-4 max-w-md">
               {lang === "he"
-                ? "לחץ על הכפתור ובצע את תהליך החיבור של מטא. ייקח כ-2 דקות."
+                ? "לחצו על הכפתור ועברו את תהליך החיבור של מטא. זה לוקח כ-2 דקות."
                 : "Click the button below and complete Meta's setup flow. Takes about 2 minutes."}
             </p>
             {META_APP_ID && !showManual && (
@@ -555,8 +583,8 @@ export default function WhatsAppPage() {
                 {loading
                   ? (lang === "he" ? "מתחבר..." : "Connecting...")
                   : connected
-                  ? (lang === "he" ? "חבר מחדש" : "Reconnect WhatsApp")
-                  : (lang === "he" ? "חבר WhatsApp Business" : "Connect WhatsApp Business")}
+                  ? (lang === "he" ? "חיבור מחדש" : "Reconnect WhatsApp")
+                  : (lang === "he" ? "חיבור וואטסאפ עסקי" : "Connect WhatsApp Business")}
               </button>
             )}
 
@@ -636,7 +664,7 @@ export default function WhatsAppPage() {
               disabled={templatesLoading}
               className="bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-800 text-sm font-semibold px-4 py-2 rounded-lg transition whitespace-nowrap"
             >
-              {templatesLoading ? (lang === "he" ? "שולח..." : "Submitting...") : (lang === "he" ? "שלח תבניות לאישור" : "Submit templates")}
+              {templatesLoading ? (lang === "he" ? "שולח..." : "Submitting...") : (lang === "he" ? "שליחת תבניות לאישור" : "Submit templates")}
             </button>
           </div>
           {templateResults && (

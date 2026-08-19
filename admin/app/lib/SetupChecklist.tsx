@@ -25,7 +25,7 @@ export const STEP_META: Record<string, { he: string; en: string; href: string; w
     he: "בחירת סוג העסק",
     en: "Choose your business type",
     href: "/dashboard/onboarding",
-    whyHe: "מגדיר עבורך שירותים, מדיניות וטון הבוט מראש",
+    whyHe: "מגדיר לכם מראש שירותים, מדיניות וטון לבוט",
     whyEn: "Pre-configures your services, policy and bot tone",
   },
   whatsapp: {
@@ -39,7 +39,7 @@ export const STEP_META: Record<string, { he: string; en: string; href: string; w
     he: "מספר להתראות",
     en: "Notification phone",
     href: "/dashboard/settings",
-    whyHe: "בלי זה לא תקבל התראה על תורים חדשים או בקשות מלקוחות",
+    whyHe: "בלי זה לא תקבלו התראה על תורים חדשים או בקשות מלקוחות",
     whyEn: "Without this you won't be alerted about new bookings or customer requests",
   },
   services: {
@@ -119,43 +119,71 @@ export function SetupChecklist() {
         <div className="h-full bg-[#1B7FA0] rounded-full transition-all" style={{ width: `${pct}%` }} />
       </div>
 
+      {/* Ordered by what to do next, not by how the server happened to list them: unfinished
+          required steps, then unfinished optional ones, then what's already done. A flat list in
+          arbitrary order asks the owner to work out their own next move — and the one step that
+          matters most (WhatsApp: nothing works without it) could sit below three finished ones. */}
       <ul className="flex flex-col gap-2">
-        {status.steps.map((step) => {
-          const meta = STEP_META[step.key];
-          if (!meta) return null;
-          return (
-            <li key={step.key} className="flex items-start gap-3">
-              <span
-                className={`mt-0.5 w-5 h-5 shrink-0 rounded-full flex items-center justify-center text-xs ${
-                  step.done ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
-                }`}
-                aria-hidden
+        {[...status.steps]
+          .sort((a, b) => {
+            const rank = (s: SetupStep) => (s.done ? 2 : s.critical ? 0 : 1);
+            return rank(a) - rank(b);
+          })
+          .map((step, index) => {
+            const meta = STEP_META[step.key];
+            if (!meta) return null;
+            // The first unfinished step gets the call to action. Everything below stays a quiet
+            // link, so there is exactly one obvious thing to do.
+            const isNext = index === 0 && !step.done;
+            return (
+              <li
+                key={step.key}
+                className={`flex items-start gap-3 ${isNext ? "bg-[#F2F9FC] border border-[#CFE7F1] rounded-xl p-3 -mx-1" : ""}`}
               >
-                {step.done ? "✓" : "○"}
-              </span>
-              <div className="min-w-0">
-                <a
-                  href={meta.href}
-                  className={`text-sm font-medium ${
-                    step.done ? "text-gray-600 line-through" : "text-[#197492] hover:underline"
+                <span
+                  className={`mt-0.5 w-5 h-5 shrink-0 rounded-full flex items-center justify-center text-xs ${
+                    step.done ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
                   }`}
+                  aria-hidden
                 >
-                  {he ? meta.he : meta.en}
-                </a>
-                {!step.done && (
-                  <p className="text-xs text-gray-600 mt-0.5">
-                    {he ? meta.whyHe : meta.whyEn}
-                    {step.critical && (
-                      <span className="ms-1.5 text-amber-700 font-medium">
-                        {he ? "· חובה" : "· required"}
-                      </span>
-                    )}
-                  </p>
-                )}
-              </div>
-            </li>
-          );
-        })}
+                  {step.done ? "✓" : "○"}
+                </span>
+                <div className="min-w-0 flex-1">
+                  {isNext && (
+                    <p className="text-[11px] font-bold text-[#136B87] uppercase tracking-wide mb-0.5">
+                      {he ? "הצעד הבא" : "Next step"}
+                    </p>
+                  )}
+                  <a
+                    href={meta.href}
+                    className={`text-sm font-medium ${
+                      step.done ? "text-gray-600 line-through" : "text-[#197492] hover:underline"
+                    }`}
+                  >
+                    {he ? meta.he : meta.en}
+                  </a>
+                  {!step.done && (
+                    <p className="text-xs text-gray-600 mt-0.5">
+                      {he ? meta.whyHe : meta.whyEn}
+                      {step.critical && (
+                        <span className="ms-1.5 text-amber-700 font-medium">
+                          {he ? "· חובה" : "· required"}
+                        </span>
+                      )}
+                    </p>
+                  )}
+                  {isNext && (
+                    <a
+                      href={meta.href}
+                      className="inline-block mt-2 bg-[#1B7FA0] hover:bg-[#2A9BBF] text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition"
+                    >
+                      {he ? "בואו נעשה את זה" : "Do it now"}
+                    </a>
+                  )}
+                </div>
+              </li>
+            );
+          })}
       </ul>
     </div>
   );

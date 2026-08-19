@@ -940,7 +940,7 @@ export default function AdminBusinessesPage() {
                   }
                   className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 disabled:opacity-50 whitespace-nowrap"
                 >
-                  {he ? "שלח" : "Send"}
+                  {he ? "שליחה" : "Send"}
                 </button>
               </div>
 

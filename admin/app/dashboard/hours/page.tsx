@@ -106,7 +106,7 @@ function BlockedTimesSection() {
         </div>
         <div className="flex items-center gap-3">
           <button type="submit" disabled={saving} className="inline-flex bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
-            {saving ? "…" : (he ? "הוסף חסימה" : "Add block")}
+            {saving ? "…" : (he ? "הוספת חסימה" : "Add block")}
           </button>
           {error && <p className="text-red-600 text-sm">{error}</p>}
         </div>

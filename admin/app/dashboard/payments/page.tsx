@@ -64,7 +64,7 @@ const PAYMENT_META: Record<PaymentProviderName, ProviderMeta> = {
     color: "#0F62FE",
     monogram: "PP",
     instructions: {
-      he: "היכנס לחשבון PayPlus ← הגדרות ← מפתחות API, והעתק את ה-API Key וה-Secret Key.",
+      he: "היכנסו לחשבון PayPlus ← הגדרות ← מפתחות API, והעתיקו את ה-API Key וה-Secret Key.",
       en: "Log into PayPlus → Settings → API Keys, and copy your API Key and Secret Key.",
     },
     instructionsUrl: "https://console.payplus.co.il/",
@@ -84,7 +84,7 @@ const PAYMENT_META: Record<PaymentProviderName, ProviderMeta> = {
     color: "#8E44AD",
     monogram: "CC",
     instructions: {
-      he: "היכנס לחשבון Cardcom ← הגדרות טרמינל, והעתק את מספר הטרמינל (TerminalNumber) ואת שם ה-API (ApiName).",
+      he: "היכנסו לחשבון Cardcom ← הגדרות טרמינל, והעתיקו את מספר הטרמינל (TerminalNumber) ואת שם ה-API (ApiName).",
       en: "Log into Cardcom → Terminal Settings, and copy your TerminalNumber and ApiName.",
     },
     instructionsUrl: "https://secure.cardcom.solutions/",
@@ -94,7 +94,7 @@ const PAYMENT_META: Record<PaymentProviderName, ProviderMeta> = {
     color: "#00C48C",
     monogram: "GR",
     instructions: {
-      he: "היכנס לחשבון Grow ← הגדרות ← API, והעתק את מזהה המשתמש (userId) ואת קוד הדף (pageCode).",
+      he: "היכנסו לחשבון Grow ← הגדרות ← API, והעתיקו את מזהה המשתמש (userId) ואת קוד הדף (pageCode).",
       en: "Log into Grow → Settings → API, and copy your userId and pageCode.",
     },
     instructionsUrl: "https://meshulam.co.il/",
@@ -287,7 +287,7 @@ function ProviderCard<T extends string>({
             }}
             className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50 transition shrink-0"
           >
-            {he ? "נתק" : "Disconnect"}
+            {he ? "ניתוק" : "Disconnect"}
           </button>
         </div>
       )}
@@ -398,7 +398,7 @@ function ProviderCard<T extends string>({
                   }}
                   className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50 transition"
                 >
-                  {he ? "נתק" : "Disconnect"}
+                  {he ? "ניתוק" : "Disconnect"}
                 </button>
               )}
             </div>
@@ -425,7 +425,7 @@ function ProviderCard<T extends string>({
                 }}
                 className="text-xs text-red-500 hover:text-red-600 disabled:opacity-50 transition"
               >
-                {he ? "נתק" : "Disconnect"}
+                {he ? "ניתוק" : "Disconnect"}
               </button>
             )}
             {error && <p className="text-red-600 text-xs">{error}</p>}
@@ -536,7 +536,7 @@ export default function PaymentsPage() {
           requirementNote={
             invoiceProvider === "payplus-invoice" && !canUsePayplusInvoice
               ? he
-                ? "חבר קודם את PayPlus כספק הסליקה שלך כדי להשתמש ב-חשבונית+ (משתמש באותם פרטי התחברות, ללא מפתחות נוספים)."
+                ? "חברו קודם את PayPlus כספק הסליקה שלכם כדי להשתמש ב-חשבונית+ (משתמש באותם פרטי התחברות, ללא מפתחות נוספים)."
                 : "Connect PayPlus as your payment provider first to use Invoice+ (it reuses the same credentials, no extra keys)."
               : undefined
           }

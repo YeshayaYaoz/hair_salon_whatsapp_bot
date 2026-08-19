@@ -569,7 +569,7 @@ export default function BillingPage() {
             </div>
             {billingCycle === "annual" ? (
               <p className="text-sm text-gray-600 mt-3">
-                {lang === "he" ? "אתה כבר במסלול השנתי — תודה! 🎉" : "You're already on the annual plan — thank you! 🎉"}
+                {lang === "he" ? "אתם כבר במסלול השנתי — תודה! 🎉" : "You're already on the annual plan — thank you! 🎉"}
               </p>
             ) : (
               <>

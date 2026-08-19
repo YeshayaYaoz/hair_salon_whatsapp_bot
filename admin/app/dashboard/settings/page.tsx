@@ -138,7 +138,7 @@ function EmailVerificationRow({ email, verified, he }: { email: string; verified
       </p>
       {sent ? (
         <p className="text-xs font-medium mt-1.5" style={{ color: "#15803D" }}>
-          {he ? "✓ נשלח קישור אימות — בדוק את תיבת הדואר." : "✓ Verification link sent — check your inbox."}
+          {he ? "✓ נשלח קישור אימות — בדקו את תיבת הדואר." : "✓ Verification link sent — check your inbox."}
         </p>
       ) : (
         <button
@@ -286,7 +286,7 @@ export default function SettingsPage() {
           {!fields.notificationPhone?.trim() && (
             <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-4 py-3 mb-3">
               {lang === "he"
-                ? "⚠️ לא הוגדר מספר להתראות — לא תקבל התראה על תורים חדשים, בקשות לשיחה עם נציג, או בקשות הזמנה. מומלץ מאוד להגדיר."
+                ? "⚠️ לא הוגדר מספר להתראות — לא תקבלו התראה על תורים חדשים, בקשות לשיחה עם נציג, או בקשות הזמנה. מומלץ מאוד להגדיר."
                 : "⚠️ No notification phone set — you won't be alerted about new bookings, human-handoff requests, or booking enquiries. Strongly recommended."}
             </div>
           )}

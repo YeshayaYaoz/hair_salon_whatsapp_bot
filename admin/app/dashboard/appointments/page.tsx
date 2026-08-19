@@ -165,7 +165,7 @@ function GoogleCalendarSection() {
                 onClick={disconnect}
                 className="text-xs text-gray-600 hover:text-red-600 transition border border-gray-200 hover:border-red-200 px-3 py-1.5 rounded-lg"
               >
-                {he ? "נתק" : "Disconnect"}
+                {he ? "ניתוק" : "Disconnect"}
               </button>
             </>
           ) : (
@@ -830,7 +830,7 @@ export default function AppointmentsPage() {
                         type="checkbox"
                         checked={selected.size > 0 && selected.size === cancellableIds.length}
                         onChange={() => toggleSelectAll(cancellableIds)}
-                        aria-label={lang === "he" ? "בחר הכל" : "Select all"}
+                        aria-label={lang === "he" ? "בחירת הכל" : "Select all"}
                       />
                     </th>
                     <th className="text-start px-2 py-3 text-gray-600 font-medium">{t.when}</th>
