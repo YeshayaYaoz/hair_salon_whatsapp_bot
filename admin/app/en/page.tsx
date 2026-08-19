@@ -1459,7 +1459,7 @@ export default function LandingPageEN() {
                 <div className="lp-plan-per">per month · for high-volume businesses</div>
                 <div className="lp-plan-divider" />
                 <div className="lp-plan-features">
-                  {["Everything in Premium","Up to 3,000 outbound messages a month — 3× — to fill quiet hours","Personal onboarding: we set everything up with you, step by step","Front of the line on every support request","Custom tailoring — the bot speaks exactly like your business"].map((f) => (
+                  {["Everything in Premium","Up to 3,000 outbound messages a month — 3× — to fill quiet hours","Personal onboarding: we set everything up with you, step by step","Front of the line on every support request","We tailor the system to your business — screens, flows and bot, fitted to how you work"].map((f) => (
                     <div key={f} className="lp-plan-feat">{f}</div>
                   ))}
                 </div>
