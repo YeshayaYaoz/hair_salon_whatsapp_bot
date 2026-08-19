@@ -3,6 +3,7 @@ import { decryptSecret } from "./crypto.js";
 import { normalizePhone } from "./phone.js";
 import { sendWhatsAppMessage, sendWhatsAppTemplate } from "../webhook/whatsappClient.js";
 import { sendBusinessNoticeEmail } from "./email.js";
+import { ownerAlertTemplate } from "./whatsappTemplates.js";
 
 /**
  * Sends a WhatsApp message to the business owner's own notification number — used for new-booking
@@ -19,9 +20,18 @@ import { sendBusinessNoticeEmail } from "./email.js";
  * Hence the window check: the owner's window is open only if a message FROM their number reached
  * this business in the last ~24h (their inbound messages are in ConversationMessage like anyone
  * else's). Outside it, delivery needs a Meta-approved UTILITY template with one {{1}} body
- * variable — configure its name in WHATSAPP_OWNER_ALERT_TEMPLATE. With no template configured,
- * this returns false rather than lying: the callers all have an honest failure path, and a false
- * "sent" is the one outcome that loses the lead invisibly.
+ * variable.
+ *
+ * The template name comes from ownerAlertTemplate() — WHATSAPP_OWNER_ALERT_TEMPLATE if set,
+ * otherwise the same tori_owner_alert that submitTemplates files on the business's own WABA the
+ * moment WhatsApp is connected. Reading the raw env var here (as this used to) meant the approved
+ * template sat unused until an operator also set an env var: submission was automatic, sending
+ * still needed manual configuration, and every alert quietly took the email path.
+ *
+ * The template attempt has an email fallback of its own, because defaulting the name changes who
+ * reaches this branch: a business connected before auto-submission existed has no approved
+ * template, Meta rejects the send with error 132001, and without the fallback that business would
+ * get NOTHING where it used to get email.
  */
 const WINDOW_MS = 23.5 * 60 * 60 * 1000; // half an hour of slack under Meta's 24h
 
@@ -69,26 +79,27 @@ export async function notifyOwner(businessId: string, message: string): Promise<
         to: business.notificationPhone, text: message,
       });
     } else {
-      const templateName = process.env.WHATSAPP_OWNER_ALERT_TEMPLATE;
-      if (templateName) {
-        console.log(`[notifyOwner] ${businessId}: template '${templateName}' to ${business.notificationPhone} (window closed)`);
+      const template = ownerAlertTemplate();
+      try {
+        console.log(`[notifyOwner] ${businessId}: template '${template.name}' to ${business.notificationPhone} (window closed)`);
         await sendWhatsAppTemplate({
           phoneNumberId: business.whatsappPhoneNumberId, accessToken,
           to: business.notificationPhone,
-          templateName,
-          languageCode: process.env.WHATSAPP_OWNER_ALERT_TEMPLATE_LANG || "he",
+          templateName: template.name,
+          languageCode: template.languageCode,
           bodyParams: [message],
         });
-      } else {
-        // Sending free-form here would "succeed" at Meta's API and die in transit. But an owner
-        // who cannot be reached on WhatsApp still said, in as many words, "I want the messages" —
-        // so the alert falls back to the business's own email rather than being refused. Slower to
-        // be noticed than WhatsApp, but it arrives, and a lead that arrives late beats a lead
-        // that never existed.
+      } catch (templateErr) {
+        // Most commonly 132001: the template is not (yet) approved on this business's WABA —
+        // either Meta is still reviewing it, or the business connected before auto-submission
+        // existed and never filed it. The owner still said, in as many words, "I want the
+        // messages" — so the alert falls back to the business's own email rather than being
+        // refused. Slower to be noticed than WhatsApp, but it arrives, and a lead that arrives
+        // late beats a lead that never existed.
         console.warn(
-          `[notifyOwner] owner of ${businessId} has no open 24h window and no WHATSAPP_OWNER_ALERT_TEMPLATE — falling back to email`
+          `[notifyOwner] ${businessId}: template '${template.name}' failed (${templateErr instanceof Error ? templateErr.message : templateErr}) — falling back to email`
         );
-        console.log(`[notifyOwner] ${businessId}: email to ${business.email} (window closed, no template)`);
+        console.log(`[notifyOwner] ${businessId}: email to ${business.email} (window closed, template failed)`);
         await sendBusinessNoticeEmail(business.email, business.name, message);
       }
     }
