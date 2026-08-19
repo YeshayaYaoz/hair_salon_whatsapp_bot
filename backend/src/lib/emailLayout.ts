@@ -67,6 +67,40 @@ export function esc(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/* A phone number written as plain text in an email is a dead end: on a phone there is nothing to
+   tap, and the owner has to select it, copy it, switch apps and paste — for an alert whose entire
+   purpose is "call this person back". The callback-request alert is the sharpest case, since the
+   number IS the payload.
+
+   Deliberately conservative about what it treats as a number, because a false positive turns a
+   price or a date into a broken tel: link. A candidate has to survive two checks: the shape below,
+   and then a digit count that is plausible for a real Israeli number. So "2026-08-19" (8 digits,
+   no leading 0, not international) and "1,284" are left alone, while "+972506747354",
+   "0506747354" and "050-674-7354" all become tappable. */
+const PHONE_CANDIDATE = /\+?\d[\d\s-]{7,17}\d/g;
+
+/**
+ * Turns phone numbers inside ALREADY-ESCAPED text into tel: links.
+ *
+ * Must run on escaped input, never raw: it emits HTML, so escaping afterwards would neuter the
+ * anchors it just created, and escaping neither would let customer-supplied text inject markup.
+ * Newlines survive untouched, so callers can still convert them to <br/> afterwards.
+ */
+export function linkifyPhones(escapedHtml: string): string {
+  return escapedHtml.replace(PHONE_CANDIDATE, (match) => {
+    const international = match.trimStart().startsWith("+");
+    const digits = match.replace(/\D/g, "");
+    const plausible = international
+      ? digits.length >= 10 && digits.length <= 15
+      : digits.startsWith("0") && digits.length >= 9 && digits.length <= 10;
+    if (!plausible) return match;
+    // href carries digits only (plus the leading +), which is what dialers expect; the visible text
+    // keeps whatever formatting the message used.
+    const href = international ? `+${digits}` : digits;
+    return `<a href="tel:${href}" style="color:${BRAND.primary};font-weight:700;text-decoration:underline;white-space:nowrap;">${match}</a>`;
+  });
+}
+
 export interface DetailRow {
   label: string;
   value: string;
