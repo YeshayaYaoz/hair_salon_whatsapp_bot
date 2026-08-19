@@ -282,7 +282,21 @@ changed almost nothing about how the site looks. That was the honest read of wha
 but it is not what "more professional, more engaging" asks for. This round is the visual work, done
 to a brief: **keep the waves**, activate the unused display font, soften the bands.
 
-### The display font was being downloaded and never used
+### Correction: the display font was tried and rejected
+
+Karantina was loaded in the root layout and used by nothing — a whole display face fetched on every
+page load and thrown away. It was wired up to the landing-page headings to fix that, **and it did
+not work**: it is a condensed, high-contrast face drawn from Israeli signage, and at heading sizes
+in Hebrew it read as decorative rather than as the voice of a business product. Reverted on the
+owner's call.
+
+Rather than leave the download in place for a font nobody uses, it is now **removed from the layout
+entirely**. Headings are Heebo, which is what they were, and the page no longer pays for a face it
+never renders — so the original finding is resolved, just in the other direction.
+
+The section below is kept as the record of what was tried and why.
+
+### The display font was being downloaded and never used *(reverted — see above)*
 
 `Karantina` is loaded in the root layout with weights 400 and 700, exposed as `--font-karantina` —
 and referenced by **nothing anywhere in the app**. A whole display face was being fetched on every
@@ -361,9 +375,52 @@ block; `/en` serves the mirrored palette and type. The `--font-karantina` variab
 CSS bundle and the woff2 returns **HTTP 200, 12KB** — i.e. the font is genuinely being served, not
 merely referenced.
 
-`/en` gets the palette, the display type and the scroll-driven reveals, but **no waves — it never
-had any.** Its section transitions are hard cuts. That is now the largest remaining visual
-difference between the two languages.
+### The waves shipped broken, and grep-based verification could never have caught it
+
+Worth recording as a process failure, not just a bug. The first version of the animated dividers
+went out visibly broken: every wave cut off partway across with a hard vertical edge, the section
+above showing through the gap.
+
+**Cause.** A leftover single-layer rule, `.wave svg { display: block; width: 100% }`, survived the
+rewrite further down the same stylesheet. `.wave svg` is element+class (0,1,1) and beats
+`.wave-layer` (0,1,0), so `width: 100%` won over `width: 200%`. Each SVG was pinned to one
+container width while its viewBox held *two* 1440-unit periods — so both periods were squeezed into
+the visible width, and the −50% drift then slid the whole thing half a container across, leaving
+the trailing half of every divider empty.
+
+**Why it shipped.** The verification claimed at the time — "started a production server and
+fetched both pages" — checked that *strings were present in the HTML*: wave layers, the new ink,
+the Karantina rule. Every one of those greps passed on a completely broken page, because the bug
+was in cascade resolution and layout, which no amount of string matching can see.
+
+**What replaced it.** Chromium via Playwright, measuring real geometry: for every `.wave`, assert
+it has exactly two `.wave-layer` children and each is ≥ 1.99× its container's width. Before the
+fix that reads 1.00×; after, 2.00×. Then actual screenshots of a divider mid-animation, looked at.
+Result: `/` 9 waves, 0 bad; `/en` 13 waves, 0 bad.
+
+The general lesson: *presence of markup is not evidence of rendering.* Anything whose failure mode
+is visual has to be verified visually.
+
+### `/en` now has waves too, and prices in dollars
+
+`/en` had no dividers at all — hard cuts between sections. It now carries **13**, one at every
+tonal transition (a wave between two same-coloured sections is invisible, so those are skipped).
+Adding them exposed one more artefact: `.lp-ba` carried 1px top and bottom borders, and since the
+wave's own background is that same ink, the border drew a hairline stripe straight across the
+water. Removed — the waves are the separator now.
+
+Pricing moved to **USD headline with the shekel amount stated underneath** — `$52 / $122 / $230`,
+each card reading "billed as ₪189 / ₪449 / ₪849 per month".
+
+The care here is deliberate: this page's original sin was advertising `$39/$79`, prices the system
+would never charge. So the dollar figures are **derived, not typed** — `Math.ceil(ils /
+ILS_PER_USD)` from the same shekel constants that mirror `PLAN_PRICES_ILS`, the only code that
+charges money. They cannot drift the way hardcoded ones did. Rounded **up**, because a quote
+landing under the real charge is the one that generates a complaint. And every card states the
+shekel amount actually billed, so a stale FX rate makes the dollar figure approximate rather than
+makes the page wrong.
+
+**`ILS_PER_USD` is currently 3.7 and needs a human to revisit it when the rate moves materially.**
 
 ---
 

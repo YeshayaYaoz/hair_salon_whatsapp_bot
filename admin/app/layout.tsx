@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { Metadata, Viewport } from "next";
-import { Heebo, Karantina } from "next/font/google";
+import { Heebo } from "next/font/google";
 import { LanguageProvider } from "./lib/LanguageContext";
 import "./globals.css";
 
@@ -97,16 +97,15 @@ const heebo = Heebo({
   display: "swap",
 });
 
-const karantina = Karantina({
-  weight: ["400", "700"],
-  subsets: ["hebrew", "latin"],
-  variable: "--font-karantina",
-  display: "swap",
-});
+/* Karantina was loaded here and applied to nothing, so every page paid for a display face it never
+   rendered. It was briefly wired up to the landing-page headings and did not work: it is a
+   condensed, high-contrast face drawn from Israeli signage, and at heading sizes in Hebrew it read
+   as decorative rather than as the voice of a business product. Rather than leave the download in
+   place for a font nobody uses, it is gone — headings are Heebo, which is what they were. */
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="he" dir="rtl" suppressHydrationWarning className={`dark ${heebo.variable} ${karantina.variable}`}>
+    <html lang="he" dir="rtl" suppressHydrationWarning className={`dark ${heebo.variable}`}>
       <head>
         {/* Sync lang/dir from the saved preference before first paint, so the page never flashes
             the server default (Hebrew/RTL) before hydration corrects it for English users. */}
