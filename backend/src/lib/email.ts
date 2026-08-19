@@ -2,7 +2,10 @@ import { emailLayout, detailTable, callout, button, steps, paragraph, esc } from
 
 export const APP_URL = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
-const FROM = "תורי-אונליין <noreply@torionline.com>";
+// Display name only — the address is unchanged, so nothing about DNS, SPF/DKIM or Resend's domain
+// verification is affected. It is the single sender for every message the product sends, including
+// the cold outreach in leadfinder, which is why it lives here rather than at each call site.
+const FROM = "מערכת תורי-אונליין <noreply@torionline.com>";
 
 async function resendSend(payload: {
   from: string;
