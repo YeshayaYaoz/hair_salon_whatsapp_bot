@@ -196,12 +196,18 @@ function VoicePhoneSection() {
   // One approval request per visit. Every click on the trial path emails the operator, and a
   // second click adds a duplicate to their inbox, not information.
   const [requested, setRequested] = useState(false);
+  // Whether Tori has ever ordered a number for this business — NOT whether the field below has a
+  // value. Connecting WhatsApp copies the WhatsApp number into voicePhoneNumber automatically
+  // (businessRoutes.ts), so gating the offer on "the field is empty" hid it from every business
+  // that finished onboarding — which is all of them. This column is set only by an actual order.
+  const [hasOrdered, setHasOrdered] = useState(true); // assume yes until loaded: never offer on a guess
 
   useEffect(() => {
-    apiFetch<{ voicePhoneNumber?: string | null; subscriptionStatus?: string }>("/api/business/me").then((me) => {
+    apiFetch<{ voicePhoneNumber?: string | null; subscriptionStatus?: string; voiceNumberOrderedAt?: string | null }>("/api/business/me").then((me) => {
       setCurrent(me.voicePhoneNumber ?? null);
       setValue(me.voicePhoneNumber ?? "");
       setPaying(me.subscriptionStatus === "active");
+      setHasOrdered(Boolean(me.voiceNumberOrderedAt));
     }).catch((err) => {
       // The skeleton is a promise that content is coming. When the load failed it never is, and
       // the error line below the section is the honest replacement.
@@ -335,16 +341,20 @@ function VoicePhoneSection() {
       )}
       {error && <p className="text-red-600 text-xs mt-2">{error}</p>}
       {notice && <p className="text-green-700 text-xs mt-2">{notice}</p>}
-      {current === null && (
+      {current !== undefined && !hasOrdered && (
         <div className="mt-4 pt-4 border-t border-gray-100">
           <p className="text-xs text-gray-600 mb-2">
             {he
-              ? paying
-                ? "אין לכם מספר נפרד? אפשר להנפיק אחד עכשיו — הוא יחובר לבוט אוטומטית."
-                : "אין לכם מספר נפרד? אפשר לבקש אחד. עם מנוי פעיל המספר מונפק מיד, אחרת הבקשה עוברת לאישור."
-              : paying
-                ? "No separate line? Get one now — it is connected to the bot automatically."
-                : "No separate line? Request one. With an active subscription it is issued immediately, otherwise it goes for approval."}
+              ? current
+                ? "המספר שלמעלה הוא מספר הוואטסאפ שלכם. רוצים קו טלפון ייעודי שעונה רק לשיחות? אפשר להנפיק אחד — הוא יחובר לבוט אוטומטית."
+                : paying
+                  ? "אין לכם מספר נפרד? אפשר להנפיק אחד עכשיו — הוא יחובר לבוט אוטומטית."
+                  : "אין לכם מספר נפרד? אפשר לבקש אחד. עם מנוי פעיל המספר מונפק מיד, אחרת הבקשה עוברת לאישור."
+              : current
+                ? "The number above is your WhatsApp line. Want a dedicated line that only takes calls? We can issue one and connect it to the bot automatically."
+                : paying
+                  ? "No separate line? Get one now — it is connected to the bot automatically."
+                  : "No separate line? Request one. With an active subscription it is issued immediately, otherwise it goes for approval."}
           </p>
           <button
             type="button"

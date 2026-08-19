@@ -76,8 +76,12 @@ export async function provisionVoiceNumber(businessId: string): Promise<Provisio
     },
   });
 
-  if (business.voicePhoneNumber) {
-    throw new AlreadyHasNumberError(`${business.name} already has ${business.voicePhoneNumber}.`);
+  // Ordered, not merely populated. Connecting WhatsApp copies the WhatsApp number into
+  // voicePhoneNumber (businessRoutes.ts), so refusing on a non-empty field refused every business
+  // that finished onboarding — including the paying ones this whole path exists for. What must
+  // never happen twice is an ORDER, and voiceNumberOrderedAt is the column that records one.
+  if (business.voiceNumberOrderedAt) {
+    throw new AlreadyHasNumberError(`${business.name} has already been issued ${business.voicePhoneNumber ?? "a number"}.`);
   }
 
   if (!mayOrderNumber(business)) {
@@ -88,7 +92,7 @@ export async function provisionVoiceNumber(businessId: string): Promise<Provisio
   // Claim, then order. The conditional update is the lock: whichever request updates a row wins,
   // and the other sees count 0 without ever reaching the carrier.
   const claim = await prisma.business.updateMany({
-    where: { id: business.id, voiceNumberOrderedAt: null, voicePhoneNumber: null },
+    where: { id: business.id, voiceNumberOrderedAt: null },
     data: { voiceNumberOrderedAt: new Date() },
   });
   if (claim.count === 0) {
@@ -103,8 +107,13 @@ export async function provisionVoiceNumber(businessId: string): Promise<Provisio
   } catch (err) {
     // Released only on failure. On success it stays set forever — it is the record that this
     // business has had a number bought for it, which outlives the number itself.
+    //
+    // Guarded on the number being *unchanged* rather than null: the field may legitimately hold the
+    // WhatsApp number before any order, so "is it null" can no longer tell a failed order from a
+    // completed one. If a number was allocated and saved, the failure came after the charge and the
+    // claim must stand.
     await prisma.business.updateMany({
-      where: { id: business.id, voicePhoneNumber: null },
+      where: { id: business.id, voicePhoneNumber: business.voicePhoneNumber },
       data: { voiceNumberOrderedAt: null },
     });
     throw err;

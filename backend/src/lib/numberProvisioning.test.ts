@@ -96,7 +96,17 @@ describe("provisionVoiceNumber", () => {
     await provisionVoiceNumber("b1");
 
     const claim = mockPrisma.business.updateMany.mock.calls[0][0];
-    expect(claim.where).toMatchObject({ id: "b1", voiceNumberOrderedAt: null, voicePhoneNumber: null });
+    expect(claim.where).toMatchObject({ id: "b1", voiceNumberOrderedAt: null });
+  });
+
+  it("still offers a number when voicePhoneNumber holds the WhatsApp line", async () => {
+    // Connecting WhatsApp copies the WhatsApp number into voicePhoneNumber. Treating that as "already
+    // has a number" refused every business that finished onboarding — which is all of them.
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue(business({ voicePhoneNumber: "972501111111" }));
+
+    const result = await provisionVoiceNumber("b1");
+
+    expect(result).toEqual({ status: "ordered", number: "972559661420" });
   });
 
   it("refuses when another request already claimed the order", async () => {
@@ -109,8 +119,10 @@ describe("provisionVoiceNumber", () => {
     expect(orderNumber).not.toHaveBeenCalled();
   });
 
-  it("refuses when the business already has a number", async () => {
-    mockPrisma.business.findUniqueOrThrow.mockResolvedValue(business({ voicePhoneNumber: "972500000000" }));
+  it("refuses when a number was already ordered for the business", async () => {
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue(
+      business({ voicePhoneNumber: "972500000000", voiceNumberOrderedAt: new Date() })
+    );
 
     await expect(provisionVoiceNumber("b1")).rejects.toBeInstanceOf(AlreadyHasNumberError);
     expect(orderNumber).not.toHaveBeenCalled();
@@ -134,7 +146,7 @@ describe("provisionVoiceNumber", () => {
 
     const release = mockPrisma.business.updateMany.mock.calls.at(-1)![0];
     expect(release.data).toEqual({ voiceNumberOrderedAt: null });
-    // Guarded on voicePhoneNumber still being null, so a release can never undo a successful order.
+    // Guarded on the number being unchanged, so a release can never undo a successful order.
     expect(release.where).toMatchObject({ voicePhoneNumber: null });
   });
 
