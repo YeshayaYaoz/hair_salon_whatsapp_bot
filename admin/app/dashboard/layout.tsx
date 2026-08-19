@@ -450,7 +450,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   return (
     <AuthGuard>
-    <div className="flex min-h-screen" style={{ background: "#F4F6F8" }}>
+    {/* Plex overrides the body's Assistant for the whole dashboard subtree — the marketing
+        side persuades, this side is a tool, and they are allowed to sound different. */}
+    <div className="flex min-h-screen font-[family-name:var(--font-plex)]" style={{ background: "#F4F6F8" }}>
       {/* The sidebar is 17 links deep and comes first in the DOM, so without this a keyboard user
           tabbed through all of it before reaching page content — on every single navigation.
           Visually hidden until focused, which is the point: only keyboard users need it. */}

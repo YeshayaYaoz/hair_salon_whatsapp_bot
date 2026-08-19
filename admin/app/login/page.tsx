@@ -116,7 +116,7 @@ export default function LoginPage() {
           min-height: 100vh;
           display: grid;
           grid-template-columns: minmax(480px, 46%) 1fr;
-          font-family: var(--font-heebo), 'Segoe UI', system-ui, -apple-system, sans-serif;
+          font-family: var(--font-assistant), 'Segoe UI', system-ui, -apple-system, sans-serif;
         }
         @media (max-width: 900px) {
           .login-root { grid-template-columns: 1fr; }
