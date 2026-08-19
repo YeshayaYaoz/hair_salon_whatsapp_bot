@@ -69,14 +69,28 @@ describe("notifyOwner", () => {
     expect(sendWhatsAppMessage).not.toHaveBeenCalled();
   });
 
-  it("falls back to the business's email outside the window with no template", async () => {
-    // A free-form send here would 'succeed' at Meta's API and die in transit. The owner's answer
-    // to that, verbatim, was 'I want the messages' — so the alert arrives by email rather than
-    // being refused. Late beats never; a lead that arrives is a lead.
+  it("tries the default template outside the window when no env var names one", async () => {
+    // The submission side files tori_owner_alert on every business's WABA automatically at
+    // connect; reading the raw env var here meant that approved template sat unused until an
+    // operator ALSO set an env var, and every alert quietly took the slower email path.
     mockPrisma.conversationMessage.findFirst.mockResolvedValue(null);
     expect(await notifyOwner("biz1", "הודעה")).toBe(true);
+    expect(sendWhatsAppTemplate).toHaveBeenCalledWith(
+      expect.objectContaining({ templateName: "tori_owner_alert", bodyParams: ["הודעה"] })
+    );
     expect(sendWhatsAppMessage).not.toHaveBeenCalled();
-    expect(sendWhatsAppTemplate).not.toHaveBeenCalled();
+    expect(sendBusinessNoticeEmail).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the business's email when the template send fails", async () => {
+    // A business connected before auto-submission existed has no approved template — Meta rejects
+    // the send (132001). The owner's answer to a lost alert, verbatim, was 'I want the messages' —
+    // so it arrives by email rather than being refused. Late beats never; a lead that arrives is
+    // a lead.
+    mockPrisma.conversationMessage.findFirst.mockResolvedValue(null);
+    sendWhatsAppTemplate.mockRejectedValue(new Error("(#132001) Template name does not exist"));
+    expect(await notifyOwner("biz1", "הודעה")).toBe(true);
+    expect(sendWhatsAppMessage).not.toHaveBeenCalled();
     expect(sendBusinessNoticeEmail).toHaveBeenCalledWith("owner@zimmer.test", "בנחת רוח", "הודעה");
   });
 
@@ -86,6 +100,7 @@ describe("notifyOwner", () => {
     // liar: with RESEND_API_KEY unset it logged and returned, and an await over silence reads
     // exactly like success. Now it throws, and 'sent' means sent.
     mockPrisma.conversationMessage.findFirst.mockResolvedValue(null);
+    sendWhatsAppTemplate.mockRejectedValue(new Error("(#132001) Template name does not exist"));
     sendBusinessNoticeEmail.mockRejectedValue(new Error("RESEND_API_KEY is not set"));
     expect(await notifyOwner("biz1", "הודעה")).toBe(false);
   });
