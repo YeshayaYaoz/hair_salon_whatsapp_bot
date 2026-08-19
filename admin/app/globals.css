@@ -17,6 +17,24 @@
     --safe-l: env(safe-area-inset-left, 0px);
     --safe-r: env(safe-area-inset-right, 0px);
 
+    /* Motion curves, named once so the whole product moves the same way.
+
+       Everything here previously animated on `ease` — cubic-bezier(0.25, 0.1, 0.25, 1) — which
+       accelerates before it decelerates. That is the right shape for something moving between two
+       on-screen positions, and the wrong one for something arriving: the slow start reads as lag,
+       because the element hangs at its offset for the first few frames before committing. Every
+       major motion system (Material, Apple HIG, Carbon) says the same thing — entrances decelerate
+       only, exits accelerate only.
+
+       --ease-entrance starts at full speed and settles, so a card that fades up feels like it
+       lands rather than like it is being dragged. --ease-exit is its mirror for anything leaving.
+       --ease-spring overshoots slightly and is reserved for confirmations (a saved badge, a
+       success tick), where a little bounce reads as the interface being pleased with you — it is
+       deliberately not the default, since overshoot on ordinary content is noise. */
+    --ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-exit: cubic-bezier(0.7, 0, 0.84, 0);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
     /* How much of the bottom of the screen the mobile nav dock takes up, published by the dashboard
        layout from a real measurement (see the ResizeObserver there). It changes with the setup
        strip and the home-indicator inset, so page padding and the More sheet both read it rather
@@ -119,8 +137,8 @@
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
   }
-  .animate-fade-in { animation: fade-in 0.4s ease both; }
-  .animate-fade-up { animation: fade-up 0.4s ease both; }
+  .animate-fade-in { animation: fade-in 0.4s var(--ease-entrance) both; }
+  .animate-fade-up { animation: fade-up 0.4s var(--ease-entrance) both; }
 
   /* Slim, unobtrusive scrollbar for the dark sidebar nav (replaces the default OS scrollbar) */
   .sidebar-scroll {

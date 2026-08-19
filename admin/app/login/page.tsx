@@ -640,7 +640,7 @@ export default function LoginPage() {
               <div className="login-left-stat">
                 <div className="login-left-stat-icon">⚡</div>
                 <div className="login-left-stat-n">10<span>{he ? " דק׳" : " min"}</span></div>
-                <div className="login-left-stat-l">{he ? "עד שהבוט חי" : "until the bot is live"}</div>
+                <div className="login-left-stat-l">{he ? "עד שאתם באוויר" : "until you are live"}</div>
               </div>
               <div className="login-left-stat">
                 <div className="login-left-stat-icon">🎁</div>
@@ -652,7 +652,7 @@ export default function LoginPage() {
             <div className="login-left-highlights">
               {(he
                 ? [
-                    ["מבין עברית חופשית", " — בלי תפריטים ובלי מילות קסם"],
+                    ["מבין עברית רגילה", " — הלקוח כותב איך שבא לו"],
                     ["מסנכרן לגוגל קלנדר", " — כל תור, ברגע שנקבע"],
                     ["שולח תזכורות לבד", " — לפני כל תור, בלי שתזכרו"],
                   ]

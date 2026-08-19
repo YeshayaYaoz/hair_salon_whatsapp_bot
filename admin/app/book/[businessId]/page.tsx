@@ -8,7 +8,8 @@ import { formatDateTimeInTz, localeFor } from "../../lib/tz";
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 interface Service { id: string; name: string; description?: string; priceCents: number; durationMin: number }
-interface BusinessInfo { id: string; name: string; address?: string; timezone?: string; services: Service[] }
+interface BusinessHours { dayOfWeek: number; openMin: number; closeMin: number }
+interface BusinessInfo { id: string; name: string; address?: string; timezone?: string; services: Service[]; hours?: BusinessHours[] }
 interface Slot { startTime: string; endTime: string }
 
 type Step = "service" | "date" | "slot" | "details" | "done";
@@ -45,6 +46,8 @@ const COPY = {
     poweredBy: "מופעל על ידי",
     minutesShort: "דק׳",
     today: "היום",
+    accessibility: "הצהרת נגישות",
+    closed: "סגור",
   },
   en: {
     steps: ["Service", "Date", "Time", "Details"],
@@ -73,6 +76,8 @@ const COPY = {
     poweredBy: "Powered by",
     minutesShort: "min",
     today: "Today",
+    accessibility: "Accessibility statement",
+    closed: "Closed",
   },
 } as const;
 
@@ -136,6 +141,23 @@ export default function BookPage() {
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Weekdays the salon has no opening hours for. The public payload has always carried `hours` and
+  // this page has always ignored it, so a customer could pick a day the salon is simply never open
+  // — Saturday for most Israeli salons — wait for a request, and be told there is nothing, with no
+  // way to tell that from a day that merely happens to be full. Greying those out up front removes
+  // the most common dead end in the flow.
+  //
+  // Deliberately only weekly closures: holidays, vacations and one-off blocks live in other tables
+  // that this endpoint doesn't expose, so an enabled day still isn't a promise of availability —
+  // it just isn't a guaranteed dead end.
+  const closedDays = new Set(
+    info?.hours
+      ? Array.from({ length: 7 }, (_, day) => day).filter(
+          (day) => !info.hours!.some((h) => h.dayOfWeek === day && h.closeMin > h.openMin)
+        )
+      : []
+  );
+
   const [booked, setBooked] = useState<{
     startTime: string;
     service: string;
@@ -358,12 +380,24 @@ export default function BookPage() {
                   <button
                     key={offset}
                     onClick={() => pickDate(offset)}
-                    className="flex flex-col items-center py-2.5 rounded-xl border border-gray-200 hover:border-[#5BB8D4] hover:bg-[#E0F5FB] transition"
+                    disabled={closedDays.has(d.getDay())}
+                    aria-label={
+                      closedDays.has(d.getDay())
+                        ? `${d.toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" })} — ${c.closed}`
+                        : d.toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" })
+                    }
+                    className={
+                      closedDays.has(d.getDay())
+                        ? "flex flex-col items-center py-2.5 rounded-xl border border-dashed border-gray-200 bg-gray-50 cursor-not-allowed"
+                        : "flex flex-col items-center py-2.5 rounded-xl border border-gray-200 hover:border-[#5BB8D4] hover:bg-[#E0F5FB] transition"
+                    }
                   >
-                    <span className="text-gray-500 text-xs">
+                    <span className={closedDays.has(d.getDay()) ? "text-gray-400 text-xs" : "text-gray-500 text-xs"}>
                       {offset === 0 ? c.today : d.toLocaleDateString(locale, { weekday: "short" })}
                     </span>
-                    <span className="text-gray-800 font-semibold text-sm">{d.getDate()}</span>
+                    <span className={closedDays.has(d.getDay()) ? "text-gray-400 font-semibold text-sm line-through" : "text-gray-800 font-semibold text-sm"}>
+                      {d.getDate()}
+                    </span>
                   </button>
                 );
               })}
@@ -444,7 +478,16 @@ export default function BookPage() {
           </div>
         )}
 
-        <p className="text-center text-gray-500 text-[11px] mt-8">{c.poweredBy} <span className="font-semibold text-gray-500">תורי</span></p>
+        {/* The accessibility statement has to be reachable from the page it describes — a
+            statement nobody can find satisfies neither the regulation nor the person who needs
+            it. */}
+        <p className="text-center text-gray-500 text-[11px] mt-8">
+          <a href={`/book/${businessId}/accessibility`} className="hover:underline">
+            {c.accessibility}
+          </a>
+          <span className="mx-2 text-gray-400" aria-hidden="true">·</span>
+          {c.poweredBy} <span className="font-semibold text-gray-500">תורי</span>
+        </p>
       </div>
     </main>
   );

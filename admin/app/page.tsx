@@ -89,11 +89,36 @@ export default function LandingPage() {
   }, []);
 
 
-  // 3D scroll tilt on product mock
+  // 3D scroll tilt on product mock.
+  //
+  // Every one of the three scroll/pointer effects on this page used to read layout and write
+  // styles synchronously inside its own event handler. A scroll event can fire many times per
+  // frame, and each call here does getBoundingClientRect() (a forced layout flush, because the
+  // previous handler call just dirtied the style) and then writes transform and opacity — the
+  // textbook layout-thrash loop. That lands directly on INP, which is the most-failed Core Web
+  // Vital, a confirmed ranking signal, and an input to Google Ads' landing-page experience score.
+  //
+  // The fix throughout is the same: coalesce to one update per animation frame with a "ticking"
+  // latch, so the browser does at most one read/write pass per painted frame no matter how often
+  // the event fires.
   useEffect(() => {
     const el = tiltEl.current;
     if (!el) return;
-    function tick() {
+
+    // Someone who asked the OS to reduce motion should not get a 28-degree rotation driven by
+    // their scroll position. The global reduce-motion rule in globals.css can't help here — it
+    // neutralises CSS animations and transitions, and this is a direct style write. So opt out at
+    // the source and paint the settled state once.
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) {
+      el.style.transform = "none";
+      el.style.opacity = "1";
+      return;
+    }
+
+    let ticking = false;
+    function update() {
+      ticking = false;
       const rect = el!.getBoundingClientRect();
       const vh = window.innerHeight;
       const start = vh * 0.95;
@@ -104,9 +129,14 @@ export default function LandingPage() {
       el!.style.transform = `perspective(1500px) rotateX(${28 * (1 - ease)}deg) scale(${0.88 + 0.12 * ease})`;
       el!.style.opacity = String(0.55 + 0.45 * ease);
     }
-    window.addEventListener("scroll", tick, { passive: true });
-    tick();
-    return () => window.removeEventListener("scroll", tick);
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(update);
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    update();
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   // Scroll reveal
@@ -119,32 +149,98 @@ export default function LandingPage() {
     return () => obs.disconnect();
   }, []);
 
-  // Feature card 3D hover
+  // Feature card 3D hover.
+  //
+  // mousemove is the highest-frequency pointer event there is — it can fire well over 100 times a
+  // second on a high-polling mouse — and this handler read layout and wrote a transform on every
+  // single one. Same rAF latch as above, plus the card's own geometry is measured once on enter
+  // rather than on every move: it cannot change while the pointer is inside it.
   useEffect(() => {
+    // Skip entirely on touch and on reduced motion. A coarse pointer still emits a synthetic
+    // mousemove on tap, which left cards frozen mid-tilt with no pointer to leave and un-tilt
+    // them — the effect is designed for a hovering cursor and has nothing to offer without one.
+    if (
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+      window.matchMedia("(pointer: coarse)").matches
+    ) {
+      return;
+    }
+
     const cards = document.querySelectorAll<HTMLElement>(".lp-feat");
+    const rects = new WeakMap<HTMLElement, DOMRect>();
+    let frame = 0;
+    let pending: { card: HTMLElement; x: number; y: number } | null = null;
+
+    const flush = () => {
+      frame = 0;
+      if (!pending) return;
+      const { card, x, y } = pending;
+      pending = null;
+      card.style.transform = `perspective(700px) rotateX(${-y}deg) rotateY(${x}deg) translateZ(12px)`;
+    };
+
+    const enter = (e: Event) => {
+      const c = e.currentTarget as HTMLElement;
+      rects.set(c, c.getBoundingClientRect());
+    };
     const move = (e: MouseEvent) => {
       const c = e.currentTarget as HTMLElement;
-      const r = c.getBoundingClientRect();
-      const x = ((e.clientX - r.left) / r.width - 0.5) * 14;
-      const y = ((e.clientY - r.top) / r.height - 0.5) * 14;
-      c.style.transform = `perspective(700px) rotateX(${-y}deg) rotateY(${x}deg) translateZ(12px)`;
+      const r = rects.get(c) ?? c.getBoundingClientRect();
+      pending = {
+        card: c,
+        x: ((e.clientX - r.left) / r.width - 0.5) * 14,
+        y: ((e.clientY - r.top) / r.height - 0.5) * 14,
+      };
+      if (!frame) frame = requestAnimationFrame(flush);
     };
-    const leave = (e: MouseEvent) => { (e.currentTarget as HTMLElement).style.transform = ""; };
-    cards.forEach((c) => { c.addEventListener("mousemove", move); c.addEventListener("mouseleave", leave); });
-    return () => cards.forEach((c) => { c.removeEventListener("mousemove", move); c.removeEventListener("mouseleave", leave); });
+    const leave = (e: Event) => {
+      pending = null;
+      (e.currentTarget as HTMLElement).style.transform = "";
+    };
+
+    cards.forEach((c) => {
+      c.addEventListener("mouseenter", enter);
+      c.addEventListener("mousemove", move);
+      c.addEventListener("mouseleave", leave);
+    });
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      cards.forEach((c) => {
+        c.removeEventListener("mouseenter", enter);
+        c.removeEventListener("mousemove", move);
+        c.removeEventListener("mouseleave", leave);
+      });
+    };
   }, []);
 
-  // Scroll progress bar + sticky CTA
+  // Scroll progress bar + sticky CTA — same rAF latch as the tilt above.
   useEffect(() => {
     const bar = document.getElementById("scroll-bar");
     const stickyBtn = document.getElementById("sticky-cta");
-    const tick = () => {
-      const p = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight);
+    let ticking = false;
+    // Tracked so the sticky CTA's opacity is only written when it actually crosses the threshold,
+    // rather than assigning the same string on every frame of a long scroll.
+    let ctaShown: boolean | null = null;
+
+    const update = () => {
+      ticking = false;
+      const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+      const p = scrollable > 0 ? window.scrollY / scrollable : 0;
       if (bar) bar.style.width = `${Math.min(p * 100, 100)}%`;
-      if (stickyBtn) stickyBtn.style.opacity = window.scrollY > 400 ? "1" : "0";
+      const show = window.scrollY > 400;
+      if (stickyBtn && show !== ctaShown) {
+        ctaShown = show;
+        stickyBtn.style.opacity = show ? "1" : "0";
+      }
     };
-    window.addEventListener("scroll", tick, { passive: true });
-    return () => window.removeEventListener("scroll", tick);
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(update);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    update();
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   // Live booking notification toast
@@ -1217,14 +1313,13 @@ export default function LandingPage() {
               </svg>
               Cartesia Voice AI
             </div>
-            {/* Railway */}
-            <div className="lp-trust-item">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <rect width="24" height="24" rx="6" fill="#0B0D0E"/>
-                <path d="M5 18l3-12h3l-3 12H5zm6 0l3-12h3l-3 12h-3z" fill="white" opacity="0.9"/>
-              </svg>
-              Railway Cloud
-            </div>
+            {/* Railway Cloud was here. Removed rather than restyled: this strip is read by a salon
+                owner deciding whether to trust us with their appointment book, and which PaaS we
+                deploy on answers a question they have not asked and cannot evaluate. Every other
+                entry names something they either already use (WhatsApp, Google Calendar) or that
+                backs the product's central claim of real AI. Hosting is not a trust signal, it is
+                an implementation detail, and padding the row with one dilutes the entries that do
+                persuade. */}
             {/* OpenAI */}
             <div className="lp-trust-item">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -1254,7 +1349,7 @@ export default function LandingPage() {
                 "עונה ללקוחות בוואטסאפ 24/7",
                 "מסנכרן כל תור לגוגל קלנדר",
                 "שולח תזכורות אוטומטיות לפני כל תור",
-                "מבין עברית חופשית — בלי תפריטים",
+                "מבין עברית רגילה — בלי תפריטים",
                 "מנהל רשימת המתנה וממלא ביטולים",
                 "עונה גם לשיחות טלפון (פרמיום)",
               ];
@@ -1273,7 +1368,7 @@ export default function LandingPage() {
           <div className="lp-stats-band-inner">
             {[
               { n: 24, sup: "/7", l: "זמין גם כשאתה ישן — גם באמצע הלילה" },
-              { n: 10, sup: " דק׳", l: "מההרשמה ועד שהבוט חי ועונה" },
+              { n: 10, sup: " דק׳", l: "מההרשמה ועד שהבוט מתחיל לענות" },
               { n: 0,  sup: "₪", l: "עלות הכשרה לצוות — הכל אוטומטי" },
               { n: 14, sup: " יום", l: "ניסיון חינם, בלי כרטיס אשראי" },
             ].map((s, i) => (
@@ -1790,7 +1885,7 @@ export default function LandingPage() {
             <div className="lp-faq-list reveal">
               {[
                 { q: "האם הבוט מבין עברית טבעית?", a: "כן. הבוט מבוסס על Claude AI של Anthropic ומבין עברית טבעית לחלוטין — כולל ניבים, קיצורים ואיות לא מדויק. לא צריך ללמד את הלקוחות להקליד בצורה מיוחדת." },
-                { q: "כמה זמן לוקחת ההקמה?", a: "בממוצע 3–10 דקות. מתחברים לוואטסאפ Business, מוסיפים את השירותים ושעות הפתיחה, מחברים גוגל קלנדר — והבוט חי." },
+                { q: "כמה זמן לוקחת ההקמה?", a: "בממוצע 3–10 דקות. מתחברים לוואטסאפ Business, מוסיפים את השירותים ושעות הפתיחה, מחברים גוגל קלנדר — והבוט מתחיל לענות." },
                 { q: "האם הלקוחות יודעים שזה בוט?", a: "זה תלוי בך. ניתן להגדיר את הבוט כ-'עוזר חכם' של הסלון ולהגדיר את האישיות שלו. רוב הלקוחות לא מבחינים — אבל אפשר גם לציין את זה." },
                 { q: "מה קורה אם לקוח רוצה שירות שאין ברשימה?", a: "הבוט יגיד ללקוח שהשירות הזה אינו זמין להזמנה אוטומטית ויציע ליצור קשר ישיר. ניתן גם להוסיף תשובות FAQ מותאמות אישית לשאלות נפוצות." },
                 { q: "האם צריך להתקין אפליקציה כלשהי?", a: "לא. הכל עובד דרך הדפדפן — הדשבורד נגיש מכל מכשיר. הלקוחות שולחים הודעות דרך WhatsApp הרגיל שלהם." },

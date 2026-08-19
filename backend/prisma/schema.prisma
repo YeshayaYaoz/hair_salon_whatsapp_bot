@@ -181,6 +181,17 @@ model Business {
   quickReplies              String[]
   botPersonality            String? // tone/personality instructions for the bot
   googleMapsUrl             String? // linked in post-visit review requests
+  // Where someone who cannot use the booking page should write. Published on the business's own
+  // accessibility statement at /book/:id/accessibility.
+  //
+  // Israeli law (reg. 35 of the Equal Rights for Persons with Disabilities (Service Accessibility)
+  // Regulations, 2013) requires every business offering a service online to publish an
+  // accessibility statement naming a contact for accessibility matters — and that duty falls on
+  // the salon, not on us, because the salon is the one providing the service. Optional here
+  // because we cannot invent a contact on a business's behalf: with it unset the statement still
+  // publishes (which is better than nothing) but tells the visitor to contact the business
+  // directly, and the dashboard prompts the owner to fill it in.
+  accessibilityContact      String?
   remindersEnabled          Boolean   @default(true)
   reviewsEnabled            Boolean   @default(true)
   cancellationPolicy        String? // shown by the bot when a customer cancels

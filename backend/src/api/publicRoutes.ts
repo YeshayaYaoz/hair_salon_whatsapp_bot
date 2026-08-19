@@ -60,6 +60,9 @@ publicRouter.get("/:businessId", async (req, res) => {
     // The booking page renders slot times, and a customer browsing from another timezone would
     // otherwise see them shifted by the offset — same reasoning as admin/app/lib/tz.ts.
     timezone: business.timezone,
+    // Published on this business's accessibility statement. Deliberately part of the public
+    // payload: the statement is a public document, and a contact nobody can reach defeats it.
+    accessibilityContact: business.accessibilityContact,
     services: business.services.map((s) => ({
       id: s.id,
       name: s.name,
