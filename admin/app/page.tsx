@@ -1385,40 +1385,46 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* TRUST BAR */}
+        {/* TRUST BAR
+            Three platforms, each one something the owner already has an account with and connects
+            to Tori themselves — which is what makes a strip like this persuasive rather than
+            decorative. All three are real integrations, not logo padding: Google covers Calendar
+            sync, sign-in and Business Profile; WhatsApp is the product; and Facebook is not a
+            courtesy mention but the actual path — every WhatsApp call goes to graph.facebook.com,
+            and connecting a number runs through Meta's Embedded Signup with a Facebook Business
+            login. This strip has twice carried vendors the product does not run on (ElevenLabs,
+            Twilio) and once carried our own suppliers, so the bar for adding a logo here is that a
+            salon owner touches it. */}
         <div className="lp-trust">
           <span className="lp-trust-label">עובד עם</span>
           <div className="lp-trust-items">
-            {/* WhatsApp */}
-            <div className="lp-trust-item">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <rect width="24" height="24" rx="6" fill="#25D366"/>
-                <path d="M12 4a8 8 0 00-6.93 11.99L4 20l4.13-1.08A8 8 0 1012 4zm4.14 10.9c-.18.5-.88.96-1.47 1.08-.4.08-.92.14-2.68-.57-2.25-.9-3.7-3.17-3.81-3.32-.1-.14-.84-1.12-.84-2.14 0-1.01.53-1.51.72-1.72.18-.2.4-.25.53-.25h.38c.12 0 .28-.04.44.34l.62 1.5c.06.14.1.3.02.44l-.23.37-.3.35c-.1.1-.2.22-.09.43.12.2.53.87 1.14 1.41.78.7 1.45.91 1.65 1.01.2.1.31.08.43-.05l.49-.58c.12-.14.24-.1.4-.04l1.43.67c.2.1.34.14.39.23.05.1.05.55-.13 1.03z" fill="white"/>
-              </svg>
-              WhatsApp Business API
-            </div>
             {/* Google */}
             <div className="lp-trust-item">
-              <svg width="20" height="20" viewBox="0 0 24 24">
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
                 <rect width="24" height="24" rx="6" fill="#fff" stroke="#E8E8E8"/>
                 <path d="M21.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                 <path d="M12 22c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 19.53 7.7 22 12 22z" fill="#34A853"/>
                 <path d="M5.84 13.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V6.07H2.18C1.43 7.55 1 9.22 1 11s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
                 <path d="M12 4.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 1.09 14.97 0 12 0 7.7 0 3.99 2.47 2.18 6.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
               </svg>
-              Google Calendar
+              Google
             </div>
-            {/* The model and voice vendors that used to sit here — Claude, Cartesia, OpenAI — are
-                gone, as is a hosting provider before them. Three reasons, and only the first is
-                taste. It names our supply chain to a salon owner who never asked and cannot
-                evaluate it. It invites the one objection this product least wants raised: "so why
-                wouldn't I just use that myself?". And it pins us publicly to vendors we swap
-                freely — the bot's provider is already a per-business setting.
-
-                What remains is the pair the buyer connects their own accounts to, which is the only
-                thing on this strip that was ever doing persuasive work. Which models run
-                underneath is disclosed where it belongs and is legally required: the privacy
-                policy's sub-processor list. */}
+            {/* Facebook */}
+            <div className="lp-trust-item">
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                <rect width="24" height="24" rx="6" fill="#1877F2"/>
+                <path d="M15.85 12.55l.42-2.73h-2.62V8.05c0-.75.37-1.48 1.54-1.48h1.19V4.25s-1.08-.19-2.11-.19c-2.16 0-3.56 1.31-3.56 3.67v2.09H8.3v2.73h2.41V19h2.94v-6.45h2.2z" fill="#fff"/>
+              </svg>
+              Facebook
+            </div>
+            {/* WhatsApp */}
+            <div className="lp-trust-item">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <rect width="24" height="24" rx="6" fill="#25D366"/>
+                <path d="M12 4a8 8 0 00-6.93 11.99L4 20l4.13-1.08A8 8 0 1012 4zm4.14 10.9c-.18.5-.88.96-1.47 1.08-.4.08-.92.14-2.68-.57-2.25-.9-3.7-3.17-3.81-3.32-.1-.14-.84-1.12-.84-2.14 0-1.01.53-1.51.72-1.72.18-.2.4-.25.53-.25h.38c.12 0 .28-.04.44.34l.62 1.5c.06.14.1.3.02.44l-.23.37-.3.35c-.1.1-.2.22-.09.43.12.2.53.87 1.14 1.41.78.7 1.45.91 1.65 1.01.2.1.31.08.43-.05l.49-.58c.12-.14.24-.1.4-.04l1.43.67c.2.1.34.14.39.23.05.1.05.55-.13 1.03z" fill="white"/>
+              </svg>
+              WhatsApp
+            </div>
           </div>
         </div>
 
