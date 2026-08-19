@@ -101,13 +101,9 @@ export function NumberProvisionOffer({
         setHasOrdered(true);
         onProvisioned?.(result.number);
         setNotice(
-          context === "whatsapp"
-            ? he
-              ? `המספר ${shown} שלכם. עכשיו אפשר להתחיל את חיבור הוואטסאפ ולהשתמש בו.`
-              : `${shown} is yours. You can now start the WhatsApp connection and use it there.`
-            : he
-              ? `המספר ${shown} הונפק וחובר.`
-              : `Number ${shown} is live.`
+          he
+            ? `המספר ${shown} שלכם. אנחנו מחברים אותו לוואטסאפ בשבילכם — זה לוקח כמה דקות, אין צורך לעשות כלום. עמוד הוואטסאפ יראה את ההתקדמות.`
+            : `${shown} is yours. We're connecting it to WhatsApp for you — it takes a few minutes and needs nothing from you. The WhatsApp page shows the progress.`
         );
         return;
       }

@@ -10,6 +10,7 @@ import { captureError } from "../lib/errorMonitoring.js";
 import { syncWhatsAppProfileInBackground } from "../lib/whatsappProfile.js";
 import { pointNumberAtCartesia, ZadarmaNotConfiguredError } from "../lib/zadarmaAdmin.js";
 import { provisionVoiceNumber, listNumberChoices, AlreadyHasNumberError } from "../lib/numberProvisioning.js";
+import { startWhatsAppAutoSetup } from "../lib/whatsappAutoSetup.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import { requireActiveSubscription } from "../lib/subscriptionGate.js";
 import { getAuthUrl, saveGoogleTokens, disconnectGoogleCalendar, deleteCalendarEvent, GoogleCalendarNotConfiguredError } from "../lib/googleCalendar.js";
@@ -1147,6 +1148,11 @@ businessRouter.post("/me/voice-phone/provision", async (req: AuthedRequest, res)
         message: "הבקשה נשלחה לאישור ונחזור אליכם. עם מנוי פעיל המספר מונפק מיד.",
       });
     }
+    // The number is theirs — now get it onto WhatsApp without them doing anything. Fire-and-forget:
+    // the run spans a real phone call (Meta calls the number, the agent answers, the recording is
+    // transcribed) and belongs to no HTTP request. Progress lands on the business row and the
+    // WhatsApp page shows it.
+    startWhatsAppAutoSetup(req.businessId!);
     return res.json({ status: "ordered", number: result.number });
   } catch (err) {
     if (err instanceof AlreadyHasNumberError) {

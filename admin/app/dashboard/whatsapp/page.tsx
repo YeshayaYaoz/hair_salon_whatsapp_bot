@@ -141,6 +141,10 @@ const META_CONFIG_ID = process.env.NEXT_PUBLIC_META_CONFIG_ID || "10139018013881
 export default function WhatsAppPage() {
   const { t, lang } = useLanguage();
   const [connected, setConnected] = useState(false);
+  // Progress of the server-side setup for a number Tori issued (see backend whatsappAutoSetup):
+  // null = not running / not such a business.
+  const [autoSetup, setAutoSetup] = useState<string | null>(null);
+  const [autoSetupError, setAutoSetupError] = useState<string | null>(null);
   const [tokenValid, setTokenValid] = useState(true);
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
   const [sdkReady, setSdkReady] = useState(false);
@@ -252,10 +256,22 @@ export default function WhatsAppPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    apiFetch<{ whatsappConnected: boolean; whatsappTokenValid?: boolean; whatsappPhoneNumberId?: string }>("/api/business/me").then((me) => {
-      setConnected(me.whatsappConnected);
-      setTokenValid(me.whatsappTokenValid !== false);
-    });
+    let stopped = false;
+    const load = () =>
+      apiFetch<{ whatsappConnected: boolean; whatsappTokenValid?: boolean; whatsappPhoneNumberId?: string; whatsappAutoSetupState?: string | null; whatsappAutoSetupError?: string | null }>("/api/business/me").then((me) => {
+        if (stopped) return;
+        setConnected(me.whatsappConnected);
+        setTokenValid(me.whatsappTokenValid !== false);
+        setAutoSetup(me.whatsappAutoSetupState ?? null);
+        setAutoSetupError(me.whatsappAutoSetupError ?? null);
+        // The automatic setup runs on the server for minutes; while it does, this page is the
+        // progress view, so it keeps itself current instead of asking the owner to refresh.
+        if (me.whatsappAutoSetupState && !["done", "failed"].includes(me.whatsappAutoSetupState)) {
+          setTimeout(load, 15_000);
+        }
+      });
+    load();
+    return () => { stopped = true; };
   }, []);
 
   // Listen for Meta's Embedded Signup postMessage — carries waba_id/phone_number_id directly,
@@ -563,7 +579,36 @@ export default function WhatsAppPage() {
           </div>
         )}
 
-        {(!connected || !tokenValid) && (
+        {/* While the server is connecting a number we issued, this page is a progress view — the
+            connect button would start a second, conflicting path, so it is replaced, not joined. */}
+        {autoSetup && !["done", "failed"].includes(autoSetup) && !connected ? (
+          <div className="bg-[#F2F9FC] border border-[#CFE7F1] rounded-xl px-4 py-3 mt-3 max-w-md">
+            <div className="flex items-center gap-2.5">
+              <svg className="animate-spin w-4 h-4 text-[#1B7FA0] shrink-0" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+              <p className="text-sm font-semibold text-[#136B87]">
+                {lang === "he" ? "מחברים את המספר שלכם לוואטסאפ" : "Connecting your number to WhatsApp"}
+              </p>
+            </div>
+            <p className="text-xs text-gray-600 mt-1.5 leading-relaxed">
+              {lang === "he"
+                ? "אנחנו מעבירים את המספר את תהליך האימות של מטא בשבילכם. זה לוקח כמה דקות — אין צורך לעשות כלום, העמוד יתעדכן לבד."
+                : "We're taking the number through Meta's verification for you. It takes a few minutes — nothing to do, this page updates itself."}
+            </p>
+          </div>
+        ) : null}
+        {autoSetup === "failed" && !connected && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mt-3 max-w-md">
+            <p className="text-sm font-semibold text-amber-800">
+              {lang === "he" ? "החיבור האוטומטי נעצר" : "Automatic connection stopped"}
+            </p>
+            <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+              {lang === "he"
+                ? "קיבלנו התראה ואנחנו מטפלים בזה — נשלים את החיבור בשבילכם וניצור קשר אם יידרש משהו."
+                : "We've been alerted and are on it — we'll finish the connection for you and reach out if anything is needed."}
+            </p>
+          </div>
+        )}
+        {(!connected || !tokenValid) && !(autoSetup && !["done", "failed"].includes(autoSetup)) && (
           <>
             <p className="text-sm text-gray-600 leading-relaxed mt-3 mb-4 max-w-md">
               {lang === "he"

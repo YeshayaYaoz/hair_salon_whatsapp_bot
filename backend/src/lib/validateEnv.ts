@@ -39,6 +39,8 @@ const RECOMMENDED: RequiredVar[] = [
   { name: "APP_URL", description: "public base URL used in every emailed link (password reset, email verification, trial signup) — without it links fall back to localhost and are unusable" },
   { name: "TORI_OUTREACH_PHONE_NUMBER_ID", description: "Tori's own WABA for Lead Finder WhatsApp broadcasts — the whatsapp broadcast channel fails at send time without it" },
   { name: "TORI_OUTREACH_ACCESS_TOKEN", description: "access token for Tori's own outreach WABA (Lead Finder WhatsApp broadcasts)" },
+  { name: "TORI_WABA_ID", description: "Tori's own WABA — the automatic WhatsApp setup puts a provisioned number on it; without it every number order ends in the 'auto-setup failed' email and a manual workflow run" },
+  { name: "META_SYSTEM_USER_TOKEN", description: "system-user token for Tori's own Meta business — drives the automatic WhatsApp setup (add/verify/register) for provisioned numbers" },
   { name: "WHATSAPP_OWNER_ALERT_TEMPLATE", description: "Meta-approved UTILITY template (one {{1}} body variable) for owner alerts when the owner's own 24h window is closed — without it those alerts fall back to the business's own email rather than silently dying in transit on WhatsApp (error 131047), which makes RESEND_API_KEY the only thing carrying them" },
   { name: "TORI_VOICE_IDS", description: "comma-separated ids of the two agent voices (masculine, feminine) — without it the Bot page offers every Hebrew voice, including ones no deployed agent speaks in" },
   { name: "OUTREACH_REPLY_TO", description: "mailbox that receives replies and opt-out requests to cold outreach email — the email broadcast channel refuses to send without it" },
