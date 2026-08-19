@@ -30,6 +30,63 @@ function Icon({ name, size = 20 }: { name: string; size?: number }) {
   );
 }
 
+/* The page's three band colours, named once so the sections and the nine wave dividers between
+   them can never drift apart — every wave takes the colour of the section above it as its own
+   background and the colour of the section below it as its fill, so a hex changed in one place and
+   not the other shows up as a visible seam.
+
+   INK replaces a flat #0A0A0A. Pure black was never a brand colour here: the login panel, the
+   legal pages and the dashboard's own dark surfaces all use #0D2A38, a deep blue-green, so the
+   landing page was the one surface in the product going full black. #0C1D26 sits in that family —
+   still reads as "dark band", but as a deliberate colour rather than an absence of one, and the
+   transition into and out of it is softer because it shares the page's hue.
+
+   ALT likewise moves off a neutral #F8F8F8 onto #F5F8FA, which is the same faint cool tint the
+   dashboard already uses for its body background. */
+const INK = "#0C1D26";
+const ALT = "#F5F8FA";
+const PAPER = "#ffffff";
+
+/* One wave period is 1440 units wide. The path is drawn twice, the second copy with every control
+   point shifted by +1440, so the shape tiles seamlessly — which is what lets the whole SVG drift
+   sideways by exactly one period and loop with no visible jump. */
+const WAVE_PATHS = {
+  crest: "M0,32 C360,64 1080,0 1440,32 C1800,64 2520,0 2880,32 L2880,64 L0,64 Z",
+  trough: "M0,32 C360,0 1080,64 1440,32 C1800,0 2520,64 2880,32 L2880,64 L0,64 Z",
+  wide: "M0,32 C480,64 960,0 1440,32 C1920,64 2400,0 2880,32 L2880,64 L0,64 Z",
+  wideTrough: "M0,32 C480,0 960,64 1440,32 C1920,0 2400,64 2880,32 L2880,64 L0,64 Z",
+} as const;
+
+/**
+ * A section divider. Two copies of the same wave drift in opposite directions at different speeds,
+ * the back one at reduced opacity and lifted a few pixels — enough parallax that the boundary
+ * reads as moving water rather than as a static shape, without any of it asking to be looked at.
+ *
+ * Runs entirely on a compositor-friendly transform, so the motion costs nothing on the main thread,
+ * and stops completely under prefers-reduced-motion.
+ */
+function Wave({
+  top,
+  bottom,
+  shape = "crest",
+}: {
+  top: string;
+  bottom: string;
+  shape?: keyof typeof WAVE_PATHS;
+}) {
+  const d = WAVE_PATHS[shape];
+  return (
+    <div className="wave" style={{ background: top }} aria-hidden="true">
+      <svg className="wave-layer wave-back" viewBox="0 0 2880 64" preserveAspectRatio="none">
+        <path d={d} fill={bottom} />
+      </svg>
+      <svg className="wave-layer wave-front" viewBox="0 0 2880 64" preserveAspectRatio="none">
+        <path d={d} fill={bottom} />
+      </svg>
+    </div>
+  );
+}
+
 export default function LandingPage() {
   const tiltEl = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -387,6 +444,40 @@ export default function LandingPage() {
           font-family: var(--font-heebo), 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
           direction: rtl; -webkit-font-smoothing: antialiased; overflow-x: hidden;
         }
+
+        /* ── DISPLAY TYPE ──────────────────────────────────────────────────────────
+           Karantina was being downloaded on every page load and used by absolutely nothing. That
+           was both a wasted font request and a missing voice: with only Heebo on the page, a 62px
+           headline and a 16px paragraph were the same typeface at different sizes, which is size
+           hierarchy, not typographic hierarchy.
+
+           Karantina is a condensed display face, so it needs the opposite treatment to Heebo here:
+           the negative tracking those headings carried was compensating for Heebo's width and
+           would crush an already-narrow face, and because Karantina sets optically smaller at the
+           same size, each heading is scaled up to hold the same weight on the page. It also tops
+           out at 700, so the 800s become 700 rather than being synthetically emboldened.
+
+           Deliberately NOT applied to prices, stat numbers or the ROI figure. Two reasons, one
+           aesthetic and one functional: the numbers are the page's factual claims and read as more
+           trustworthy in a neutral face, and the stat band animates its counters — a display face
+           without tabular figures would make those digits jitter in width as they count up. So the
+           page ends up with two deliberate voices: editorial for the argument, neutral for the
+           evidence. */
+        /* Selectors are scoped under .lp purely for specificity: the original single-class rules
+           for these headings appear LATER in this stylesheet, so at equal specificity they would
+           win on source order and every override below would silently do nothing. */
+        .lp .lp-h1, .lp .lp-title, .lp .lp-cta-title, .lp .lp-premium-title {
+          font-family: var(--font-karantina), var(--font-heebo), 'Segoe UI', sans-serif;
+          font-weight: 700;
+          letter-spacing: 0;
+          /* Keeps a Hebrew heading from dropping a single orphan word onto its own line, which is
+             far more visually disruptive in a condensed face than in Heebo. */
+          text-wrap: balance;
+        }
+        .lp .lp-h1 { font-size: clamp(46px, 5.8vw, 80px); line-height: 1.0; }
+        .lp .lp-title { font-size: clamp(36px, 4.4vw, 56px); line-height: 1.05; }
+        .lp .lp-cta-title { font-size: clamp(36px, 5.6vw, 70px); line-height: 1.0; }
+        .lp .lp-premium-title { font-size: clamp(36px, 3.8vw, 54px); line-height: 1.05; }
         #scroll-bar { position: fixed; top: var(--safe-t); left: 0; height: 2px; background: #25D366; z-index: 9999; width: 0; transition: width 0.05s linear; }
 
         /* STICKY CTA */
@@ -579,11 +670,30 @@ export default function LandingPage() {
         .btn-outline:hover { border-color: #aaa; background: #FAFAFA; transform: translateY(-1px); }
 
         /* WAVE DIVIDERS */
-        .wave { line-height: 0; display: block; }
+        /* Two copies of the wave, drifting in opposite directions at different speeds. The SVG is
+           twice the container's width and holds two identical periods, so translating it by exactly
+           -50% lands period two where period one started — the loop has no seam and needs no JS.
+
+           Only the transform property animates, so this runs on the compositor and never touches layout or the
+           main thread; nine of them cost nothing. The back layer is lifted 5px and dimmed, so its
+           crest breaks the surface of the front one at a shifting offset and the boundary reads as
+           depth rather than as a single printed shape. */
+        .wave { line-height: 0; display: block; position: relative; height: 64px; overflow: hidden; }
+        .wave-layer { position: absolute; left: 0; bottom: 0; width: 200%; height: 64px; display: block; }
+        .wave-front { animation: wave-drift 22s linear infinite; }
+        .wave-back { opacity: 0.42; transform: translateY(-5px); animation: wave-drift-back 34s linear infinite; }
+        @keyframes wave-drift { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        @keyframes wave-drift-back {
+          from { transform: translateX(-50%) translateY(-5px); }
+          to { transform: translateX(0) translateY(-5px); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .wave-front, .wave-back { animation: none; }
+        }
         .wave svg { display: block; width: 100%; }
 
         /* MARQUEE */
-        .lp-marquee { background: #0A0A0A; padding: 16px 0; overflow: hidden; }
+        .lp-marquee { background: ${INK}; padding: 16px 0; overflow: hidden; }
         .marquee-track { display: flex; gap: 0; animation: marquee-scroll 28s linear infinite; white-space: nowrap; width: max-content; }
         .marquee-track:hover { animation-play-state: paused; }
         @keyframes marquee-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
@@ -592,7 +702,7 @@ export default function LandingPage() {
         .marquee-item strong { color: rgba(255,255,255,0.9); }
 
         /* 3D PRODUCT */
-        .lp-3d-wrap { background: #F8F8F8; padding: 0 24px 100px; overflow: hidden; }
+        .lp-3d-wrap { background: ${ALT}; padding: 0 24px 100px; overflow: hidden; }
         .lp-3d-inner { max-width: 1000px; margin: 0 auto; will-change: transform, opacity; transform-origin: center top; transform: perspective(1500px) rotateX(28deg) scale(0.88); opacity: 0.55; }
         .mock { background: #18181B; border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 40px 100px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.04); direction: ltr; }
         .mock-titlebar { background: #111; padding: 14px 20px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.07); direction: ltr; }
@@ -640,7 +750,7 @@ export default function LandingPage() {
         .lp-title { font-size: clamp(28px, 3.5vw, 44px); font-weight: 800; letter-spacing: -1.5px; color: #0A0A0A; margin-bottom: 56px; line-height: 1.1; }
 
         /* STATS BAND */
-        .lp-stats-band { background: #0A0A0A; padding: 72px 40px; }
+        .lp-stats-band { background: ${INK}; padding: 72px 40px; }
         .lp-stats-band-inner { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
         .lp-stat-cell { padding: 48px 36px; background: #141414; border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; }
         /* direction:ltr, on an RTL page: the number is built from two spans (count-up + suffix), and
@@ -673,7 +783,7 @@ export default function LandingPage() {
         @keyframes ping { 0% { transform: scale(1); opacity: 1; } 75%,100% { transform: scale(2.2); opacity: 0; } }
 
         /* HOW IT WORKS */
-        .lp-steps { padding: 100px 40px; max-width: 1080px; margin: 0 auto; background: #F8F8F8; }
+        .lp-steps { padding: 100px 40px; max-width: 1080px; margin: 0 auto; background: ${ALT}; }
         .lp-steps-grid { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid #E8E8E8; border-radius: 14px; overflow: hidden; }
         .lp-step { padding: 40px 34px; background: #fff; border-left: 1px solid #EBEBEB; transition: background 0.2s; }
         .lp-step:hover { background: #FAFAFA; }
@@ -683,7 +793,7 @@ export default function LandingPage() {
         .lp-step-desc { font-size: 16px; color: #666; line-height: 1.7; }
 
         /* FEATURES */
-        .lp-features { background: #F8F8F8; padding: 100px 40px; }
+        .lp-features { background: ${ALT}; padding: 100px 40px; }
         .lp-features-inner { max-width: 1080px; margin: 0 auto; }
         .lp-feats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 52px; }
         .lp-feat { background: #fff; border: 1px solid #E8E8E8; border-radius: 12px; padding: 28px 24px; transition: transform 0.18s ease, box-shadow 0.18s ease; cursor: default; transform-style: preserve-3d; }
@@ -707,7 +817,7 @@ export default function LandingPage() {
         .lp-testi-role { font-size: 12px; color: #6B6B6B; }
 
         /* BEFORE/AFTER */
-        .lp-ba { background: #0A0A0A; padding: 100px 40px; }
+        .lp-ba { background: ${INK}; padding: 100px 40px; }
         .lp-ba-inner { max-width: 1080px; margin: 0 auto; }
         .lp-ba .lp-label { color: #D97706; }
         .lp-ba .lp-title { color: #fff; }
@@ -732,7 +842,7 @@ export default function LandingPage() {
         .after .lp-ba-bullet { color: #4ADE80; }
 
         /* PREMIUM */
-        .lp-premium { background: #0A0A0A; padding: 100px 40px; position: relative; overflow: hidden; }
+        .lp-premium { background: ${INK}; padding: 100px 40px; position: relative; overflow: hidden; }
         .lp-premium::before { content: ''; position: absolute; top: -120px; right: -120px; width: 500px; height: 500px; border-radius: 50%; background: radial-gradient(circle, rgba(245,158,11,0.06) 0%, transparent 70%); pointer-events: none; }
         .lp-premium-inner { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
         .lp-premium-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.25); color: #F59E0B; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 20px; margin-bottom: 18px; letter-spacing: 0.08em; text-transform: uppercase; }
@@ -774,7 +884,7 @@ export default function LandingPage() {
         .lp-pricing-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 52px; }
         .lp-plan { border-radius: 16px; padding: 36px; border: 1px solid #E8E8E8; position: relative; transition: box-shadow 0.2s; }
         .lp-plan:hover { box-shadow: 0 16px 48px rgba(0,0,0,0.08); }
-        .lp-plan.featured { border-color: #111; background: #0A0A0A; }
+        .lp-plan.featured { border-color: #111; background: ${INK}; }
         .lp-plan-tag { position: absolute; top: -12px; right: 28px; background: #0F8043; color: #fff; font-size: 11px; font-weight: 700; padding: 3px 12px; border-radius: 20px; letter-spacing: 0.05em; }
         .lp-plan.featured .lp-plan-tag { background: #F59E0B; color: #000; }
         .lp-plan-name { font-size: 14px; font-weight: 700; color: #111; margin-bottom: 8px; letter-spacing: -0.2px; }
@@ -816,7 +926,7 @@ export default function LandingPage() {
         .lp-demo-input button:hover { background: #20c45a; transform: scale(1.05); }
         @media (max-width: 900px) { .lp-demo { padding: 72px 20px; } }
 
-        .lp-roi { padding: 100px 40px; background: #0A0A0A; }
+        .lp-roi { padding: 100px 40px; background: ${INK}; }
         .lp-roi-inner { max-width: 640px; margin: 0 auto; text-align: center; }
         .lp-roi .lp-label { color: #F59E0B; }
         .lp-roi .lp-title { color: #fff; margin-bottom: 44px; }
@@ -865,7 +975,7 @@ export default function LandingPage() {
         .lp-roi-note strong { color: rgba(255,255,255,0.7); }
 
         /* FAQ */
-        .lp-faq { padding: 100px 40px; background: #F8F8F8; }
+        .lp-faq { padding: 100px 40px; background: ${ALT}; }
         .lp-faq-inner { max-width: 720px; margin: 0 auto; }
         .lp-faq-list { display: flex; flex-direction: column; gap: 0; margin-top: 52px; border: 1px solid #E8E8E8; border-radius: 14px; overflow: hidden; }
         .faq-item { background: #fff; border-bottom: 1px solid #EBEBEB; }
@@ -887,7 +997,7 @@ export default function LandingPage() {
         .lp-cta-trust-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #747474; }
 
         /* FOOTER */
-        .lp-footer { background: #0A0A0A; padding: 64px 44px 36px; }
+        .lp-footer { background: ${INK}; padding: 64px 44px 36px; }
         .lp-footer-top { display: grid; grid-template-columns: 1.7fr 1fr 1fr 1.5fr; gap: 48px; margin-bottom: 44px; align-items: start; max-width: 1200px; }
         .lp-footer-brand-block { max-width: 300px; }
         .lp-footer-logo-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
@@ -910,8 +1020,37 @@ export default function LandingPage() {
         /* ANIMATIONS */
         @keyframes fadeUp { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
         @keyframes fadeDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
-        .reveal { opacity: 0; transform: translateY(22px); transition: opacity 0.6s ease, transform 0.6s ease; }
+        .reveal { opacity: 0; transform: translateY(22px); transition: opacity 0.6s var(--ease-entrance), transform 0.6s var(--ease-entrance); }
         .reveal.in { opacity: 1; transform: none; }
+
+        /* Scroll-driven reveals, where the browser supports them.
+           animation-timeline: view() ties an animation's progress to the element's own passage
+           through the viewport, so the reveal is driven by the compositor with no JavaScript, no
+           IntersectionObserver callback, and no main-thread work per element — and it scrubs, so
+           scrolling back up un-reveals instead of leaving everything permanently on.
+
+           Wrapped in @supports so this is purely additive: browsers without it keep the existing
+           observer path exactly as it was, and the observer still runs everywhere (it is harmless
+           here — a running animation with a both-fill outranks the class it toggles). Also gated on
+           no-preference, so reduced-motion users get the settled state and nothing moves. */
+        @supports (animation-timeline: view()) {
+          @media (prefers-reduced-motion: no-preference) {
+            .reveal {
+              animation: reveal-rise linear both;
+              animation-timeline: view();
+              animation-range: entry 0% entry 55%;
+            }
+            /* The stagger classes shift each card's range instead of its transition-delay, so a
+               row of three still arrives in sequence rather than all at once. */
+            .reveal.d1, .reveal.d4 { animation-range: entry 4% entry 58%; }
+            .reveal.d2, .reveal.d5 { animation-range: entry 9% entry 64%; }
+            .reveal.d3, .reveal.d6 { animation-range: entry 14% entry 70%; }
+          }
+        }
+        @keyframes reveal-rise {
+          from { opacity: 0; transform: translateY(22px); }
+          to { opacity: 1; transform: none; }
+        }
         .reveal.d1 { transition-delay: 0.08s; } .reveal.d2 { transition-delay: 0.16s; } .reveal.d3 { transition-delay: 0.24s; }
         .reveal.d4 { transition-delay: 0.08s; } .reveal.d5 { transition-delay: 0.16s; } .reveal.d6 { transition-delay: 0.24s; }
 
@@ -1042,7 +1181,7 @@ export default function LandingPage() {
         .lp-compare { padding: 100px 40px; background: #fff; border-top: 1px solid #EBEBEB; }
         .lp-compare-inner { max-width: 860px; margin: 0 auto; }
         .compare-table { width: 100%; border-collapse: collapse; margin-top: 52px; border: 1px solid #E8E8E8; border-radius: 14px; overflow: hidden; }
-        .compare-table th { padding: 16px 20px; font-size: 13px; font-weight: 700; text-align: center; background: #F8F8F8; border-bottom: 1px solid #EBEBEB; }
+        .compare-table th { padding: 16px 20px; font-size: 13px; font-weight: 700; text-align: center; background: ${ALT}; border-bottom: 1px solid #EBEBEB; }
         .compare-table th:first-child { text-align: right; width: 44%; }
         .compare-table th.col-tori { background: #1D4ED8; color: #fff; }
         .compare-table th.col-tori .col-badge { display: inline-block; background: #fff; color: #1D4ED8; font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 20px; margin-right: 6px; letter-spacing: 0.04em; vertical-align: middle; }
@@ -1332,11 +1471,7 @@ export default function LandingPage() {
         </div>
 
         {/* WAVE: white → dark */}
-        <div className="wave" style={{ background: "#fff" }}>
-          <svg viewBox="0 0 1440 64" preserveAspectRatio="none" style={{ height: 64 }}>
-            <path d="M0,32 C360,64 1080,0 1440,32 L1440,64 L0,64 Z" fill="#0A0A0A"/>
-          </svg>
-        </div>
+        <Wave top={PAPER} bottom={INK} shape="crest" />
 
         {/* MARQUEE — facts about the product, not quotes. The previous version scrolled five-star
             reviews from people who don't exist; invented testimonials are both a legal exposure and
@@ -1384,11 +1519,7 @@ export default function LandingPage() {
         </div>
 
         {/* WAVE: dark → light */}
-        <div className="wave" style={{ background: "#0A0A0A" }}>
-          <svg viewBox="0 0 1440 64" preserveAspectRatio="none" style={{ height: 64 }}>
-            <path d="M0,32 C360,0 1080,64 1440,32 L1440,64 L0,64 Z" fill="#F8F8F8"/>
-          </svg>
-        </div>
+        <Wave top={INK} bottom={ALT} shape="trough" />
 
         {/* 3D PRODUCT PREVIEW */}
         <div className="lp-3d-wrap">
@@ -1497,7 +1628,7 @@ export default function LandingPage() {
         </section>
 
         {/* HOW IT WORKS */}
-        <div style={{ background: "#F8F8F8", borderTop: "1px solid #EBEBEB", borderBottom: "1px solid #EBEBEB", padding: "100px 40px" }}>
+        <div style={{ background: ALT, borderTop: "1px solid #EBEBEB", borderBottom: "1px solid #EBEBEB", padding: "100px 40px" }}>
           <div style={{ maxWidth: 1080, margin: "0 auto" }}>
             <div className="lp-label reveal">תהליך</div>
             <h2 className="lp-title reveal">3 צעדים, ואחרי זה הכל קורה לבד.</h2>
@@ -1558,11 +1689,7 @@ export default function LandingPage() {
         </section>
 
         {/* WAVE: light gray → dark */}
-        <div className="wave" style={{ background: "#F8F8F8" }}>
-          <svg viewBox="0 0 1440 64" preserveAspectRatio="none" style={{ height: 64 }}>
-            <path d="M0,32 C360,64 1080,0 1440,32 L1440,64 L0,64 Z" fill="#0A0A0A"/>
-          </svg>
-        </div>
+        <Wave top={ALT} bottom={INK} shape="crest" />
 
         {/* BEFORE / AFTER */}
         <section className="lp-ba">
@@ -1615,11 +1742,7 @@ export default function LandingPage() {
         </section>
 
         {/* WAVE: dark → white */}
-        <div className="wave" style={{ background: "#0A0A0A" }}>
-          <svg viewBox="0 0 1440 64" preserveAspectRatio="none" style={{ height: 64 }}>
-            <path d="M0,32 C360,0 1080,64 1440,32 L1440,64 L0,64 Z" fill="#fff"/>
-          </svg>
-        </div>
+        <Wave top={INK} bottom={PAPER} shape="trough" />
 
         {/* WHAT CHANGES DAY-TO-DAY — replaces a testimonial grid quoting five-star reviews from
             invented customers. Until there are real quotes with permission to publish, the honest
@@ -1647,11 +1770,7 @@ export default function LandingPage() {
         </section>
 
         {/* WAVE: white → dark */}
-        <div className="wave" style={{ background: "#fff" }}>
-          <svg viewBox="0 0 1440 64" preserveAspectRatio="none" style={{ height: 64 }}>
-            <path d="M0,32 C480,64 960,0 1440,32 L1440,64 L0,64 Z" fill="#0A0A0A"/>
-          </svg>
-        </div>
+        <Wave top={PAPER} bottom={INK} shape="wide" />
 
         {/* PREMIUM VOICE */}
         <section className="lp-premium" id="premium">
@@ -1807,11 +1926,7 @@ export default function LandingPage() {
         </section>
 
         {/* WAVE: dark → white */}
-        <div className="wave" style={{ background: "#0A0A0A" }}>
-          <svg viewBox="0 0 1440 64" preserveAspectRatio="none" style={{ height: 64 }}>
-            <path d="M0,32 C480,0 960,64 1440,32 L1440,64 L0,64 Z" fill="#fff"/>
-          </svg>
-        </div>
+        <Wave top={INK} bottom={PAPER} shape="wideTrough" />
 
         {/* PRICING */}
         <section className="lp-pricing" id="pricing">
@@ -1871,11 +1986,7 @@ export default function LandingPage() {
         </section>
 
         {/* WAVE: white → light gray */}
-        <div className="wave" style={{ background: "#fff" }}>
-          <svg viewBox="0 0 1440 64" preserveAspectRatio="none" style={{ height: 64 }}>
-            <path d="M0,32 C360,64 1080,0 1440,32 L1440,64 L0,64 Z" fill="#F8F8F8"/>
-          </svg>
-        </div>
+        <Wave top={PAPER} bottom={ALT} shape="crest" />
 
         {/* FAQ */}
         <section className="lp-faq" id="faq">
@@ -1922,11 +2033,7 @@ export default function LandingPage() {
         </section>
 
         {/* WAVE: light gray → white */}
-        <div className="wave" style={{ background: "#F8F8F8" }}>
-          <svg viewBox="0 0 1440 64" preserveAspectRatio="none" style={{ height: 64 }}>
-            <path d="M0,32 C360,0 1080,64 1440,32 L1440,64 L0,64 Z" fill="#fff"/>
-          </svg>
-        </div>
+        <Wave top={ALT} bottom={PAPER} shape="trough" />
 
         {/* CTA */}
         <section className="lp-cta reveal">
@@ -1945,11 +2052,7 @@ export default function LandingPage() {
         </section>
 
         {/* WAVE: white → dark footer */}
-        <div className="wave" style={{ background: "#fff" }}>
-          <svg viewBox="0 0 1440 64" preserveAspectRatio="none" style={{ height: 64 }}>
-            <path d="M0,32 C480,64 960,0 1440,32 L1440,64 L0,64 Z" fill="#0A0A0A"/>
-          </svg>
-        </div>
+        <Wave top={PAPER} bottom={INK} shape="wide" />
 
         {/* FOOTER */}
         <footer className="lp-footer">
