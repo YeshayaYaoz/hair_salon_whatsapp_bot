@@ -378,7 +378,7 @@ export default function LandingPageEN() {
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         .lp {
           background: #fff; color: #111;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+          font-family: var(--font-assistant), -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
           direction: ltr; -webkit-font-smoothing: antialiased; overflow-x: hidden;
         }
         .lp .lp-h1 { font-size: clamp(46px, 5.8vw, 80px); line-height: 1.0; }
@@ -1021,14 +1021,15 @@ export default function LandingPageEN() {
         <div className="lp-trust-bar">
           <div className="lp-trust-bar-inner">
             <span className="lp-trust-label">Works with</span>
-            {/* The real stack. The previous list credited ElevenLabs and Twilio, neither of which
-                this product uses — a trust bar naming vendors we don't run on is a false claim. */}
+            {/* Only what the buyer connects their own account to. The model vendors that used to sit
+                here — and a hosting provider before them — named our supply chain to someone who
+                cannot evaluate it and never asked, and invited the one objection this product least
+                wants raised: "so why wouldn't I just use that myself?". Which models run underneath
+                is an implementation detail we are free to change, and it is disclosed where it
+                actually belongs, in the privacy policy's sub-processor list. */}
             {[
               { icon: "chat", text: "WhatsApp Business" },
               { icon: "calendar", text: "Google Calendar" },
-              { icon: "bot", text: "Claude AI" },
-              { icon: "wave", text: "Cartesia Voice" },
-              { icon: "chart", text: "OpenAI" },
             ].map(({ icon, text }) => (
               <div key={text} className="lp-trust-logo">
                 <Icon name={icon} size={18} />
@@ -1486,7 +1487,7 @@ export default function LandingPageEN() {
             <h2 className="lp-title reveal" style={{ textAlign: "center" }}>Questions? We have answers.</h2>
             <div>
               {[
-                { q: "Does the bot understand natural language?", a: "Yes. The bot is powered by Claude AI by Anthropic and understands natural language completely — including abbreviations, typos, and informal phrasing. Customers don't need to type in any special format." },
+                { q: "Does the bot understand natural language?", a: "Yes. The bot understands natural language completely — including abbreviations, typos, and informal phrasing. Customers don't need to type in any special format." },
                 { q: "How long does setup take?", a: "On average 3–10 minutes. Connect your WhatsApp Business account, add your services and hours, connect Google Calendar — and the bot is live." },
                 { q: "Will customers know it's a bot?", a: "That's up to you. You can configure the bot as a 'smart assistant' for your business and set its personality. Most customers don't notice — but you can also be transparent about it." },
                 { q: "What if a customer asks for a service not on the list?", a: "The bot will let the customer know that service isn't available for automatic booking and offer to connect them directly. You can also add custom FAQ answers for common questions." },

@@ -442,7 +442,7 @@ export default function LandingPage() {
         @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
         .lp {
           background: #fff; color: #111;
-          font-family: var(--font-heebo), 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+          font-family: var(--font-assistant), 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
           direction: rtl; -webkit-font-smoothing: antialiased; overflow-x: hidden;
         }
         .lp .lp-h1 { font-size: clamp(46px, 5.8vw, 80px); line-height: 1.0; }
@@ -1408,40 +1408,17 @@ export default function LandingPage() {
               </svg>
               Google Calendar
             </div>
-            {/* Claude / Anthropic */}
-            <div className="lp-trust-item">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <rect width="24" height="24" rx="6" fill="#1B7FA0"/>
-                <path d="M12 5l5 14H7L12 5z" fill="none" stroke="white" strokeWidth="1.5" strokeLinejoin="round"/>
-                <path d="M8.5 14h7" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              Claude AI
-            </div>
-            {/* Cartesia — the actual voice stack. The previous list credited ElevenLabs and Twilio,
-                neither of which this product uses; a trust bar naming vendors we don't run on is a
-                false claim sitting on the most-read strip of the page. */}
-            <div className="lp-trust-item">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <rect width="24" height="24" rx="6" fill="#111"/>
-                <path d="M6 12h1.5M9.5 8.5v7M13 5.5v13M16.5 9v6M19 11v2" stroke="#F59E0B" strokeWidth="1.8" strokeLinecap="round"/>
-              </svg>
-              Cartesia Voice AI
-            </div>
-            {/* Railway Cloud was here. Removed rather than restyled: this strip is read by a salon
-                owner deciding whether to trust us with their appointment book, and which PaaS we
-                deploy on answers a question they have not asked and cannot evaluate. Every other
-                entry names something they either already use (WhatsApp, Google Calendar) or that
-                backs the product's central claim of real AI. Hosting is not a trust signal, it is
-                an implementation detail, and padding the row with one dilutes the entries that do
-                persuade. */}
-            {/* OpenAI */}
-            <div className="lp-trust-item">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <rect width="24" height="24" rx="6" fill="#10A37F"/>
-                <path d="M12 4.5a4.5 4.5 0 00-4.5 4.5v1H6a1.5 1.5 0 000 3h.5v3a4.5 4.5 0 009 0v-3H16a1.5 1.5 0 000-3h-1.5V9A4.5 4.5 0 0012 4.5zm0 2a2.5 2.5 0 012.5 2.5v1h-5V9A2.5 2.5 0 0112 6.5zm0 11a2.5 2.5 0 01-2.5-2.5v-3h5v3A2.5 2.5 0 0112 17.5z" fill="white"/>
-              </svg>
-              OpenAI
-            </div>
+            {/* The model and voice vendors that used to sit here — Claude, Cartesia, OpenAI — are
+                gone, as is a hosting provider before them. Three reasons, and only the first is
+                taste. It names our supply chain to a salon owner who never asked and cannot
+                evaluate it. It invites the one objection this product least wants raised: "so why
+                wouldn't I just use that myself?". And it pins us publicly to vendors we swap
+                freely — the bot's provider is already a per-business setting.
+
+                What remains is the pair the buyer connects their own accounts to, which is the only
+                thing on this strip that was ever doing persuasive work. Which models run
+                underneath is disclosed where it belongs and is legally required: the privacy
+                policy's sub-processor list. */}
           </div>
         </div>
 
@@ -1970,7 +1947,7 @@ export default function LandingPage() {
             <h2 className="lp-title reveal" style={{ textAlign: "center" }}>שאלות? יש לנו תשובות.</h2>
             <div className="lp-faq-list reveal">
               {[
-                { q: "האם הבוט מבין עברית טבעית?", a: "כן. הבוט מבוסס על Claude AI של Anthropic ומבין עברית טבעית לחלוטין — כולל ניבים, קיצורים ואיות לא מדויק. לא צריך ללמד את הלקוחות להקליד בצורה מיוחדת." },
+                { q: "האם הבוט מבין עברית טבעית?", a: "כן, לחלוטין — כולל ניבים, קיצורים, שגיאות כתיב ועברית מדוברת. לא צריך ללמד את הלקוחות להקליד בצורה מיוחדת." },
                 { q: "כמה זמן לוקחת ההקמה?", a: "בממוצע 3–10 דקות. מתחברים לוואטסאפ Business, מוסיפים את השירותים ושעות הפתיחה, מחברים גוגל קלנדר — והבוט מתחיל לענות." },
                 { q: "האם הלקוחות יודעים שזה בוט?", a: "זה תלוי בך. ניתן להגדיר את הבוט כ-'עוזר חכם' של הסלון ולהגדיר את האישיות שלו. רוב הלקוחות לא מבחינים — אבל אפשר גם לציין את זה." },
                 { q: "מה קורה אם לקוח רוצה שירות שאין ברשימה?", a: "הבוט יגיד ללקוח שהשירות הזה אינו זמין להזמנה אוטומטית ויציע ליצור קשר ישיר. ניתן גם להוסיף תשובות FAQ מותאמות אישית לשאלות נפוצות." },

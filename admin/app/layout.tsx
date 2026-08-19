@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { Metadata, Viewport } from "next";
-import { Heebo } from "next/font/google";
+import { Assistant, IBM_Plex_Sans_Hebrew } from "next/font/google";
 import { LanguageProvider } from "./lib/LanguageContext";
 import "./globals.css";
 
@@ -91,9 +91,32 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-const heebo = Heebo({
+/* Two faces, deliberately split by audience.
+ *
+ * Assistant carries every public surface — the landing pages, sign-up, and the booking pages a
+ * salon's own customers land on. It is warmer and more compact than Heebo, which is what those
+ * pages are doing: persuading a person.
+ *
+ * IBM Plex Sans Hebrew carries the dashboard (applied in app/dashboard/layout.tsx). It is IBM's
+ * corporate face, more engineered and more distinctly drawn, which suits a tool an owner works
+ * inside every day rather than reads once.
+ *
+ * Both replace Heebo, which was Oded Ezer's Hebrew extension of Roboto — i.e. the single most
+ * generic UI typeface on the web, wearing Hebrew. Heebo is no longer loaded at all: nothing
+ * referenced it once these two landed, and a font nobody renders is pure download.
+ *
+ * Assistant is a variable font, so omitting `weight` gives the whole 200–800 range in one file.
+ * Plex Hebrew ships static weights, so the ones actually used are listed explicitly. */
+const assistant = Assistant({
   subsets: ["hebrew", "latin"],
-  variable: "--font-heebo",
+  variable: "--font-assistant",
+  display: "swap",
+});
+
+const plex = IBM_Plex_Sans_Hebrew({
+  weight: ["400", "500", "600", "700"],
+  subsets: ["hebrew", "latin"],
+  variable: "--font-plex",
   display: "swap",
 });
 
@@ -101,11 +124,11 @@ const heebo = Heebo({
    rendered. It was briefly wired up to the landing-page headings and did not work: it is a
    condensed, high-contrast face drawn from Israeli signage, and at heading sizes in Hebrew it read
    as decorative rather than as the voice of a business product. Rather than leave the download in
-   place for a font nobody uses, it is gone — headings are Heebo, which is what they were. */
+   place for a font nobody uses, it is gone. Headings now sit in Assistant, below. */
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="he" dir="rtl" suppressHydrationWarning className={`dark ${heebo.variable}`}>
+    <html lang="he" dir="rtl" suppressHydrationWarning className={`dark ${assistant.variable} ${plex.variable}`}>
       <head>
         {/* Sync lang/dir from the saved preference before first paint, so the page never flashes
             the server default (Hebrew/RTL) before hydration corrects it for English users. */}
@@ -122,7 +145,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           colour — but the inherited colour really was near-white on a light page, so anything added
           without an explicit colour would have rendered invisible. The pages that are still dark
           (password reset, OAuth callbacks) set their own background and text colours. */}
-      <body className="min-h-screen font-[family-name:var(--font-heebo)]">
+      <body className="min-h-screen font-[family-name:var(--font-assistant)]">
         <LanguageProvider>{children}</LanguageProvider>
       </body>
     </html>
