@@ -1,4 +1,4 @@
-import { emailLayout, detailTable, callout, button, steps, paragraph, esc } from "./emailLayout.js";
+import { emailLayout, detailTable, callout, button, steps, paragraph, esc, linkifyPhones } from "./emailLayout.js";
 
 export const APP_URL = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
@@ -99,8 +99,14 @@ export async function sendBusinessNoticeEmail(to: string, businessName: string, 
     subject: `הודעה מתורי-אונליין עבור ${businessName}`,
     html: emailLayout({
       heading: "הודעה מצוות תורי-אונליין",
-      // Free text typed by the operator: escaped, with newlines kept as line breaks.
-      body: paragraph(esc(text).replace(/\n/g, "<br/>")),
+      // Free text: escaped first, then phone numbers turned into tel: links, then newlines to
+      // line breaks. Order matters — linkifyPhones emits HTML, so it has to run after esc() and
+      // before anything that would escape again.
+      //
+      // This path carries every owner alert that falls back to email, and the ones that matter
+      // most are the ones whose entire point is a number to ring back: a callback request from
+      // the voice bot, a booking with the customer's phone, a waitlist entry.
+      body: paragraph(linkifyPhones(esc(text)).replace(/\n/g, "<br/>")),
     }),
   });
 }
