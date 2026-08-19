@@ -52,3 +52,4 @@ export function localPartOf(phone: string | null | undefined): string {
   const code = dialCodeOf(digits);
   return digits.startsWith(code) ? digits.slice(code.length) : digits;
 }
+
