@@ -275,6 +275,98 @@ of counting matches with `grep` rather than reading the branches. No change made
 
 ---
 
+## Third round: the visual pass
+
+The first two rounds fixed what was *wrong* — truth, law, structure, performance — and deliberately
+changed almost nothing about how the site looks. That was the honest read of what the audit found,
+but it is not what "more professional, more engaging" asks for. This round is the visual work, done
+to a brief: **keep the waves**, activate the unused display font, soften the bands.
+
+### The display font was being downloaded and never used
+
+`Karantina` is loaded in the root layout with weights 400 and 700, exposed as `--font-karantina` —
+and referenced by **nothing anywhere in the app**. A whole display face was being fetched on every
+page load and thrown away.
+
+The cost of that was not just the request. With only Heebo on the page, a 62px headline and a 16px
+paragraph were *the same typeface at two sizes* — size hierarchy, not typographic hierarchy. The
+page had no display voice at all.
+
+Karantina now sets the four narrative headings: hero `h1`, section titles, the closing CTA title
+and the premium title. It is a condensed face, so it needed the opposite treatment to Heebo: the
+negative tracking those headings carried (−1.5px to −2.5px) was compensating for Heebo's width and
+would crush an already-narrow face, so tracking goes to 0 and each heading scales up to hold the
+same presence. It tops out at 700, so the 800s become 700 rather than being synthetically
+emboldened.
+
+**Deliberately not applied to prices, stat numbers or the ROI figure**, for one aesthetic and one
+functional reason: the numbers are the page's factual claims and read as more trustworthy in a
+neutral face, and the stat band *animates its counters* — a display face without tabular figures
+would make those digits jitter in width as they count. The page now has two intentional voices:
+editorial for the argument, neutral for the evidence.
+
+One trap worth recording: the new rules are scoped `.lp .lp-h1` rather than `.lp-h1`. The original
+single-class heading rules appear **later** in the same stylesheet, so at equal specificity they
+would have won on source order and every override would have silently done nothing.
+
+### Softened bands
+
+`#0A0A0A` was never a brand colour. The login panel, the legal pages and the dashboard's own dark
+surfaces all use `#0D2A38` — a deep blue-green — so the landing page was the single surface in the
+product going full black. The dark bands are now `#0C1D26`, in that family: still unmistakably a
+dark band, but a deliberate colour rather than an absence of one, and the transitions in and out of
+it are softer because it shares the page's hue. The light-grey bands move from a neutral `#F8F8F8`
+to `#F5F8FA`, the same faint cool tint the dashboard already uses for its body background.
+
+Both are named constants (`INK`, `ALT`) rather than repeated hexes, because each wave takes the
+colour of the section above it as its background and the section below it as its fill — a hex
+changed in one place and not the other shows up as a visible seam.
+
+### The waves now move
+
+They stay, and they do more. Each divider is two copies of the same wave drifting in opposite
+directions at different speeds, the back one dimmed to 42% and lifted 5px, so its crest breaks the
+surface of the front one at a shifting offset. The boundary reads as moving water rather than a
+printed shape.
+
+The mechanism: one wave period is 1440 units, the path is drawn twice with the second copy's
+control points shifted by +1440, and the SVG is twice the container width — so translating it by
+exactly −50% lands period two where period one started and the loop has no seam. Only `transform`
+animates, so all nine run on the compositor and cost nothing on the main thread. They stop dead
+under `prefers-reduced-motion`.
+
+Nine hand-written `<div className="wave">` blocks collapsed into one `<Wave top bottom shape />`
+component.
+
+### Scroll-driven reveals
+
+The genuinely modern piece. `animation-timeline: view()` ties an animation's progress to the
+element's own passage through the viewport, so reveals are driven by the compositor with no
+JavaScript, no IntersectionObserver callback, and no per-element main-thread work — and they
+*scrub*, so scrolling back up un-reveals instead of leaving everything permanently on.
+
+Wrapped in `@supports` so it is purely additive: browsers without it keep the existing observer
+path exactly as it was. Gated on `prefers-reduced-motion: no-preference`. The stagger classes shift
+each card's `animation-range` instead of its `transition-delay`, so a row of three still arrives in
+sequence.
+
+Also added: `text-wrap: balance` on headings, which stops a Hebrew heading dropping a single orphan
+word onto its own line — far more disruptive in a condensed face than in Heebo.
+
+### Verified in a real render
+
+Not just a green build. The production server was started and both pages fetched: `/` serves 18
+wave layers across 9 dividers, the new ink in 18 places, the Karantina rule, and the scroll-driven
+block; `/en` serves the mirrored palette and type. The `--font-karantina` variable resolves in the
+CSS bundle and the woff2 returns **HTTP 200, 12KB** — i.e. the font is genuinely being served, not
+merely referenced.
+
+`/en` gets the palette, the display type and the scroll-driven reveals, but **no waves — it never
+had any.** Its section transitions are hard cuts. That is now the largest remaining visual
+difference between the two languages.
+
+---
+
 ## Still recommended
 
 1. **A real testimonial, obtained properly.** Testimonials placed next to a CTA are reported to

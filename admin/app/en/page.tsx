@@ -25,6 +25,11 @@ function Icon({ name, size = 20 }: { name: string; size?: number }) {
   return <C size={size} strokeWidth={1.8} aria-hidden />;
 }
 
+/* Same two band colours as the Hebrew landing page — see the comment there. Kept in sync by
+   hand rather than shared, because the two pages have separate stylesheets and no common module;
+   if a third page ever needs them, that is the moment to extract them. */
+const INK = "#0C1D26";
+
 export default function LandingPageEN() {
   const tiltEl = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -343,6 +348,21 @@ export default function LandingPageEN() {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
           direction: ltr; -webkit-font-smoothing: antialiased; overflow-x: hidden;
         }
+
+        /* Karantina on display type, matching the Hebrew page so the two languages read as one
+           product. Scoped under .lp for specificity — the single-class heading rules appear later
+           in this stylesheet and would otherwise win on source order. Numbers stay in Heebo: the
+           stat counters animate, and a face without tabular figures makes digits jitter. */
+        .lp .lp-h1, .lp .lp-title, .lp .lp-cta-title, .lp .lp-premium-title {
+          font-family: var(--font-karantina), var(--font-heebo), 'Segoe UI', sans-serif;
+          font-weight: 700;
+          letter-spacing: 0;
+          text-wrap: balance;
+        }
+        .lp .lp-h1 { font-size: clamp(46px, 5.8vw, 80px); line-height: 1.0; }
+        .lp .lp-title { font-size: clamp(36px, 4.4vw, 56px); line-height: 1.05; }
+        .lp .lp-cta-title { font-size: clamp(36px, 5.6vw, 70px); line-height: 1.0; }
+        .lp .lp-premium-title { font-size: clamp(36px, 3.8vw, 54px); line-height: 1.05; }
         #scroll-bar { position: fixed; top: var(--safe-t); left: 0; height: 2px; background: #25D366; z-index: 9999; width: 0; transition: width 0.05s linear; }
 
         #sticky-cta {
@@ -485,7 +505,7 @@ export default function LandingPageEN() {
         .lp-trust-logo-text { font-size: 15px; font-weight: 800; color: #111; letter-spacing: -0.5px; }
 
         /* Stats band */
-        .lp-marquee { background: #0A0A0A; padding: 16px 0; overflow: hidden; }
+        .lp-marquee { background: ${INK}; padding: 16px 0; overflow: hidden; }
         .marquee-track { display: flex; gap: 0; animation: marquee-scroll 28s linear infinite; white-space: nowrap; width: max-content; }
         .marquee-track:hover { animation-play-state: paused; }
         @keyframes marquee-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
@@ -493,7 +513,7 @@ export default function LandingPageEN() {
         .marquee-item .star { color: #F59E0B; font-size: 11px; }
         .marquee-item strong { color: rgba(255,255,255,0.9); }
 
-        .lp-stats-band { background: #0A0A0A; padding: 72px 40px; }
+        .lp-stats-band { background: ${INK}; padding: 72px 40px; }
         .lp-stats-band-inner { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
         .lp-stat-cell { padding: 48px 36px; background: #141414; border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; }
         .lp-stat-n { font-size: 52px; font-weight: 800; letter-spacing: -3px; line-height: 1; color: #fff; margin-bottom: 6px; font-variant-numeric: tabular-nums; display: flex; align-items: flex-end; gap: 2px; }
@@ -508,7 +528,28 @@ export default function LandingPageEN() {
         .lp-section-inner { max-width: 1080px; margin: 0 auto; }
         .lp-label { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #0F8043; margin-bottom: 12px; }
         .lp-title { font-size: clamp(26px, 4vw, 42px); font-weight: 900; letter-spacing: -1.5px; line-height: 1.15; color: #0A0A0A; margin-bottom: 48px; text-wrap: balance; }
-        .reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.55s ease, transform 0.55s ease; }
+        .reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.55s var(--ease-entrance), transform 0.55s var(--ease-entrance); }
+
+        /* Scroll-driven reveals where supported — same additive @supports pattern as the Hebrew
+           page: the compositor drives the reveal from the element's own passage through the
+           viewport, with no observer callback and no main-thread work. Browsers without it keep
+           the existing IntersectionObserver path untouched. */
+        @supports (animation-timeline: view()) {
+          @media (prefers-reduced-motion: no-preference) {
+            .reveal {
+              animation: reveal-rise linear both;
+              animation-timeline: view();
+              animation-range: entry 0% entry 55%;
+            }
+            .reveal.d1, .reveal.d4 { animation-range: entry 4% entry 58%; }
+            .reveal.d2, .reveal.d5 { animation-range: entry 9% entry 64%; }
+            .reveal.d3, .reveal.d6 { animation-range: entry 14% entry 70%; }
+          }
+        }
+        @keyframes reveal-rise {
+          from { opacity: 0; transform: translateY(18px); }
+          to { opacity: 1; transform: none; }
+        }
         .reveal.in { opacity: 1; transform: none; }
 
         /* Flow */
@@ -551,7 +592,7 @@ export default function LandingPageEN() {
         .feat-desc { font-size: 13.5px; color: #666; line-height: 1.6; }
 
         /* Before/After */
-        .lp-ba { background: #0A0A0A; border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 100px 40px; }
+        .lp-ba { background: ${INK}; border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 100px 40px; }
         .lp-ba-inner { max-width: 1080px; margin: 0 auto; }
         .lp-ba-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
         @media (max-width: 700px) { .lp-ba-grid { grid-template-columns: 1fr; } }
@@ -613,7 +654,7 @@ export default function LandingPageEN() {
         .mock-appt-badge.pending { background: rgba(245,158,11,0.1); color: #F59E0B; border-color: rgba(245,158,11,0.2); }
 
         /* ROI */
-        .lp-roi { padding: 100px 40px; background: #0A0A0A; }
+        .lp-roi { padding: 100px 40px; background: ${INK}; }
         .lp-roi-inner { max-width: 900px; margin: 0 auto; }
         .lp-roi-sub { font-size: 16px; color: rgba(255,255,255,0.5); text-align: center; margin-bottom: 36px; }
         .lp-roi-slider-row { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; }
@@ -672,7 +713,7 @@ export default function LandingPageEN() {
         .feat-desc { font-size: 13.5px; }
 
         /* CTA section */
-        .lp-cta { padding: 100px 40px; background: #0A0A0A; text-align: center; }
+        .lp-cta { padding: 100px 40px; background: ${INK}; text-align: center; }
         .lp-cta-title { font-size: clamp(28px, 5vw, 48px); font-weight: 900; color: #fff; letter-spacing: -2px; margin-bottom: 16px; }
         .lp-cta-sub { font-size: 16px; color: rgba(255,255,255,0.5); margin-bottom: 36px; }
         .lp-cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 28px; }
@@ -680,7 +721,7 @@ export default function LandingPageEN() {
         .lp-cta-trust-item { font-size: 12px; color: rgba(255,255,255,0.6); }
 
         /* Footer */
-        .lp-footer { background: #0A0A0A; padding: 60px 40px 32px; border-top: 1px solid rgba(255,255,255,0.06); }
+        .lp-footer { background: ${INK}; padding: 60px 40px 32px; border-top: 1px solid rgba(255,255,255,0.06); }
         .lp-footer-top { max-width: 1080px; margin: 0 auto 40px; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 40px; }
         @media (max-width: 700px) { .lp-footer-top { grid-template-columns: 1fr; } }
         .lp-footer-logo-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
@@ -715,7 +756,7 @@ export default function LandingPageEN() {
         .lp-demo-input button:hover { background: #20c45a; transform: scale(1.05); }
         @media (max-width: 900px) { .lp-demo { padding: 72px 20px; } }
 
-        .lp-premium { padding: 100px 40px; background: #0A0A0A; }
+        .lp-premium { padding: 100px 40px; background: ${INK}; }
         .lp-premium-inner { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
         @media (max-width: 800px) { .lp-premium-inner { grid-template-columns: 1fr; } }
         .lp-premium-title { font-size: clamp(28px, 4vw, 44px); font-weight: 900; color: #fff; letter-spacing: -2px; line-height: 1.1; margin-bottom: 20px; }
