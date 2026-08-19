@@ -1,6 +1,7 @@
 name: Configure Tori's outreach channel
 
-# Sets the three Railway variables the Lead Finder WhatsApp channel refuses to send without.
+# Sets the Railway variables for Tori's own Meta channel: Lead Finder outreach, and the
+# automatic WhatsApp setup that provisioned numbers go through (TORI_WABA_ID + system token).
 #
 # It exists as a workflow rather than a note in a doc because two of the three values are
 # credentials: the access token is already an Actions secret, and copying it out of there by hand —
@@ -36,6 +37,7 @@ jobs:
           # separate variable anyway: outreach is the one thing here pointed at strangers, and it is
           # the credential most likely to need revoking on its own.
           OUTREACH_TOKEN: ${{ secrets.META_SYSTEM_USER_TOKEN }}
+          WABA_ID: ${{ secrets.TORI_WABA_ID }}
           PHONE_ID: ${{ inputs.phone_number_id }}
           TEMPLATE: ${{ inputs.template_name }}
         run: |
@@ -47,7 +49,11 @@ jobs:
           npm i -g @railway/cli >/dev/null 2>&1
 
           args=(--set "TORI_OUTREACH_PHONE_NUMBER_ID=$PHONE_ID"
-                --set "TORI_OUTREACH_ACCESS_TOKEN=$OUTREACH_TOKEN")
+                --set "TORI_OUTREACH_ACCESS_TOKEN=$OUTREACH_TOKEN"
+                # The automatic WhatsApp setup for provisioned numbers runs on the server and needs
+                # Tori's own WABA + system token there — same secret-to-secret rationale as above.
+                --set "META_SYSTEM_USER_TOKEN=$OUTREACH_TOKEN")
+          [ -n "${WABA_ID:-}" ] && args+=(--set "TORI_WABA_ID=$WABA_ID")
           [ -n "$TEMPLATE" ] && args+=(--set "TORI_OUTREACH_TEMPLATE_NAME=$TEMPLATE")
 
           railway variables --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
