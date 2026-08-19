@@ -445,36 +445,6 @@ export default function LandingPage() {
           font-family: var(--font-heebo), 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
           direction: rtl; -webkit-font-smoothing: antialiased; overflow-x: hidden;
         }
-
-        /* ── DISPLAY TYPE ──────────────────────────────────────────────────────────
-           Karantina was being downloaded on every page load and used by absolutely nothing. That
-           was both a wasted font request and a missing voice: with only Heebo on the page, a 62px
-           headline and a 16px paragraph were the same typeface at different sizes, which is size
-           hierarchy, not typographic hierarchy.
-
-           Karantina is a condensed display face, so it needs the opposite treatment to Heebo here:
-           the negative tracking those headings carried was compensating for Heebo's width and
-           would crush an already-narrow face, and because Karantina sets optically smaller at the
-           same size, each heading is scaled up to hold the same weight on the page. It also tops
-           out at 700, so the 800s become 700 rather than being synthetically emboldened.
-
-           Deliberately NOT applied to prices, stat numbers or the ROI figure. Two reasons, one
-           aesthetic and one functional: the numbers are the page's factual claims and read as more
-           trustworthy in a neutral face, and the stat band animates its counters — a display face
-           without tabular figures would make those digits jitter in width as they count up. So the
-           page ends up with two deliberate voices: editorial for the argument, neutral for the
-           evidence. */
-        /* Selectors are scoped under .lp purely for specificity: the original single-class rules
-           for these headings appear LATER in this stylesheet, so at equal specificity they would
-           win on source order and every override below would silently do nothing. */
-        .lp .lp-h1, .lp .lp-title, .lp .lp-cta-title, .lp .lp-premium-title {
-          font-family: var(--font-karantina), var(--font-heebo), 'Segoe UI', sans-serif;
-          font-weight: 700;
-          letter-spacing: 0;
-          /* Keeps a Hebrew heading from dropping a single orphan word onto its own line, which is
-             far more visually disruptive in a condensed face than in Heebo. */
-          text-wrap: balance;
-        }
         .lp .lp-h1 { font-size: clamp(46px, 5.8vw, 80px); line-height: 1.0; }
         .lp .lp-title { font-size: clamp(36px, 4.4vw, 56px); line-height: 1.05; }
         .lp .lp-cta-title { font-size: clamp(36px, 5.6vw, 70px); line-height: 1.0; }
@@ -690,7 +660,12 @@ export default function LandingPage() {
         @media (prefers-reduced-motion: reduce) {
           .wave-front, .wave-back { animation: none; }
         }
-        .wave svg { display: block; width: 100%; }
+        /* The single-layer rule that used to live here — '.wave svg { width: 100% }' — is gone on
+           purpose. It outranked .wave-layer on specificity (element+class beats class) and so
+           pinned each SVG to one container width while its viewBox held two 1440-unit periods.
+           Both periods were squeezed into the visible width, and the -50% drift then slid the
+           whole thing half a container across, leaving the trailing half of every divider
+           uncovered — a hard vertical edge with the section above showing through it. */
 
         /* MARQUEE */
         .lp-marquee { background: ${INK}; padding: 16px 0; overflow: hidden; }

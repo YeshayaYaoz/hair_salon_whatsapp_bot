@@ -29,6 +29,46 @@ function Icon({ name, size = 20 }: { name: string; size?: number }) {
    hand rather than shared, because the two pages have separate stylesheets and no common module;
    if a third page ever needs them, that is the moment to extract them. */
 const INK = "#0C1D26";
+const ALT = "#F9FAFB";   // this page's existing light-alt tint
+
+/* Plan prices. The shekel figures are the source of truth — they mirror PLAN_PRICES_ILS in
+   backend/src/billing/payplusSubscription.ts, which is the only code that charges money, and
+   billing runs through an Israeli provider with no USD path at all.
+ *
+ * The dollar figures are therefore a CONVERSION, not a second price list, and are derived here
+ * rather than typed so the two can never drift the way the old hardcoded $39/$79 did. Rounded up:
+ * a quote that lands under the amount actually charged is the one that generates a complaint.
+ *
+ * ILS_PER_USD needs a human to revisit it when the rate moves materially. Every card also states
+ * the shekel amount it will really be billed, so a stale rate makes the dollar figure approximate
+ * rather than makes the page wrong. */
+const ILS_PER_USD = 3.7;
+const PLAN_ILS = { standard: 189, premium: 449, ultra: 849 } as const;
+const usd = (ils: number) => Math.ceil(ils / ILS_PER_USD);
+const PAPER = "#ffffff";
+
+/* One wave period is 1440 units. The path is drawn twice, the second copy with every control point
+   shifted by +1440, so the shape tiles seamlessly — which is what lets the SVG drift sideways by
+   exactly one period and loop with no visible jump. Mirrors the Hebrew landing page. */
+const WAVE_PATHS = {
+  crest: "M0,32 C360,64 1080,0 1440,32 C1800,64 2520,0 2880,32 L2880,64 L0,64 Z",
+  trough: "M0,32 C360,0 1080,64 1440,32 C1800,0 2520,64 2880,32 L2880,64 L0,64 Z",
+  wide: "M0,32 C480,64 960,0 1440,32 C1920,64 2400,0 2880,32 L2880,64 L0,64 Z",
+  wideTrough: "M0,32 C480,0 960,64 1440,32 C1920,0 2400,64 2880,32 L2880,64 L0,64 Z",
+} as const;
+
+/** Section divider: two copies of the same wave drifting in opposite directions at different
+ *  speeds, the back one dimmed and lifted so its crest breaks the surface of the front one. Runs
+ *  purely on transform, so it stays on the compositor; stops under prefers-reduced-motion. */
+function Wave({ top, bottom, shape = "crest" }: { top: string; bottom: string; shape?: keyof typeof WAVE_PATHS }) {
+  const d = WAVE_PATHS[shape];
+  return (
+    <div className="wave" style={{ background: top }} aria-hidden="true">
+      <svg className="wave-layer wave-back" viewBox="0 0 2880 64" preserveAspectRatio="none"><path d={d} fill={bottom} /></svg>
+      <svg className="wave-layer wave-front" viewBox="0 0 2880 64" preserveAspectRatio="none"><path d={d} fill={bottom} /></svg>
+    </div>
+  );
+}
 
 export default function LandingPageEN() {
   const tiltEl = useRef<HTMLDivElement>(null);
@@ -348,17 +388,6 @@ export default function LandingPageEN() {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
           direction: ltr; -webkit-font-smoothing: antialiased; overflow-x: hidden;
         }
-
-        /* Karantina on display type, matching the Hebrew page so the two languages read as one
-           product. Scoped under .lp for specificity — the single-class heading rules appear later
-           in this stylesheet and would otherwise win on source order. Numbers stay in Heebo: the
-           stat counters animate, and a face without tabular figures makes digits jitter. */
-        .lp .lp-h1, .lp .lp-title, .lp .lp-cta-title, .lp .lp-premium-title {
-          font-family: var(--font-karantina), var(--font-heebo), 'Segoe UI', sans-serif;
-          font-weight: 700;
-          letter-spacing: 0;
-          text-wrap: balance;
-        }
         .lp .lp-h1 { font-size: clamp(46px, 5.8vw, 80px); line-height: 1.0; }
         .lp .lp-title { font-size: clamp(36px, 4.4vw, 56px); line-height: 1.05; }
         .lp .lp-cta-title { font-size: clamp(36px, 5.6vw, 70px); line-height: 1.0; }
@@ -528,6 +557,24 @@ export default function LandingPageEN() {
         .lp-section-inner { max-width: 1080px; margin: 0 auto; }
         .lp-label { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #0F8043; margin-bottom: 12px; }
         .lp-title { font-size: clamp(26px, 4vw, 42px); font-weight: 900; letter-spacing: -1.5px; line-height: 1.15; color: #0A0A0A; margin-bottom: 48px; text-wrap: balance; }
+        /* WAVE DIVIDERS — see the Wave component above.
+           Deliberately no '.wave svg { width: 100% }' rule here: on the Hebrew page a leftover rule
+           of exactly that shape outranked .wave-layer (element+class beats class), pinned each SVG
+           to one container width while its viewBox held two periods, and the drift then slid the
+           whole thing half a container across, leaving the trailing half of every divider blank. */
+        .wave { line-height: 0; display: block; position: relative; height: 64px; overflow: hidden; }
+        .wave-layer { position: absolute; left: 0; bottom: 0; width: 200%; height: 64px; display: block; }
+        .wave-front { animation: wave-drift 22s linear infinite; }
+        .wave-back { opacity: 0.42; transform: translateY(-5px); animation: wave-drift-back 34s linear infinite; }
+        @keyframes wave-drift { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        @keyframes wave-drift-back {
+          from { transform: translateX(-50%) translateY(-5px); }
+          to { transform: translateX(0) translateY(-5px); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .wave-front, .wave-back { animation: none; }
+        }
+
         .reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.55s var(--ease-entrance), transform 0.55s var(--ease-entrance); }
 
         /* Scroll-driven reveals where supported — same additive @supports pattern as the Hebrew
@@ -592,7 +639,10 @@ export default function LandingPageEN() {
         .feat-desc { font-size: 13.5px; color: #666; line-height: 1.6; }
 
         /* Before/After */
-        .lp-ba { background: ${INK}; border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 100px 40px; }
+        /* The 1px top/bottom rules that used to separate this band from its neighbours are gone:
+           a wave divider now sits on each side, and because the wave's own background is this same
+           ink the border showed up as a hairline stripe drawn straight across the water. */
+        .lp-ba { background: ${INK}; padding: 100px 40px; }
         .lp-ba-inner { max-width: 1080px; margin: 0 auto; }
         .lp-ba-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
         @media (max-width: 700px) { .lp-ba-grid { grid-template-columns: 1fr; } }
@@ -999,6 +1049,7 @@ export default function LandingPageEN() {
             reviews from people who don't exist; invented testimonials are both a legal exposure and
             the fastest way for a visitor to write the whole page off. Every line here is something
             the product verifiably does. (Duplicated once because the CSS loop translates -50%.) */}
+        <Wave top={PAPER} bottom={INK} shape="crest" />
         <div className="lp-marquee">
           <div className="marquee-track">
             {(() => {
@@ -1041,6 +1092,7 @@ export default function LandingPageEN() {
         </div>
 
         {/* INTEGRATION FLOW */}
+        <Wave top={INK} bottom={ALT} shape="trough" />
         <section className="lp-flow" id="how">
           <div className="lp-flow-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>Integrations</div>
@@ -1074,6 +1126,7 @@ export default function LandingPageEN() {
         </section>
 
         {/* HOW IT WORKS STEPS */}
+        <Wave top={ALT} bottom={PAPER} shape="crest" />
         <section className="lp-steps">
           <div className="lp-steps-inner">
             <div className="lp-label reveal">Process</div>
@@ -1097,6 +1150,7 @@ export default function LandingPageEN() {
         </section>
 
         {/* FEATURES */}
+        <Wave top={PAPER} bottom={ALT} shape="wide" />
         <section className="lp-features" id="features">
           <div className="lp-features-inner">
             <div className="lp-label reveal">What's included</div>
@@ -1182,6 +1236,7 @@ export default function LandingPageEN() {
         </div>
 
         {/* BEFORE / AFTER */}
+        <Wave top={ALT} bottom={INK} shape="crest" />
         <section className="lp-ba">
           <div className="lp-ba-inner">
             <div className="lp-label reveal" style={{ color: "#F87171" }}>Before & After</div>
@@ -1222,6 +1277,7 @@ export default function LandingPageEN() {
         {/* WHAT CHANGES DAY-TO-DAY — replaces a scrolling track of five-star quotes from invented
             customers. Until there are real quotes with permission to publish, the honest version of
             this section is concrete scenarios of what the product does. */}
+        <Wave top={INK} bottom={PAPER} shape="trough" />
         <section className="lp-testimonials">
           <div className="lp-testimonials-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>Day to day</div>
@@ -1243,6 +1299,7 @@ export default function LandingPageEN() {
         </section>
 
         {/* PREMIUM */}
+        <Wave top={PAPER} bottom={INK} shape="wide" />
         <section className="lp-premium" id="premium">
           <div className="lp-premium-inner">
             <div>
@@ -1264,6 +1321,7 @@ export default function LandingPageEN() {
         </section>
 
         {/* LIVE INTERACTIVE DEMO */}
+        <Wave top={INK} bottom={PAPER} shape="wideTrough" />
         <section className="lp-demo" id="demo">
           <div className="lp-demo-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>Try it yourself</div>
@@ -1300,6 +1358,7 @@ export default function LandingPageEN() {
         </section>
 
         {/* ROI CALCULATOR */}
+        <Wave top={PAPER} bottom={INK} shape="crest" />
         <section className="lp-roi" id="roi">
           <div className="lp-roi-inner">
             <div className="lp-label reveal" style={{ textAlign: "center", color: "#F59E0B" }}>Savings calculator</div>
@@ -1328,6 +1387,7 @@ export default function LandingPageEN() {
         </section>
 
         {/* PRICING */}
+        <Wave top={INK} bottom={PAPER} shape="trough" />
         <section className="lp-pricing" id="pricing">
           <div className="lp-pricing-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>Pricing</div>
@@ -1341,8 +1401,8 @@ export default function LandingPageEN() {
               <div className="lp-plan">
                 <div className="lp-plan-tag">Standard</div>
                 <div className="lp-plan-name">Standard</div>
-                <div className="lp-plan-price">₪189</div>
-                <div className="lp-plan-per">per month · 14-day free trial</div>
+                <div className="lp-plan-price">${usd(PLAN_ILS.standard)}</div>
+                <div className="lp-plan-per">per month · 14-day free trial<br /><span style={{ fontSize: 11, opacity: 0.75 }}>billed as ₪{PLAN_ILS.standard} / month</span></div>
                 <div className="lp-plan-divider" />
                 <div className="lp-plan-features">
                   {["WhatsApp bot, 24/7","Google Calendar auto-sync","Automatic reminders","Full management dashboard","Flexible services, staff & hours","Waitlist","Email support"].map((f) => (
@@ -1354,8 +1414,8 @@ export default function LandingPageEN() {
               <div className="lp-plan highlight">
                 <div className="lp-plan-tag">Premium</div>
                 <div className="lp-plan-name">Premium</div>
-                <div className="lp-plan-price">₪449</div>
-                <div className="lp-plan-per">per month · no contract</div>
+                <div className="lp-plan-price">${usd(PLAN_ILS.premium)}</div>
+                <div className="lp-plan-per">per month · no contract<br /><span style={{ fontSize: 11, opacity: 0.75 }}>billed as ₪{PLAN_ILS.premium} / month</span></div>
                 <div className="lp-plan-divider" />
                 <div className="lp-plan-features">
                   {["Everything in Standard","Incoming phone call handling","Natural AI voice","Automatic call transcription","Sync call appointments to Google Calendar","Priority WhatsApp support","4-hour SLA"].map((f) => (
@@ -1367,8 +1427,8 @@ export default function LandingPageEN() {
               <div className="lp-plan">
                 <div className="lp-plan-tag">Ultra</div>
                 <div className="lp-plan-name">Ultra</div>
-                <div className="lp-plan-price">₪849</div>
-                <div className="lp-plan-per">per month · for high-volume businesses</div>
+                <div className="lp-plan-price">${usd(PLAN_ILS.ultra)}</div>
+                <div className="lp-plan-per">per month · for high-volume businesses<br /><span style={{ fontSize: 11, opacity: 0.75 }}>billed as ₪{PLAN_ILS.ultra} / month</span></div>
                 <div className="lp-plan-divider" />
                 <div className="lp-plan-features">
                   {["Everything in Premium","Up to 3,000 outbound messages a month — 3×","Personal onboarding","Top-priority support","Custom tailoring for your business"].map((f) => (
@@ -1387,6 +1447,7 @@ export default function LandingPageEN() {
         </section>
 
         {/* COMPARISON */}
+        <Wave top={PAPER} bottom={ALT} shape="crest" />
         <section className="lp-compare">
           <div className="lp-compare-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>Comparison</div>
@@ -1425,6 +1486,7 @@ export default function LandingPageEN() {
         </section>
 
         {/* FAQ */}
+        <Wave top={ALT} bottom={PAPER} shape="trough" />
         <section className="lp-faq" id="faq">
           <div className="lp-faq-inner">
             <div className="lp-label reveal" style={{ textAlign: "center" }}>FAQ</div>
@@ -1453,6 +1515,7 @@ export default function LandingPageEN() {
         </section>
 
         {/* CTA */}
+        <Wave top={PAPER} bottom={INK} shape="wide" />
         <section className="lp-cta reveal">
           <h2 className="lp-cta-title">Stop answering everyone yourself.</h2>
           <div className="lp-cta-sub">Try free for 14 days — no credit card, no risk.</div>
