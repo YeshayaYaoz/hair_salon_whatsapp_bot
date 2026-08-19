@@ -6,7 +6,7 @@ import { useLanguage } from "../../lib/LanguageContext";
 import { SavedBadge } from "../../lib/SavedBadge";
 import { SkeletonCard } from "../../lib/Skeleton";
 import { Toggle, Section, Field } from "../../lib/SettingsControls";
-import { DIAL_CODES, DEFAULT_DIAL_CODE, dialCodeOf } from "../../lib/dialCodes";
+import { DIAL_CODES, DEFAULT_DIAL_CODE, dialCodeOf, localPartOf } from "../../lib/dialCodes";
 
 interface BusinessProfile {
   name: string;
@@ -179,8 +179,12 @@ export default function SettingsPage() {
     Boolean(notificationPhoneVerifiedAt) && fields.notificationPhone?.trim() === (savedNotificationPhone ?? "");
 
   useEffect(() => {
+    // notificationPhone is STORED fully qualified ("972506747354") but SHOWN as the local part
+    // ("506747354") beside the dial-code dropdown — otherwise the prefix printed twice, once on
+    // the control and once inside the input. savedNotificationPhone keeps the same displayed form
+    // so the verified-badge comparison stays apples-to-apples.
     apiFetch<BusinessProfile & { emailVerifiedAt?: string | null; notificationPhoneVerifiedAt?: string | null }>("/api/business/me").then((me) => {
-      setSavedNotificationPhone(me.notificationPhone ?? "");
+      setSavedNotificationPhone(localPartOf(me.notificationPhone));
       setNotificationPhoneVerifiedAt(me.notificationPhoneVerifiedAt ?? null);
       setDialCode(dialCodeOf(me.notificationPhone));
       setFields({
@@ -188,7 +192,7 @@ export default function SettingsPage() {
         address: me.address ?? "",
         timezone: me.timezone,
         email: me.email,
-        notificationPhone: me.notificationPhone ?? "",
+        notificationPhone: localPartOf(me.notificationPhone),
         googleMapsUrl: me.googleMapsUrl ?? "",
         accessibilityContact: me.accessibilityContact ?? "",
         depositEnabled: me.depositEnabled ?? false,
@@ -231,8 +235,8 @@ export default function SettingsPage() {
       const me = await apiFetch<{ notificationPhone?: string | null; notificationPhoneVerifiedAt?: string | null }>(
         "/api/business/me"
       );
-      setFields((f) => ({ ...f, notificationPhone: me.notificationPhone ?? "" }));
-      setSavedNotificationPhone(me.notificationPhone ?? "");
+      setFields((f) => ({ ...f, notificationPhone: localPartOf(me.notificationPhone) }));
+      setSavedNotificationPhone(localPartOf(me.notificationPhone));
       setNotificationPhoneVerifiedAt(me.notificationPhoneVerifiedAt ?? null);
       setDialCode(dialCodeOf(me.notificationPhone));
 
@@ -294,7 +298,12 @@ export default function SettingsPage() {
             {/* The country is chosen, not inferred. Guessing it from the digits meant a bare
                 national number was stored with no country code and could never be delivered, and a
                 foreign number written with its own trunk zero had 972 forced onto it. */}
-            <div className="flex gap-2">
+            {/* dir="ltr" on the row, not only on the controls inside it: a phone number reads
+                left-to-right even on an RTL page, so the dial code must sit physically LEFT of the
+                digits — "+972 | 506747354" — the way the assembled number is read. Under the
+                page's RTL the flex order put the dropdown to the input's right, splitting the
+                number around the control. */}
+            <div className="flex gap-2" dir="ltr">
               <select
                 value={dialCode}
                 onChange={(e) => setDialCode(e.target.value)}
@@ -309,7 +318,7 @@ export default function SettingsPage() {
                 ))}
               </select>
               <input
-                placeholder={dialCode === "972" ? "0501234567" : "501234567"}
+                placeholder="501234567"
                 value={fields.notificationPhone}
                 onChange={(e) => set("notificationPhone", e.target.value)}
                 className="w-full"

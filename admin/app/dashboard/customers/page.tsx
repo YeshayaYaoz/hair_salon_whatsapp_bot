@@ -286,7 +286,9 @@ function ConversationPanel({
               placeholder={he ? "שם הלקוח" : "Customer name"}
               className="w-full text-sm"
             />
-            <div className="flex gap-2">
+            {/* dir="ltr" on the row: the dial code sits physically LEFT of the digits, the way
+                the assembled number is read — same fix as the notification-phone row in Settings. */}
+            <div className="flex gap-2" dir="ltr">
               <select value={editDial} onChange={(e) => setEditDial(e.target.value)} className="w-32 shrink-0 text-sm" dir="ltr">
                 {DIAL_CODES.map((c) => <option key={c.code} value={c.code}>+{c.code}</option>)}
               </select>
