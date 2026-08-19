@@ -31,20 +31,13 @@ function Icon({ name, size = 20 }: { name: string; size?: number }) {
 const INK = "#0C1D26";
 const ALT = "#F9FAFB";   // this page's existing light-alt tint
 
-/* Plan prices. The shekel figures are the source of truth — they mirror PLAN_PRICES_ILS in
-   backend/src/billing/payplusSubscription.ts, which is the only code that charges money, and
-   billing runs through an Israeli provider with no USD path at all.
- *
- * The dollar figures are therefore a CONVERSION, not a second price list, and are derived here
- * rather than typed so the two can never drift the way the old hardcoded $39/$79 did. Rounded up:
- * a quote that lands under the amount actually charged is the one that generates a complaint.
- *
- * ILS_PER_USD needs a human to revisit it when the rate moves materially. Every card also states
- * the shekel amount it will really be billed, so a stale rate makes the dollar figure approximate
- * rather than makes the page wrong. */
-const ILS_PER_USD = 3.7;
+/* Plan prices, mirroring PLAN_PRICES_ILS in backend/src/billing/payplusSubscription.ts — the only
+   code that charges money. Shekels on both language versions: billing runs through an Israeli
+   provider with no USD path, so a dollar figure could only ever be a conversion, and a converted
+   price drifts out of date the moment the rate moves. Naming them here rather than typing them
+   into the markup is what stops a repeat of the old hardcoded $39/$79, which sat on this page
+   long after the real prices changed. */
 const PLAN_ILS = { standard: 189, premium: 449, ultra: 849 } as const;
-const usd = (ils: number) => Math.ceil(ils / ILS_PER_USD);
 const PAPER = "#ffffff";
 
 /* One wave period is 1440 units. The path is drawn twice, the second copy with every control point
@@ -1401,8 +1394,8 @@ export default function LandingPageEN() {
               <div className="lp-plan">
                 <div className="lp-plan-tag">Standard</div>
                 <div className="lp-plan-name">Standard</div>
-                <div className="lp-plan-price">${usd(PLAN_ILS.standard)}</div>
-                <div className="lp-plan-per">per month · 14-day free trial<br /><span style={{ fontSize: 11, opacity: 0.75 }}>billed as ₪{PLAN_ILS.standard} / month</span></div>
+                <div className="lp-plan-price">₪{PLAN_ILS.standard}</div>
+                <div className="lp-plan-per">per month · 14-day free trial</div>
                 <div className="lp-plan-divider" />
                 <div className="lp-plan-features">
                   {["WhatsApp bot, 24/7","Google Calendar auto-sync","Automatic reminders","Full management dashboard","Flexible services, staff & hours","Waitlist","Email support"].map((f) => (
@@ -1414,8 +1407,8 @@ export default function LandingPageEN() {
               <div className="lp-plan highlight">
                 <div className="lp-plan-tag">Premium</div>
                 <div className="lp-plan-name">Premium</div>
-                <div className="lp-plan-price">${usd(PLAN_ILS.premium)}</div>
-                <div className="lp-plan-per">per month · no contract<br /><span style={{ fontSize: 11, opacity: 0.75 }}>billed as ₪{PLAN_ILS.premium} / month</span></div>
+                <div className="lp-plan-price">₪{PLAN_ILS.premium}</div>
+                <div className="lp-plan-per">per month · no contract</div>
                 <div className="lp-plan-divider" />
                 <div className="lp-plan-features">
                   {["Everything in Standard","Incoming phone call handling","Natural AI voice","Automatic call transcription","Sync call appointments to Google Calendar","Priority WhatsApp support","4-hour SLA"].map((f) => (
@@ -1427,8 +1420,8 @@ export default function LandingPageEN() {
               <div className="lp-plan">
                 <div className="lp-plan-tag">Ultra</div>
                 <div className="lp-plan-name">Ultra</div>
-                <div className="lp-plan-price">${usd(PLAN_ILS.ultra)}</div>
-                <div className="lp-plan-per">per month · for high-volume businesses<br /><span style={{ fontSize: 11, opacity: 0.75 }}>billed as ₪{PLAN_ILS.ultra} / month</span></div>
+                <div className="lp-plan-price">₪{PLAN_ILS.ultra}</div>
+                <div className="lp-plan-per">per month · for high-volume businesses</div>
                 <div className="lp-plan-divider" />
                 <div className="lp-plan-features">
                   {["Everything in Premium","Up to 3,000 outbound messages a month — 3×","Personal onboarding","Top-priority support","Custom tailoring for your business"].map((f) => (
