@@ -56,14 +56,18 @@ module.exports = {
           "100%": { backgroundPosition: "200% 0" },
         },
       },
+      // Entrances decelerate (--ease-entrance), so an element arrives and settles instead of
+      // hanging at its offset for the first few frames the way plain `ease` makes it. `pop` keeps
+      // its own overshoot curve — it is the confirmation animation, and the bounce is the point.
+      // The curves themselves are defined once on :root in globals.css.
       animation: {
-        "fade-up": "fade-up 0.4s ease both",
-        "fade-up-slow": "fade-up 0.6s ease both",
-        "fade-in": "fade-in 0.3s ease both",
-        "slide-in-end": "slide-in-end 0.3s ease both",
-        "slide-in-start": "slide-in-start 0.3s ease both",
-        "scale-in": "scale-in 0.25s ease both",
-        "pop": "pop 0.3s ease both",
+        "fade-up": "fade-up 0.4s var(--ease-entrance) both",
+        "fade-up-slow": "fade-up 0.6s var(--ease-entrance) both",
+        "fade-in": "fade-in 0.3s var(--ease-entrance) both",
+        "slide-in-end": "slide-in-end 0.3s var(--ease-entrance) both",
+        "slide-in-start": "slide-in-start 0.3s var(--ease-entrance) both",
+        "scale-in": "scale-in 0.25s var(--ease-entrance) both",
+        "pop": "pop 0.3s var(--ease-spring) both",
       },
     },
   },

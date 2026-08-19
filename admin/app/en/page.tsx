@@ -60,10 +60,23 @@ export default function LandingPageEN() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [demoMsgs]);
 
+  // 3D scroll tilt. Coalesced to one read/write pass per animation frame — see the matching
+  // comment on the Hebrew landing page for why the original synchronous handler was an INP
+  // problem, and why reduced-motion has to be honoured here in JS rather than in CSS.
   useEffect(() => {
     const el = tiltEl.current;
     if (!el) return;
-    function tick() {
+
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) {
+      el.style.transform = "none";
+      el.style.opacity = "1";
+      return;
+    }
+
+    let ticking = false;
+    function update() {
+      ticking = false;
       const rect = el!.getBoundingClientRect();
       const vh = window.innerHeight;
       const start = vh * 0.95;
@@ -74,9 +87,14 @@ export default function LandingPageEN() {
       el!.style.transform = `perspective(1500px) rotateX(${28 * (1 - ease)}deg) scale(${0.88 + 0.12 * ease})`;
       el!.style.opacity = String(0.55 + 0.45 * ease);
     }
-    window.addEventListener("scroll", tick, { passive: true });
-    tick();
-    return () => window.removeEventListener("scroll", tick);
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(update);
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    update();
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   useEffect(() => {
@@ -88,30 +106,89 @@ export default function LandingPageEN() {
     return () => obs.disconnect();
   }, []);
 
+  // Feature card 3D hover — rAF-coalesced, geometry measured once on enter, and skipped entirely
+  // on touch and reduced motion. See the Hebrew landing page for the reasoning.
   useEffect(() => {
+    if (
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+      window.matchMedia("(pointer: coarse)").matches
+    ) {
+      return;
+    }
+
     const cards = document.querySelectorAll<HTMLElement>(".lp-feat");
+    const rects = new WeakMap<HTMLElement, DOMRect>();
+    let frame = 0;
+    let pending: { card: HTMLElement; x: number; y: number } | null = null;
+
+    const flush = () => {
+      frame = 0;
+      if (!pending) return;
+      const { card, x, y } = pending;
+      pending = null;
+      card.style.transform = `perspective(700px) rotateX(${-y}deg) rotateY(${x}deg) translateZ(12px)`;
+    };
+
+    const enter = (e: Event) => {
+      const c = e.currentTarget as HTMLElement;
+      rects.set(c, c.getBoundingClientRect());
+    };
     const move = (e: MouseEvent) => {
       const c = e.currentTarget as HTMLElement;
-      const r = c.getBoundingClientRect();
-      const x = ((e.clientX - r.left) / r.width - 0.5) * 14;
-      const y = ((e.clientY - r.top) / r.height - 0.5) * 14;
-      c.style.transform = `perspective(700px) rotateX(${-y}deg) rotateY(${x}deg) translateZ(12px)`;
+      const r = rects.get(c) ?? c.getBoundingClientRect();
+      pending = {
+        card: c,
+        x: ((e.clientX - r.left) / r.width - 0.5) * 14,
+        y: ((e.clientY - r.top) / r.height - 0.5) * 14,
+      };
+      if (!frame) frame = requestAnimationFrame(flush);
     };
-    const leave = (e: MouseEvent) => { (e.currentTarget as HTMLElement).style.transform = ""; };
-    cards.forEach((c) => { c.addEventListener("mousemove", move); c.addEventListener("mouseleave", leave); });
-    return () => cards.forEach((c) => { c.removeEventListener("mousemove", move); c.removeEventListener("mouseleave", leave); });
+    const leave = (e: Event) => {
+      pending = null;
+      (e.currentTarget as HTMLElement).style.transform = "";
+    };
+
+    cards.forEach((c) => {
+      c.addEventListener("mouseenter", enter);
+      c.addEventListener("mousemove", move);
+      c.addEventListener("mouseleave", leave);
+    });
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      cards.forEach((c) => {
+        c.removeEventListener("mouseenter", enter);
+        c.removeEventListener("mousemove", move);
+        c.removeEventListener("mouseleave", leave);
+      });
+    };
   }, []);
 
+  // Scroll progress bar + sticky CTA — same rAF latch as the tilt above.
   useEffect(() => {
     const bar = document.getElementById("scroll-bar");
     const stickyBtn = document.getElementById("sticky-cta");
-    const tick = () => {
-      const p = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight);
+    let ticking = false;
+    let ctaShown: boolean | null = null;
+
+    const update = () => {
+      ticking = false;
+      const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+      const p = scrollable > 0 ? window.scrollY / scrollable : 0;
       if (bar) bar.style.width = `${Math.min(p * 100, 100)}%`;
-      if (stickyBtn) stickyBtn.style.opacity = window.scrollY > 400 ? "1" : "0";
+      const show = window.scrollY > 400;
+      if (stickyBtn && show !== ctaShown) {
+        ctaShown = show;
+        stickyBtn.style.opacity = show ? "1" : "0";
+      }
     };
-    window.addEventListener("scroll", tick, { passive: true });
-    return () => window.removeEventListener("scroll", tick);
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(update);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    update();
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   useEffect(() => {

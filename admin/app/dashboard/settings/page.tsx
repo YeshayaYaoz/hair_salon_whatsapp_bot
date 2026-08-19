@@ -16,6 +16,7 @@ interface BusinessProfile {
   notificationPhone?: string;
   notificationPhoneVerifiedAt?: string | null;
   googleMapsUrl?: string;
+  accessibilityContact?: string;
   depositEnabled?: boolean;
   depositAmountIls?: number;
   depositHoldMinutes?: number;
@@ -159,7 +160,7 @@ export default function SettingsPage() {
   const he = lang === "he";
   const [fields, setFields] = useState<BusinessProfile>({
     name: "", address: "", timezone: "Asia/Jerusalem", email: "",
-    notificationPhone: "", googleMapsUrl: "",
+    notificationPhone: "", googleMapsUrl: "", accessibilityContact: "",
     depositEnabled: false, depositAmountIls: 0, depositHoldMinutes: 30, paymentConnected: false,
   });
   const [loaded, setLoaded] = useState(false);
@@ -189,6 +190,7 @@ export default function SettingsPage() {
         email: me.email,
         notificationPhone: me.notificationPhone ?? "",
         googleMapsUrl: me.googleMapsUrl ?? "",
+        accessibilityContact: me.accessibilityContact ?? "",
         depositEnabled: me.depositEnabled ?? false,
         depositAmountIls: me.depositAmountIls ?? 0,
         depositHoldMinutes: me.depositHoldMinutes ?? 30,
@@ -217,6 +219,7 @@ export default function SettingsPage() {
           notificationPhone: fields.notificationPhone,
           notificationPhoneDialCode: dialCode,
           googleMapsUrl: fields.googleMapsUrl,
+          accessibilityContact: fields.accessibilityContact,
           depositEnabled: fields.depositEnabled,
           depositAmountIls: fields.depositAmountIls,
           depositHoldMinutes: fields.depositHoldMinutes,
@@ -339,6 +342,14 @@ export default function SettingsPage() {
               placeholder="https://g.page/r/..."
               value={fields.googleMapsUrl}
               onChange={(e) => set("googleMapsUrl", e.target.value)}
+              className="w-full"
+            />
+          </Field>
+          <Field label={t.accessibilityContact} hint={t.accessibilityContactHint}>
+            <input
+              placeholder={he ? "לדוגמה: אורית · orit@example.com · 03-1234567" : "e.g. Orit · orit@example.com · 03-1234567"}
+              value={fields.accessibilityContact}
+              onChange={(e) => set("accessibilityContact", e.target.value)}
               className="w-full"
             />
           </Field>

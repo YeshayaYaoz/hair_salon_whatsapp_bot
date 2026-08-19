@@ -195,38 +195,101 @@ salon's customers ever see. **Fixed.**
 
 ---
 
-## Recommended, not yet done
+## Second round
 
-Ordered by value. None of these are defects; they are the next round.
+Everything below was on the "recommended" list at first publication and has since been built.
 
-1. **Per-salon accessibility statements on booking pages.** Described above. Real differentiator,
-   real legal value to the customer, one template.
-2. **A real testimonial, obtained properly.** Testimonials placed next to a CTA are reported to
+### Per-salon accessibility statements
+
+The differentiator described above, now shipped. `/book/{id}/accessibility` generates a statement
+in the salon's own name: what it covers, the conformance level, the eight measures the booking page
+implements, the one known limitation (third-party payment pages), and a contact.
+
+Two decisions worth recording. **The statement is scoped narrowly and says so** — it covers the
+booking page and explicitly disclaims the salon's physical premises, other websites and social
+channels, because we know nothing about those and an overreaching statement is worse than a narrow
+one. And **the contact is a real field the owner fills in**, not something we invent: a new
+`Business.accessibilityContact` column, edited on the Settings page with an explanation of why the
+duty is theirs rather than ours. Left empty, the statement still publishes and directs visitors to
+the business's usual channels — better than no statement, and honest about what we don't know.
+
+### Motion: cost and craft
+
+**Cost.** All three scroll/pointer effects on both landing pages read layout and wrote styles
+synchronously inside their own handlers — the textbook thrash loop, since `getBoundingClientRect()`
+right after a style write forces a synchronous layout. `mousemove` is the worst offender: a
+high-polling mouse fires it well over 100 times a second, and each one measured a card and wrote a
+transform. All six now coalesce to one read/write pass per animation frame behind a `ticking`
+latch, card geometry is measured once on `mouseenter` instead of on every move, and the sticky CTA
+only writes its opacity when it actually crosses the threshold.
+
+Two behaviours came out of this that weren't in the original finding. The tilt effects now **honour
+`prefers-reduced-motion` in JavaScript**, which the global CSS rule could never do for them — that
+rule neutralises CSS animations and transitions, and these are direct style writes. And the card
+tilt is **skipped entirely on coarse pointers**, where a synthetic `mousemove` on tap was leaving
+cards frozen mid-tilt with no pointer to leave and un-tilt them.
+
+**Craft.** Every entrance in the system animated on `ease` — `cubic-bezier(0.25, 0.1, 0.25, 1)` —
+which accelerates before it decelerates. That is right for something moving between two on-screen
+positions and wrong for something arriving: the slow start reads as lag, because the element hangs
+at its offset for the first few frames before committing. Every major motion system (Material,
+Apple HIG, Carbon) says entrances decelerate only. Three curves are now named once on `:root`:
+
+| Token | Curve | Used for |
+| --- | --- | --- |
+| `--ease-entrance` | `cubic-bezier(0.16, 1, 0.3, 1)` | everything arriving — fade-up, fade-in, slide-in, scale-in |
+| `--ease-exit` | `cubic-bezier(0.7, 0, 0.84, 0)` | anything leaving |
+| `--ease-spring` | `cubic-bezier(0.34, 1.56, 0.64, 1)` | confirmations only (`pop`) — the overshoot is the point |
+
+### Live regions
+
+`SavedBadge` — used across six settings-style pages — now carries `role="status"`. It is mounted
+*after* an async save completes, and a screen reader has no reason to revisit that corner of the
+screen, so the save was previously silent and the only way to confirm it was to reload.
+
+### Closed days on the booking date picker
+
+The public endpoint has always returned the salon's opening hours and this page has always ignored
+them, so a customer could pick a day the salon is simply never open — Saturday, for most Israeli
+salons — wait for a request, and be told there was nothing, with no way to distinguish that from a
+day that merely happened to be full. Closed weekdays are now struck through and disabled.
+
+Scoped honestly: only weekly closures. Holidays, vacations and one-off blocks live in tables this
+endpoint doesn't expose, so an enabled day still isn't a promise of availability — it just isn't a
+*guaranteed* dead end.
+
+### Trust bar
+
+Railway Cloud removed. This strip is read by a salon owner deciding whether to trust us with their
+appointment book, and which PaaS we deploy on answers a question they have not asked and cannot
+evaluate. The AI vendors stay: they back the product's central claim. Hosting doesn't.
+
+### Correction: the multiple-`<h1>` finding was wrong
+
+The first version of this report flagged three `<h1>`s on `/dashboard/analytics` and two each on
+`/bot` and `/settings`, and said `/dashboard/blocked` had no heading. On inspection **none of that
+is a defect**. The duplicates are mutually exclusive early-return branches — error state, loading
+state, loaded state — so exactly one `<h1>` ever renders. And `/dashboard/blocked` is a redirect
+stub kept alive for old bookmarks; it correctly renders nothing at all. The finding was an artefact
+of counting matches with `grep` rather than reading the branches. No change made.
+
+---
+
+## Still recommended
+
+1. **A real testimonial, obtained properly.** Testimonials placed next to a CTA are reported to
    lift B2B SaaS conversion by up to 68%, and pricing pages carrying them convert ~34% better. The
    product now has *no* social proof rather than fake proof, which is the right trade — but the
    honest version is worth actively going and getting. One named salon owner, with written
-   permission, beats every invented number that was just removed. Restore the JSON-LD
-   `aggregateRating` only once reviews are visible on the page.
-3. **INP risk from unthrottled scroll and mousemove handlers.** The landing page writes
-   `style.transform` directly on every `mousemove` over a feature card, and calls
-   `getBoundingClientRect()` on every scroll tick for the 3D product tilt — both outside
-   `requestAnimationFrame`. INP is the most-failed Core Web Vital in 2026 (43% of sites miss the
-   200ms threshold), it is a confirmed ranking signal, and it feeds Google Ads Quality Score
-   through landing-page experience. Wrapping both in rAF is a contained change.
-4. **`aria-live` regions.** There are none anywhere in the app. Every async outcome — saved, error,
-   loading — is a silent visual change to a screen-reader user. The billing banner added here is
-   the first `role="status"` in the codebase; the `SavedBadge` component used across six pages is
-   the natural next one.
-5. **Multiple `<h1>`s** on `/dashboard/analytics` (3), `/bot` (2) and `/settings` (2);
-   `/dashboard/blocked` has no heading at all.
-6. **Trust bar is aimed at the wrong reader.** It lists Railway Cloud and OpenAI. A salon owner
-   deciding whether to trust us with their appointment book does not know or care what we deploy
-   on; WhatsApp Business API and Google Calendar are the only two entries doing persuasive work.
-   Infrastructure vendors belong in the footer, if anywhere.
-7. **Booking page shows no availability until a date is picked.** The customer chooses a day, waits,
-   and may be told there is nothing — then has to go back. Fetching the range up front and dimming
-   closed days would remove a dead end from the flow with the highest abandonment sensitivity in
-   the product.
+   permission, beats every invented number that was removed. Restore the JSON-LD `aggregateRating`
+   only once reviews are visible on the page. **This is the one item on the list that cannot be
+   built — it has to be asked for.**
+2. **Tell existing salons about their accessibility obligation.** The statement now generates
+   automatically, but no owner knows it exists or that the duty was ever theirs. A one-off message
+   pointing at their new statement and the contact field is both a genuine service and a good
+   reason to be in their inbox.
+3. **Prompt for the accessibility contact in the setup checklist**, so the field gets filled rather
+   than sitting empty behind a Settings tab.
 
 ---
 

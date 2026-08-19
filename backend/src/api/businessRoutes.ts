@@ -692,6 +692,9 @@ const profileSchema = z.object({
   quickReplies: z.array(z.string().min(1).max(20)).max(3).optional(),
   botPersonality: z.string().optional(),
   googleMapsUrl: z.string().optional(),
+  // Free text on purpose: an owner may want to publish an email, a phone number, or both, and a
+  // format check here would reject a perfectly valid "אורית, 03-1234567" for no gain.
+  accessibilityContact: z.string().max(200).optional(),
   remindersEnabled: z.boolean().optional(),
   reviewsEnabled: z.boolean().optional(),
   cancellationPolicy: z.string().max(500).optional(),
