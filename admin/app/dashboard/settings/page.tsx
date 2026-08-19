@@ -274,7 +274,35 @@ export default function SettingsPage() {
             <input value={fields.address} onChange={(e) => set("address", e.target.value)} className="w-full" />
           </Field>
           <Field label={t.timezone}>
-            <input value={fields.timezone} onChange={(e) => set("timezone", e.target.value)} className="w-full" />
+            {/* A select, not free text. A typo here ("Asia/Jerusalm") silently shifts every
+                reminder and every slot the bot offers, and nothing on screen says why. */}
+            <select value={fields.timezone} onChange={(e) => set("timezone", e.target.value)} className="w-full" dir="ltr">
+              {[
+                "Asia/Jerusalem", "Europe/London", "Europe/Paris", "Europe/Berlin",
+                "America/New_York", "America/Los_Angeles",
+                // A stored zone outside the list must stay visible while selected — otherwise the
+                // browser displays the first option while something else is actually saved.
+                ...(["Asia/Jerusalem","Europe/London","Europe/Paris","Europe/Berlin","America/New_York","America/Los_Angeles"].includes(fields.timezone) ? [] : [fields.timezone]),
+              ].map((tz) => (
+                <option key={tz} value={tz}>{tz}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label={t.googleMapsUrl} hint={t.googleMapsUrlHint}>
+            <input
+              placeholder="https://g.page/r/..."
+              value={fields.googleMapsUrl}
+              onChange={(e) => set("googleMapsUrl", e.target.value)}
+              className="w-full"
+            />
+          </Field>
+          <Field label={t.accessibilityContact} hint={t.accessibilityContactHint}>
+            <input
+              placeholder={he ? "לדוגמה: אורית · orit@example.com · 03-1234567" : "e.g. Orit · orit@example.com · 03-1234567"}
+              value={fields.accessibilityContact}
+              onChange={(e) => set("accessibilityContact", e.target.value)}
+              className="w-full"
+            />
           </Field>
           <Field label={t.loginEmail}>
             <input value={fields.email} disabled className="w-full opacity-60 cursor-not-allowed" />
@@ -337,22 +365,6 @@ export default function SettingsPage() {
               </p>
             )
           )}
-          <Field label={t.googleMapsUrl} hint={t.googleMapsUrlHint}>
-            <input
-              placeholder="https://g.page/r/..."
-              value={fields.googleMapsUrl}
-              onChange={(e) => set("googleMapsUrl", e.target.value)}
-              className="w-full"
-            />
-          </Field>
-          <Field label={t.accessibilityContact} hint={t.accessibilityContactHint}>
-            <input
-              placeholder={he ? "לדוגמה: אורית · orit@example.com · 03-1234567" : "e.g. Orit · orit@example.com · 03-1234567"}
-              value={fields.accessibilityContact}
-              onChange={(e) => set("accessibilityContact", e.target.value)}
-              className="w-full"
-            />
-          </Field>
         </Section>
 
         <Section

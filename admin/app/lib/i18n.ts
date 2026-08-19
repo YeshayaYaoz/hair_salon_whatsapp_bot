@@ -106,7 +106,7 @@ const translations = {
     markNotified: "Mark notified", noWaitlist: "No one on the waitlist yet.",
 
     // Settings
-    settingsTitle: "Settings", settingsSubtitle: "Salon profile and business details",
+    settingsTitle: "Settings", settingsSubtitle: "Business details, your alerts, and deposits",
     businessProfile: "Business profile", businessProfileDesc: "Basic info shown to customers via the bot.",
     bookingNotifications: "Booking notifications",
     bookingNotificationsDesc: "Get a WhatsApp message on your phone every time a customer books.",
@@ -275,10 +275,10 @@ const translations = {
     markNotified: "סימון כעודכן", noWaitlist: "אין כרגע ממתינים",
 
     // Settings
-    settingsTitle: "הגדרות", settingsSubtitle: "פרופיל הסלון ופרטי העסק",
+    settingsTitle: "הגדרות", settingsSubtitle: "פרטי העסק, התראות אליכם ומקדמות",
     businessProfile: "פרופיל העסק", businessProfileDesc: "מידע בסיסי שמוצג ללקוחות דרך הבוט.",
     bookingNotifications: "התראות הזמנה",
-    bookingNotificationsDesc: "קבלו הודעת וואטסאפ בכל פעם שלקוח קובע תור.",
+    bookingNotificationsDesc: "לאן אנחנו שולחים לכם הודעת וואטסאפ כשלקוח קובע תור או מבקש נציג.",
 
     // Bot
     botTabTitle: "בוט", botTabSubtitle: "איך הבוט מדבר, ומה הוא שולח אוטומטית",
