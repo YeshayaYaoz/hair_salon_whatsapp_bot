@@ -1,0 +1,70 @@
+name: Email digital-invoice about API access
+
+# One-off outreach to info@digital-invoice.co.il asking for their demo environment and API
+# document, sent at the owner's explicit request. Their own site says the docs are handed out by
+# mailing this address — the "API Docs" link on their מהו-API page is text with no href.
+#
+# Runs through `railway run` so RESEND_API_KEY is read from the backend's own production
+# variables and never exists in this repo or its logs. Reply-To is the owner's address, so the
+# answer goes straight to his inbox — nothing here needs to (or can) watch a mailbox.
+#
+# Kept as a workflow rather than deleted after use: the next "mail this vendor for API docs"
+# request edits two strings instead of rebuilding the plumbing.
+on:
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+      BACKEND_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+    steps:
+      - name: Send via Resend
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::error::RAILWAY_TOKEN is not set."
+            exit 1
+          fi
+          npm i -g @railway/cli >/dev/null 2>&1
+
+          # Assembled with jq so the Hebrew text needs no JSON escaping by hand.
+          cat > /tmp/body.txt <<'EOF'
+          שלום,
+
+          אני פונה מטעם תורי-אונליין (torionline.com) — מערכת לניהול תורים והזמנות בוואטסאפ לעסקים קטנים בישראל. אנחנו מפיקים קבלות עבור העסקים שעובדים איתנו דרך ספקי חשבוניות דיגיטליות, ומעוניינים להוסיף תמיכה במערכת שלכם.
+
+          בהתאם להנחיות באתר שלכם, אשמח:
+          1. לקבל גישה לסביבת הדמו
+          2. לקבל את מסמך ה-API
+
+          שלוש שאלות שיעזרו לנו להתממשק מהר:
+          - איך מתבצע האימות מול ה-API (מפתח וסוד? טוקן?)
+          - מהי הקריאה להפקת קבלה על תשלום שנסלק חיצונית (לא דרככם)
+          - האם קיימת קריאה שמאמתת פרטי גישה בלי להפיק מסמך, לצורך בדיקת חיבור
+
+          כתובת ליצירת קשר ולרישום: y28112000@gmail.com
+          אפשר להשיב ישירות למייל הזה — התשובה תגיע אליי.
+
+          תודה רבה,
+          ישעיה
+          תורי-אונליין · torionline.com
+          EOF
+
+          jq -n --rawfile body /tmp/body.txt '{
+            from: "תורי-אונליין <noreply@torionline.com>",
+            to: "info@digital-invoice.co.il",
+            reply_to: "y28112000@gmail.com",
+            subject: "בקשת גישה לסביבת דמו ומסמך API — תורי-אונליין",
+            text: $body
+          }' > /tmp/payload.json
+
+          # The key is expanded inside railway run's environment, quoted, and never echoed.
+          railway run --service "$BACKEND_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+            bash -c 'code=$(curl -sS -o /tmp/resp.json -w "%{http_code}" https://api.resend.com/emails \
+              -H "Authorization: Bearer $RESEND_API_KEY" -H "Content-Type: application/json" \
+              --data @/tmp/payload.json); \
+              echo "HTTP $code"; \
+              if [ "$code" = "200" ]; then jq -r "\"Sent, id: \" + .id" /tmp/resp.json; \
+              else cat /tmp/resp.json; exit 1; fi'
