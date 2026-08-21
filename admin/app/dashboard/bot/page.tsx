@@ -142,7 +142,10 @@ function VoiceSelect() {
               onChange={(e) => save(e.target.value)}
               className="flex-1 min-w-[200px] disabled:opacity-50"
             >
-              <option value="">{he ? "ברירת מחדל" : "Default"}</option>
+              {/* The default is the agent's configured voice, which is masculine — and with the curated
+                  list currently offering only a feminine alternative, this option is the only way
+                  to get the male voice, so it has to say that instead of the opaque "default". */}
+              <option value="">{he ? "ברירת מחדל — קול גברי" : "Default — male voice"}</option>
               {groups.map((g) => {
                 const inGroup = voices.filter((v) => v.gender === g.key);
                 if (!inGroup.length) return null;
@@ -460,7 +463,11 @@ function VoiceMinutes() {
                   {" · "}
                   {formatDuration(c.durationSeconds)}
                 </span>
-                <span className="text-gray-700">
+                {/* dir="auto": summaries are stored in Hebrew now (translated at ingestion),
+                    but rows written before that are English, and English text inside an RTL list
+                    renders with its punctuation flung to the wrong end — the period leading the
+                    sentence. auto lets each row lay out in its own language's direction. */}
+                <span className="text-gray-700" dir="auto">
                   {/* A call the hourly sync recorded has no summary — the provider only sends one
                       with the live event. Saying so beats an empty cell that reads as a bug. */}
                   {c.summary || "—"}

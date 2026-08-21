@@ -19,6 +19,7 @@
 import { asyncRouter } from "../lib/asyncRouter.js";
 import { prisma } from "../lib/prisma.js";
 import { getAgentCall, type CartesiaCall } from "../lib/cartesiaAdmin.js";
+import { toHebrewSummary } from "../lib/hebrewSummary.js";
 import { recordCall, voiceNumberIndex, transcriptMetrics } from "../lib/voiceUsage.js";
 
 export const cartesiaWebhookRouter = asyncRouter();
@@ -64,8 +65,12 @@ async function handle(body: WebhookBody): Promise<void> {
     }
 
     case "post_call_analysis": {
-      const summary = body.analysis?.summary?.trim();
-      if (!summary || !body.call_id) return;
+      const rawSummary = body.analysis?.summary?.trim();
+      if (!rawSummary || !body.call_id) return;
+      // Hebrew before storage — the row is read on a Hebrew dashboard. recordCall translates its
+      // own path, so the fallback below hands it the already-translated text (a no-op there:
+      // Hebrew input passes straight through).
+      const summary = await toHebrewSummary(rawSummary);
 
       const updated = await prisma.apiUsageEvent.updateMany({
         where: { externalId: body.call_id },

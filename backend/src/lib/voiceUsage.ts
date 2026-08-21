@@ -13,6 +13,7 @@
  * what gets read.
  */
 import { prisma } from "./prisma.js";
+import { toHebrewSummary } from "./hebrewSummary.js";
 import { listAgentCalls, CartesiaNotConfiguredError, type CartesiaCall, type CartesiaTurn } from "./cartesiaAdmin.js";
 import { normalizePhone } from "./phone.js";
 
@@ -102,6 +103,11 @@ export async function recordCall(c: CartesiaCall, byNumber: Map<string, string>)
   }
 
   const metrics = transcriptMetrics(c.transcript);
+  // Translated once, up front, so the create and the duplicate-update below can never disagree
+  // about which language got stored. Cartesia writes its post-call summaries in English; the
+  // owner reading them is on a Hebrew dashboard. Fail-open — see hebrewSummary.ts.
+  const summary = await toHebrewSummary(c.summary);
+
   try {
     await prisma.apiUsageEvent.create({
       data: {
@@ -112,7 +118,7 @@ export async function recordCall(c: CartesiaCall, byNumber: Map<string, string>)
         externalId: c.id,
         durationSeconds: seconds,
         costAgorot: callCostAgorot(seconds),
-        summary: c.summary?.trim() || null,
+        summary,
         ...metrics,
       },
     });
@@ -122,11 +128,11 @@ export async function recordCall(c: CartesiaCall, byNumber: Map<string, string>)
     // transcript the list endpoint does not, so a duplicate is still worth writing through for the
     // fields the first write could not have had — never for the billing figures, which are settled.
     if (!isUniqueViolation(err)) throw err;
-    if (metrics.ttfbMsMedian !== null || c.summary) {
+    if (metrics.ttfbMsMedian !== null || summary) {
       await prisma.apiUsageEvent.updateMany({
         where: { externalId: c.id },
         data: {
-          ...(c.summary?.trim() ? { summary: c.summary.trim() } : {}),
+          ...(summary ? { summary } : {}),
           ...(metrics.ttfbMsMedian !== null ? metrics : {}),
         },
       });
