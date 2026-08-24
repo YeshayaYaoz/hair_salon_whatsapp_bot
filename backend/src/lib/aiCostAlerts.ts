@@ -27,7 +27,7 @@ const AI_BUDGET_SHARE_OF_REVENUE = 0.25;
  * revenue to take a share of; their figure is the flat amount worth paying to win a customer.
  */
 export const AI_BUDGET_AGOROT_BY_PLAN: Record<string, number> = {
-  standard: Math.round(189 * 100 * AI_BUDGET_SHARE_OF_REVENUE), // ₪47.25
+  standard: Math.round(174.9 * 100 * AI_BUDGET_SHARE_OF_REVENUE),
   premium: Math.round(449 * 100 * AI_BUDGET_SHARE_OF_REVENUE), // ₪112.25
   ultra: Math.round(849 * 100 * AI_BUDGET_SHARE_OF_REVENUE), // ₪212.25
 };

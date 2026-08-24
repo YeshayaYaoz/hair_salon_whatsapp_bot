@@ -37,7 +37,7 @@ const ALT = "#F9FAFB";   // this page's existing light-alt tint
    price drifts out of date the moment the rate moves. Naming them here rather than typing them
    into the markup is what stops a repeat of the old hardcoded $39/$79, which sat on this page
    long after the real prices changed. */
-const PLAN_ILS = { standard: 189, premium: 449, ultra: 849 } as const;
+const PLAN_ILS = { standard: "174.90", premium: "449", ultra: "849" } as const;
 const PAPER = "#ffffff";
 
 /* One wave period is 1440 units. The path is drawn twice, the second copy with every control point

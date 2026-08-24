@@ -15,7 +15,9 @@ const STATUS_COLORS: Record<string, string> = {
 type PlanKey = "standard" | "premium" | "ultra";
 const PLANS: PlanKey[] = ["standard", "premium", "ultra"];
 const PLAN_LABEL: Record<PlanKey, string> = { standard: "Standard", premium: "Premium", ultra: "Ultra" };
-const PLAN_PRICES: Record<PlanKey, number> = { standard: 189, premium: 449, ultra: 849 };
+const PLAN_PRICES: Record<PlanKey, number> = { standard: 174.9, premium: 449, ultra: 849 };
+// ₪174.9 must render as "174.90" — a price, not a float.
+const fmtIls = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
 // Must match ANNUAL_MONTHS_CHARGED in backend/src/billing/payplusSubscription.ts — the annual term
 // charges this many months for 12 months of service.
 const ANNUAL_MONTHS_CHARGED = 10;
@@ -369,7 +371,7 @@ export default function BillingPage() {
     billingCycle === "annual"
       ? (PLAN_PRICES[activePlan] * ANNUAL_MONTHS_CHARGED) / 12
       : PLAN_PRICES[activePlan];
-  const realMonthlyPrice = Math.max(0, Math.round(listMonthlyPrice - (status === "active" ? loyaltyDiscountIls : 0)));
+  const realMonthlyPrice = Math.max(0, listMonthlyPrice - (status === "active" ? loyaltyDiscountIls : 0));
 
   return (
     <div className="animate-fade-in">
@@ -456,9 +458,9 @@ export default function BillingPage() {
                   </span>
                   <div className="flex items-baseline gap-1">
                     {loyaltyDiscountIls > 0 && (
-                      <span className="text-xs text-gray-600 line-through tabular-nums">₪{PLAN_PRICES[activePlan]}</span>
+                      <span className="text-xs text-gray-600 line-through tabular-nums">₪{fmtIls(PLAN_PRICES[activePlan])}</span>
                     )}
-                    <span className="text-lg font-extrabold text-gray-900 tabular-nums">₪{realMonthlyPrice}</span>
+                    <span className="text-lg font-extrabold text-gray-900 tabular-nums">₪{fmtIls(realMonthlyPrice)}</span>
                     <span className="text-xs text-gray-600">{lang === "he" ? "/חודש" : "/month"}</span>
                   </div>
                 </div>
@@ -521,9 +523,9 @@ export default function BillingPage() {
                   <p className="text-xs text-gray-600 mb-2">{lang === "he" ? PLAN_TAGLINE[p].he : PLAN_TAGLINE[p].en}</p>
                   <div className="flex items-baseline gap-1 mb-1">
                     {p === plan && loyaltyDiscountIls > 0 && (
-                      <span className="text-base text-gray-600 line-through tabular-nums">₪{PLAN_PRICES[p]}</span>
+                      <span className="text-base text-gray-600 line-through tabular-nums">₪{fmtIls(PLAN_PRICES[p])}</span>
                     )}
-                    <span className="text-3xl font-extrabold text-gray-900 tabular-nums">₪{priceAfterDiscount}</span>
+                    <span className="text-3xl font-extrabold text-gray-900 tabular-nums">₪{fmtIls(priceAfterDiscount)}</span>
                     <span className="text-sm text-gray-600">{lang === "he" ? "/חודש" : "/month"}</span>
                   </div>
                   <p className="text-xs text-gray-600">{lang === "he" ? PLAN_ICEBREAKER[p].he : PLAN_ICEBREAKER[p].en}</p>
@@ -622,7 +624,7 @@ export default function BillingPage() {
             ) : (
               <>
                 <div className="flex items-baseline gap-1.5 mt-3">
-                  <span className="text-white/50 text-base line-through tabular-nums">₪{PLAN_PRICES[activePlan]}</span>
+                  <span className="text-white/50 text-base line-through tabular-nums">₪{fmtIls(PLAN_PRICES[activePlan])}</span>
                   <span className="text-3xl font-extrabold text-white tabular-nums">₪{Math.round((PLAN_PRICES[activePlan] * 10) / 12)}</span>
                   <span className="text-sm text-white/70">{lang === "he" ? "/חודש בממוצע" : "/mo on average"}</span>
                 </div>
