@@ -25,20 +25,88 @@ const MESSAGE_QUOTA_BY_PLAN: Record<PlanKey, number> = { standard: 300, premium:
 
 // Features shared by both plans — everything below is what actually differs, so the comparison
 // is honest about what a Premium upgrade buys today rather than padding the list.
-const SHARED_FEATURES_HE = [
-  "בוט WhatsApp פעיל 24/7",
-  "קביעת תורים ותזכורות אוטומטיות",
-  "סנכרון מלא עם Google Calendar",
-  "דשבורד ניהול ואנליטיקס",
-  "תמיכה טכנית ללא הגבלה",
-];
-const SHARED_FEATURES_EN = [
-  "24/7 active WhatsApp bot",
-  "Automatic booking & reminders",
-  "Full Google Calendar sync",
-  "Management dashboard & analytics",
-  "Unlimited technical support",
-];
+/**
+ * Per-plan cards. The previous layout repeated the same five base lines on every card, which made
+ * the three plans look identical and buried the actual differences at the bottom — the one
+ * question a pricing card must answer ("what do I get for the extra money?") took the most work
+ * to answer. Now Standard states the full base once, and each tier above it opens with
+ * "everything in X" and lists only what changes.
+ *
+ * The voice bot appears as a real Premium feature: it is live in production, and the "coming
+ * soon" tag it used to carry was both false and the death of Premium's whole pitch — the card was
+ * asking ₪260 more for a quota bump and a promise.
+ */
+const PLAN_TAGLINE: Record<PlanKey, { he: string; en: string }> = {
+  standard: { he: "כל מה שצריך כדי שהוואטסאפ יעבוד בשבילכם", en: "Everything you need for WhatsApp to work for you" },
+  premium: { he: "גם הטלפון עונה מעצמו", en: "The phone answers itself too" },
+  ultra: { he: "נפח גבוה, ליווי צמוד, התאמה אישית", en: "High volume, close guidance, custom fit" },
+};
+const PLAN_FEATURES: Record<PlanKey, { he: string[]; en: string[] }> = {
+  standard: {
+    he: [
+      "בוט WhatsApp בעברית שסוגר תורים לבד, 24/7",
+      "תזכורות אוטומטיות — פחות תורים שנשכחים",
+      "בקשת ביקורת אחרי כל ביקור",
+      "סנכרון מלא עם Google Calendar",
+      "גביית מקדמות באשראי",
+      "רשימת המתנה שממלאת ביטולים",
+      "דשבורד ניהול ואנליטיקס",
+      "עד 300 הודעות תזכורת/ביקורת בחודש",
+    ],
+    en: [
+      "A WhatsApp bot that closes bookings on its own, 24/7",
+      "Automatic reminders — fewer no-shows",
+      "A review request after every visit",
+      "Full Google Calendar sync",
+      "Card deposits on bookings",
+      "A waitlist that refills cancellations",
+      "Management dashboard & analytics",
+      "Up to 300 reminder/review messages a month",
+    ],
+  },
+  premium: {
+    he: [
+      "כל מה שיש ב-Standard, ובנוסף:",
+      "סוכן AI עונה לכל שיחת טלפון נכנסת בקול טבעי",
+      "בוחרים קול — גבר או אישה",
+      "תור שנקבע בטלפון נכנס ליומן כמו כל תור",
+      "כל שיחה מתומללת — קוראים במקום להאזין",
+      "אין מספר? אנחנו מנפיקים ומחברים בשבילכם",
+      "עד 1,000 הודעות תזכורת/ביקורת בחודש",
+    ],
+    en: [
+      "Everything in Standard, plus:",
+      "An AI agent answers every incoming call in a natural voice",
+      "Pick the voice — male or female",
+      "Phone bookings land in your calendar like any other",
+      "Every call transcribed — read instead of replaying",
+      "No number? We issue and connect one for you",
+      "Up to 1,000 reminder/review messages a month",
+    ],
+  },
+  ultra: {
+    he: [
+      "כל מה שיש ב-Premium, ובנוסף:",
+      "עד 3,000 הודעות בחודש — למילוי שעות מתות",
+      "ליווי הקמה אישי — מגדירים הכל ביחד",
+      "קופצים לראש התור בכל פנייה לתמיכה",
+      "מתאימים את המערכת אישית לעסק שלכם",
+    ],
+    en: [
+      "Everything in Premium, plus:",
+      "Up to 3,000 messages a month — to fill quiet hours",
+      "Personal onboarding — we set it all up together",
+      "Front of the line on every support request",
+      "The system tailored personally to your business",
+    ],
+  },
+};
+/** The friendly beat under the price — small, true, and human. */
+const PLAN_ICEBREAKER: Record<PlanKey, { he: string; en: string }> = {
+  standard: { he: "☕ פחות ממחיר קפה ביום", en: "☕ Less than a coffee a day" },
+  premium: { he: "📞 הטלפון עונה גם כשהידיים שלכם עסוקות", en: "📞 Answers even when your hands are full" },
+  ultra: { he: "🤝 עסק גדול? יש לכם צוות מאחוריכם", en: "🤝 Growing fast? You've got a team behind you" },
+};
 
 const AFTER_HOURS_CAPTURE = 0.15; // share of bookings recovered by answering 24/7
 const MINUTES_SAVED_PER_BOOKING = 4; // manual admin time saved per booking
@@ -277,8 +345,6 @@ export default function BillingPage() {
   const statusKey = status as keyof typeof t.billingStatuses | null;
   const info = statusKey && t.billingStatuses[statusKey] ? t.billingStatuses[statusKey] : null;
   const color = status ? STATUS_COLORS[status] : "";
-  const sharedFeatures = lang === "he" ? SHARED_FEATURES_HE : SHARED_FEATURES_EN;
-
   let trialDaysLeft: number | null = null;
   if (status === "trial" && createdAt) {
     const trialEnd = new Date(createdAt).getTime() + 14 * 24 * 60 * 60 * 1000;
@@ -451,7 +517,8 @@ export default function BillingPage() {
                     </span>
                   )}
 
-                  <span className="text-sm font-bold text-gray-900 mb-2">{PLAN_LABEL[p]}</span>
+                  <span className="text-sm font-bold text-gray-900">{PLAN_LABEL[p]}</span>
+                  <p className="text-xs text-gray-600 mb-2">{lang === "he" ? PLAN_TAGLINE[p].he : PLAN_TAGLINE[p].en}</p>
                   <div className="flex items-baseline gap-1 mb-1">
                     {p === plan && loyaltyDiscountIls > 0 && (
                       <span className="text-base text-gray-600 line-through tabular-nums">₪{PLAN_PRICES[p]}</span>
@@ -459,48 +526,29 @@ export default function BillingPage() {
                     <span className="text-3xl font-extrabold text-gray-900 tabular-nums">₪{priceAfterDiscount}</span>
                     <span className="text-sm text-gray-600">{lang === "he" ? "/חודש" : "/month"}</span>
                   </div>
+                  <p className="text-xs text-gray-600">{lang === "he" ? PLAN_ICEBREAKER[p].he : PLAN_ICEBREAKER[p].en}</p>
                   {p === plan && loyaltyDiscountIls > 0 && (
-                    <p className="text-xs font-medium text-green-700 mb-2">
+                    <p className="text-xs font-medium text-green-700 mt-1">
                       🎁 {lang === "he" ? "הנחת נאמנות מוחלת אוטומטית" : "Loyalty discount applied automatically"}
                     </p>
                   )}
 
                   <ul className="flex flex-col gap-2 my-4">
-                    {sharedFeatures.map((f) => (
-                      <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
-                        <svg className="w-4 h-4 text-[#197492] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                        {f}
-                      </li>
-                    ))}
-                    <li className="flex items-center gap-2 text-sm text-gray-900 font-medium">
-                      <svg className="w-4 h-4 text-[#197492] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                      {lang === "he"
-                        ? `עד ${MESSAGE_QUOTA_BY_PLAN[p].toLocaleString()} הודעות תזכורת/ביקורת בחודש`
-                        : `Up to ${MESSAGE_QUOTA_BY_PLAN[p].toLocaleString()} reminder/review messages/month`}
-                    </li>
-                    {p === "ultra" && (
-                      <li className="flex items-center gap-2 text-sm text-gray-900 font-medium">
-                        <svg className="w-4 h-4 text-[#197492] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                        {lang === "he" ? "תמיכה מועדפת וליווי הקמה אישי" : "Priority support and personal onboarding"}
-                      </li>
-                    )}
-                    {p !== "standard" && (
-                      <li className="flex items-center gap-2 text-sm text-gray-600">
-                        <span className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-amber-700">🔜</span>
-                        <span>
-                          {lang === "he" ? "מענה טלפוני חכם ב-AI" : "AI phone-call answering"}
-                          <span className="ms-1.5 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-1.5 py-0.5 align-middle">
-                            {lang === "he" ? "בקרוב" : "SOON"}
-                          </span>
-                        </span>
-                      </li>
-                    )}
+                    {(lang === "he" ? PLAN_FEATURES[p].he : PLAN_FEATURES[p].en).map((f, i) => {
+                      // The "everything in X, plus:" opener is a header for the list, not a feature
+                      // of it — no checkmark, slightly muted, so the eye starts at what's new.
+                      const isOpener = i === 0 && p !== "standard";
+                      return isOpener ? (
+                        <li key={f} className="text-xs font-semibold text-gray-500">{f}</li>
+                      ) : (
+                        <li key={f} className="flex items-start gap-2 text-sm text-gray-700">
+                          <svg className="w-4 h-4 mt-0.5 text-[#197492] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                          {f}
+                        </li>
+                      );
+                    })}
                   </ul>
 
                   <div className="mt-auto flex flex-col gap-2">
