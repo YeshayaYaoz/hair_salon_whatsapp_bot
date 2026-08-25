@@ -81,7 +81,7 @@ export async function runSubscriptionBillingJob(): Promise<void> {
       nextBillingDate: { lte: now },
     },
     select: {
-      id: true, name: true, subscriptionToken: true, subscriptionPlan: true, billingCycle: true,
+      id: true, name: true, subscriptionToken: true, subscriptionCustomerUid: true, subscriptionPlan: true, billingCycle: true,
       billingCyclesCompleted: true, loyaltyDiscountIls: true, paymentProvider: true, invoiceProvider: true,
       billingFailedAttempts: true,
       notificationPhone: true, whatsappPhoneNumberId: true, whatsappAccessToken: true,
@@ -109,7 +109,12 @@ export async function runSubscriptionBillingJob(): Promise<void> {
     const amountIls = Math.max(0, fullAmount - business.loyaltyDiscountIls);
 
     const token = decryptSecret(business.subscriptionToken!);
-    const result = await chargeSubscriptionToken(token, amountIls, `תורי — חיוב ${business.billingCycle === "annual" ? "שנתי" : "חודשי"} (${business.name})`);
+    const result = await chargeSubscriptionToken(
+      token,
+      amountIls,
+      `תורי — חיוב ${business.billingCycle === "annual" ? "שנתי" : "חודשי"} (${business.name})`,
+      business.subscriptionCustomerUid ?? undefined
+    );
 
     if (result.success) {
       // Loyalty discount: only tracked for monthly billing — award it once tenure crosses the

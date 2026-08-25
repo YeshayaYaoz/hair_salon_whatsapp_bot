@@ -240,7 +240,7 @@ payplusBillingRouter.post("/payplus/switch-to-annual", requireAuth, async (req: 
   const token = decryptSecret(business.subscriptionToken);
   let result;
   try {
-    result = await chargeSubscriptionToken(token, amountIls, "תורי — מעבר למנוי שנתי");
+    result = await chargeSubscriptionToken(token, amountIls, "תורי — מעבר למנוי שנתי", business.subscriptionCustomerUid ?? undefined);
   } catch (err) {
     if (err instanceof PayPlusTerminalNotConfiguredError) return res.status(503).json({ error: "חיוב בכרטיס שמור אינו מוגדר בשרת. פנו לתמיכה." });
     throw err;
@@ -285,7 +285,7 @@ payplusBillingRouter.post("/payplus/wallet/topup", requireAuth, async (req: Auth
   const token = decryptSecret(business.subscriptionToken);
   let result;
   try {
-    result = await chargeSubscriptionToken(token, parsed.data.amountIls, "תורי — טעינת ארנק להודעות");
+    result = await chargeSubscriptionToken(token, parsed.data.amountIls, "תורי — טעינת ארנק להודעות", business.subscriptionCustomerUid ?? undefined);
   } catch (err) {
     if (err instanceof PayPlusTerminalNotConfiguredError) return res.status(503).json({ error: "חיוב בכרטיס שמור אינו מוגדר בשרת. פנו לתמיכה." });
     throw err;
@@ -341,7 +341,12 @@ payplusBillingRouter.put("/payplus/plan", requireAuth, async (req: AuthedRequest
     const token = decryptSecret(business.subscriptionToken);
     let result;
     try {
-      result = await chargeSubscriptionToken(token, proratedDiff, `תורי — שדרוג תוכנית (${parsed.data.plan})`);
+      result = await chargeSubscriptionToken(
+        token,
+        proratedDiff,
+        `תורי — שדרוג תוכנית (${parsed.data.plan})`,
+        business.subscriptionCustomerUid ?? undefined
+      );
     } catch (err) {
       if (err instanceof PayPlusTerminalNotConfiguredError) return res.status(503).json({ error: "חיוב בכרטיס שמור אינו מוגדר בשרת. פנו לתמיכה." });
       throw err;
@@ -575,8 +580,9 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
           walletBalanceAgorot: { increment: business.checkoutAmountIls * 100 },
           // Saved so the next top-up is a one-click token charge rather than another hosted page.
           // Only ever set, never cleared: a top-up must not be able to drop a working subscription
-          // token just because PayPlus returned none for this transaction.
-          ...(tokenUid ? { subscriptionToken: encryptSecret(tokenUid) } : {}),
+          // token just because PayPlus returned none for this transaction. The customer_uid moves
+          // with it — charging the token without it is rejected.
+          ...(tokenUid ? { subscriptionToken: encryptSecret(tokenUid), subscriptionCustomerUid: event.customerUid ?? null } : {}),
           // Consumed — leaving it set would let a replayed callback credit the wallet twice.
           checkoutRef: null,
           checkoutPurpose: null,
@@ -611,6 +617,7 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
         subscriptionStatus: "active",
         subscriptionPlan: plan,
         subscriptionToken: tokenUid ? encryptSecret(tokenUid) : null,
+        subscriptionCustomerUid: tokenUid ? event.customerUid ?? null : null,
         billingCycle,
         nextBillingDate: new Date(Date.now() + BILLING_PERIOD_DAYS[billingCycle] * 24 * 60 * 60 * 1000),
         lastBillingAttemptAt: new Date(),

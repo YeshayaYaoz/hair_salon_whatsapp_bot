@@ -306,6 +306,11 @@ export async function chargeSubscriptionToken(
       cashier_uid: cashierUid,
       amount: amountIls,
       currency_code: "ILS",
+      // Required, despite the OpenAPI schema also giving it a default of 1 — the server does not
+      // apply that default and answers `credit-terms-incorrect` when the field is absent, which is
+      // exactly how the first real ₪1 token charge failed. 1 = רגיל; 6 (credit) and 8 (payments)
+      // are the instalment terms, which a subscription renewal must never use.
+      credit_terms: 1,
       use_token: true,
       token,
       ...(customerUid ? { customer_uid: customerUid } : {}),
