@@ -32,6 +32,10 @@ model Business {
   // salon's own merchant account for charging their customers, not this.
   subscriptionPlan          String? // "standard" | "premium"
   subscriptionToken         String? // encrypted at rest — PayPlus recurring charge token
+  // PayPlus's Transactions/Charge marks customer_uid mandatory whenever use_token is true. The
+  // checkout callback is the only place it is ever handed to us, so it is captured there and kept
+  // beside the token it belongs to. Not a secret — an opaque PayPlus id, not card data.
+  subscriptionCustomerUid   String?
   // PayPlus caps more_info at 19 characters, which a cuid alone exceeds. The checkout link carries
   // this short reference instead, and the webhook looks the business up by it. plan/cycle can't fit
   // either, so they're parked here when the link is generated and read back on the callback.

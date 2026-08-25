@@ -61,6 +61,7 @@ describe("chargeSubscriptionToken", () => {
       cashier_uid: "cash-1",
       amount: 149,
       currency_code: "ILS",
+      credit_terms: 1,
       use_token: true,
       token: "tok-1",
     });
@@ -111,6 +112,16 @@ describe("chargeSubscriptionToken", () => {
     fetchMock.mockResolvedValue(okResponse({ transaction_uid: "tr-3" }));
     await chargeSubscriptionToken("tok-1", 1, "x");
     expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)).not.toHaveProperty("customer_uid");
+  });
+
+  it("always sends credit_terms — omitting it is rejected as credit-terms-incorrect", async () => {
+    // The first real ₪1 token charge failed on exactly this. The field is listed as required AND
+    // carries `"default": 1` in PayPlus's OpenAPI schema, so it reads as optional — but the server
+    // applies no default. 1 is רגיל; 6 and 8 are instalment terms a renewal must never send.
+    fetchMock.mockResolvedValue(okResponse({ transaction_uid: "tr-4" }));
+    await chargeSubscriptionToken("tok-1", 189, "x");
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.credit_terms).toBe(1);
   });
 
   it("reads the transaction id from either response shape PayPlus uses", async () => {
