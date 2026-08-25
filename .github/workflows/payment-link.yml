@@ -1,0 +1,61 @@
+name: One-off payment link
+
+# Generates a PayPlus payment link for an arbitrary amount — a setup fee, a custom service, an
+# agreed price that matches no plan.
+#
+# Runs through `railway run` because the PayPlus credentials live in Railway, not in Actions
+# secrets: the merchant keys belong to the service that charges with them, and a second copy here
+# would be another place to rotate and one more to forget.
+#
+# The link itself is printed in the log. That is deliberate — it is a payment page anyone with the
+# URL can pay on, not a credential that grants access to anything, and it is useless once paid.
+on:
+  workflow_dispatch:
+    inputs:
+      amount:
+        description: "Amount in ILS, e.g. 374.90"
+        required: true
+      description:
+        description: "What the payer is buying — appears on the payment page and the receipt"
+        default: "תשלום לתורי אונליין"
+      name:
+        description: "Payer name for the receipt"
+        default: "לקוח"
+      email:
+        description: "Payer email — PayPlus sends the receipt here (optional)"
+        default: ""
+
+jobs:
+  link:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+
+      - name: Generate the link
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+          RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+          AMOUNT: ${{ inputs.amount }}
+          DESCRIPTION: ${{ inputs.description }}
+          PAYER_NAME: ${{ inputs.name }}
+          PAYER_EMAIL: ${{ inputs.email }}
+        run: |
+          set -euo pipefail
+          npm i -g @railway/cli >/dev/null 2>&1
+          # An array, not a string: the description and payer name contain spaces, and an unquoted
+          # expansion would split them into separate arguments — the script would receive only the
+          # first word and PayPlus would print that on the receipt.
+          args=(--amount "$AMOUNT" --description "$DESCRIPTION" --name "$PAYER_NAME")
+          [ -n "$PAYER_EMAIL" ] && args+=(--email "$PAYER_EMAIL")
+          railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+            npx tsx scripts/payment-link.ts "${args[@]}"
