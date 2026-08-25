@@ -1,4 +1,4 @@
-export const INVOICE_PROVIDERS = ["greeninvoice", "icount", "payplus-invoice", "tori_managed"] as const;
+export const INVOICE_PROVIDERS = ["greeninvoice", "icount", "ypay", "payplus-invoice", "tori_managed"] as const;
 export type InvoiceProviderName = (typeof INVOICE_PROVIDERS)[number];
 
 export interface InvoiceCredentials {

@@ -1,6 +1,7 @@
 import type { InvoiceProvider, InvoiceProviderName } from "./types.js";
 import { greenInvoiceProvider } from "./greenInvoice.js";
 import { icountProvider } from "./icount.js";
+import { ypayProvider } from "./ypay.js";
 import { payplusInvoiceProvider } from "./payplusInvoice.js";
 import { toriManagedInvoiceProvider } from "./toriManaged.js";
 
@@ -10,6 +11,7 @@ export { resolveInvoiceCredentials } from "./resolve.js";
 const PROVIDERS: Record<InvoiceProviderName, InvoiceProvider> = {
   greeninvoice: greenInvoiceProvider,
   icount: icountProvider,
+  ypay: ypayProvider,
   "payplus-invoice": payplusInvoiceProvider,
   tori_managed: toriManagedInvoiceProvider,
 };

@@ -11,7 +11,7 @@ import { readableWithWhiteText } from "../../lib/readableColor";
 const PAYMENT_PROVIDERS = ["payplus", "tranzila", "cardcom", "grow"] as const;
 type PaymentProviderName = (typeof PAYMENT_PROVIDERS)[number];
 
-const INVOICE_PROVIDERS = ["greeninvoice", "icount", "payplus-invoice"] as const;
+const INVOICE_PROVIDERS = ["greeninvoice", "icount", "ypay", "payplus-invoice"] as const;
 type InvoiceProviderName = (typeof INVOICE_PROVIDERS)[number];
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -121,6 +121,19 @@ const INVOICE_META: Record<InvoiceProviderName, ProviderMeta> = {
       en: "Your company id (cid) is in your account's URL. Generate an API Token under Settings → API.",
     },
     instructionsUrl: "https://app.icount.co.il/",
+  },
+  ypay: {
+    label: "YPAY",
+    color: "#1B4F9C",
+    monogram: "Y",
+    instructions: {
+      // Their own document (v1.9, p.3) states the keys are issued "after registration to API
+      // service" and arrive by email — so this points at the account rather than at a settings
+      // screen the owner may not have.
+      he: "נדרשת הרשמה לשירות ה-API של YPAY. לאחריה מגיעים במייל client_id ו-client_secret — אלה שני המפתחות כאן.",
+      en: "Requires registering for YPAY's API service. They then email you a client_id and client_secret — those are the two keys here.",
+    },
+    instructionsUrl: "https://ypay.co.il/front/article/68",
   },
   "payplus-invoice": {
     label: "PayPlus חשבונית+",
