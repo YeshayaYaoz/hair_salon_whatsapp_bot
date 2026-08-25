@@ -65,6 +65,7 @@ model Business {
   // abandoned checkout must leave no trace of a discount the business never paid for.
   checkoutCouponCode        String?
   couponRedemptions         CouponRedemption[]
+  customerCoupons           CustomerCoupon[]
   lastBillingReminderSentAt DateTime? // last "charge in 2 days" heads-up, to avoid duplicates
   // Consecutive failed charges in the current dunning run. Reset to 0 on any success. Drives the
   // retry schedule in subscriptionBillingJob — one declined card must not cut a paying business
@@ -463,6 +464,12 @@ model Appointment {
   depositExpiresAt   DateTime? // pending_payment holds past this are auto-cancelled to free the slot
   depositPaidAt      DateTime?
 
+  // A customer coupon applied to this booking. The code and the resolved discount are both stored:
+  // the code so the owner can see which promotion drove the booking, and the amount because the
+  // coupon's terms can change afterwards and this row must keep saying what was actually given.
+  couponCode         String?
+  couponDiscountIls  Int?
+
   @@index([businessId, startTime])
   @@index([status, depositExpiresAt])
 }
@@ -820,4 +827,50 @@ model CouponRedemption {
 
   @@unique([couponId, businessId])
   @@index([businessId])
+}
+
+// A discount code a BUSINESS offers its own customers — "new client 20% off", "בין הזמנים".
+// Entirely separate from Coupon, which discounts Tori's own subscriptions: different owner,
+// different money, different audience. Sharing one table would have made every query start by
+// asking which kind it was looking at.
+model CustomerCoupon {
+  id             String   @id @default(cuid())
+  business       Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  businessId     String
+  // Unique per business, not globally: two salons may both run "WELCOME10" and neither should
+  // block the other.
+  code           String
+  // "percent" (value = 0-100) | "fixed" (value = whole shekels off)
+  discountType   String
+  discountValue  Int
+  // Empty = every service. Otherwise the services this code is valid on.
+  serviceIds     String[] @default([])
+  maxUses        Int?     // null = unlimited
+  usedCount      Int      @default(0)
+  // When true, a phone number that already used this code is refused. The common case for a
+  // "new customer" promotion, and the thing an owner assumes is on by default.
+  onePerCustomer Boolean  @default(true)
+  expiresAt      DateTime?
+  active         Boolean  @default(true)
+  description    String?  // shown to the customer by the bot when the code is accepted
+  createdAt      DateTime @default(now())
+  redemptions    CustomerCouponRedemption[]
+
+  @@unique([businessId, code])
+  @@index([businessId])
+}
+
+// One customer redeeming one of a business's coupons. Keyed on the phone number rather than the
+// Customer row: the bot knows the number before it has resolved or created a customer, and the
+// per-customer limit has to hold on the first message, not only after a record exists.
+model CustomerCouponRedemption {
+  id            String         @id @default(cuid())
+  coupon        CustomerCoupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  couponId      String
+  customerPhone String
+  appointmentId String?
+  discountIls   Int
+  redeemedAt    DateTime       @default(now())
+
+  @@index([couponId, customerPhone])
 }

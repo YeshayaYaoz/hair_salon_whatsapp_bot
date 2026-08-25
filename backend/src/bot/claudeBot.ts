@@ -2,6 +2,7 @@ import { prisma } from "../lib/prisma.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { appendTurn, getHistory, type Turn } from "./conversationStore.js";
 import { findAvailableSlots, createAppointment, SlotUnavailableError, OutsideBusinessHoursError, SLOT_BLOCKING_STATUSES, type AvailableSlot } from "../booking/availability.js";
+import { quoteCustomerCoupon, redeemCustomerCoupon, releaseCustomerCoupon, CustomerCouponError, CUSTOMER_COUPON_FAILURE_HE } from "../booking/customerCoupons.js";
 import { isDepositRequired, depositHoldFields, createDepositLink, releaseHold } from "../booking/deposits.js";
 import { parseBookingTime, parseDateString, dayOfWeekForDate, instantPartsInTz, zonedDateParts } from "../lib/timezone.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
@@ -66,8 +67,22 @@ const tools: GenericTool[] = [
         customerName: { type: "string", description: "Customer's first name — required. Ask the customer for their name before calling this tool if it isn't already known." },
         durationMin: { type: "number", description: "Same durationMin passed to check_availability, if any" },
         staffName: { type: "string", description: "Same staffName passed to check_availability, if the customer requested a specific staff member" },
+        couponCode: { type: "string", description: "Only if the customer gave a discount code AND check_coupon already accepted it. Never invent one." },
       },
       required: ["serviceName", "startTime", "customerName"],
+    },
+  },
+  {
+    name: "check_coupon",
+    description:
+      "Check a discount code the customer mentioned, for a specific service. Call this whenever a customer says they have a code, coupon or promotion — never guess whether a code is valid, and never promise a discount without calling this first. Returns the discount and the final price, or a reason it cannot be used. Checking costs nothing and can be repeated.",
+    input_schema: {
+      type: "object",
+      properties: {
+        code: { type: "string", description: "The code exactly as the customer wrote it" },
+        serviceName: { type: "string", description: "The service they want it applied to, matching a known service name" },
+      },
+      required: ["code", "serviceName"],
     },
   },
   {
@@ -333,6 +348,36 @@ export async function runTool(
     });
   }
 
+  if (name === "check_coupon") {
+    const { service, services } = await findServiceByName(businessId, input.serviceName as string);
+    if (!service) return unknownServiceError(services);
+    try {
+      const quote = await quoteCustomerCoupon({
+        businessId,
+        code: input.code as string,
+        serviceId: service.id,
+        servicePriceIls: Math.round(service.priceCents / 100),
+        customerPhone,
+      });
+      return JSON.stringify({
+        valid: true,
+        code: quote.code,
+        discountIls: quote.discountIls,
+        originalPriceIls: Math.round(service.priceCents / 100),
+        finalPriceIls: quote.finalPriceIls,
+        ...(quote.description ? { description: quote.description } : {}),
+        note: "Tell the customer the discounted price. Pass this exact code as couponCode when you call book_appointment.",
+      });
+    } catch (err) {
+      if (err instanceof CustomerCouponError) {
+        // The reason is returned in Hebrew because it is the sentence the customer hears — the
+        // model relaying an English enum would translate it inconsistently every time.
+        return JSON.stringify({ valid: false, reason: CUSTOMER_COUPON_FAILURE_HE[err.reason] });
+      }
+      throw err;
+    }
+  }
+
   if (name === "book_appointment") {
     const { service, services } = await findServiceByName(businessId, input.serviceName as string);
     if (!service) return unknownServiceError(services);
@@ -391,6 +436,27 @@ export async function runTool(
       });
     }
 
+    // Re-quoted here, never trusted from the model: the tool call that validated it happened turns
+    // ago, the code may have been exhausted since, and the model can pass a code the customer only
+    // wished for. A code that no longer holds books at full price rather than failing the booking —
+    // the customer chose a time, and losing the slot over a promotion is the worse outcome.
+    let couponQuote: Awaited<ReturnType<typeof quoteCustomerCoupon>> | null = null;
+    if (input.couponCode) {
+      couponQuote = await quoteCustomerCoupon({
+        businessId,
+        code: input.couponCode as string,
+        serviceId: service.id,
+        servicePriceIls: Math.round(service.priceCents / 100),
+        customerPhone,
+      }).catch(() => null);
+    }
+
+    // The deposit never exceeds what is actually owed: a ₪50 deposit on a service discounted to
+    // ₪40 would charge the customer more than the visit costs.
+    const depositBiz = couponQuote
+      ? { ...biz, depositAmountIls: Math.min(biz.depositAmountIls, couponQuote.finalPriceIls) }
+      : biz;
+
     let appointment;
     try {
       appointment = await createAppointment({
@@ -401,7 +467,7 @@ export async function runTool(
         startTime,
         overrideDurationMin: input.durationMin as number | undefined,
         staffId: staffResolution.staffId ?? null,
-        ...(depositRequired ? depositHoldFields(biz) : {}),
+        ...(depositRequired ? depositHoldFields(depositBiz) : {}),
       });
     } catch (err) {
       if (err instanceof SlotUnavailableError) {
@@ -413,6 +479,25 @@ export async function runTool(
       throw err;
     }
     lastOfferedSlots.value = undefined;
+
+    // Consumed only now that the appointment exists, so a booking that failed for any other reason
+    // leaves the promotion untouched. A use that cannot be claimed (someone took the last one in
+    // between) leaves the booking standing at the quoted price — the discrepancy is visible to the
+    // owner on the coupons screen, which is the right place for it.
+    if (couponQuote) {
+      const claimed = await redeemCustomerCoupon({
+        couponId: couponQuote.couponId,
+        customerPhone,
+        appointmentId: appointment.id,
+        discountIls: couponQuote.discountIls,
+      });
+      if (claimed) {
+        await prisma.appointment.update({
+          where: { id: appointment.id },
+          data: { couponCode: couponQuote.code, couponDiscountIls: couponQuote.discountIls },
+        });
+      }
+    }
 
     await prisma.customer.updateMany({
       where: { businessId, phone: customerPhone },
@@ -593,6 +678,7 @@ export async function runTool(
     });
     if (!appointment) return JSON.stringify({ error: "No matching appointment found" });
     await prisma.appointment.update({ where: { id: appointment.id }, data: { status: "cancelled" } });
+    await releaseCustomerCoupon(appointment.id);
     if (appointment.calendarEventId) {
       deleteCalendarEvent(businessId, appointment.calendarEventId).catch((err) => console.error("Calendar event delete failed:", err));
     }
@@ -666,6 +752,7 @@ export async function runTool(
 
     // Cancel the old one first so its slot doesn't block the new booking, then book the new time.
     await prisma.appointment.update({ where: { id: existing.id }, data: { status: "cancelled" } });
+    await releaseCustomerCoupon(existing.id);
     if (existing.calendarEventId) {
       deleteCalendarEvent(businessId, existing.calendarEventId).catch((err) => console.error("Calendar event delete failed:", err));
     }

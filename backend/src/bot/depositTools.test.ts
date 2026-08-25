@@ -3,6 +3,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockPrisma = {
   business: { findUniqueOrThrow: vi.fn() },
   appointment: { findFirst: vi.fn(), update: vi.fn() },
+  // Cancelling releases any customer coupon the booking used. Stubbed to "no redemption" so these
+  // tests exercise the real path rather than passing on a swallowed error.
+  customerCouponRedemption: { findFirst: vi.fn().mockResolvedValue(null) },
+  customerCoupon: { updateMany: vi.fn() },
+  $transaction: vi.fn(),
 };
 const mockNotifyOwner = vi.fn();
 const mockNotifyWaitlist = vi.fn();

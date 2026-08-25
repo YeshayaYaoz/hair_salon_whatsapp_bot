@@ -42,6 +42,7 @@ import multer from "multer";
 import { saveImage, deleteImageByUrl, toPublicUploadUrl, MAX_UPLOAD_BYTES, ALLOWED_MIME, UnsupportedImageError } from "../lib/storage.js";
 import { depositCallbackUrl, getPaymentProvider, PAYMENT_PROVIDERS, UnknownPaymentProviderError } from "../lib/payments/index.js";
 import { getInvoiceProvider, INVOICE_PROVIDERS, UnknownInvoiceProviderError, resolveInvoiceCredentials } from "../lib/invoices/index.js";
+import { releaseCustomerCoupon } from "../booking/customerCoupons.js";
 
 export const businessRouter = asyncRouter();
 businessRouter.use(requireAuth);
@@ -2080,6 +2081,7 @@ businessRouter.patch("/appointments/:id/cancel", async (req: AuthedRequest, res)
   if (!appointment) return res.status(404).json({ error: "Not found" });
 
   await prisma.appointment.update({ where: { id: req.params.id }, data: { status: "cancelled" } });
+  await releaseCustomerCoupon(req.params.id);
   res.json({ ok: true });
 
   // Notify waitlist and clean up the calendar event after responding so the HTTP request isn't delayed
@@ -2748,6 +2750,86 @@ businessRouter.post("/google-business/hours/apply", async (req: AuthedRequest, r
 // --- FAQ entries ---
 
 const faqSchema = z.object({ question: z.string().min(1), answer: z.string().min(1) });
+
+// --- Customer coupons: discount codes a business hands out to ITS OWN customers. ---
+
+const customerCouponSchema = z
+  .object({
+    // Letters, digits, dash and underscore: a code is typed by hand off a card or a WhatsApp
+    // message, and anything else invites a mismatch the customer reads as "it doesn't work".
+    code: z.string().trim().min(2).max(30).regex(/^[A-Za-z0-9_-]+$/, "אותיות באנגלית, ספרות, מקף וקו תחתון בלבד"),
+    discountType: z.enum(["percent", "fixed"]),
+    discountValue: z.number().int().positive(),
+    serviceIds: z.array(z.string()).optional(),
+    maxUses: z.number().int().positive().nullable().optional(),
+    onePerCustomer: z.boolean().optional(),
+    expiresAt: z.string().datetime().nullable().optional(),
+    active: z.boolean().optional(),
+    description: z.string().trim().max(200).optional(),
+  })
+  .refine((v) => v.discountType !== "percent" || v.discountValue <= 100, {
+    message: "אחוז הנחה לא יכול לעלות על 100",
+    path: ["discountValue"],
+  });
+
+function customerCouponData(input: z.infer<typeof customerCouponSchema>) {
+  return {
+    code: input.code.trim().toUpperCase(),
+    discountType: input.discountType,
+    discountValue: input.discountValue,
+    serviceIds: input.serviceIds ?? [],
+    maxUses: input.maxUses ?? null,
+    onePerCustomer: input.onePerCustomer ?? true,
+    expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+    ...(input.active === undefined ? {} : { active: input.active }),
+    description: input.description ?? null,
+  };
+}
+
+businessRouter.get("/customer-coupons", async (req: AuthedRequest, res) => {
+  res.json(
+    await prisma.customerCoupon.findMany({
+      where: { businessId: req.businessId! },
+      orderBy: { createdAt: "desc" },
+    })
+  );
+});
+
+businessRouter.post("/customer-coupons", async (req: AuthedRequest, res) => {
+  const parsed = customerCouponSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const data = customerCouponData(parsed.data);
+  // Checked before insert so the owner gets "you already have that code" instead of a raw unique
+  // constraint error. The constraint is still what guarantees it.
+  const existing = await prisma.customerCoupon.findUnique({
+    where: { businessId_code: { businessId: req.businessId!, code: data.code } },
+  });
+  if (existing) return res.status(409).json({ error: `כבר יש לכם קוד בשם ${data.code}.` });
+
+  const coupon = await prisma.customerCoupon.create({ data: { ...data, businessId: req.businessId! } });
+  res.status(201).json(coupon);
+});
+
+// updateMany rather than update-by-id: the businessId in the WHERE clause is what stops one
+// account editing another's coupon.
+businessRouter.put("/customer-coupons/:id", async (req: AuthedRequest, res) => {
+  const parsed = customerCouponSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const { count } = await prisma.customerCoupon.updateMany({
+    where: { id: req.params.id, businessId: req.businessId! },
+    data: customerCouponData(parsed.data),
+  });
+  if (count === 0) return res.status(404).json({ error: "Not found" });
+  res.json({ ok: true });
+});
+
+// A real delete, unlike Tori's own coupons: this code belongs to the business, its redemptions
+// cascade with it, and an owner who removes a promotion expects it gone rather than archived.
+// Appointments keep their own couponCode/couponDiscountIls copy, so history stays truthful.
+businessRouter.delete("/customer-coupons/:id", async (req: AuthedRequest, res) => {
+  await prisma.customerCoupon.deleteMany({ where: { id: req.params.id, businessId: req.businessId! } });
+  res.json({ ok: true });
+});
 
 businessRouter.get("/faq", async (req: AuthedRequest, res) => {
   res.json(await prisma.faqEntry.findMany({ where: { businessId: req.businessId! } }));

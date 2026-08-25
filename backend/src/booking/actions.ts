@@ -11,6 +11,7 @@ import { notifyOwner } from "../lib/ownerNotify.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { sendWithTemplateFallback } from "../lib/scheduledMessages.js";
 import { confirmationTemplate } from "../lib/whatsappTemplates.js";
+import { releaseCustomerCoupon } from "./customerCoupons.js";
 
 export { SlotUnavailableError, OutsideBusinessHoursError };
 
@@ -145,6 +146,9 @@ export async function cancelAppointmentById(businessId: string, appointmentId: s
   if (!appointment) throw new AppointmentNotFoundError();
 
   await prisma.appointment.update({ where: { id: appointment.id }, data: { status: "cancelled" } });
+  // Gives the coupon use back. Without it a limited promotion drains on bookings that never
+  // happened, and a "new client" code is spent forever by a customer who cancelled.
+  await releaseCustomerCoupon(appointment.id);
   if (appointment.calendarEventId) {
     deleteCalendarEvent(businessId, appointment.calendarEventId).catch((err) => console.error("Calendar event delete failed:", err));
   }
@@ -176,6 +180,7 @@ export async function rescheduleAppointmentById(params: {
   if (!existing) throw new AppointmentNotFoundError();
 
   await prisma.appointment.update({ where: { id: existing.id }, data: { status: "cancelled" } });
+  await releaseCustomerCoupon(existing.id);
   if (existing.calendarEventId) {
     deleteCalendarEvent(params.businessId, existing.calendarEventId).catch((err) => console.error("Calendar event delete failed:", err));
   }
