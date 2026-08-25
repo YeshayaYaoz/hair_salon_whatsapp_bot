@@ -21,6 +21,7 @@ import {
 } from "./payplusSubscription.js";
 import { requireSuperAdmin } from "../api/businessRoutes.js";
 import { captureError } from "../lib/errorMonitoring.js";
+import { validateCoupon, redeemCoupon, CouponError, COUPON_FAILURE_HE, normalizeCode } from "./coupons.js";
 import { explainPayPlusError } from "../lib/payplusErrors.js";
 import { parsePayPlusCallback, keyTree } from "../lib/payplusCallback.js";
 
@@ -170,15 +171,142 @@ payplusBillingRouter.post("/payplus/health/charge-token", requireAuth, requireSu
   }
 });
 
-/** Creates a PayPlus checkout link that charges the first period AND captures a recurring token. */
-payplusBillingRouter.post("/payplus/checkout", requireAuth, async (req: AuthedRequest, res) => {
+// --- Coupon administration. Operator only: these create money-off codes. ---
+
+payplusBillingRouter.get("/payplus/coupons", requireAuth, requireSuperAdmin, async (_req: AuthedRequest, res) => {
+  const coupons = await prisma.coupon.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      // Who used it, not just how many — "which businesses came in on LAUNCH50" is the question
+      // this screen exists to answer.
+      redemptions: {
+        orderBy: { redeemedAt: "desc" },
+        select: { discountIls: true, plan: true, redeemedAt: true, business: { select: { id: true, name: true } } },
+      },
+    },
+  });
+  res.json(coupons);
+});
+
+payplusBillingRouter.post("/payplus/coupons", requireAuth, requireSuperAdmin, async (req: AuthedRequest, res) => {
   const parsed = z
-    .object({ plan: z.enum(["standard", "premium", "ultra"]), returnUrl: z.string().url(), cycle: z.enum(["monthly", "annual"]).optional() })
+    .object({
+      // Letters, digits, dash and underscore only: a code is typed by hand off a poster or a
+      // WhatsApp message, and anything else invites an invisible mismatch (a Hebrew dash, a
+      // trailing space) that reads as "the code doesn't work".
+      code: z.string().trim().min(3).max(40).regex(/^[A-Za-z0-9_-]+$/),
+      discountType: z.enum(["percent", "fixed"]),
+      discountValue: z.number().int().positive(),
+      durationCycles: z.number().int().positive().nullable().optional(),
+      maxRedemptions: z.number().int().positive().nullable().optional(),
+      expiresAt: z.string().datetime().nullable().optional(),
+      allowedPlans: z.array(z.enum(["standard", "premium", "ultra"])).optional(),
+      note: z.string().trim().max(300).optional(),
+    })
+    .refine((v) => v.discountType !== "percent" || v.discountValue <= 100, {
+      message: "A percentage discount cannot exceed 100.",
+      path: ["discountValue"],
+    })
+    .safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const code = normalizeCode(parsed.data.code);
+  const existing = await prisma.coupon.findUnique({ where: { code } });
+  if (existing) return res.status(409).json({ error: `הקוד ${code} כבר קיים.` });
+
+  const coupon = await prisma.coupon.create({
+    data: {
+      code,
+      discountType: parsed.data.discountType,
+      discountValue: parsed.data.discountValue,
+      durationCycles: parsed.data.durationCycles ?? null,
+      maxRedemptions: parsed.data.maxRedemptions ?? null,
+      expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
+      allowedPlans: parsed.data.allowedPlans ?? [],
+      note: parsed.data.note ?? null,
+    },
+  });
+  res.status(201).json(coupon);
+});
+
+/**
+ * Deactivates a code. Never deletes it: businesses already on its discount hold a reference, and
+ * "which promo did this customer come in on" has to stay answerable after the campaign ends.
+ * Existing redemptions keep working — switching a code off stops NEW redemptions, it does not
+ * take a discount away from someone who already paid on it.
+ */
+payplusBillingRouter.post("/payplus/coupons/:id/deactivate", requireAuth, requireSuperAdmin, async (req: AuthedRequest, res) => {
+  const updated = await prisma.coupon.updateMany({ where: { id: req.params.id }, data: { active: false } });
+  if (updated.count === 0) return res.status(404).json({ error: "Coupon not found" });
+  res.json({ ok: true });
+});
+
+payplusBillingRouter.post("/payplus/coupons/:id/activate", requireAuth, requireSuperAdmin, async (req: AuthedRequest, res) => {
+  const updated = await prisma.coupon.updateMany({ where: { id: req.params.id }, data: { active: true } });
+  if (updated.count === 0) return res.status(404).json({ error: "Coupon not found" });
+  res.json({ ok: true });
+});
+
+/**
+ * Tells the owner what a code is worth before they commit to anything.
+ *
+ * Read-only: nothing is consumed until the payment webhook redeems it. A rejected code answers 200
+ * with ok:false rather than a 4xx — "this code is expired" is a successful answer to the question
+ * asked, and the shared apiFetch turns any non-2xx into a thrown error with no body to read.
+ */
+payplusBillingRouter.post("/payplus/coupon/preview", requireAuth, async (req: AuthedRequest, res) => {
+  const parsed = z
+    .object({ code: z.string().trim().min(1).max(40), plan: z.enum(["standard", "premium", "ultra"]) })
     .safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   try {
-    const url = await createSubscriptionCheckoutLink(req.businessId!, parsed.data.plan, parsed.data.returnUrl, parsed.data.cycle ?? "monthly");
+    const preview = await validateCoupon(parsed.data.code, parsed.data.plan, req.businessId!);
+    return res.json({ ok: true, ...preview });
+  } catch (err) {
+    if (err instanceof CouponError) return res.json({ ok: false, reason: err.reason, message: COUPON_FAILURE_HE[err.reason] });
+    throw err;
+  }
+});
+
+/** Creates a PayPlus checkout link that charges the first period AND captures a recurring token. */
+payplusBillingRouter.post("/payplus/checkout", requireAuth, async (req: AuthedRequest, res) => {
+  const parsed = z
+    .object({
+      plan: z.enum(["standard", "premium", "ultra"]),
+      returnUrl: z.string().url(),
+      cycle: z.enum(["monthly", "annual"]).optional(),
+      couponCode: z.string().trim().max(40).optional(),
+    })
+    .safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  // Re-validated here rather than trusted from the client: the preview call that showed the owner
+  // a discount happened at a different moment, and a code can expire or be exhausted in between.
+  // A bad code fails the checkout outright instead of quietly charging full price — the owner
+  // entered it deliberately and would otherwise discover it on their card statement.
+  let coupon: { code: string; discountIls: number } | undefined;
+  if (parsed.data.couponCode) {
+    try {
+      const preview = await validateCoupon(parsed.data.couponCode, parsed.data.plan, req.businessId!);
+      coupon = { code: preview.code, discountIls: preview.discountIls };
+    } catch (err) {
+      if (err instanceof CouponError) {
+        return res.status(400).json({ error: COUPON_FAILURE_HE[err.reason], couponRejected: true });
+      }
+      throw err;
+    }
+  }
+
+  try {
+    const url = await createSubscriptionCheckoutLink(
+      req.businessId!,
+      parsed.data.plan,
+      parsed.data.returnUrl,
+      parsed.data.cycle ?? "monthly",
+      undefined,
+      coupon
+    );
     res.json({ url });
   } catch (err) {
     console.error("PayPlus subscription checkout failed:", err);
@@ -558,7 +686,7 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
 
     const business = await prisma.business.findUnique({
       where: { checkoutRef },
-      select: { id: true, checkoutPlan: true, checkoutCycle: true, checkoutPurpose: true, checkoutAmountIls: true },
+      select: { id: true, checkoutPlan: true, checkoutCycle: true, checkoutPurpose: true, checkoutAmountIls: true, checkoutCouponCode: true },
     });
     if (!business) {
       console.warn(`[payplus subscription webhook] No pending checkout for ref ${checkoutRef}`);
@@ -628,8 +756,22 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
         checkoutCycle: null,
         checkoutPurpose: null,
         checkoutAmountIls: null,
+        checkoutCouponCode: null,
       },
     });
+
+    // After activation, never before: the discount was already taken off the amount they just
+    // paid, and redeeming earlier would consume a limited code for a checkout that was abandoned.
+    // Failure here cannot undo a completed payment, so it is logged and the subscription stands —
+    // the business is active either way, and a missing recurring discount is a support fix.
+    if (business.checkoutCouponCode) {
+      const result = await redeemCoupon(business.checkoutCouponCode, plan, business.id);
+      console.log(
+        result.applied
+          ? `[payplus subscription webhook] Redeemed coupon ${business.checkoutCouponCode} (−₪${result.discountIls}) for ${business.id}`
+          : `[payplus subscription webhook] Coupon ${business.checkoutCouponCode} not redeemed for ${business.id}: ${result.reason}`
+      );
+    }
     console.log(`[payplus subscription webhook] Activated ${plan}/${billingCycle} subscription for business ${business.id}`);
   } catch (err) {
     console.error("[payplus subscription webhook] Failed to process event:", err);

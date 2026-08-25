@@ -54,6 +54,17 @@ model Business {
   billingCycle              String    @default("monthly") // "monthly" | "annual"
   billingCyclesCompleted    Int       @default(0) // successful charges — drives the loyalty discount
   loyaltyDiscountIls        Int       @default(0) // auto-applied recurring discount once tenure threshold is hit
+  // A coupon the business redeemed at signup. The code is stored for support ("which promo did
+  // they come in on?"); the money is in couponDiscountIls, and couponCyclesRemaining counts down
+  // how many more charges it applies to — null means it never expires.
+  couponCode                String?
+  couponDiscountIls         Int       @default(0)
+  couponCyclesRemaining     Int?
+  // The code typed at checkout, held until the payment succeeds. Separate from couponCode above,
+  // which means "redeemed": a code parked here has taken nothing off anything yet, and an
+  // abandoned checkout must leave no trace of a discount the business never paid for.
+  checkoutCouponCode        String?
+  couponRedemptions         CouponRedemption[]
   lastBillingReminderSentAt DateTime? // last "charge in 2 days" heads-up, to avoid duplicates
   // Consecutive failed charges in the current dunning run. Reset to 0 on any success. Drives the
   // retry schedule in subscriptionBillingJob — one declined card must not cut a paying business
@@ -763,4 +774,50 @@ model LeadScoringConfig {
   key       String   @unique // e.g. "default"
   weights   Json
   updatedAt DateTime @updatedAt
+}
+
+// A discount code for Tori's OWN subscriptions — the operator's growth lever, not anything a
+// salon offers its customers (that is CustomerCoupon).
+//
+// Money is stored as a type + value rather than a resolved shekel figure: a percentage has to be
+// recomputed per plan, and freezing it at creation time would silently misprice every plan but the
+// one it was created against.
+model Coupon {
+  id              String    @id @default(cuid())
+  // Compared case-insensitively at redemption, stored uppercase so the stored form is canonical.
+  code            String    @unique
+  // "percent" (value = 0-100) | "fixed" (value = whole shekels off)
+  discountType    String
+  discountValue   Int
+  // How many billing cycles the discount survives. 1 = first charge only, null = forever. A
+  // forever-coupon is a permanent revenue cut, so the admin UI names it as such.
+  durationCycles  Int?
+  // Null = unlimited. Compared against redeemedCount, which is incremented inside the same
+  // transaction that records the redemption, so two simultaneous redemptions cannot both pass.
+  maxRedemptions  Int?
+  redeemedCount   Int       @default(0)
+  expiresAt       DateTime?
+  active          Boolean   @default(true)
+  // Empty = every plan. Otherwise the plan keys this code is valid for.
+  allowedPlans    String[]  @default([])
+  note            String?   // free text for the operator: which campaign, who it was for
+  createdAt       DateTime  @default(now())
+  redemptions     CouponRedemption[]
+}
+
+// One business redeeming one coupon. Its own table rather than a counter on Business because the
+// unique constraint is what enforces "once per business", and because "who used LAUNCH50" is a
+// question the operator will ask.
+model CouponRedemption {
+  id          String   @id @default(cuid())
+  couponId    String
+  coupon      Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  discountIls Int      // what it actually took off, resolved at redemption
+  plan        String
+  redeemedAt  DateTime @default(now())
+
+  @@unique([couponId, businessId])
+  @@index([businessId])
 }

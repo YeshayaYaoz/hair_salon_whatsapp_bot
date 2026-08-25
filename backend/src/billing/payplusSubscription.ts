@@ -127,21 +127,37 @@ export async function createSubscriptionCheckoutLink(
   returnUrl: string,
   cycle: "monthly" | "annual" = "monthly",
   /** Already discounted by unusedCreditIls when this checkout is an upgrade, not a first purchase. */
-  amountOverrideIls?: number
+  amountOverrideIls?: number,
+  /** A validated coupon. Discounts this charge and is parked for the webhook to redeem on payment. */
+  coupon?: { code: string; discountIls: number }
 ): Promise<string> {
   const fullPrice = planPriceForCycle(plan, cycle);
-  const amountIls = amountOverrideIls ?? fullPrice;
+  const beforeCoupon = amountOverrideIls ?? fullPrice;
+  // The coupon is a per-CYCLE discount, so on an annual term it comes off each of the months
+  // charged — quoting a monthly discount against an annual price would advertise a 10× smaller
+  // benefit than the coupon's own terms promise.
+  const couponOff = coupon ? coupon.discountIls * (cycle === "annual" ? ANNUAL_MONTHS_CHARGED : 1) : 0;
+  // Never below zero: PayPlus rejects a non-positive amount with an error that says nothing about
+  // coupons, and a 100%-off code is a legitimate thing to hand someone.
+  const amountIls = Math.max(1, beforeCoupon - couponOff);
   const planLabel = plan === "ultra" ? "Ultra" : plan === "premium" ? "Premium" : "Standard";
   const cycleLabel = cycle === "annual" ? "שנתי" : "חודשי";
   // Named on the payment page so the owner can see why it is not the list price.
-  const credited = amountIls < fullPrice ? ` — בקיזוז ₪${fullPrice - amountIls} ששולמו כבר` : "";
+  const credited = beforeCoupon < fullPrice ? ` — בקיזוז ₪${fullPrice - beforeCoupon} ששולמו כבר` : "";
+  const couponNote = couponOff > 0 ? ` — קופון ${coupon!.code} (−₪${couponOff})` : "";
 
   return generateCheckoutPage({
     businessId,
     amountIls,
-    itemName: `תורי — מנוי ${planLabel} (${cycleLabel})${credited}`,
+    itemName: `תורי — מנוי ${planLabel} (${cycleLabel})${credited}${couponNote}`,
     returnUrl,
-    pending: { checkoutPurpose: "subscription", checkoutPlan: plan, checkoutCycle: cycle },
+    pending: {
+      checkoutPurpose: "subscription",
+      checkoutPlan: plan,
+      checkoutCycle: cycle,
+      // Cleared when absent, so an abandoned checkout's code cannot attach itself to the next one.
+      checkoutCouponCode: coupon?.code ?? null,
+    },
   });
 }
 
@@ -172,6 +188,7 @@ interface PendingCheckout {
   checkoutPlan?: string;
   checkoutCycle?: string;
   checkoutAmountIls?: number;
+  checkoutCouponCode?: string | null;
 }
 
 async function generateCheckoutPage(params: {

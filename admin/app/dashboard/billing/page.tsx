@@ -205,6 +205,7 @@ function SavingsSummary({
 
 export default function BillingPage() {
   const { t, lang } = useLanguage();
+  const he = lang === "he";
   const [status, setStatus] = useState<string | null>(null);
   const [whatsappConnected, setWhatsappConnected] = useState(false);
   const [createdAt, setCreatedAt] = useState<string | null>(null);
@@ -216,6 +217,12 @@ export default function BillingPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [plan, setPlan] = useState<PlanKey>("standard");
+  // A verified coupon, or null. Held separately from the raw input so an edited-but-unverified
+  // code can never be sent to checkout — a bad code fails the whole checkout server-side.
+  const [couponInput, setCouponInput] = useState("");
+  const [coupon, setCoupon] = useState<{ code: string; discountIls: number; durationCycles: number | null } | null>(null);
+  const [couponChecking, setCouponChecking] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
   const [currentPlan, setCurrentPlan] = useState<string | null>(null);
   const [billingCycle, setBillingCycle] = useState<string>("monthly");
   const [loyaltyDiscountIls, setLoyaltyDiscountIls] = useState(0);
@@ -300,6 +307,36 @@ export default function BillingPage() {
     }
   }
 
+  /**
+   * Checks a code and shows what it is worth, without committing to anything.
+   *
+   * Verified against the plan currently selected: the same code can be valid on Premium and not on
+   * Standard, so a preview taken against the wrong plan would promise a discount the checkout then
+   * refuses. Re-verified server-side at checkout too — this is a convenience, not the gate.
+   */
+  async function applyCoupon() {
+    const code = couponInput.trim();
+    if (!code) return;
+    setCouponChecking(true);
+    setCouponError(null);
+    try {
+      const r = await apiFetch<{ ok: boolean; code?: string; discountIls?: number; durationCycles?: number | null; message?: string }>(
+        "/api/billing/payplus/coupon/preview",
+        { method: "POST", body: JSON.stringify({ code, plan }) }
+      );
+      if (r.ok && r.code) {
+        setCoupon({ code: r.code, discountIls: r.discountIls ?? 0, durationCycles: r.durationCycles ?? null });
+      } else {
+        setCoupon(null);
+        setCouponError(r.message ?? (he ? "הקוד לא תקף." : "That code isn't valid."));
+      }
+    } catch (err) {
+      setCouponError(err instanceof Error ? err.message : he ? "לא הצלחנו לבדוק את הקוד" : "Could not check the code");
+    } finally {
+      setCouponChecking(false);
+    }
+  }
+
   async function subscribe(planToCheckout: PlanKey = plan) {
     setError(null);
     setPlan(planToCheckout);
@@ -308,7 +345,13 @@ export default function BillingPage() {
       // PayPlus checkout — charges the first month and stores a token for recurring billing.
       const { url } = await apiFetch<{ url: string }>("/api/billing/payplus/checkout", {
         method: "POST",
-        body: JSON.stringify({ plan: planToCheckout, returnUrl: window.location.href }),
+        body: JSON.stringify({
+          plan: planToCheckout,
+          returnUrl: window.location.href,
+          // Sent only once accepted: an unverified code would fail the whole checkout, and the
+          // owner would be blocked from subscribing by a typo in an optional field.
+          ...(coupon ? { couponCode: coupon.code } : {}),
+        }),
       });
       window.location.href = url;
     } catch (err) {
@@ -496,6 +539,65 @@ export default function BillingPage() {
               </div>
             </div>
           ) : (
+          <>
+          {/* Above the cards, not inside one: the discount applies to whichever plan is chosen,
+              and a field repeated per card would ask the same question three times. */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
+            {coupon ? (
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <p className="text-sm text-green-700 font-medium">
+                  🎉 {he
+                    ? `הקוד ${coupon.code} פעיל — ₪${coupon.discountIls} הנחה${
+                        coupon.durationCycles === null
+                          ? " בכל חודש, כל עוד המנוי פעיל"
+                          : coupon.durationCycles === 1
+                            ? " בחודש הראשון"
+                            : ` בכל אחד מ-${coupon.durationCycles} החודשים הראשונים`
+                      }`
+                    : `Code ${coupon.code} applied — ₪${coupon.discountIls} off${
+                        coupon.durationCycles === null
+                          ? " every month, for as long as you subscribe"
+                          : coupon.durationCycles === 1
+                            ? " the first month"
+                            : ` each of the first ${coupon.durationCycles} months`
+                      }`}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setCoupon(null); setCouponInput(""); setCouponError(null); }}
+                  className="text-xs text-gray-600 hover:text-gray-800 underline"
+                >
+                  {he ? "הסרה" : "Remove"}
+                </button>
+              </div>
+            ) : (
+              <>
+                <label htmlFor="coupon" className="block text-xs font-medium text-gray-700 mb-1.5">
+                  {he ? "יש לכם קוד קופון?" : "Have a coupon code?"}
+                </label>
+                <div className="flex gap-2 flex-wrap">
+                  <input
+                    id="coupon"
+                    value={couponInput}
+                    onChange={(e) => { setCouponInput(e.target.value); setCouponError(null); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyCoupon(); } }}
+                    placeholder={he ? "לדוגמה: LAUNCH50" : "e.g. LAUNCH50"}
+                    dir="ltr"
+                    className="flex-1 min-w-[160px] uppercase"
+                  />
+                  <button
+                    type="button"
+                    onClick={applyCoupon}
+                    disabled={couponChecking || !couponInput.trim()}
+                    className="bg-gray-50 hover:bg-gray-100 disabled:opacity-50 text-gray-700 border border-gray-200 text-sm font-semibold px-4 py-2 rounded-lg transition"
+                  >
+                    {couponChecking ? (he ? "בודק…" : "Checking…") : he ? "החלה" : "Apply"}
+                  </button>
+                </div>
+                {couponError && <p className="text-red-600 text-xs mt-2">{couponError}</p>}
+              </>
+            )}
+          </div>
           <div className="grid sm:grid-cols-3 gap-4">
             {PLANS.map((p) => {
               const isCurrent = currentPlan === p && status === "active";
@@ -593,6 +695,7 @@ export default function BillingPage() {
               );
             })}
           </div>
+          </>
           )}
 
           {error && <p className="text-red-600 text-xs mt-3">{error}</p>}

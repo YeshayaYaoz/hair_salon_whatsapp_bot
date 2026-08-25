@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma.js";
+import { couponDiscountForCharge, couponStateAfterCharge } from "./coupons.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
 import { sendAdminAlertEmail } from "../lib/email.js";
@@ -83,6 +84,7 @@ export async function runSubscriptionBillingJob(): Promise<void> {
     select: {
       id: true, name: true, subscriptionToken: true, subscriptionCustomerUid: true, subscriptionPlan: true, billingCycle: true,
       billingCyclesCompleted: true, loyaltyDiscountIls: true, paymentProvider: true, invoiceProvider: true,
+      couponDiscountIls: true, couponCyclesRemaining: true,
       billingFailedAttempts: true,
       notificationPhone: true, whatsappPhoneNumberId: true, whatsappAccessToken: true,
     },
@@ -106,7 +108,12 @@ export async function runSubscriptionBillingJob(): Promise<void> {
       (business.paymentProvider === "tori_managed" ? MANAGED_PAYMENT_SURCHARGE_ILS : 0) +
       (business.invoiceProvider === "tori_managed" ? MANAGED_INVOICE_SURCHARGE_ILS : 0);
     const fullAmount = basePrice * periodMultiplier + managedSurcharge * periodMultiplier;
-    const amountIls = Math.max(0, fullAmount - business.loyaltyDiscountIls);
+    // The coupon is a per-cycle discount, so an annual term gets it off each month charged — the
+    // same arithmetic the checkout page quoted, which is the number the owner agreed to.
+    const couponOff = couponDiscountForCharge(business) * periodMultiplier;
+    // Floor of ₪1: PayPlus rejects a zero charge, and a discount that fully covers a plan is a
+    // real thing to hand someone. Clamping here rather than refusing keeps them subscribed.
+    const amountIls = Math.max(1, fullAmount - business.loyaltyDiscountIls - couponOff);
 
     const token = decryptSecret(business.subscriptionToken!);
     const result = await chargeSubscriptionToken(
@@ -135,6 +142,10 @@ export async function runSubscriptionBillingJob(): Promise<void> {
           billingFailedAttempts: 0, // paid — any dunning run in progress is over
           messagesUsedThisCycle: 0, // new cycle paid for — reset the plan's message quota
           ...(justEarnedDiscount ? { loyaltyDiscountIls: LOYALTY_DISCOUNT_ILS } : {}),
+          // Counted down only on success. A failed attempt that consumed a discounted cycle would
+          // quietly raise the price of the retry — the last thing a business with a declined card
+          // needs, and impossible to explain afterwards.
+          ...couponStateAfterCharge(business),
         },
       });
       console.log(`[subscriptionBilling] Charged ${business.id} (${business.name}) ₪${amountIls}`);
