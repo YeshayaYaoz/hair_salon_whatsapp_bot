@@ -1,0 +1,87 @@
+name: Subscription coupon
+
+# Creates or lists a discount code for Tori's own subscriptions.
+#
+# Runs through `railway run` because the database lives there. A coupon is a standing offer of
+# money, so running it here rather than by hand leaves a record of exactly what was created, by
+# whom and when — the workflow log is the audit trail.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "list — show every code and who redeemed it; create — make a new one"
+        type: choice
+        options: [list, create]
+        default: list
+      code:
+        description: "The code businesses will type, e.g. LAUNCH50"
+        default: ""
+      percent:
+        description: "Percentage off, e.g. 50. Leave blank if using a shekel amount."
+        default: ""
+      fixed:
+        description: "Shekels off, e.g. 100. Leave blank if using a percentage."
+        default: ""
+      cycles:
+        description: "How many monthly charges it applies to. Blank = forever."
+        default: ""
+      max:
+        description: "How many businesses may redeem it. Blank = unlimited."
+        default: ""
+      expires:
+        description: "Last day it can be redeemed, YYYY-MM-DD. Blank = no end date."
+        default: ""
+      note:
+        description: "For your own reference — which campaign this was for"
+        default: ""
+
+jobs:
+  coupon:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+
+      - name: ${{ inputs.action }}
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+          RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+          ACTION: ${{ inputs.action }}
+          CODE: ${{ inputs.code }}
+          PERCENT: ${{ inputs.percent }}
+          FIXED: ${{ inputs.fixed }}
+          CYCLES: ${{ inputs.cycles }}
+          MAXR: ${{ inputs.max }}
+          EXPIRES: ${{ inputs.expires }}
+          NOTE: ${{ inputs.note }}
+        run: |
+          set -euo pipefail
+          npm i -g @railway/cli >/dev/null 2>&1
+
+          # An array, not a string: the note contains spaces, and an unquoted expansion would split
+          # it into separate arguments the script would read as flags.
+          args=()
+          if [ "$ACTION" = "create" ]; then
+            [ -z "$CODE" ] && { echo "::error::'create' needs the code input."; exit 1; }
+            args+=(--code "$CODE")
+            [ -n "$PERCENT" ] && args+=(--percent "$PERCENT")
+            [ -n "$FIXED" ]   && args+=(--fixed "$FIXED")
+            [ -n "$CYCLES" ]  && args+=(--cycles "$CYCLES")
+            [ -n "$MAXR" ]    && args+=(--max "$MAXR")
+            [ -n "$EXPIRES" ] && args+=(--expires "$EXPIRES")
+            [ -n "$NOTE" ]    && args+=(--note "$NOTE")
+          else
+            args+=(--list)
+          fi
+
+          railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+            npx tsx scripts/create-coupon.ts "${args[@]}"
