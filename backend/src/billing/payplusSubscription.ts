@@ -462,3 +462,43 @@ export async function lookupCustomerTokens(
   // The newest entry: every listed card belongs to this customer, the last one was added last.
   return { token: tokens[tokens.length - 1], count: tokens.length };
 }
+
+/**
+ * The customer_uid a saved card belongs to, recovered from the token itself.
+ *
+ * Transactions/Charge needs both, but a business whose card was stored before the customer_uid was
+ * persisted alongside it holds only the token — and Token/List cannot help, because it takes a
+ * customer_uid as its INPUT. Token/View is the only direction that runs the other way, which is
+ * what makes a stranded row repairable instead of needing the owner to pay a fresh checkout.
+ *
+ * `mask=true` is not optional. Without it this endpoint returns `decryptCard` — the full, unmasked
+ * card number — and we have no use for it: pulling a PAN into this process would drag the whole
+ * server into PCI scope to recover a field we already know how to ask for directly.
+ *
+ * Returns undefined on any failure. The caller is mid-charge and a charge attempt with no
+ * customer_uid is still better than no charge attempt at all.
+ */
+export async function fetchCustomerUidForToken(token: string): Promise<string | undefined> {
+  try {
+    // Inside the try with everything else: this runs mid-renewal, and unconfigured credentials
+    // must degrade to "could not recover it" rather than take the whole billing run down.
+    const { apiKey, secretKey } = creds();
+    const res = await fetch(`${BASE_URL}/Token/View/${encodeURIComponent(token)}?mask=true`, {
+      headers: {
+        Authorization: JSON.stringify({ api_key: apiKey, secret_key: secretKey }),
+        "api-key": apiKey,
+        "secret-key": secretKey,
+      },
+    });
+    if (!res.ok) {
+      console.warn(`[payplus] Token/View failed (${res.status})`);
+      return undefined;
+    }
+    const body = (await res.json()) as { data?: { customer_uid?: string }; results?: { status?: string } };
+    if (body.results?.status && body.results.status !== "success") return undefined;
+    return body.data?.customer_uid || undefined;
+  } catch (err) {
+    console.warn("[payplus] Token/View lookup failed:", err);
+    return undefined;
+  }
+}

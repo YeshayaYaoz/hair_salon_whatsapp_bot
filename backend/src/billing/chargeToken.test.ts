@@ -7,7 +7,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const mockSystemSetting = { findMany: vi.fn(async () => [] as Array<{ key: string; value: string }>) };
 vi.mock("../lib/prisma.js", () => ({ prisma: { systemSetting: mockSystemSetting } }));
 
-const { chargeSubscriptionToken, PayPlusTerminalNotConfiguredError, probeGenerateLink, fetchTokenForCustomer } = await import("./payplusSubscription.js");
+const { chargeSubscriptionToken, PayPlusTerminalNotConfiguredError, probeGenerateLink, fetchTokenForCustomer, fetchCustomerUidForToken } =
+  await import("./payplusSubscription.js");
 
 /**
  * Pins the HTTP contract of the token charge — endpoint path and required fields.
@@ -201,5 +202,33 @@ describe("fetchTokenForCustomer", () => {
   it("returns undefined when the account has no tokens — tokenization likely not enabled", async () => {
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({ results: { status: "success" }, data: [] }) });
     expect(await fetchTokenForCustomer("term-1", "cust-1")).toBeUndefined();
+  });
+});
+
+describe("fetchCustomerUidForToken", () => {
+  it("recovers the customer_uid from the token, and never asks for the card number", async () => {
+    // Token/List runs the wrong way for this — it takes a customer_uid as INPUT. Token/View is the
+    // only direction that maps a stored card back to its customer, which is what makes a row
+    // holding a token but no customer_uid repairable instead of needing a fresh checkout.
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ results: { status: "success" }, data: { customer_uid: "cust-7", last_4_digits: "1234" } }),
+    });
+    expect(await fetchCustomerUidForToken("tok-1")).toBe("cust-7");
+
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain("/Token/View/tok-1");
+    // Without mask=true this endpoint returns `decryptCard` — the full PAN. We have no use for a
+    // card number, and receiving one would pull this server into PCI scope for nothing.
+    expect(url).toContain("mask=true");
+  });
+
+  it("returns undefined rather than throwing when the lookup fails", async () => {
+    // The caller is mid-renewal: a charge attempted without the id still beats no charge at all.
+    fetchMock.mockResolvedValue({ ok: false, status: 404, text: async () => "not found" });
+    expect(await fetchCustomerUidForToken("tok-1")).toBeUndefined();
+
+    fetchMock.mockRejectedValue(new Error("ECONNRESET"));
+    expect(await fetchCustomerUidForToken("tok-1")).toBeUndefined();
   });
 });
