@@ -63,7 +63,7 @@ const RECOMMENDED: RequiredVar[] = [
   { name: "TORI_MANAGED_PAYMENT_SECRET_KEY", description: "Tori's own PayPlus account (subscription billing only — NOT salon clearing)" },
   { name: "TORI_MANAGED_INVOICE_API_KEY", description: "\"Managed\" invoicing option for salons without their own Green Invoice account" },
   { name: "TORI_MANAGED_INVOICE_SECRET_KEY", description: "\"Managed\" invoicing option for salons without their own Green Invoice account" },
-  { name: "SUPER_ADMIN_EMAIL", description: "your account email — unlocks the /dashboard/admin businesses list" },
+  { name: "SUPER_ADMIN_EMAIL", description: "your account email — unlocks the /dashboard/admin businesses list AND is the sole recipient of every operator alert (new subscription, number request, failed WhatsApp setup); unset means sendAdminAlertEmail returns silently and you are told about none of them" },
   { name: "RESEND_API_KEY", description: "transactional emails (welcome, password reset)" },
   { name: "OPENAI_API_KEY", description: "two uses: voice-note transcription in the WhatsApp bot (Whisper), and the optional OpenAI provider choice on the Bot settings page" },
   { name: "CARTESIA_API_KEY", description: "Cartesia management API key — lets the dashboard point a salon's voice number at the shared agent. Without it that assignment is manual, and a number with no agent answers the call and hangs up immediately" },

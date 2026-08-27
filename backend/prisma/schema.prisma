@@ -188,7 +188,10 @@ model Business {
   // Which LLM backend answers this business's WhatsApp bot — "anthropic" | "openai" | "deepseek".
   // aiModel overrides the provider's default model id (e.g. "gpt-4o-mini", "deepseek-chat"); null
   // means "use that provider's built-in cheap/smart pair" (see bot/providers/index.ts).
-  aiProvider                String    @default("anthropic")
+  // DeepSeek by default: it handles this bot's tool-driven workload at a fraction of the cost.
+  // getAiProvider falls back to whatever IS configured, so a deployment without a DeepSeek key
+  // still answers rather than failing at send time.
+  aiProvider                String    @default("deepseek")
   aiModel                   String?
   // Sampling temperature for the bot's replies. Null = use the app default (0.2), which is low on
   // purpose: high temperature is what produced invented Hebrew ("מבורך הבא" for "ברוך הבא"), since

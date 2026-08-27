@@ -103,6 +103,7 @@ export function createOpenAiCompatibleProvider(config: {
 
   return {
     key: config.key,
+    isConfigured: () => Boolean(process.env[config.apiKeyEnvVar]?.trim()),
 
     resolveModel(tier, override) {
       if (override) return override;

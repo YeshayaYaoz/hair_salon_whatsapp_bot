@@ -51,6 +51,10 @@ export interface SystemPromptParts {
 export interface AiProvider {
   /** Provider key as stored on Business.aiProvider — used for usage-ledger pricing lookups. */
   readonly key: string;
+  /** Whether this deployment actually has the credential to call it. Read at call time, not at
+   * import time: the env is populated before any request but not necessarily before this module
+   * is first evaluated. */
+  isConfigured(): boolean;
   /** Resolves the model id to bill/send: business.aiModel if set, else this provider's default
    * cheap or smart tier. */
   resolveModel(tier: "cheap" | "smart", override: string | null | undefined): string;

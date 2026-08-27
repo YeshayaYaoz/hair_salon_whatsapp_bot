@@ -134,6 +134,7 @@ function fromAnthropicResponse(response: Anthropic.Message): GenericResponse {
 
 export const anthropicProvider: AiProvider = {
   key: "anthropic",
+  isConfigured: () => Boolean(process.env.ANTHROPIC_API_KEY?.trim()),
 
   resolveModel(tier, override) {
     if (override) return override;

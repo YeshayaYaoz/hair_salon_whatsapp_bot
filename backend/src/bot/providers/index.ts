@@ -44,8 +44,28 @@ export function isAiProviderKey(v: unknown): v is string {
   return typeof v === "string" && v in PROVIDERS;
 }
 
-/** Falls back to Anthropic for any unrecognized/legacy value (including businesses created before
- * this field existed, which default to "anthropic" at the DB level anyway). */
+/**
+ * The provider to actually call for a stored preference.
+ *
+ * Falls back for two different reasons, and both matter:
+ *
+ *   - An unrecognised or legacy value (a business created before this field existed).
+ *   - A provider this deployment has no key for. DeepSeek is the default for new businesses
+ *     because it is far cheaper, but a deployment without DEEPSEEK_API_KEY would then have every
+ *     new bot fail at send time with a server-configuration error the owner cannot act on.
+ *     Falling back to a provider that IS configured keeps the bot answering; the Bot settings page
+ *     still reports which providers are unconfigured, so the gap stays visible.
+ */
 export function getAiProvider(key: string | null | undefined): AiProvider {
-  return (key && PROVIDERS[key]) || anthropicProvider;
+  const chosen = (key && PROVIDERS[key]) || null;
+  if (chosen?.isConfigured()) return chosen;
+  if (chosen) {
+    console.warn(`[providers] ${chosen.key} is selected but has no API key on this server — falling back.`);
+  }
+  // Cheapest first, so an unconfigured choice degrades toward lower cost rather than toward the
+  // most expensive provider that happens to have a key.
+  return (
+    [PROVIDERS.deepseek, PROVIDERS.anthropic, PROVIDERS.openai].find((p) => p.isConfigured()) ??
+    anthropicProvider
+  );
 }

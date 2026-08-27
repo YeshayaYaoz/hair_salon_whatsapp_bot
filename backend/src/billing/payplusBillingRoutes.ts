@@ -21,6 +21,7 @@ import {
 } from "./payplusSubscription.js";
 import { requireSuperAdmin } from "../api/businessRoutes.js";
 import { captureError } from "../lib/errorMonitoring.js";
+import { sendAdminAlertEmail } from "../lib/email.js";
 import { validateCoupon, redeemCoupon, CouponError, COUPON_FAILURE_HE, normalizeCode } from "./coupons.js";
 import { explainPayPlusError } from "../lib/payplusErrors.js";
 import { parsePayPlusCallback, keyTree } from "../lib/payplusCallback.js";
@@ -773,6 +774,33 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
       );
     }
     console.log(`[payplus subscription webhook] Activated ${plan}/${billingCycle} subscription for business ${business.id}`);
+
+    // Tell the operator a sale happened. This was only ever a console line, so the one event the
+    // business most needs to know about — money arriving — was invisible unless someone happened
+    // to be reading logs. Sent after the activation is committed, and never allowed to fail it:
+    // the subscription is live either way, and a missing email is not worth a webhook retry that
+    // could re-run everything above.
+    try {
+      const paid = await prisma.business.findUnique({
+        where: { id: business.id },
+        select: { name: true, email: true, couponCode: true, couponDiscountIls: true },
+      });
+      const priceIls = PLAN_PRICES_ILS[plan] ?? 0;
+      const cycleLabel = billingCycle === "annual" ? "שנתי" : "חודשי";
+      await sendAdminAlertEmail(
+        `💰 מנוי חדש: ${paid?.name ?? business.id} — ${plan} (${cycleLabel})`,
+        `<h2>${paid?.name ?? business.id} נרשמו ל-${plan}</h2>
+         <ul>
+           <li>תוכנית: <strong>${plan}</strong> · חיוב ${cycleLabel}</li>
+           <li>מחיר מחירון: ₪${priceIls}</li>
+           ${paid?.couponCode ? `<li>קופון: <strong>${paid.couponCode}</strong> (−₪${paid.couponDiscountIls} לחיוב)</li>` : ""}
+           <li>אימייל: ${paid?.email ?? "—"}</li>
+           <li>מזהה עסק: <code>${business.id}</code></li>
+         </ul>`
+      );
+    } catch (err) {
+      console.error("[payplus subscription webhook] Could not send the new-subscription alert:", err);
+    }
   } catch (err) {
     console.error("[payplus subscription webhook] Failed to process event:", err);
     captureError(err, { phase: "payplus subscription webhook" });
