@@ -7,7 +7,7 @@ import { SkeletonBlock, SkeletonRow } from "../../lib/Skeleton";
 import { EmptyState } from "../../lib/EmptyState";
 import { formatPhone } from "../../lib/formatPhone";
 import { useDialog } from "../../lib/useDialog";
-import { DIAL_CODES, dialCodeOf, localPartOf } from "../../lib/dialCodes";
+import { DIAL_CODES, DEFAULT_DIAL_CODE, dialCodeOf, localPartOf } from "../../lib/dialCodes";
 
 interface Customer {
   id: string;
@@ -489,6 +489,48 @@ export default function CustomersPage() {
 
   const [loaded, setLoaded] = useState(false);
 
+  // Adding a customer by hand. The CRM otherwise fills only from inbound WhatsApp, so every
+  // customer the salon had before Tori — and everyone who books over the counter — is invisible.
+  const [addOpen, setAddOpen] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addPhone, setAddPhone] = useState("");
+  const [addDial, setAddDial] = useState(DEFAULT_DIAL_CODE);
+  const [addNotes, setAddNotes] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+
+  async function refreshCustomers() {
+    setCustomers(await apiFetch<Customer[]>("/api/business/customers"));
+  }
+
+  async function addCustomer(e: React.FormEvent) {
+    e.preventDefault();
+    setAdding(true);
+    setAddError(null);
+    try {
+      await apiFetch("/api/business/customers", {
+        method: "POST",
+        body: JSON.stringify({
+          phone: addPhone,
+          dialCode: addDial,
+          name: addName || undefined,
+          notes: addNotes || undefined,
+        }),
+      });
+      setAddName("");
+      setAddPhone("");
+      setAddNotes("");
+      setAddOpen(false);
+      await refreshCustomers();
+    } catch (err) {
+      // The server's message names the real problem — an invalid number, or a customer who is
+      // already on the list — both of which the owner can act on.
+      setAddError(err instanceof Error ? err.message : he ? "ההוספה נכשלה" : "Could not add");
+    } finally {
+      setAdding(false);
+    }
+  }
+
   /** Makes the bot open a new conversation with every customer. Transcripts are kept — the reset
    * moves a marker rather than deleting, so the confirm has to say so or it reads as destructive. */
   async function resetAllConversations() {
@@ -583,6 +625,12 @@ export default function CustomersPage() {
             </button>
           )}
           <button
+            onClick={() => { setAddOpen((v) => !v); setAddError(null); }}
+            className="bg-[#1B7FA0] hover:bg-[#2A9BBF] text-white text-xs font-semibold px-3 py-2 rounded-lg transition"
+          >
+            {he ? "הוספת לקוח" : "Add customer"}
+          </button>
+          <button
             onClick={resetAllConversations}
             disabled={resettingAll}
             title={he
@@ -601,6 +649,68 @@ export default function CustomersPage() {
         </div>
       </div>
 
+      {addOpen && (
+        <form onSubmit={addCustomer} className="bg-white border border-gray-200 rounded-xl p-5 mb-4 animate-fade-up">
+          <h2 className="text-sm font-semibold text-gray-900 mb-1">{he ? "לקוח חדש" : "New customer"}</h2>
+          <p className="text-xs text-gray-600 mb-4 max-w-lg leading-relaxed">
+            {he
+              ? "לקוחות שכותבים לבוט נוספים לכאן לבד. כאן מוסיפים את מי שכבר היה לכם מקודם, או מי שקבע בטלפון — וברגע שיכתוב לבוט, הוא יזוהה עם השם וההיסטוריה שלו."
+              : "Customers who message the bot are added here automatically. Use this for people you already had, or who booked over the phone — the moment they message the bot, they're recognised with their name and history."}
+          </p>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "שם" : "Name"}</label>
+              <input value={addName} onChange={(e) => setAddName(e.target.value)} placeholder={he ? "לדוגמה: דנה כהן" : "e.g. Dana Cohen"} className="w-full" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "טלפון" : "Phone"}</label>
+              {/* The country is chosen, not guessed from the digits: a number stored without the
+                  right country code never matches the one WhatsApp reports, so the customer would
+                  quietly exist twice. */}
+              <div className="flex gap-2">
+                <select value={addDial} onChange={(e) => setAddDial(e.target.value)} className="w-28 shrink-0" dir="ltr" aria-label={he ? "קידומת מדינה" : "Country code"}>
+                  {DIAL_CODES.map((c) => <option key={c.code} value={c.code}>+{c.code}</option>)}
+                </select>
+                <input
+                  value={addPhone}
+                  onChange={(e) => setAddPhone(e.target.value)}
+                  placeholder={addDial === "972" ? "0501234567" : "501234567"}
+                  dir="ltr"
+                  required
+                  className="w-full"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="mt-3">
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "הערה (לא חובה)" : "Note (optional)"}</label>
+            <input
+              value={addNotes}
+              onChange={(e) => setAddNotes(e.target.value)}
+              placeholder={he ? "לדוגמה: מעדיפה תורים בבוקר" : "e.g. prefers morning appointments"}
+              className="w-full"
+            />
+          </div>
+          <div className="flex items-center gap-3 mt-4">
+            <button
+              type="submit"
+              disabled={adding || !addPhone.trim()}
+              className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition"
+            >
+              {adding ? (he ? "מוסיף…" : "Adding…") : he ? "הוספה" : "Add"}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setAddOpen(false); setAddError(null); }}
+              className="text-sm text-gray-600 hover:text-gray-800"
+            >
+              {he ? "ביטול" : "Cancel"}
+            </button>
+            {addError && <p className="text-red-600 text-sm">{addError}</p>}
+          </div>
+        </form>
+      )}
+
       <div className="flex items-center gap-2.5 mb-4 px-4 py-2.5 rounded-lg bg-[#1B7FA0]/8 border border-[#1B7FA0]/20 animate-fade-up stagger-1">
         <svg className="w-4 h-4 text-[#197492] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.9 9.9 0 01-4.29-.98L3 20l1.3-3.9C3.47 15.03 3 13.57 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -618,8 +728,8 @@ export default function CustomersPage() {
             icon="🤝"
             title={t.noCustomers}
             hint={lang === "he"
-              ? "כל לקוח שכותב לבוט נשמר כאן אוטומטית, כולל היסטוריית התורים שלו."
-              : "Every customer who messages the bot is saved here automatically, with their booking history."}
+              ? "כל לקוח שכותב לבוט נשמר כאן אוטומטית — ואת מי שכבר היה לכם אפשר להוסיף עכשיו בכפתור \"הוספת לקוח\"."
+              : "Every customer who messages the bot is saved here automatically — and you can add the ones you already had with \"Add customer\"."}
           />
         ) : (
           <table className="w-full text-sm">

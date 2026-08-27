@@ -70,3 +70,25 @@ describe("normalizeOwnerPhone", () => {
     expect(normalizeOwnerPhone("+44 7700 900123")).toBe("447700900123");
   });
 });
+
+describe("manually added customers", () => {
+  // The property the manual-add route depends on: a customer typed into the dashboard has to end
+  // up stored in the exact string WhatsApp reports as `message.from` on an inbound message, or the
+  // webhook's lookup by (businessId, phone) misses and the same person exists twice — once dead.
+  const WHATSAPP_REPORTS = "972501234567";
+
+  it.each([
+    ["0501234567", "972"],
+    ["050-123-4567", "972"],
+    ["050 123 4567", "972"],
+    ["+972501234567", "972"],
+    ["972501234567", "972"],
+    ["50-123-4567", "972"],
+  ])("stores %s as the form WhatsApp reports", (typed, dial) => {
+    expect(normalizeOwnerPhone(typed, dial)).toBe(WHATSAPP_REPORTS);
+  });
+
+  it("refuses a number that is too short to be real, rather than storing an unreachable row", () => {
+    expect(normalizeOwnerPhone("050123", "972")).toBeNull();
+  });
+});

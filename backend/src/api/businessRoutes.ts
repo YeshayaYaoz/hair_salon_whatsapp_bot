@@ -2311,6 +2311,59 @@ businessRouter.get("/customers", async (req: AuthedRequest, res) => {
   res.json(customers);
 });
 
+/**
+ * Adds a customer by hand.
+ *
+ * The CRM otherwise fills only from inbound WhatsApp, which leaves every customer a salon already
+ * had before Tori invisible: no name on their first message, no history behind a booking made over
+ * the counter, and nobody to pick from when the owner wants to send something.
+ *
+ * The phone is normalised to the exact form WhatsApp reports on an inbound message
+ * (digits, country code, no plus). That is the whole point of doing it here rather than storing
+ * what was typed: a row saved as "050-123-4567" would never match the "972501234567" the webhook
+ * looks up, so the same person would exist twice and the manually-added copy would stay dead.
+ */
+businessRouter.post("/customers", async (req: AuthedRequest, res) => {
+  const parsed = z
+    .object({
+      phone: z.string().min(1).max(30),
+      dialCode: z.string().max(6).optional(),
+      name: z.string().max(120).optional(),
+      notes: z.string().max(2000).optional(),
+    })
+    .safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const phone = normalizeOwnerPhone(parsed.data.phone, parsed.data.dialCode);
+  if (!phone) {
+    return res.status(400).json({ error: "מספר הטלפון לא תקין. בדקו את הספרות ואת קידומת המדינה." });
+  }
+
+  const name = parsed.data.name?.trim() || null;
+  const notes = parsed.data.notes?.trim() || null;
+
+  // Already known — from an earlier message, a booking, or a previous manual add. Answering 409
+  // and pointing at the existing row is more useful than either a duplicate (the unique constraint
+  // forbids it anyway) or a silent overwrite of a name the customer gave themselves.
+  const existing = await prisma.customer.findUnique({
+    where: { businessId_phone: { businessId: req.businessId!, phone } },
+    select: { id: true, name: true },
+  });
+  if (existing) {
+    return res.status(409).json({
+      error: existing.name
+        ? `${existing.name} כבר קיים/ת ברשימה עם המספר הזה.`
+        : "כבר קיים לקוח עם המספר הזה.",
+      customerId: existing.id,
+    });
+  }
+
+  const customer = await prisma.customer.create({
+    data: { businessId: req.businessId!, phone, name, notes },
+  });
+  res.status(201).json(customer);
+});
+
 businessRouter.patch("/customers/:id/notes", async (req: AuthedRequest, res) => {
   const parsed = z.object({ notes: z.string().max(2000) }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
