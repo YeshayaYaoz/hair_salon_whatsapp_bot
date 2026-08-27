@@ -5,6 +5,7 @@ import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
 import { sendAdminAlertEmail } from "../lib/email.js";
 import {
   chargeSubscriptionToken,
+  fetchCustomerUidForToken,
   PLAN_PRICES_ILS,
   BILLING_PERIOD_DAYS,
   LOYALTY_DISCOUNT_AFTER_CYCLES,
@@ -116,11 +117,27 @@ export async function runSubscriptionBillingJob(): Promise<void> {
     const amountIls = Math.max(1, fullAmount - business.loyaltyDiscountIls - couponOff);
 
     const token = decryptSecret(business.subscriptionToken!);
+
+    // A card stored before customer_uid was persisted next to it leaves the row holding half of
+    // what Transactions/Charge requires. Recover the missing half from the token rather than
+    // failing the renewal and asking a paying customer to enter their card again — and store it,
+    // so this costs one extra request per stranded business exactly once.
+    let customerUid = business.subscriptionCustomerUid ?? undefined;
+    if (!customerUid) {
+      customerUid = await fetchCustomerUidForToken(token);
+      if (customerUid) {
+        await prisma.business.update({ where: { id: business.id }, data: { subscriptionCustomerUid: customerUid } });
+        console.log(`[subscriptionBilling] Recovered customer_uid for business ${business.id} from its saved token`);
+      } else {
+        console.warn(`[subscriptionBilling] Business ${business.id} has a token but no customer_uid, and Token/View could not supply one`);
+      }
+    }
+
     const result = await chargeSubscriptionToken(
       token,
       amountIls,
       `תורי — חיוב ${business.billingCycle === "annual" ? "שנתי" : "חודשי"} (${business.name})`,
-      business.subscriptionCustomerUid ?? undefined
+      customerUid
     );
 
     if (result.success) {

@@ -11,9 +11,14 @@ const sendAdminAlertEmail = vi.fn();
 vi.mock("../lib/email.js", () => ({ sendAdminAlertEmail: (...a: unknown[]) => sendAdminAlertEmail(...a) }));
 
 const chargeSubscriptionToken = vi.fn();
+const fetchCustomerUidForToken = vi.fn();
 vi.mock("./payplusSubscription.js", async () => {
   const actual = await vi.importActual<typeof import("./payplusSubscription.js")>("./payplusSubscription.js");
-  return { ...actual, chargeSubscriptionToken: (...a: unknown[]) => chargeSubscriptionToken(...a) };
+  return {
+    ...actual,
+    chargeSubscriptionToken: (...a: unknown[]) => chargeSubscriptionToken(...a),
+    fetchCustomerUidForToken: (...a: unknown[]) => fetchCustomerUidForToken(...a),
+  };
 });
 
 const { runSubscriptionBillingJob } = await import("./subscriptionBillingJob.js");
@@ -47,6 +52,51 @@ beforeEach(() => {
   mockPrisma.business.updateMany.mockResolvedValue({ count: 1 }); // claim succeeds by default
   mockPrisma.business.update.mockResolvedValue({});
   sendAdminAlertEmail.mockResolvedValue(undefined);
+  fetchCustomerUidForToken.mockResolvedValue(undefined);
+});
+
+/**
+ * PayPlus rejects a token charge that arrives without the customer_uid the card belongs to. Rows
+ * whose card was stored before that id was kept alongside it hold only half of what a renewal
+ * needs — and the gap is invisible until the renewal fires, weeks after the customer paid.
+ */
+describe("customer_uid recovery before a renewal", () => {
+  it("uses the stored id without a lookup when the row already has one", async () => {
+    mockPrisma.business.findMany.mockResolvedValue([dueBusiness({ subscriptionCustomerUid: "cust-stored" })]);
+    chargeSubscriptionToken.mockResolvedValue({ success: true });
+
+    await runSubscriptionBillingJob();
+
+    expect(fetchCustomerUidForToken).not.toHaveBeenCalled();
+    expect(chargeSubscriptionToken.mock.calls[0][3]).toBe("cust-stored");
+  });
+
+  it("recovers the id from the token and persists it, so the lookup happens once", async () => {
+    mockPrisma.business.findMany.mockResolvedValue([dueBusiness({ subscriptionCustomerUid: null })]);
+    fetchCustomerUidForToken.mockResolvedValue("cust-recovered");
+    chargeSubscriptionToken.mockResolvedValue({ success: true });
+
+    await runSubscriptionBillingJob();
+
+    expect(fetchCustomerUidForToken).toHaveBeenCalledWith("tok");
+    expect(chargeSubscriptionToken.mock.calls[0][3]).toBe("cust-recovered");
+    expect(
+      mockPrisma.business.update.mock.calls.some((c) => c[0].data?.subscriptionCustomerUid === "cust-recovered")
+    ).toBe(true);
+  });
+
+  it("still attempts the charge when the id cannot be recovered", async () => {
+    // A renewal that might work beats one that certainly does not — and a real rejection is
+    // reported by PayPlus with a reason, which a skipped charge never would be.
+    mockPrisma.business.findMany.mockResolvedValue([dueBusiness({ subscriptionCustomerUid: null })]);
+    fetchCustomerUidForToken.mockResolvedValue(undefined);
+    chargeSubscriptionToken.mockResolvedValue({ success: true });
+
+    await runSubscriptionBillingJob();
+
+    expect(chargeSubscriptionToken).toHaveBeenCalledTimes(1);
+    expect(chargeSubscriptionToken.mock.calls[0][3]).toBeUndefined();
+  });
 });
 
 /**

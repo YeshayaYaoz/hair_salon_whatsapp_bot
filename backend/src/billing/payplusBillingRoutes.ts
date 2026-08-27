@@ -98,6 +98,25 @@ payplusBillingRouter.get("/payplus/health", requireAuth, requireSuperAdmin, asyn
       : "ישמר אוטומטית בתשלום ה-₪1 הבא — ואם לא, השורה הבאה אומרת למה",
   });
 
+  // Paying businesses whose renewal would be rejected — a stored card missing the customer_uid
+  // that Transactions/Charge requires beside it. This is the failure that stays invisible for a
+  // whole billing period: the subscription is active, the money arrived, and nothing goes wrong
+  // until the renewal fires weeks later. The nightly job now recovers the id from the token before
+  // charging, so a number here is a heads-up rather than an outage — but it should be 0, and if it
+  // is not, the recovery is failing too.
+  const strandedTokens = await prisma.business.count({
+    where: { subscriptionToken: { not: null }, subscriptionCustomerUid: null },
+  });
+  checks.push({
+    name: "כרטיסים שמורים עם מזהה לקוח (חידושים)",
+    ok: strandedTokens === 0,
+    detail:
+      strandedTokens === 0
+        ? "כל הכרטיסים השמורים מוכנים לחידוש"
+        : `ל-${strandedTokens} עסקים יש כרטיס שמור בלי customer_uid. החיוב הלילי ישלים אותו מהטוקן לפני הגבייה, ` +
+          `אבל אם המספר לא יורד אחרי הריצה הבאה — Token/View נכשל וצריך לבדוק את זה`,
+  });
+
   // What actually happened on the last callback — the webhook records every hop of the token
   // capture, so "paid and the card still was not saved" is diagnosable from this page instead of
   // from production logs.
