@@ -1,6 +1,7 @@
 import { asyncRouter } from "../lib/asyncRouter.js";
 import crypto from "crypto";
 import { prisma } from "../lib/prisma.js";
+import { issueAndSendReceipt } from "../lib/receipts.js";
 import { getInvoiceProvider, resolveInvoiceCredentials } from "../lib/invoices/index.js";
 import { captureError } from "../lib/errorMonitoring.js";
 import { decryptSecret } from "../lib/crypto.js";
@@ -228,14 +229,28 @@ paymentWebhookRouter.post("/:provider/:businessId/:webhookSecret", async (req, r
       return;
     }
 
-    const invoiceProvider = getInvoiceProvider(resolved.provider);
-    const receipt = await invoiceProvider.createReceipt(resolved.credentials, {
+    // Issued AND delivered. This used to create the document and write its URL to this log, which
+    // meant a business with invoicing connected got receipts no customer ever received and no
+    // screen ever showed — working, invisible, and indistinguishable from broken.
+    const receipt = await issueAndSendReceipt({
+      businessId,
       amountIls: event.amountIls,
       description: "תשלום עבור טיפול",
       customerName: event.customerName,
       customerPhone: event.customerPhone,
     });
-    console.log(`[payments webhook] Auto-issued receipt for ${businessId}: ${receipt.documentUrl}`);
+    console.log(
+      `[payments webhook] Auto-issued receipt for ${businessId} (delivery: ${receipt.delivery}): ${receipt.documentUrl}`
+    );
+    // The customer paid moments ago, so the 24h window is open and delivery should succeed. If it
+    // did not, the owner is the only one who can forward it — and they cannot do that without
+    // being told the receipt exists.
+    if (receipt.delivery !== "sent") {
+      notifyOwner(
+        businessId,
+        `הופקה קבלה על ₪${event.amountIls} עבור ${event.customerName}, אבל היא לא נשלחה ללקוח.\nאפשר לשלוח אותה מכאן:\n${receipt.documentUrl}`
+      );
+    }
   } catch (err) {
     console.error(`[payments webhook] Failed to process ${provider} event for business ${businessId}:`, err);
     captureError(err, { businessId, provider, phase: "payment webhook" });

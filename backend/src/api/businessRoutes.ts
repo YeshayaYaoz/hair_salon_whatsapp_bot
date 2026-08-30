@@ -43,6 +43,7 @@ import { saveImage, deleteImageByUrl, toPublicUploadUrl, MAX_UPLOAD_BYTES, ALLOW
 import { depositCallbackUrl, getPaymentProvider, PAYMENT_PROVIDERS, UnknownPaymentProviderError } from "../lib/payments/index.js";
 import { getInvoiceProvider, INVOICE_PROVIDERS, UnknownInvoiceProviderError, resolveInvoiceCredentials } from "../lib/invoices/index.js";
 import { releaseCustomerCoupon } from "../booking/customerCoupons.js";
+import { issueAndSendReceipt, NoInvoiceProviderError, DELIVERY_MESSAGE_HE } from "../lib/receipts.js";
 
 export const businessRouter = asyncRouter();
 businessRouter.use(requireAuth);
@@ -1477,6 +1478,56 @@ businessRouter.post("/payments/link", async (req: AuthedRequest, res) => {
 
 // Issues a receipt/invoice via the business's connected invoicing provider — call this after a
 // payment has actually been confirmed (e.g. from the payment provider's success webhook).
+/**
+ * Issues a receipt for money taken outside the bot — cash, a card at the counter, a bank transfer —
+ * and sends it to the customer.
+ *
+ * The gap this fills: automatic receipts only ever happened when a customer paid a deposit THROUGH
+ * the bot, which is a small share of a salon's takings. Everything rung up at the till produced
+ * nothing at all, and the owner had no way to ask for a receipt from inside Tori.
+ *
+ * Answers 200 with the delivery outcome even when WhatsApp refused the message: the document was
+ * issued, it counts for the business's books, and the owner needs the link to forward. Reporting
+ * that as an error would tell them nothing was created when something was.
+ */
+businessRouter.post("/customers/:id/receipt", async (req: AuthedRequest, res) => {
+  const parsed = z
+    .object({
+      amountIls: z.number().positive().max(100000),
+      description: z.string().trim().min(1).max(200),
+    })
+    .safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const customer = await prisma.customer.findFirst({
+    where: { id: req.params.id, businessId: req.businessId! },
+    select: { name: true, phone: true },
+  });
+  if (!customer) return res.status(404).json({ error: "Not found" });
+
+  try {
+    const receipt = await issueAndSendReceipt({
+      businessId: req.businessId!,
+      amountIls: parsed.data.amountIls,
+      description: parsed.data.description,
+      // Providers require a name on the document. A customer who has never given one still needs a
+      // receipt, and "לקוח" is what the salon would write on a paper one.
+      customerName: customer.name?.trim() || "לקוח",
+      customerPhone: customer.phone,
+    });
+    return res.json({ ...receipt, message: DELIVERY_MESSAGE_HE[receipt.delivery] });
+  } catch (err) {
+    if (err instanceof NoInvoiceProviderError) {
+      return res.status(400).json({
+        error: "לא מחובר ספק חשבוניות. אפשר לחבר אחד בעמוד סליקה וחשבוניות.",
+      });
+    }
+    console.error("Manual receipt failed:", err);
+    captureError(err, { businessId: req.businessId, phase: "manual_receipt" });
+    return res.status(502).json({ error: "הפקת הקבלה נכשלה מול ספק החשבוניות. נסו שוב, או בדקו את הפרטים בעמוד סליקה וחשבוניות." });
+  }
+});
+
 businessRouter.post("/invoices/receipt", async (req: AuthedRequest, res) => {
   const parsed = z
     .object({ amountIls: z.number().positive(), description: z.string().min(1), customerName: z.string().min(1), customerPhone: z.string().optional(), customerEmail: z.string().email().optional() })

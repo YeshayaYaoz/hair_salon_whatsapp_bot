@@ -81,6 +81,36 @@ function ConversationPanel({
   const [resetting, setResetting] = useState(false);
   const [resetDone, setResetDone] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  // Issuing a receipt for money taken outside the bot — cash, a card at the counter. Automatic
+  // receipts only ever fire on a deposit paid through the bot, which is a small share of takings.
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [receiptAmount, setReceiptAmount] = useState("");
+  const [receiptDescription, setReceiptDescription] = useState("");
+  const [issuing, setIssuing] = useState(false);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+  const [receiptResult, setReceiptResult] = useState<{ documentUrl: string; message: string } | null>(null);
+
+  async function issueReceipt(e: React.FormEvent) {
+    e.preventDefault();
+    setIssuing(true);
+    setReceiptError(null);
+    setReceiptResult(null);
+    try {
+      const r = await apiFetch<{ documentUrl: string; delivery: string; message: string }>(
+        `/api/business/customers/${customer.id}/receipt`,
+        { method: "POST", body: JSON.stringify({ amountIls: Number(receiptAmount), description: receiptDescription }) }
+      );
+      // Kept on screen rather than cleared: when WhatsApp refused the send, this link is the only
+      // way the owner can get the receipt to the customer.
+      setReceiptResult({ documentUrl: r.documentUrl, message: r.message });
+      setReceiptAmount("");
+      setReceiptDescription("");
+    } catch (err) {
+      setReceiptError(err instanceof Error ? err.message : he ? "ההפקה נכשלה" : "Could not issue");
+    } finally {
+      setIssuing(false);
+    }
+  }
   const [editName, setEditName] = useState(customer.name ?? "");
   const [editPhone, setEditPhone] = useState(localPartOf(customer.phone));
   const [editDial, setEditDial] = useState(dialCodeOf(customer.phone));
@@ -253,6 +283,13 @@ function ConversationPanel({
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <button
+              onClick={() => { setReceiptOpen((v) => !v); setReceiptError(null); }}
+              title={he ? "הפקת קבלה על תשלום שהתקבל" : "Issue a receipt for a payment you took"}
+              className="text-xs font-medium text-gray-600 hover:text-[#145F78] hover:bg-[#1B7FA0]/10 px-2 py-1.5 rounded-lg transition"
+            >
+              {he ? "הפקת קבלה" : "Receipt"}
+            </button>
+            <button
               onClick={resetConversation}
               disabled={resetting}
               title={he ? "הבוט יתחיל שיחה חדשה — ההיסטוריה נשמרת" : "The bot starts a new conversation — history is kept"}
@@ -277,6 +314,65 @@ function ConversationPanel({
             </button>
           </div>
         </div>
+
+        {receiptOpen && (
+          <form onSubmit={issueReceipt} className="px-5 py-3 border-b border-gray-100 shrink-0 bg-gray-50/70 flex flex-col gap-2">
+            <p className="text-[11px] text-gray-600">
+              {he
+                ? "לתשלום שהתקבל במזומן, באשראי בסלון או בהעברה. הקבלה תישלח ללקוח בוואטסאפ."
+                : "For a payment taken in cash, on a card at the salon, or by transfer. The receipt is sent to the customer on WhatsApp."}
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min={1}
+                step="0.01"
+                value={receiptAmount}
+                onChange={(e) => setReceiptAmount(e.target.value)}
+                placeholder={he ? "סכום ₪" : "Amount ₪"}
+                required
+                className="w-32 shrink-0 text-sm"
+              />
+              <input
+                value={receiptDescription}
+                onChange={(e) => setReceiptDescription(e.target.value)}
+                placeholder={he ? "על מה? לדוגמה: תספורת וצבע" : "What for? e.g. haircut and colour"}
+                required
+                className="w-full text-sm"
+              />
+            </div>
+            {receiptError && <p className="text-xs text-red-600">{receiptError}</p>}
+            {receiptResult && (
+              <div className="text-xs bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                <p className="text-green-800 font-medium">{receiptResult.message}</p>
+                <a
+                  href={receiptResult.documentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#197492] underline break-all"
+                >
+                  {he ? "פתיחת הקבלה" : "Open the receipt"}
+                </a>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <button
+                type="submit"
+                disabled={issuing || !receiptAmount || !receiptDescription.trim()}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#1B7FA0] text-white hover:bg-[#2A9BBF] disabled:opacity-50"
+              >
+                {issuing ? (he ? "מפיק…" : "Issuing…") : he ? "הפקה ושליחה" : "Issue and send"}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setReceiptOpen(false); setReceiptError(null); setReceiptResult(null); }}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg text-gray-600 hover:bg-gray-100"
+              >
+                {he ? "סגירה" : "Close"}
+              </button>
+            </div>
+          </form>
+        )}
 
         {editOpen && (
           <div className="px-5 py-3 border-b border-gray-100 shrink-0 bg-gray-50/70 flex flex-col gap-2">
