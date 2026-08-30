@@ -104,8 +104,8 @@ const PAYMENT_META: Record<PaymentProviderName, ProviderMeta> = {
     color: "#1B4F9C",
     monogram: "Y",
     instructions: {
-      he: "אותם client_id ו-client_secret של YPAY שמשמשים להפקת קבלות — הם נשלחים במייל לאחר רכישת מוצר ה-API. אצל YPAY הסליקה והקבלה יוצאות יחד, כך שאין צורך לחבר גם ספק קבלות.",
-      en: "The same YPAY client_id and client_secret used for receipts — emailed after you buy their API product. YPAY clears and issues the receipt together, so there's no need to connect a separate receipts provider.",
+      he: "אותם client_id ו-client_secret של YPAY שמשמשים להפקת קבלות — הם נשלחים במייל לאחר רכישת מוצר ה-API. אצל YPAY הסליקה והקבלה יוצאות יחד, כך שאין צורך לחבר גם ספק קבלות. שימו לב: נדרשת חבילה עם שירות סליקה פעיל — בחבילה החינמית מסמכים נשמרים 7 ימים בלבד.",
+      en: "The same YPAY client_id and client_secret used for receipts — emailed after you buy their API product. YPAY clears and issues the receipt together, so there's no need to connect a separate receipts provider. Note: an active clearing plan is required — on the free plan documents are kept for 7 days only.",
     },
     instructionsUrl: "https://ypay.co.il/front/article/68",
   },
