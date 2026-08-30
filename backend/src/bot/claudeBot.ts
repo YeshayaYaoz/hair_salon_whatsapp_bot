@@ -2,6 +2,8 @@ import { prisma } from "../lib/prisma.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { appendTurn, getHistory, type Turn } from "./conversationStore.js";
 import { findAvailableSlots, createAppointment, SlotUnavailableError, OutsideBusinessHoursError, SLOT_BLOCKING_STATUSES, type AvailableSlot } from "../booking/availability.js";
+import { checkManager } from "./managerAuth.js";
+import { issueAndSendReceipt, NoInvoiceProviderError, DELIVERY_MESSAGE_HE } from "../lib/receipts.js";
 import { quoteCustomerCoupon, redeemCustomerCoupon, releaseCustomerCoupon, CustomerCouponError, CUSTOMER_COUPON_FAILURE_HE } from "../booking/customerCoupons.js";
 import { isDepositRequired, depositHoldFields, createDepositLink, releaseHold } from "../booking/deposits.js";
 import { parseBookingTime, parseDateString, dayOfWeekForDate, instantPartsInTz, zonedDateParts } from "../lib/timezone.js";
@@ -40,6 +42,43 @@ function chooseTier(messageText: string, hadToolError: boolean): "cheap" | "smar
   if (trimmed.length > 0 && trimmed.length <= 20 && SIMPLE_MESSAGE_RE.test(trimmed)) return "cheap";
   return "smart";
 }
+
+/**
+ * Manager-only tools.
+ *
+ * Deliberately NOT in the `tools` array above. They are appended only for a sender Meta says is the
+ * owner (see managerAuth), so a customer's model never even sees that they exist — and every one of
+ * them re-checks authorisation at execution time, because prompt-level hiding is not a security
+ * boundary, it is only hygiene.
+ */
+/** Names the execution guard treats as owner-only. Derived below from managerTools itself. */
+const managerTools: GenericTool[] = [
+  {
+    name: "issue_receipt",
+    description:
+      "Issue a receipt (קבלה) for money the business already received — cash, a card at the counter, a transfer — and send it to the customer on WhatsApp. Two steps, both through this tool: call it first WITHOUT confirmed to get back the exact details, read them to the owner and ask for a yes; only then call again with confirmed:true. Never set confirmed:true on the first call. A receipt is a real accounting document that cannot be deleted once issued.",
+    input_schema: {
+      type: "object",
+      properties: {
+        customerName: {
+          type: "string",
+          description: "The customer's name or phone as the owner said it — used to find them in the CRM",
+        },
+        amountIls: { type: "number", description: "Amount received, in shekels" },
+        description: { type: "string", description: "What it was for, e.g. 'תספורת וצבע'" },
+        confirmed: {
+          type: "boolean",
+          description: "Only true on the second call, after the owner explicitly confirmed the details you read back.",
+        },
+      },
+      required: ["customerName", "amountIls", "description"],
+    },
+  },
+];
+
+// Derived rather than hand-listed: a manager tool added above is guarded automatically, instead of
+// depending on someone remembering to add its name in a second place.
+const MANAGER_ONLY_TOOLS = new Set(managerTools.map((t) => t.name));
 
 const tools: GenericTool[] = [
   {
@@ -305,6 +344,42 @@ async function resolveStaffId(businessId: string, staffName: string | undefined)
 // Exported for tests, following normalizeServiceName above. The tool bodies are where the money
 // decisions live — deposits, cancellations, payment links — and driving the whole model loop to
 // reach them would test the provider adapter far more than the behaviour under test.
+/**
+ * Finds a customer the owner named in passing — "דנה", "0501234567", "דנה כהן".
+ *
+ * Scoped to the business, and never used to decide authorisation: this resolves WHO a receipt is
+ * for, long after managerAuth has already settled who is asking.
+ *
+ * An ambiguous name returns null rather than guessing. Issuing a real accounting document against
+ * the wrong customer is worse than asking which Dana they meant.
+ */
+async function findCustomerByNameOrPhone(
+  businessId: string,
+  query: string
+): Promise<{ id: string; name: string | null; phone: string } | null> {
+  const trimmed = query.trim();
+  if (!trimmed) return null;
+
+  const asDigits = trimmed.replace(/\D/g, "");
+  if (asDigits.length >= 7) {
+    // Suffix match: the owner may say the local form of a number stored internationally.
+    const byPhone = await prisma.customer.findMany({
+      where: { businessId, phone: { endsWith: asDigits.slice(-9) } },
+      select: { id: true, name: true, phone: true },
+      take: 2,
+    });
+    if (byPhone.length === 1) return byPhone[0];
+    if (byPhone.length > 1) return null;
+  }
+
+  const byName = await prisma.customer.findMany({
+    where: { businessId, name: { contains: trimmed, mode: "insensitive" } },
+    select: { id: true, name: true, phone: true },
+    take: 2,
+  });
+  return byName.length === 1 ? byName[0] : null;
+}
+
 export async function runTool(
   businessId: string,
   customerPhone: string,
@@ -313,6 +388,75 @@ export async function runTool(
   lastOfferedSlots: { value?: AvailableSlot[] },
   lastPhotos: { value?: { url: string; caption?: string }[] }
 ): Promise<string> {
+  // Manager-only tools are authorised HERE, at execution, against the phone number Meta signed —
+  // never by the model's belief about who it is talking to, and never from anything in the message.
+  // Hiding the tool from a customer's tool list is hygiene; this is the boundary.
+  if (MANAGER_ONLY_TOOLS.has(name)) {
+    const { isManager } = await checkManager(businessId, customerPhone);
+    if (!isManager) {
+      // Says nothing about what the tool is or that authorisation exists — a refusal that
+      // describes the gate is a map of the gate.
+      console.warn(`[bot] Refused manager tool "${name}" for non-manager ${customerPhone} on ${businessId}`);
+      return JSON.stringify({
+        error: "This is not something you can do here. Answer the customer normally and do not mention this.",
+      });
+    }
+  }
+
+  if (name === "issue_receipt") {
+    const amountIls = Number(input.amountIls);
+    if (!Number.isFinite(amountIls) || amountIls <= 0) {
+      return JSON.stringify({ error: "Ask the owner for the amount received, in shekels." });
+    }
+    const description = String(input.description ?? "").trim();
+    if (!description) return JSON.stringify({ error: "Ask the owner what the payment was for." });
+
+    const customer = await findCustomerByNameOrPhone(businessId, String(input.customerName ?? ""));
+    if (!customer) {
+      return JSON.stringify({
+        error: `No customer matching "${input.customerName}". Ask the owner for the customer's phone number, or tell them to add the customer in the dashboard first.`,
+      });
+    }
+
+    // The confirmation gate is code, not prompting. A receipt is an accounting document that cannot
+    // be deleted — only credited — so "the model was told to ask first" is not good enough. The
+    // first call always returns a preview and issues nothing.
+    if (input.confirmed !== true) {
+      return JSON.stringify({
+        needsConfirmation: true,
+        willIssue: {
+          customer: customer.name ?? customer.phone,
+          amountIls,
+          description,
+        },
+        note: "Read these details back to the owner and ask them to confirm. Only if they say yes, call issue_receipt again with the same values and confirmed:true. Nothing has been issued yet.",
+      });
+    }
+
+    try {
+      const receipt = await issueAndSendReceipt({
+        businessId,
+        amountIls,
+        description,
+        customerName: customer.name?.trim() || "לקוח",
+        customerPhone: customer.phone,
+      });
+      return JSON.stringify({
+        issued: true,
+        documentUrl: receipt.documentUrl,
+        delivery: receipt.delivery,
+        note: DELIVERY_MESSAGE_HE[receipt.delivery] + " Give the owner the link.",
+      });
+    } catch (err) {
+      if (err instanceof NoInvoiceProviderError) {
+        return JSON.stringify({
+          error: "No invoicing provider is connected. Tell the owner to connect one on the Payments page in the dashboard.",
+        });
+      }
+      throw err;
+    }
+  }
+
   if (name === "check_availability") {
     const { service, services } = await findServiceByName(businessId, input.serviceName as string);
     if (!service) return unknownServiceError(services);
@@ -1098,7 +1242,27 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   const baseTools = biz.bookingModel === "inquiry" ? inquiryTools : tools;
   // Only where a "service" is something people sleep in. A salon has no party size to fit, and the
   // tool would be one more thing to weigh on every call for no benefit.
-  const activeTools = biz.businessType === "bnb" ? [...baseTools, unitsForGuestsTool] : baseTools;
+  const withUnits = biz.businessType === "bnb" ? [...baseTools, unitsForGuestsTool] : baseTools;
+
+  // Manager tools are offered only to the owner's own number, as asserted by Meta's signed webhook
+  // envelope. This keeps them out of a customer's prompt entirely — the model cannot offer, hint at
+  // or hallucinate a capability it was never shown. It is NOT what makes them safe: runTool
+  // re-checks the same thing at execution, so a model that invents the call still gets refused.
+  const { isManager, businessName } = await checkManager(businessId, customerPhone);
+  const activeTools = isManager ? [...withUnits, ...managerTools] : withUnits;
+
+  // Said in the system prompt rather than left for the model to infer: without it the bot greets
+  // the owner as a customer and offers to book them an appointment at their own salon.
+  const systemForTurn = isManager
+    ? {
+        ...system,
+        volatile:
+          system.volatile +
+          `\n\nYou are speaking with the OWNER of ${businessName ?? "this business"}, not a customer. ` +
+          "Their number is the one registered on the account. Be brief and practical, skip the customer greeting, " +
+          "and help them with what they ask. You can issue receipts for them with issue_receipt.",
+      }
+    : system;
 
   const turns: GenericTurn[] = [
     ...history.map((t: Turn) => ({ role: t.role, text: stampIfStale(t, biz.timezone) }) as GenericTurn),
@@ -1130,7 +1294,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   async function call(currentModel: string) {
     const res = await provider.send({
       model: currentModel,
-      system,
+      system: systemForTurn,
       tools: activeTools,
       turns,
       // null (the default) means "use the app default" — see DEFAULT_TEMPERATURE.
