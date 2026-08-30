@@ -68,3 +68,34 @@ describe("cardcom callback parser", () => {
     expect(PARSERS.cardcom({ ...documented, ResponseCode: 605 } as never).success).toBe(false);
   });
 });
+
+describe("ypay callback parser", () => {
+  // Their API doc v1.9, "Transaction Information": this is the whole payload. Note what is NOT in
+  // it — nothing echoes back the chargeIdentifier we sent, which is why lib/payments/ypay.ts puts
+  // the reference in the notifyUrl query and the route reads it from there.
+  const documented = {
+    success: "true",
+    transactionId: "918273",
+    url: "https://ypay.co.il/doc/918273.pdf",
+    sum: "80",
+    document_id: "900061",
+    document_type: "108",
+  };
+
+  it("reads the amount and the receipt YPAY issued during clearing", () => {
+    const e = PARSERS.ypay(documented as never);
+    expect(e).toMatchObject({ success: true, amountIls: 80, receiptUrl: "https://ypay.co.il/doc/918273.pdf" });
+  });
+
+  it("carries no referenceId of its own — the route supplies it from the notify URL", () => {
+    expect(PARSERS.ypay(documented as never).referenceId).toBeUndefined();
+  });
+
+  it("accepts the documented string as well as a real boolean", () => {
+    expect(PARSERS.ypay({ ...documented, success: true } as never).success).toBe(true);
+  });
+
+  it("a failed transaction is not success", () => {
+    expect(PARSERS.ypay({ success: "false", transactionId: "0" } as never).success).toBe(false);
+  });
+});

@@ -8,7 +8,7 @@ import { SkeletonCard } from "../../lib/Skeleton";
 import { AffiliateOffer } from "../../lib/AffiliateOffer";
 import { readableWithWhiteText } from "../../lib/readableColor";
 
-const PAYMENT_PROVIDERS = ["payplus", "tranzila", "cardcom", "grow"] as const;
+const PAYMENT_PROVIDERS = ["payplus", "tranzila", "cardcom", "grow", "ypay"] as const;
 type PaymentProviderName = (typeof PAYMENT_PROVIDERS)[number];
 
 const INVOICE_PROVIDERS = ["greeninvoice", "icount", "ypay", "payplus-invoice"] as const;
@@ -98,6 +98,16 @@ const PAYMENT_META: Record<PaymentProviderName, ProviderMeta> = {
       en: "Log into Grow → Settings → API, and copy your userId and pageCode.",
     },
     instructionsUrl: "https://meshulam.co.il/",
+  },
+  ypay: {
+    label: "YPAY",
+    color: "#1B4F9C",
+    monogram: "Y",
+    instructions: {
+      he: "אותם client_id ו-client_secret של YPAY שמשמשים להפקת קבלות — הם נשלחים במייל לאחר רכישת מוצר ה-API. אצל YPAY הסליקה והקבלה יוצאות יחד, כך שאין צורך לחבר גם ספק קבלות.",
+      en: "The same YPAY client_id and client_secret used for receipts — emailed after you buy their API product. YPAY clears and issues the receipt together, so there's no need to connect a separate receipts provider.",
+    },
+    instructionsUrl: "https://ypay.co.il/front/article/68",
   },
 };
 
@@ -579,16 +589,21 @@ export default function PaymentsPage() {
           own merchant/invoicing account above. A real managed offering would require a proper
           Marketplace/Split-Payments contract with per-salon KYC, not a shared-account shortcut. */}
 
-      {/* PayPlus is deliberately excluded: createPaymentLink sends refURL_callback with every
-          transaction (see lib/payments/payplus.ts), so the URL is already delivered per payment and
-          there is nothing to paste. Grow, Tranzila and Cardcom only echo back a reference id, so
-          for them this step is genuinely load-bearing and skipping it fails silently — everything
-          looks connected right up until a customer pays a deposit that never confirms.
+      {/* PayPlus and YPAY are deliberately excluded: both take a callback address with every
+          transaction — refURL_callback (lib/payments/payplus.ts) and notifyUrl
+          (lib/payments/ypay.ts) — so the URL is already delivered per payment and there is nothing
+          to paste. Grow, Tranzila and Cardcom only echo back a reference id, so for them this step
+          is genuinely load-bearing and skipping it fails silently — everything looks connected
+          right up until a customer pays a deposit that never confirms.
 
           This asymmetry was the actual answer to "can we drop the paste step?": not in general,
-          only where the provider accepts a callback per transaction. Removing it for all four
-          would have quietly broken deposits on three of them. */}
-      {me?.paymentConnected && me.paymentProvider && me.paymentProvider !== "tori_managed" && me.paymentProvider !== "payplus" && (
+          only where the provider accepts a callback per transaction. Removing it for all of them
+          would have quietly broken deposits on the three that need it. */}
+      {me?.paymentConnected &&
+        me.paymentProvider &&
+        me.paymentProvider !== "tori_managed" &&
+        me.paymentProvider !== "payplus" &&
+        me.paymentProvider !== "ypay" && (
         <div className="mt-5 bg-white border border-gray-200 rounded-2xl px-5 py-4 animate-fade-up stagger-2">
           <p className="text-xs font-semibold text-gray-700 mb-1.5">
             {he ? "כתובת Webhook — להגדרה בממשק הספק" : "Webhook URL — set this in your provider's dashboard"}
