@@ -3,6 +3,7 @@ import { payplusProvider } from "./payplus.js";
 import { tranzilaProvider } from "./tranzila.js";
 import { cardcomProvider } from "./cardcom.js";
 import { growProvider } from "./grow.js";
+import { ypayPaymentProvider } from "./ypay.js";
 import { toriManagedPaymentProvider } from "./toriManaged.js";
 
 export * from "./types.js";
@@ -12,6 +13,7 @@ const PROVIDERS: Record<PaymentProviderName, PaymentProvider> = {
   tranzila: tranzilaProvider,
   cardcom: cardcomProvider,
   grow: growProvider,
+  ypay: ypayPaymentProvider,
   tori_managed: toriManagedPaymentProvider,
 };
 

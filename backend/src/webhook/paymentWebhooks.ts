@@ -76,12 +76,34 @@ function parseGrowEvent(body: Record<string, unknown>): ParsedPaymentEvent {
   };
 }
 
+// YPAY's notify payload (their API doc v1.9, "Transaction Information"): success, transactionId,
+// url, sum, document_id, document_type — and nothing else. In particular NOTHING echoes back the
+// chargeIdentifier we sent, so there is no reference in the body to key on; lib/payments/ypay.ts
+// puts it in the notifyUrl query instead and the handler below reads it from there.
+//
+// `sum` and `url` are documented as present only when docType was not 'none', which is why the
+// adapter always asks for a document: no document means no amount, and no amount means the deposit
+// check below can never pass.
+function parseYpayEvent(body: Record<string, unknown>): ParsedPaymentEvent {
+  // Documented as the strings 'true'/'false'; accept a real boolean too rather than trust the
+  // rendering of a field we have not seen on the wire.
+  const success = body.success === true || String(body.success).toLowerCase() === "true";
+  return {
+    success,
+    amountIls: Number(body.sum) || undefined,
+    // Their document URL — YPAY issues the receipt as part of the clearing, so there is one here
+    // and a second must not be issued below.
+    receiptUrl: (body.url as string) || undefined,
+  };
+}
+
 /** Exported for the contract tests — each parser is pinned against its provider's documented callback. */
 export const PARSERS: Record<string, (body: Record<string, unknown>) => ParsedPaymentEvent> = {
   payplus: parsePayPlusEvent,
   tranzila: parseTranzilaEvent,
   cardcom: parseCardcomEvent,
   grow: parseGrowEvent,
+  ypay: parseYpayEvent,
 };
 
 // Configure this URL (…/webhook/payments/<provider>/<businessId>/<webhookSecret>) as the notify/
@@ -136,6 +158,13 @@ paymentWebhookRouter.post("/:provider/:businessId/:webhookSecret", async (req, r
 
     const event = parser(req.body as Record<string, unknown>);
     if (!event.success) return;
+
+    // Providers whose callback body carries no reference of their own (YPAY) get it from the query
+    // string of the notify URL we handed them. Only ever a fallback: a body that does carry one is
+    // the more trustworthy source, and this must never be able to override it.
+    if (!event.referenceId && typeof req.query.ref === "string") {
+      event.referenceId = req.query.ref;
+    }
 
     // Deposit-before-booking: the payment link's referenceId is the appointment's own id (see
     // claudeBot.ts book_appointment). If this event matches a still-pending hold, confirm it —
@@ -203,6 +232,21 @@ paymentWebhookRouter.post("/:provider/:businessId/:webhookSecret", async (req, r
           `💰 מקדמה שולמה — התור מאושר!\nלקוח: ${customerLabel}\nשירות: ${pending.service.name}\nמועד: ${when}\nסכום: ₪${pending.depositAmountIls ?? event.amountIls ?? "?"}`
         );
       }
+    }
+
+    // YPAY clears and issues the tax document in the same operation — the receipt already exists
+    // by the time this callback arrives, and its URL is in the payload. Running the invoice
+    // provider as well would hand the customer two receipts for one payment, and if the salon's
+    // invoice provider is a different company, two receipts in two different sets of books.
+    // Checked before the invoice provider is even resolved, because it holds regardless of which
+    // one is connected.
+    if (provider === "ypay") {
+      console.log(
+        event.receiptUrl
+          ? `[payments webhook] YPAY issued the receipt during clearing for ${businessId}: ${event.receiptUrl}`
+          : `[payments webhook] YPAY reported no document URL for ${businessId} — check the account's document settings`
+      );
+      return;
     }
 
     const resolved = resolveInvoiceCredentials(business);
