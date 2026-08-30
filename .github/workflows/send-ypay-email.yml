@@ -1,0 +1,72 @@
+name: Email YPAY about tokens and API access
+
+# One-off outreach to service@ypay.co.il, sent at the owner's explicit request.
+#
+# The question that matters is #1 and #2: their pricing page advertises "סליקה עם אסימונים" on the
+# בסיס and פרימיום plans, and "אסימון" is ambiguous in exactly the way that decides an architecture.
+# If it means a saved card token, subscription renewals could run through YPAY; if it means prepaid
+# per-transaction credits, they cannot. Their published API document (v1.9, 03-06-2025) contains no
+# endpoint for charging a saved card at all, which is why the question is worth asking rather than
+# assuming either way.
+#
+# Runs through `railway run` so RESEND_API_KEY is read from the backend's own production variables
+# and never exists in this repo or its logs. Reply-To is the owner's address, so the answer goes
+# straight to his inbox — nothing here can watch a mailbox.
+on:
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+      BACKEND_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+    steps:
+      - name: Send via Resend
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::error::RAILWAY_TOKEN is not set."
+            exit 1
+          fi
+          npm i -g @railway/cli >/dev/null 2>&1
+
+          # Assembled with jq so the Hebrew text needs no JSON escaping by hand.
+          cat > /tmp/body.txt <<'EOF'
+          שלום,
+
+          אני פונה מטעם תורי-אונליין (torionline.com) — מערכת לניהול תורים והזמנות בוואטסאפ לעסקים קטנים בישראל. יש לי חשבון אצלכם, ופיתחנו התממשקות ל-API שלכם להפקת קבלות ולסליקה, על בסיס מסמך ה-API גרסה 1.9 מתאריך 03-06-2025.
+
+          לפני שנפעיל את זה מול עסקים אמיתיים, ארבע שאלות:
+
+          1. במחירון מופיע "סליקה עם אסימונים" בחבילות בסיס ופרימיום. האם הכוונה לשמירת כרטיס אשראי (טוקן) לצורך חיוב חוזר, או ליחידות חיוב שנרכשות מראש?
+
+          2. אם מדובר בטוקן של כרטיס — האם אפשר לחייב כרטיס שמור דרך ה-API, ובאיזו קריאה? במסמך 1.9 מתועדות accessToken, document, payment, payment/getBankId ו-payment/getTransactionsInfo בלבד, ולא מצאתי קריאה לחיוב באמצעות טוקן.
+
+          3. האם יש גרסה עדכנית יותר של מסמך ה-API מגרסה 1.9?
+
+          4. איזו חבילה נדרשת כדי להשתמש ב-POST /payment (דף הסליקה המתארח)? והאם "ממשק API" עדיין נמכר בנפרד ב-50 ש"ח לחודש, או שהוא כלול בחבילות בסיס/פרימיום?
+
+          אפשר להשיב ישירות למייל הזה — התשובה תגיע אליי.
+
+          תודה רבה,
+          ישעיה
+          תורי-אונליין · torionline.com
+          EOF
+
+          jq -n --rawfile body /tmp/body.txt '{
+            from: "תורי-אונליין <noreply@torionline.com>",
+            to: "service@ypay.co.il",
+            reply_to: "y28112000@gmail.com",
+            subject: "שאלה על סליקה עם אסימונים ועל ממשק ה-API — תורי-אונליין",
+            text: $body
+          }' > /tmp/payload.json
+
+          # The key is expanded inside railway run's environment, quoted, and never echoed.
+          railway run --service "$BACKEND_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+            bash -c 'code=$(curl -sS -o /tmp/resp.json -w "%{http_code}" https://api.resend.com/emails \
+              -H "Authorization: Bearer $RESEND_API_KEY" -H "Content-Type: application/json" \
+              --data @/tmp/payload.json); \
+              echo "HTTP $code"; \
+              if [ "$code" = "200" ]; then jq -r "\"Sent, id: \" + .id" /tmp/resp.json; \
+              else cat /tmp/resp.json; exit 1; fi'
