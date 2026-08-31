@@ -200,3 +200,120 @@ export async function notifyCustomerOfCancellation(params: {
     return false;
   }
 }
+
+// --- Reading the business's own configuration ---------------------------------------------------
+
+const DAY_NAMES_HE = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+
+/** minutes-from-midnight to "HH:MM", the form an owner speaks and reads. */
+export function minutesToHhmm(min: number): string {
+  return `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+}
+
+/** "9", "9:30", "09:30" → minutes from midnight, or null. Owners dictate times loosely. */
+export function hhmmToMinutes(raw: string): number | null {
+  const m = raw.trim().match(/^(\d{1,2})(?::(\d{2}))?$/);
+  if (!m) return null;
+  const hours = Number(m[1]);
+  const minutes = m[2] ? Number(m[2]) : 0;
+  if (hours > 23 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+/** Hebrew day name → 0-6, accepting the forms an owner actually says. */
+export function dayNameToIndex(raw: string): number | null {
+  const t = raw.trim().replace(/^יום\s+/, "");
+  const direct = DAY_NAMES_HE.indexOf(t);
+  if (direct >= 0) return direct;
+  const aliases: Record<string, number> = {
+    "א": 0, "ב": 1, "ג": 2, "ד": 3, "ה": 4, "ו": 5, "ש": 6,
+    sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6,
+  };
+  return aliases[t.toLowerCase()] ?? null;
+}
+
+export async function openingHours(businessId: string): Promise<{ day: string; dayOfWeek: number; open: string; close: string }[]> {
+  const rows = await prisma.businessHours.findMany({ where: { businessId }, orderBy: { dayOfWeek: "asc" } });
+  return rows.map((r) => ({
+    day: DAY_NAMES_HE[r.dayOfWeek],
+    dayOfWeek: r.dayOfWeek,
+    open: minutesToHhmm(r.openMin),
+    close: minutesToHhmm(r.closeMin),
+  }));
+}
+
+/**
+ * Sets or clears one day's opening hours.
+ *
+ * Closing a day DELETES the row rather than storing a zero-length window: the slot engine reads
+ * "no row" as closed, and a 0-0 window would be a day that is open for no minutes — the same
+ * outcome by accident rather than by statement, and impossible to tell apart later.
+ */
+export async function setDayHours(params: {
+  businessId: string;
+  dayOfWeek: number;
+  openMin?: number;
+  closeMin?: number;
+  closed?: boolean;
+}): Promise<void> {
+  const { businessId, dayOfWeek } = params;
+  if (params.closed) {
+    await prisma.businessHours.deleteMany({ where: { businessId, dayOfWeek } });
+    return;
+  }
+  if (params.openMin === undefined || params.closeMin === undefined) {
+    throw new Error("Both an opening and a closing time are needed.");
+  }
+  if (params.closeMin <= params.openMin) {
+    throw new Error("The closing time must be after the opening time.");
+  }
+  await prisma.businessHours.upsert({
+    where: { businessId_dayOfWeek: { businessId, dayOfWeek } },
+    create: { businessId, dayOfWeek, openMin: params.openMin, closeMin: params.closeMin },
+    update: { openMin: params.openMin, closeMin: params.closeMin },
+  });
+}
+
+export async function listServices(businessId: string) {
+  const rows = await prisma.service.findMany({ where: { businessId }, orderBy: { name: "asc" } });
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    priceIls: Math.round(r.priceCents / 100),
+    durationMin: r.durationMin,
+  }));
+}
+
+export async function listStaff(businessId: string) {
+  return prisma.staffMember.findMany({ where: { businessId }, select: { id: true, name: true }, orderBy: { name: "asc" } });
+}
+
+export async function listFaq(businessId: string) {
+  return prisma.faqEntry.findMany({ where: { businessId }, select: { id: true, question: true, answer: true } });
+}
+
+export async function listWaitlist(businessId: string) {
+  const rows = await prisma.waitlistEntry.findMany({
+    where: { businessId, notified: false },
+    include: { customer: true, service: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return rows.map((r) => ({
+    customer: r.customer.name ?? r.customer.phone,
+    phone: r.customer.phone,
+    service: r.service?.name ?? null,
+  }));
+}
+
+/** Upcoming blocks only — a block from last March is not something an owner is asking about. */
+export async function listBlocks(businessId: string, timezone: string) {
+  const rows = await prisma.blockedTime.findMany({
+    where: { businessId, endTime: { gte: new Date() } },
+    orderBy: { startTime: "asc" },
+    take: 20,
+  });
+  const fmt = new Intl.DateTimeFormat("he-IL", {
+    timeZone: timezone, day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+  return rows.map((r) => ({ id: r.id, from: fmt.format(r.startTime), to: fmt.format(r.endTime), reason: r.reason }));
+}

@@ -3,8 +3,15 @@ import { buildSystemPrompt } from "./prompt.js";
 import { appendTurn, getHistory, type Turn } from "./conversationStore.js";
 import { findAvailableSlots, createAppointment, SlotUnavailableError, OutsideBusinessHoursError, SLOT_BLOCKING_STATUSES, type AvailableSlot } from "../booking/availability.js";
 import { cancelAppointmentById } from "../booking/actions.js";
+import { normalizeOwnerPhone } from "../lib/phone.js";
+import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
+import { decryptSecret } from "../lib/crypto.js";
 import { checkManager } from "./managerAuth.js";
-import { daySchedule, businessSummary, blockTime, notifyCustomerOfCancellation, dayBounds, todayIn, BlockOverlapError } from "./managerActions.js";
+import {
+  daySchedule, businessSummary, blockTime, notifyCustomerOfCancellation, dayBounds, todayIn, BlockOverlapError,
+  openingHours, setDayHours, listServices, listStaff, listFaq, listWaitlist, listBlocks,
+  minutesToHhmm, hhmmToMinutes, dayNameToIndex,
+} from "./managerActions.js";
 import { issueAndSendReceipt, NoInvoiceProviderError, DELIVERY_MESSAGE_HE } from "../lib/receipts.js";
 import { quoteCustomerCoupon, redeemCustomerCoupon, releaseCustomerCoupon, CustomerCouponError, CUSTOMER_COUPON_FAILURE_HE } from "../booking/customerCoupons.js";
 import { isDepositRequired, depositHoldFields, createDepositLink, releaseHold } from "../booking/deposits.js";
@@ -128,6 +135,177 @@ const managerTools: GenericTool[] = [
         confirmed: { type: "boolean", description: "Only true on the second call, after the owner confirmed." },
       },
       required: ["customerName"],
+    },
+  },
+  {
+    name: "show_settings",
+    description:
+      "Read one part of the business's own setup: opening hours, services and prices, staff, FAQ answers the bot gives, who is on the waitlist, or upcoming blocked time. Read-only and cheap — use it before changing anything so you can tell the owner what it is now.",
+    input_schema: {
+      type: "object",
+      properties: {
+        what: {
+          type: "string",
+          enum: ["hours", "services", "staff", "faq", "waitlist", "blocks"],
+          description: "Which part to show",
+        },
+      },
+      required: ["what"],
+    },
+  },
+  {
+    name: "set_hours",
+    description:
+      "Set or clear one day's opening hours — 'תשנה יום שלישי ל-9 עד 5', 'אני סגור בשבת'. One day per call; for several days call it once per day. Two steps: without confirmed to read the change back, then with confirmed:true. Changing hours changes what the bot offers every customer, so it is always confirmed.",
+    input_schema: {
+      type: "object",
+      properties: {
+        day: { type: "string", description: "Day name as the owner said it — 'שלישי', 'יום ראשון', 'Monday'" },
+        open: { type: "string", description: "Opening time HH:MM. Omit when closing the day." },
+        close: { type: "string", description: "Closing time HH:MM. Omit when closing the day." },
+        closed: { type: "boolean", description: "True to mark the day closed entirely." },
+        confirmed: { type: "boolean" },
+      },
+      required: ["day"],
+    },
+  },
+  {
+    name: "upsert_service",
+    description:
+      "Add a service or change an existing one's price or duration — 'תעלה את הצבע ל-250', 'תוסיף שירות פן, 80 שקל, 30 דקות'. Matches an existing service by name; creates it when there is none. Two-step confirmation. Prices are what customers are quoted, so never guess a value the owner did not say.",
+    input_schema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        priceIls: { type: "number", description: "Price in shekels" },
+        durationMin: { type: "number", description: "How long it takes, in minutes" },
+        confirmed: { type: "boolean" },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "manage_staff",
+    description: "Add or remove a member of staff customers can ask for by name. Two-step confirmation on removal.",
+    input_schema: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["add", "remove"] },
+        name: { type: "string" },
+        confirmed: { type: "boolean" },
+      },
+      required: ["action", "name"],
+    },
+  },
+  {
+    name: "add_faq",
+    description:
+      "Teach the bot an answer it should give customers — 'אם שואלים על חניה, תגיד שיש חניון בבניין'. Applies to every customer from then on, so read it back before saving.",
+    input_schema: {
+      type: "object",
+      properties: {
+        question: { type: "string" },
+        answer: { type: "string" },
+        confirmed: { type: "boolean" },
+      },
+      required: ["question", "answer"],
+    },
+  },
+  {
+    name: "remove_block",
+    description: "Remove a time block the owner previously set — 'תבטל את החסימה של מחר'. Use show_settings with 'blocks' first to find which one they mean.",
+    input_schema: {
+      type: "object",
+      properties: {
+        date: { type: "string", description: "YYYY-MM-DD of the block to remove" },
+        confirmed: { type: "boolean" },
+      },
+      required: ["date"],
+    },
+  },
+  {
+    name: "set_bot_enabled",
+    description:
+      "Turn the customer-facing bot on or off. Off means it stops answering customers entirely — messages are still saved and the owner answers them by hand. Always confirm; this is invisible from the customer's side and easy to leave off by accident.",
+    input_schema: {
+      type: "object",
+      properties: {
+        enabled: { type: "boolean" },
+        confirmed: { type: "boolean" },
+      },
+      required: ["enabled"],
+    },
+  },
+  {
+    name: "book_for_customer",
+    description:
+      "Book an appointment on the owner's behalf — for someone who phoned or walked in. If the customer is not in the CRM, pass their phone and they are added. Two-step confirmation. Respects opening hours and existing bookings exactly as a customer booking would.",
+    input_schema: {
+      type: "object",
+      properties: {
+        customerName: { type: "string" },
+        customerPhone: { type: "string", description: "Needed only for someone not already a customer" },
+        serviceName: { type: "string" },
+        date: { type: "string", description: "YYYY-MM-DD" },
+        time: { type: "string", description: "HH:MM in the business's timezone" },
+        confirmed: { type: "boolean" },
+      },
+      required: ["customerName", "serviceName", "date", "time"],
+    },
+  },
+  {
+    name: "add_customer",
+    description: "Add someone to the customer list without booking anything — a regular the salon already had.",
+    input_schema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        phone: { type: "string" },
+        note: { type: "string" },
+      },
+      required: ["name", "phone"],
+    },
+  },
+  {
+    name: "set_customer_note",
+    description: "Save a note about a customer, shown to the owner beside that customer's conversation — 'תרשום על דנה שהיא מעדיפה בוקר'. The note is for the owner; the bot does not read it out to customers.",
+    input_schema: {
+      type: "object",
+      properties: {
+        customerName: { type: "string" },
+        note: { type: "string" },
+      },
+      required: ["customerName", "note"],
+    },
+  },
+  {
+    name: "message_customer",
+    description:
+      "Send a customer a WhatsApp message from the business — 'תכתבי לדנה שאני מאחרת ברבע שעה'. Two-step confirmation: this reaches a real person in the business's name, so read the exact wording back first.",
+    input_schema: {
+      type: "object",
+      properties: {
+        customerName: { type: "string" },
+        text: { type: "string", description: "Exactly what to send" },
+        confirmed: { type: "boolean" },
+      },
+      required: ["customerName", "text"],
+    },
+  },
+  {
+    name: "create_discount_code",
+    description:
+      "Create a discount code for the business's customers — 'תפתח קוד WELCOME10 של 10 אחוז'. Two-step confirmation.",
+    input_schema: {
+      type: "object",
+      properties: {
+        code: { type: "string", description: "Latin letters and digits, e.g. WELCOME10" },
+        percent: { type: "number", description: "Percentage off. Give this or fixedIls, not both." },
+        fixedIls: { type: "number", description: "Shekels off. Give this or percent, not both." },
+        maxUses: { type: "number", description: "Optional cap on total uses" },
+        confirmed: { type: "boolean" },
+      },
+      required: ["code"],
     },
   },
 ];
@@ -459,18 +637,398 @@ export async function runTool(
     }
   }
 
+  // A confirmation gate shared by every manager write. Same shape everywhere, so the owner learns
+  // one rhythm — the bot reads back what it is about to do, and only a "yes" makes it happen.
+  const confirmFirst = (input: Record<string, unknown>, preview: Record<string, unknown>, what: string) =>
+    input.confirmed === true
+      ? null
+      : JSON.stringify({
+          needsConfirmation: true,
+          [what]: preview,
+          note: "Read this back to the owner and ask them to confirm. Nothing has changed yet. Only if they say yes, call again with the same values and confirmed:true.",
+        });
+
+  if (name === "show_settings") {
+    const biz = await prisma.business.findUniqueOrThrow({
+      where: { id: businessId },
+      select: { timezone: true, botEnabled: true },
+    });
+    const tz = biz.timezone || "Asia/Jerusalem";
+    switch (input.what) {
+      case "hours": {
+        const hours = await openingHours(businessId);
+        return JSON.stringify({
+          hours,
+          // Days with no row are closed, and an owner asking "what are my hours" needs to hear
+          // which days those are rather than notice an absence.
+          closedDays: [0, 1, 2, 3, 4, 5, 6]
+            .filter((d) => !hours.some((h) => h.dayOfWeek === d))
+            .map((d) => ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"][d]),
+        });
+      }
+      case "services":
+        return JSON.stringify({ services: await listServices(businessId) });
+      case "staff":
+        return JSON.stringify({ staff: await listStaff(businessId) });
+      case "faq":
+        return JSON.stringify({ faq: await listFaq(businessId) });
+      case "waitlist":
+        return JSON.stringify({ waiting: await listWaitlist(businessId) });
+      case "blocks":
+        return JSON.stringify({ blocks: await listBlocks(businessId, tz) });
+      default:
+        return JSON.stringify({ error: "Ask the owner which part they mean." });
+    }
+  }
+
+  if (name === "set_hours") {
+    const dayIndex = dayNameToIndex(String(input.day ?? ""));
+    if (dayIndex === null) return JSON.stringify({ error: "Ask the owner which day they mean." });
+    const dayName = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"][dayIndex];
+
+    if (input.closed === true) {
+      const gate = confirmFirst(input, { day: dayName, closed: true }, "willSet");
+      if (gate) return gate;
+      await setDayHours({ businessId, dayOfWeek: dayIndex, closed: true });
+      return JSON.stringify({ updated: true, note: `יום ${dayName} מסומן כסגור. הבוט לא יציע בו תורים.` });
+    }
+
+    const openMin = hhmmToMinutes(String(input.open ?? ""));
+    const closeMin = hhmmToMinutes(String(input.close ?? ""));
+    if (openMin === null || closeMin === null) {
+      return JSON.stringify({ error: "Ask the owner for the opening and closing time, e.g. 09:00 to 17:00." });
+    }
+    if (closeMin <= openMin) return JSON.stringify({ error: "The closing time must be after the opening time." });
+
+    const gate = confirmFirst(
+      input,
+      { day: dayName, open: minutesToHhmm(openMin), close: minutesToHhmm(closeMin) },
+      "willSet"
+    );
+    if (gate) return gate;
+
+    await setDayHours({ businessId, dayOfWeek: dayIndex, openMin, closeMin });
+    return JSON.stringify({ updated: true, day: dayName, open: minutesToHhmm(openMin), close: minutesToHhmm(closeMin) });
+  }
+
+  if (name === "upsert_service") {
+    const serviceName = String(input.name ?? "").trim();
+    if (!serviceName) return JSON.stringify({ error: "Ask the owner which service." });
+    const existing = (await listServices(businessId)).find(
+      (svc) => svc.name.trim().toLowerCase() === serviceName.toLowerCase()
+    );
+
+    const priceIls = input.priceIls === undefined ? existing?.priceIls : Number(input.priceIls);
+    const durationMin = input.durationMin === undefined ? existing?.durationMin : Number(input.durationMin);
+    if (priceIls === undefined || durationMin === undefined) {
+      // Never invented: a price the owner did not say is a price customers would be quoted.
+      return JSON.stringify({
+        error: existing
+          ? "Ask the owner what to change — the price, the duration, or both."
+          : "That service does not exist yet. Ask the owner for its price and how long it takes.",
+      });
+    }
+    if (!Number.isFinite(priceIls) || priceIls < 0 || !Number.isFinite(durationMin) || durationMin <= 0) {
+      return JSON.stringify({ error: "Ask the owner for a valid price and duration." });
+    }
+
+    const gate = confirmFirst(
+      input,
+      { service: serviceName, priceIls, durationMin, isNew: !existing },
+      "willSave"
+    );
+    if (gate) return gate;
+
+    if (existing) {
+      await prisma.service.update({
+        where: { id: existing.id },
+        data: { priceCents: Math.round(priceIls * 100), durationMin },
+      });
+    } else {
+      await prisma.service.create({
+        data: { businessId, name: serviceName, priceCents: Math.round(priceIls * 100), durationMin },
+      });
+    }
+    return JSON.stringify({ saved: true, service: serviceName, priceIls, durationMin });
+  }
+
+  if (name === "manage_staff") {
+    const staffName = String(input.name ?? "").trim();
+    if (!staffName) return JSON.stringify({ error: "Ask the owner for the name." });
+
+    if (input.action === "add") {
+      const already = (await listStaff(businessId)).find((m) => m.name.trim().toLowerCase() === staffName.toLowerCase());
+      if (already) return JSON.stringify({ error: `${staffName} is already on the team.` });
+      await prisma.staffMember.create({ data: { businessId, name: staffName } });
+      return JSON.stringify({ added: true, name: staffName });
+    }
+
+    const member = (await listStaff(businessId)).find((m) => m.name.trim().toLowerCase() === staffName.toLowerCase());
+    if (!member) return JSON.stringify({ error: `No staff member called ${staffName}.` });
+    const gate = confirmFirst(input, { remove: member.name }, "willRemove");
+    if (gate) return gate;
+    // Their past appointments keep the row via staffId; removing only stops new bookings naming
+    // them, which is what an owner means by "she doesn't work here any more".
+    await prisma.staffMember.deleteMany({ where: { id: member.id, businessId } });
+    return JSON.stringify({ removed: true, name: member.name });
+  }
+
+  if (name === "add_faq") {
+    const question = String(input.question ?? "").trim();
+    const answer = String(input.answer ?? "").trim();
+    if (!question || !answer) return JSON.stringify({ error: "Ask the owner for both the question and the answer." });
+    const gate = confirmFirst(input, { question, answer }, "willAdd");
+    if (gate) return gate;
+    await prisma.faqEntry.create({ data: { businessId, question, answer } });
+    return JSON.stringify({ added: true, note: "The bot will use this with customers from now on." });
+  }
+
+  if (name === "remove_block") {
+    const biz = await prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { timezone: true } });
+    const tz = biz.timezone || "Asia/Jerusalem";
+    const date = String(input.date ?? "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return JSON.stringify({ error: "Ask the owner which date." });
+
+    const { start, end } = dayBounds(date, tz);
+    const blocks = await prisma.blockedTime.findMany({
+      where: { businessId, startTime: { gte: start, lt: end } },
+      orderBy: { startTime: "asc" },
+    });
+    if (blocks.length === 0) return JSON.stringify({ error: "There is no block on that date." });
+
+    const fmt = new Intl.DateTimeFormat("he-IL", { timeZone: tz, hour: "2-digit", minute: "2-digit" });
+    const gate = confirmFirst(
+      input,
+      { date, blocks: blocks.map((b) => ({ from: fmt.format(b.startTime), to: fmt.format(b.endTime) })) },
+      "willRemove"
+    );
+    if (gate) return gate;
+
+    await prisma.blockedTime.deleteMany({ where: { id: { in: blocks.map((b) => b.id) }, businessId } });
+    return JSON.stringify({ removed: blocks.length, note: "The bot can offer that time again." });
+  }
+
+  if (name === "set_bot_enabled") {
+    const enabled = input.enabled === true;
+    const gate = confirmFirst(input, { botWillBe: enabled ? "on" : "off" }, "willSet");
+    if (gate) return gate;
+    await prisma.business.update({ where: { id: businessId }, data: { botEnabled: enabled } });
+    return JSON.stringify({
+      botEnabled: enabled,
+      note: enabled
+        ? "הבוט עונה שוב ללקוחות."
+        : "הבוט מפסיק לענות ללקוחות. ההודעות שלהם עדיין נשמרות ואפשר לענות ידנית מהדשבורד. אפשר להדליק בחזרה כאן בכל רגע.",
+    });
+  }
+
+  if (name === "book_for_customer") {
+    const biz = await prisma.business.findUniqueOrThrow({
+      where: { id: businessId },
+      select: { timezone: true },
+    });
+    const tz = biz.timezone || "Asia/Jerusalem";
+    const { service, services } = await findServiceByName(businessId, String(input.serviceName ?? ""));
+    if (!service) return unknownServiceError(services);
+
+    const date = String(input.date ?? "");
+    const time = String(input.time ?? "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || hhmmToMinutes(time) === null) {
+      return JSON.stringify({ error: "Ask the owner for the date and time." });
+    }
+    const startTime = parseBookingTime(`${date}T${time.padStart(5, "0")}:00`, tz);
+
+    let target = await findCustomerByNameOrPhone(businessId, String(input.customerName ?? ""));
+    const givenPhone = input.customerPhone ? normalizeOwnerPhone(String(input.customerPhone)) : null;
+    if (!target && !givenPhone) {
+      return JSON.stringify({
+        error: `No customer matching "${input.customerName}". Ask the owner for their phone number and call again with customerPhone.`,
+      });
+    }
+
+    const gate = confirmFirst(
+      input,
+      {
+        customer: target?.name ?? String(input.customerName),
+        service: service.name,
+        date,
+        time,
+      },
+      "willBook"
+    );
+    if (gate) return gate;
+
+    if (!target && givenPhone) {
+      const created = await prisma.customer.upsert({
+        where: { businessId_phone: { businessId, phone: givenPhone } },
+        create: { businessId, phone: givenPhone, name: String(input.customerName).trim() || null },
+        update: {},
+        select: { id: true, name: true, phone: true },
+      });
+      target = created;
+    }
+
+    try {
+      await createAppointment({
+        businessId,
+        serviceId: service.id,
+        customerPhone: target!.phone,
+        customerName: target!.name ?? (String(input.customerName).trim() || "לקוח"),
+        startTime,
+      });
+    } catch (err) {
+      if (err instanceof SlotUnavailableError) {
+        return JSON.stringify({ error: "That slot is already taken. Offer the owner another time." });
+      }
+      if (err instanceof OutsideBusinessHoursError) {
+        return JSON.stringify({
+          error: "That time is outside the opening hours. Tell the owner — they can change the hours with set_hours if they meant to.",
+        });
+      }
+      throw err;
+    }
+    return JSON.stringify({ booked: true, customer: target!.name ?? target!.phone, service: service.name, date, time });
+  }
+
+  if (name === "add_customer") {
+    const phone = normalizeOwnerPhone(String(input.phone ?? ""));
+    if (!phone) return JSON.stringify({ error: "That phone number does not look right — ask the owner to repeat it." });
+    const existing = await prisma.customer.findUnique({
+      where: { businessId_phone: { businessId, phone } },
+      select: { name: true },
+    });
+    if (existing) {
+      return JSON.stringify({ error: `${existing.name ?? "Someone"} is already saved with that number.` });
+    }
+    await prisma.customer.create({
+      data: {
+        businessId,
+        phone,
+        name: String(input.name ?? "").trim() || null,
+        notes: input.note ? String(input.note).trim() : null,
+      },
+    });
+    return JSON.stringify({
+      added: true,
+      note: "They are on the customer list. When they first message the bot it will already know their name.",
+    });
+  }
+
+  if (name === "set_customer_note") {
+    const target = await findCustomerByNameOrPhone(businessId, String(input.customerName ?? ""));
+    if (!target) return JSON.stringify({ error: `No customer matching "${input.customerName}".` });
+    await prisma.customer.update({ where: { id: target.id }, data: { notes: String(input.note ?? "").trim() } });
+    return JSON.stringify({ saved: true, customer: target.name ?? target.phone });
+  }
+
+  if (name === "message_customer") {
+    const target = await findCustomerByNameOrPhone(businessId, String(input.customerName ?? ""));
+    if (!target) return JSON.stringify({ error: `No customer matching "${input.customerName}".` });
+    const text = String(input.text ?? "").trim();
+    if (!text) return JSON.stringify({ error: "Ask the owner what to say." });
+
+    const gate = confirmFirst(input, { to: target.name ?? target.phone, text }, "willSend");
+    if (gate) return gate;
+
+    const biz = await prisma.business.findUniqueOrThrow({
+      where: { id: businessId },
+      select: { whatsappPhoneNumberId: true, whatsappAccessToken: true },
+    });
+    if (!biz.whatsappPhoneNumberId || !biz.whatsappAccessToken) {
+      return JSON.stringify({ error: "WhatsApp is not connected, so nothing can be sent." });
+    }
+    try {
+      await sendWhatsAppMessage({
+        phoneNumberId: biz.whatsappPhoneNumberId,
+        accessToken: decryptSecret(biz.whatsappAccessToken),
+        to: target.phone,
+        text,
+      });
+      return JSON.stringify({ sent: true, to: target.name ?? target.phone });
+    } catch (err) {
+      // Almost always the 24h window. Said plainly so the owner phones instead of assuming it went.
+      return JSON.stringify({
+        error:
+          "WhatsApp would not deliver it — most likely because this customer has not written in the last 24 hours. Tell the owner it was NOT sent.",
+      });
+    }
+  }
+
+  if (name === "create_discount_code") {
+    const code = String(input.code ?? "").trim().toUpperCase();
+    if (!/^[A-Za-z0-9_-]{2,30}$/.test(code)) {
+      return JSON.stringify({ error: "A code should be Latin letters and digits, e.g. WELCOME10." });
+    }
+    const percent = input.percent === undefined ? null : Number(input.percent);
+    const fixedIls = input.fixedIls === undefined ? null : Number(input.fixedIls);
+    if ((percent === null) === (fixedIls === null)) {
+      return JSON.stringify({ error: "Ask the owner whether it is a percentage or a shekel amount." });
+    }
+    if (percent !== null && (!Number.isFinite(percent) || percent <= 0 || percent > 100)) {
+      return JSON.stringify({ error: "A percentage discount has to be between 1 and 100." });
+    }
+    if (fixedIls !== null && (!Number.isFinite(fixedIls) || fixedIls <= 0)) {
+      return JSON.stringify({ error: "Ask the owner for the amount off, in shekels." });
+    }
+
+    const existing = await prisma.customerCoupon.findUnique({
+      where: { businessId_code: { businessId, code } },
+      select: { id: true },
+    });
+    if (existing) return JSON.stringify({ error: `There is already a code called ${code}.` });
+
+    const gate = confirmFirst(
+      input,
+      { code, discount: percent !== null ? `${percent}%` : `₪${fixedIls}`, maxUses: input.maxUses ?? null },
+      "willCreate"
+    );
+    if (gate) return gate;
+
+    await prisma.customerCoupon.create({
+      data: {
+        businessId,
+        code,
+        discountType: percent !== null ? "percent" : "fixed",
+        discountValue: Math.round((percent ?? fixedIls)!),
+        maxUses: input.maxUses ? Math.round(Number(input.maxUses)) : null,
+      },
+    });
+    return JSON.stringify({
+      created: true,
+      code,
+      note: "Customers can use it by typing the code to the bot. Share it however you like — the bot recognises it.",
+    });
+  }
+
   if (name === "manager_help") {
     // Discoverability is the whole point: an owner who does not know these exist has none of them.
     // Returned as data for the model to phrase naturally rather than a canned block, so it reads
     // like an answer to what they actually asked.
     return JSON.stringify({
-      youCanAskMeTo: [
-        "לראות את היומן — 'מה יש לי היום?', 'מי מגיע מחר?'",
-        "לחסום זמן — 'תחסום לי מחר 14:00 עד 16:00', 'אני לא עובד ביום שלישי'",
-        "להוציא קבלה — 'תוציא קבלה לדנה על 200 שקל, תספורת'",
-        "לבטל תור — 'תבטל את התור של יוסי מחר'",
-        "לראות מספרים — 'כמה הכנסתי החודש?'",
-      ],
+      youCanAskMeTo: {
+        היומן: [
+          "'מה יש לי היום?' · 'מי מגיע מחר?'",
+          "'תקבע לדנה תספורת מחר ב-10' — גם ללקוחה חדשה, רק תגיד לי את הטלפון",
+          "'תבטל את התור של יוסי מחר' — אני גם מודיע לו",
+          "'תחסום לי מחר 14:00 עד 16:00'",
+        ],
+        "שעות ומחירים": [
+          "'מה שעות הפתיחה שלי?' · 'תשנה יום שלישי ל-9 עד 5' · 'אני סגור בשבת'",
+          "'כמה עולה צבע?' · 'תעלה את הצבע ל-250' · 'תוסיף שירות פן, 80 שקל, 30 דקות'",
+          "'תוסיף עובדת בשם מיכל'",
+        ],
+        לקוחות: [
+          "'תכתבי לדנה שאני מאחרת ברבע שעה'",
+          "'תוסיף לקוחה חדשה: רותי, 0501234567'",
+          "'תרשום על דנה שהיא מעדיפה בוקר'",
+          "'מי ברשימת המתנה?'",
+        ],
+        כסף: [
+          "'תוציא קבלה לדנה על 200 שקל, תספורת'",
+          "'כמה הכנסתי החודש?'",
+          "'תפתח קוד הנחה WELCOME10 של 10 אחוז'",
+        ],
+        אחר: ["'תכבה את הבוט' / 'תדליק את הבוט'", "'מה השאלות הנפוצות?' · 'אם שואלים על חניה תגיד שיש חניון'"],
+      },
       note:
         "Tell the owner these in their own language, briefly and in a friendly way, and mention they can just write naturally — no commands or menus. Do not read the list back verbatim as a menu unless they asked for a full list.",
     });
@@ -1495,7 +2053,12 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
           "- No customer greeting, no 'how can I help you book an appointment', no sales tone. They own the place.\n" +
           "- Be brief and practical, like a capable assistant who already knows the business.\n" +
           "- They write naturally. There are no commands or menus — understand what they mean and do it.\n" +
-          "- You can: show their schedule, block time off, issue receipts, cancel bookings, report revenue.\n" +
+          "- Nearly everything they can do in the dashboard, they can do here: see and change the schedule, " +
+          "book and cancel for customers, block time off, set opening hours, change prices and services, manage " +
+          "staff and FAQ answers, message a customer, issue receipts, create discount codes, see revenue, and " +
+          "turn the customer bot on or off.\n" +
+          "- Read the current state before changing it (show_settings) so you can tell them what it is now — " +
+          "an owner changing Tuesday's hours usually wants to hear what they are first.\n" +
           "- If they greet you, ask what you can do, seem unsure, or ask for something near but not exactly " +
           "one of your abilities, call manager_help and tell them — most owners do not yet know any of this " +
           "is possible from WhatsApp, so surfacing it is genuinely useful rather than noise.\n" +

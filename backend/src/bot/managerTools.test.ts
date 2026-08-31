@@ -9,8 +9,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  */
 
 const mockPrisma = {
-  business: { findUnique: vi.fn(), findUniqueOrThrow: vi.fn() },
-  customer: { findMany: vi.fn() },
+  business: { findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), update: vi.fn() },
+  customer: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), upsert: vi.fn() },
+  service: { findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
+  staffMember: { findMany: vi.fn(), create: vi.fn(), deleteMany: vi.fn() },
+  faqEntry: { findMany: vi.fn(), create: vi.fn() },
+  blockedTime: { findMany: vi.fn(), deleteMany: vi.fn() },
+  customerCoupon: { findUnique: vi.fn(), create: vi.fn() },
+  appointment: { findFirst: vi.fn(), findMany: vi.fn() },
 };
 vi.mock("../lib/prisma.js", () => ({ prisma: mockPrisma }));
 
@@ -25,6 +31,16 @@ vi.mock("../lib/receipts.js", () => ({
 // Everything else runTool can reach, stubbed to nothing — these tests never take those paths.
 vi.mock("./managerActions.js", () => ({
   daySchedule: vi.fn().mockResolvedValue([]),
+  openingHours: vi.fn().mockResolvedValue([]),
+  setDayHours: vi.fn(),
+  listServices: vi.fn().mockResolvedValue([]),
+  listStaff: vi.fn().mockResolvedValue([]),
+  listFaq: vi.fn().mockResolvedValue([]),
+  listWaitlist: vi.fn().mockResolvedValue([]),
+  listBlocks: vi.fn().mockResolvedValue([]),
+  minutesToHhmm: (n: number) => String(n),
+  hhmmToMinutes: (t: string) => (t === "09:00" ? 540 : t === "17:00" ? 1020 : t === "10:00" ? 600 : null),
+  dayNameToIndex: () => 2,
   businessSummary: vi.fn().mockResolvedValue({ confirmedThisMonth: 0, revenueThisMonthIls: 0, newCustomersThisMonth: 0, upcomingCount: 0 }),
   blockTime: vi.fn().mockResolvedValue({ id: "bt1" }),
   notifyCustomerOfCancellation: vi.fn().mockResolvedValue(true),
@@ -168,6 +184,18 @@ describe("every manager tool is behind the same guard", () => {
     ["block_time", { date: "2026-09-01", startTime: "14:00", endTime: "16:00", confirmed: true }],
     ["cancel_booking", { customerName: "דנה", confirmed: true }],
     ["issue_receipt", { customerName: "דנה", amountIls: 200, description: "תספורת", confirmed: true }],
+    ["show_settings", { what: "hours" }],
+    ["set_hours", { day: "שלישי", open: "09:00", close: "17:00", confirmed: true }],
+    ["upsert_service", { name: "תספורת", priceIls: 100, durationMin: 30, confirmed: true }],
+    ["manage_staff", { action: "add", name: "מיכל" }],
+    ["add_faq", { question: "חניה?", answer: "יש", confirmed: true }],
+    ["remove_block", { date: "2026-09-01", confirmed: true }],
+    ["set_bot_enabled", { enabled: false, confirmed: true }],
+    ["book_for_customer", { customerName: "דנה", serviceName: "תספורת", date: "2026-09-01", time: "10:00", confirmed: true }],
+    ["add_customer", { name: "רותי", phone: "0501234567" }],
+    ["set_customer_note", { customerName: "דנה", note: "בוקר" }],
+    ["message_customer", { customerName: "דנה", text: "היי", confirmed: true }],
+    ["create_discount_code", { code: "WELCOME10", percent: 10, confirmed: true }],
   ])("refuses %s from a customer", async (tool, input) => {
     mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ timezone: "Asia/Jerusalem" });
 
@@ -175,6 +203,12 @@ describe("every manager tool is behind the same guard", () => {
 
     expect(out.error).toBeTruthy();
     // Nothing that would only exist on a successful run.
-    expect(out.issued ?? out.blocked ?? out.cancelled ?? out.appointments ?? out.youCanAskMeTo).toBeUndefined();
+    expect(
+      out.issued ?? out.blocked ?? out.cancelled ?? out.appointments ?? out.youCanAskMeTo ??
+      out.updated ?? out.saved ?? out.added ?? out.removed ?? out.booked ?? out.sent ?? out.created ??
+      out.hours ?? out.services ?? out.staff ?? out.faq ?? out.waiting ?? out.blocks ??
+      // A refusal must not even reach the confirmation step — that would leak that the tool is real.
+      out.needsConfirmation
+    ).toBeUndefined();
   });
 });
