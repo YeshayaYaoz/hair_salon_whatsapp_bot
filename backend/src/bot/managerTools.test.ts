@@ -23,6 +23,17 @@ vi.mock("../lib/receipts.js", () => ({
 }));
 
 // Everything else runTool can reach, stubbed to nothing — these tests never take those paths.
+vi.mock("./managerActions.js", () => ({
+  daySchedule: vi.fn().mockResolvedValue([]),
+  businessSummary: vi.fn().mockResolvedValue({ confirmedThisMonth: 0, revenueThisMonthIls: 0, newCustomersThisMonth: 0, upcomingCount: 0 }),
+  blockTime: vi.fn().mockResolvedValue({ id: "bt1" }),
+  notifyCustomerOfCancellation: vi.fn().mockResolvedValue(true),
+  dayBounds: () => ({ start: new Date(0), end: new Date(1) }),
+  todayIn: () => "2026-09-01",
+  BlockOverlapError: class extends Error {},
+}));
+vi.mock("../booking/actions.js", () => ({ cancelAppointmentById: vi.fn() }));
+
 vi.mock("../booking/customerCoupons.js", () => ({
   quoteCustomerCoupon: vi.fn(),
   redeemCustomerCoupon: vi.fn(),
@@ -144,5 +155,26 @@ describe("issue_receipt input handling", () => {
     const out = JSON.parse(await runTool("b1", OWNER, "issue_receipt", receiptInput, noSlots, noPhotos));
 
     expect(out.error).toMatch(/invoicing provider/i);
+  });
+});
+
+describe("every manager tool is behind the same guard", () => {
+  // Named individually rather than looped over MANAGER_ONLY_TOOLS so that adding a tool without a
+  // guard test is a visible omission rather than a silently-passing loop.
+  it.each([
+    ["manager_help", {}],
+    ["day_schedule", { date: "2026-09-01" }],
+    ["business_summary", {}],
+    ["block_time", { date: "2026-09-01", startTime: "14:00", endTime: "16:00", confirmed: true }],
+    ["cancel_booking", { customerName: "דנה", confirmed: true }],
+    ["issue_receipt", { customerName: "דנה", amountIls: 200, description: "תספורת", confirmed: true }],
+  ])("refuses %s from a customer", async (tool, input) => {
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ timezone: "Asia/Jerusalem" });
+
+    const out = JSON.parse(await runTool("b1", CUSTOMER, tool, input, noSlots, noPhotos));
+
+    expect(out.error).toBeTruthy();
+    // Nothing that would only exist on a successful run.
+    expect(out.issued ?? out.blocked ?? out.cancelled ?? out.appointments ?? out.youCanAskMeTo).toBeUndefined();
   });
 });

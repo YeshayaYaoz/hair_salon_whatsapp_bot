@@ -372,6 +372,19 @@ export default function SettingsPage() {
                 : "⚠️ No notification phone set — you won't be alerted about new bookings, human-handoff requests, or booking enquiries. Strongly recommended."}
             </div>
           )}
+          {/* The number below is not only where alerts arrive — it is what lets the owner RUN the
+              business from WhatsApp. Said here because this is the screen where that number is set,
+              and an owner who does not know the capability exists will never try it. */}
+          <div className="bg-[#F2F9FC] border border-[#CFE7F1] rounded-lg px-3.5 py-3 mb-3">
+            <p className="text-xs font-semibold text-[#136B87] mb-1">
+              {he ? "💬 מהמספר הזה אפשר גם לנהל את העסק בוואטסאפ" : "💬 This number can also run the business from WhatsApp"}
+            </p>
+            <p className="text-xs text-gray-700 leading-relaxed">
+              {he
+                ? "כתבו לבוט שלכם מהמספר הזה בשפה חופשית — \"מה יש לי היום?\", \"תחסום לי מחר 14:00-16:00\", \"תוציא קבלה לדנה על 200 ש\"ח\", \"כמה הכנסתי החודש?\". רק המספר הזה יכול לעשות את זה, ווואטסאפ מאמתת אותו — לקוח לא יכול להתחזות אליכם."
+                : "Message your own bot from this number in plain language — \"what do I have today?\", \"block tomorrow 14:00-16:00\", \"issue a receipt for Dana, ₪200\", \"how much did I take this month?\". Only this number can, and WhatsApp verifies it — a customer cannot impersonate you."}
+            </p>
+          </div>
           <Field label={t.notifPhone} hint={t.notifPhoneHint}>
             {/* The country is chosen, not inferred. Guessing it from the digits meant a bare
                 national number was stored with no country code and could never be delivered, and a

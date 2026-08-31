@@ -2,7 +2,9 @@ import { prisma } from "../lib/prisma.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { appendTurn, getHistory, type Turn } from "./conversationStore.js";
 import { findAvailableSlots, createAppointment, SlotUnavailableError, OutsideBusinessHoursError, SLOT_BLOCKING_STATUSES, type AvailableSlot } from "../booking/availability.js";
+import { cancelAppointmentById } from "../booking/actions.js";
 import { checkManager } from "./managerAuth.js";
+import { daySchedule, businessSummary, blockTime, notifyCustomerOfCancellation, dayBounds, todayIn, BlockOverlapError } from "./managerActions.js";
 import { issueAndSendReceipt, NoInvoiceProviderError, DELIVERY_MESSAGE_HE } from "../lib/receipts.js";
 import { quoteCustomerCoupon, redeemCustomerCoupon, releaseCustomerCoupon, CustomerCouponError, CUSTOMER_COUPON_FAILURE_HE } from "../booking/customerCoupons.js";
 import { isDepositRequired, depositHoldFields, createDepositLink, releaseHold } from "../booking/deposits.js";
@@ -72,6 +74,60 @@ const managerTools: GenericTool[] = [
         },
       },
       required: ["customerName", "amountIls", "description"],
+    },
+  },
+  {
+    name: "manager_help",
+    description:
+      "List what the owner can do from WhatsApp. Call this when the owner greets you, asks what you can do, seems unsure, or asks for something close to but not exactly one of your abilities. Cheap and read-only — err towards calling it.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "day_schedule",
+    description:
+      "The owner's own bookings for a date — who is coming, when, for what. Use for 'what do I have today', 'מה יש לי מחר', 'who's coming at 3'. Read-only.",
+    input_schema: {
+      type: "object",
+      properties: {
+        date: { type: "string", description: "YYYY-MM-DD. Omit for today." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "business_summary",
+    description:
+      "How the business is doing: bookings and revenue this month, new customers, how many appointments are still upcoming. Read-only.",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "block_time",
+    description:
+      "Block a window so the bot stops offering it — a day off, a dentist appointment, a supplier visit. Two steps like issue_receipt: call without confirmed to check the window is free and read it back, then again with confirmed:true. If bookings already sit inside the window it refuses and lists them; do not retry, tell the owner what clashes and let them decide.",
+    input_schema: {
+      type: "object",
+      properties: {
+        date: { type: "string", description: "YYYY-MM-DD" },
+        startTime: { type: "string", description: "HH:MM in the business's own timezone" },
+        endTime: { type: "string", description: "HH:MM in the business's own timezone" },
+        reason: { type: "string", description: "Optional note, e.g. 'חופש'" },
+        confirmed: { type: "boolean", description: "Only true on the second call, after the owner confirmed." },
+      },
+      required: ["date", "startTime", "endTime"],
+    },
+  },
+  {
+    name: "cancel_booking",
+    description:
+      "Cancel a customer's booking on the owner's behalf and tell the customer it was cancelled. Two steps: call without confirmed to identify the exact booking and read it back, then again with confirmed:true. This messages a real customer, so never confirm on the owner's behalf.",
+    input_schema: {
+      type: "object",
+      properties: {
+        customerName: { type: "string", description: "Customer name or phone as the owner said it" },
+        date: { type: "string", description: "YYYY-MM-DD of the booking. Omit to use their next one." },
+        confirmed: { type: "boolean", description: "Only true on the second call, after the owner confirmed." },
+      },
+      required: ["customerName"],
     },
   },
 ];
@@ -401,6 +457,169 @@ export async function runTool(
         error: "This is not something you can do here. Answer the customer normally and do not mention this.",
       });
     }
+  }
+
+  if (name === "manager_help") {
+    // Discoverability is the whole point: an owner who does not know these exist has none of them.
+    // Returned as data for the model to phrase naturally rather than a canned block, so it reads
+    // like an answer to what they actually asked.
+    return JSON.stringify({
+      youCanAskMeTo: [
+        "לראות את היומן — 'מה יש לי היום?', 'מי מגיע מחר?'",
+        "לחסום זמן — 'תחסום לי מחר 14:00 עד 16:00', 'אני לא עובד ביום שלישי'",
+        "להוציא קבלה — 'תוציא קבלה לדנה על 200 שקל, תספורת'",
+        "לבטל תור — 'תבטל את התור של יוסי מחר'",
+        "לראות מספרים — 'כמה הכנסתי החודש?'",
+      ],
+      note:
+        "Tell the owner these in their own language, briefly and in a friendly way, and mention they can just write naturally — no commands or menus. Do not read the list back verbatim as a menu unless they asked for a full list.",
+    });
+  }
+
+  if (name === "day_schedule") {
+    const biz = await prisma.business.findUniqueOrThrow({
+      where: { id: businessId },
+      select: { timezone: true },
+    });
+    const tz = biz.timezone || "Asia/Jerusalem";
+    const date = (input.date as string | undefined) || todayIn(tz);
+    const entries = await daySchedule(businessId, date, tz);
+    return JSON.stringify({
+      date,
+      count: entries.length,
+      appointments: entries,
+      note:
+        entries.length === 0
+          ? "Nothing booked that day. Say so plainly."
+          : "Read these out in order, briefly. pending_payment means the slot is held but the deposit has not been paid yet — worth flagging.",
+    });
+  }
+
+  if (name === "business_summary") {
+    const biz = await prisma.business.findUniqueOrThrow({
+      where: { id: businessId },
+      select: { timezone: true },
+    });
+    const summary = await businessSummary(businessId, biz.timezone || "Asia/Jerusalem");
+    return JSON.stringify({
+      ...summary,
+      note: "Revenue is net of any discount codes actually used, so it is what was really taken, not list prices.",
+    });
+  }
+
+  if (name === "block_time") {
+    const biz = await prisma.business.findUniqueOrThrow({
+      where: { id: businessId },
+      select: { timezone: true },
+    });
+    const tz = biz.timezone || "Asia/Jerusalem";
+    const date = String(input.date ?? "");
+    const from = String(input.startTime ?? "");
+    const to = String(input.endTime ?? "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{1,2}:\d{2}$/.test(from) || !/^\d{1,2}:\d{2}$/.test(to)) {
+      return JSON.stringify({ error: "Ask the owner for the date and the start and end times." });
+    }
+
+    const start = parseBookingTime(`${date}T${from.padStart(5, "0")}:00`, tz);
+    const end = parseBookingTime(`${date}T${to.padStart(5, "0")}:00`, tz);
+    if (end.getTime() <= start.getTime()) {
+      return JSON.stringify({ error: "The end time is not after the start time — ask the owner to clarify." });
+    }
+
+    try {
+      // Dry run first: this both validates the window and surfaces clashes before anything is
+      // written, so the confirmation the owner is asked for is about a window we know is free.
+      const clashCheck = await blockTime({ businessId, start, end, timezone: tz, reason: undefined, dryRun: true });
+      void clashCheck;
+    } catch (err) {
+      if (err instanceof BlockOverlapError) {
+        return JSON.stringify({
+          error: "There are bookings inside that window.",
+          conflicts: err.conflicts,
+          note: "Do not block over these. Tell the owner what clashes and ask what they want to do — they may want to cancel those first.",
+        });
+      }
+      throw err;
+    }
+
+    if (input.confirmed !== true) {
+      return JSON.stringify({
+        needsConfirmation: true,
+        willBlock: { date, from, to, reason: input.reason ?? null },
+        note: "Read this back and ask the owner to confirm. Nothing is blocked yet. Only then call again with confirmed:true.",
+      });
+    }
+
+    try {
+      await blockTime({ businessId, start, end, reason: input.reason as string | undefined, timezone: tz });
+      return JSON.stringify({ blocked: true, date, from, to, note: "The bot will no longer offer that time." });
+    } catch (err) {
+      if (err instanceof BlockOverlapError) {
+        // Something was booked between the preview and the confirmation.
+        return JSON.stringify({ error: "A booking was just made inside that window.", conflicts: err.conflicts });
+      }
+      throw err;
+    }
+  }
+
+  if (name === "cancel_booking") {
+    const customer = await findCustomerByNameOrPhone(businessId, String(input.customerName ?? ""));
+    if (!customer) {
+      return JSON.stringify({ error: `No customer matching "${input.customerName}". Ask the owner for their phone number.` });
+    }
+
+    const biz = await prisma.business.findUniqueOrThrow({
+      where: { id: businessId },
+      select: { timezone: true },
+    });
+    const tz = biz.timezone || "Asia/Jerusalem";
+
+    const dateFilter = input.date
+      ? (() => {
+          const { start, end } = dayBounds(String(input.date), tz);
+          return { gte: start, lt: end };
+        })()
+      : { gte: new Date() };
+
+    const booking = await prisma.appointment.findFirst({
+      where: { businessId, customerId: customer.id, status: "confirmed", startTime: dateFilter },
+      include: { service: true },
+      orderBy: { startTime: "asc" },
+    });
+    if (!booking) {
+      return JSON.stringify({
+        error: input.date
+          ? `${customer.name ?? customer.phone} has no confirmed booking on that date.`
+          : `${customer.name ?? customer.phone} has no upcoming booking.`,
+      });
+    }
+
+    const when = new Intl.DateTimeFormat("he-IL", {
+      timeZone: tz, weekday: "long", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit",
+    }).format(booking.startTime);
+
+    if (input.confirmed !== true) {
+      return JSON.stringify({
+        needsConfirmation: true,
+        willCancel: { customer: customer.name ?? customer.phone, service: booking.service.name, when },
+        note: "Read this back and ask the owner to confirm. Nothing is cancelled yet, and the customer has not been told anything.",
+      });
+    }
+
+    await cancelAppointmentById(businessId, booking.id);
+    const told = await notifyCustomerOfCancellation({
+      businessId,
+      customerPhone: customer.phone,
+      serviceName: booking.service.name,
+      when,
+    });
+    return JSON.stringify({
+      cancelled: true,
+      customerNotified: told,
+      note: told
+        ? "The slot is free and the customer has been told."
+        : "The slot is free, but the customer could NOT be messaged — tell the owner to contact them directly.",
+    });
   }
 
   if (name === "issue_receipt") {
@@ -1251,6 +1470,18 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   const { isManager, businessName } = await checkManager(businessId, customerPhone);
   const activeTools = isManager ? [...withUnits, ...managerTools] : withUnits;
 
+  // The first time an owner writes to their own bot, tell them what it can do for them. Without
+  // this the capability is invisible: nobody thinks to ask their booking bot to block a Tuesday.
+  // Claimed with a conditional update so two messages arriving together cannot both send it.
+  let introduceManagerTools = false;
+  if (isManager) {
+    const claimed = await prisma.business.updateMany({
+      where: { id: businessId, managerIntroSentAt: null },
+      data: { managerIntroSentAt: new Date() },
+    });
+    introduceManagerTools = claimed.count > 0;
+  }
+
   // Said in the system prompt rather than left for the model to infer: without it the bot greets
   // the owner as a customer and offers to book them an appointment at their own salon.
   const systemForTurn = isManager
@@ -1258,9 +1489,24 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
         ...system,
         volatile:
           system.volatile +
-          `\n\nYou are speaking with the OWNER of ${businessName ?? "this business"}, not a customer. ` +
-          "Their number is the one registered on the account. Be brief and practical, skip the customer greeting, " +
-          "and help them with what they ask. You can issue receipts for them with issue_receipt.",
+          `\n\n=== YOU ARE TALKING TO THE OWNER OF ${businessName ?? "THIS BUSINESS"} ===\n` +
+          "This is the number registered on the account, verified by WhatsApp itself. This is NOT a customer.\n\n" +
+          "Talk to them completely differently from a customer:\n" +
+          "- No customer greeting, no 'how can I help you book an appointment', no sales tone. They own the place.\n" +
+          "- Be brief and practical, like a capable assistant who already knows the business.\n" +
+          "- They write naturally. There are no commands or menus — understand what they mean and do it.\n" +
+          "- You can: show their schedule, block time off, issue receipts, cancel bookings, report revenue.\n" +
+          "- If they greet you, ask what you can do, seem unsure, or ask for something near but not exactly " +
+          "one of your abilities, call manager_help and tell them — most owners do not yet know any of this " +
+          "is possible from WhatsApp, so surfacing it is genuinely useful rather than noise.\n" +
+          "- Anything that changes money or a customer's booking is confirmed with them first. The tools " +
+          "enforce this; never try to skip it, and never confirm on their behalf." +
+          (introduceManagerTools
+            ? "\n\nTHIS IS THE FIRST TIME THEY HAVE WRITTEN TO THEIR OWN BOT. Whatever else you answer, open by " +
+              "telling them warmly and briefly that they can run the business from right here — call manager_help " +
+              "and weave two or three concrete examples into a sentence or two. Do not paste a menu. Then answer " +
+              "what they actually asked."
+            : ""),
       }
     : system;
 

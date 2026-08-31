@@ -149,6 +149,10 @@ model Business {
   // failure it guards against is silent: the bot tells a customer "someone will call you back"
   // while the alert went nowhere. Cleared whenever the number changes.
   notificationPhoneVerifiedAt DateTime?
+  // Set the first time the owner writes to their own bot and we tell them what they can do from
+  // there. Once only: an owner who already knows does not need the pitch again, and repeating it
+  // on every message would make their own bot tiresome to use.
+  managerIntroSentAt        DateTime?
   // Set once the owner clicks the link we email them. Null means unverified — which is the state
   // every existing account starts in, so nothing may *require* this to be non-null.
   emailVerifiedAt           DateTime?
