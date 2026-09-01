@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SkeletonRow } from "../../lib/Skeleton";
 import { useDialog } from "../../lib/useDialog";
+import { DEFAULT_TZ } from "../../lib/tz";
 
 interface AdminBusiness {
   id: string;
@@ -501,7 +502,7 @@ export default function AdminBusinessesPage() {
   }
 
   function fmtDate(iso: string) {
-    return new Date(iso).toLocaleDateString(he ? "he-IL" : "en-US", { day: "numeric", month: "short", year: "numeric" });
+    return new Date(iso).toLocaleDateString(he ? "he-IL" : "en-US", { timeZone: DEFAULT_TZ, day: "numeric", month: "short", year: "numeric" });
   }
 
   const all = businesses ?? [];

@@ -196,7 +196,7 @@ export default function AnalyticsPage() {
           {greetingFor(lang)}{businessName ? `, ${businessName}` : ""} 👋
         </h1>
         <p className="text-sm mt-1" style={{ color: "#4B5563" }}>
-          {new Date().toLocaleDateString(lang === "he" ? "he-IL" : "en-US", { weekday: "long", day: "numeric", month: "long" })}
+          {new Date().toLocaleDateString(lang === "he" ? "he-IL" : "en-US", { timeZone: tz, weekday: "long", day: "numeric", month: "long" })}
           {" · "}
           {todayAppts.length === 0
             ? (lang === "he" ? "אין תורים היום" : "no appointments today")

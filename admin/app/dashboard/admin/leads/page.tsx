@@ -6,6 +6,7 @@ import { apiFetch } from "../../../lib/api";
 import { SkeletonRow } from "../../../lib/Skeleton";
 import { useDialog } from "../../../lib/useDialog";
 import { useLanguage } from "../../../lib/LanguageContext";
+import { DEFAULT_TZ } from "../../../lib/tz";
 
 // --- Types ---
 
@@ -374,7 +375,7 @@ function CampaignListView({ onOpenCampaign }: { onOpenCampaign: (id: string) => 
   }
 
   function fmtDate(iso: string) {
-    return new Date(iso).toLocaleDateString("he-IL", { day: "numeric", month: "short", year: "numeric" });
+    return new Date(iso).toLocaleDateString("he-IL", { timeZone: DEFAULT_TZ, day: "numeric", month: "short", year: "numeric" });
   }
 
   return (
