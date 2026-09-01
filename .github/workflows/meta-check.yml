@@ -82,13 +82,14 @@ jobs:
       # capability is a finding, not a broken check.
 
       # The messaging tier is the gate on the Calling API (it needs 2,000 unique recipients/day),
-      # and it also caps how fast the pilot can grow. A new WABA starts far below it.
-      - name: What tier and quality this number is on
+      # and it also caps how fast the pilot can grow.
+      #
+      # Per number, not just the first: the display name is approved or declined per number, and
+      # reading row 0 and calling it "the account" hid a decline on a number further down the list.
+      - name: Tier, quality and display-name status, per number
         run: |
-          for f in "throughput" "quality_rating" "messaging_limit_tier" "status" "name_status" "code_verification_status"; do
-            v=$(curl -sS "$GRAPH/$WABA/phone_numbers?fields=$f&access_token=$TOKEN" | jq -c ".data[0].$f // \"—\"" 2>/dev/null)
-            echo "  $f: $v"
-          done
+          curl -sS "$GRAPH/$WABA/phone_numbers?fields=display_phone_number,verified_name,quality_rating,name_status,status,code_verification_status,throughput,messaging_limit_tier&access_token=$TOKEN" \
+            | jq -r '.data[]? | "  \(.display_phone_number)  \(.verified_name)\n      status=\(.status // "—")  name_status=\(.name_status // "—")  quality=\(.quality_rating // "—")  tier=\(.messaging_limit_tier // "—")  throughput=\(.throughput.level // "—")  code=\(.code_verification_status // "—")"'
 
       # Whether voice calling is switched on for this number at all, and on what terms.
       - name: Are calling features enabled
