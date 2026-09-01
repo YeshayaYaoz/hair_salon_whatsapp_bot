@@ -276,3 +276,38 @@ export const OUTREACH_TEMPLATE_EXAMPLE = ["מספרת רונית"];
  */
 export const OUTREACH_TEMPLATE_FOOTER = "לא רלוונטי? השיבו הסר ולא נפנה שוב.";
 export const OUTREACH_TEMPLATE_BUTTONS = ["הסירו אותי"];
+
+const DEFAULT_ANNOUNCE_NAME = "tori_product_update_manage";
+
+/**
+ * Product announcement to businesses already on Tori — not cold outreach.
+ *
+ * Separate from the outreach template even though both are MARKETING and both go out from Tori's
+ * own number, because they are answerable to different things. Outreach reaches strangers and its
+ * wording is tuned to not read as spam; this reaches paying customers, and its job is to get them
+ * to try one specific thing. Sharing one template would mean every future announcement re-enters
+ * review with the cold opener still attached.
+ *
+ * Still MARKETING: the recipient has no open 24-hour window (an owner who last messaged us in
+ * March), and dressing a feature announcement as UTILITY is the reclassification that costs a
+ * number its quality rating.
+ */
+export function announceTemplate(): TemplateConfig {
+  return { name: process.env.TORI_ANNOUNCE_TEMPLATE_NAME || DEFAULT_ANNOUNCE_NAME, languageCode: DEFAULT_LANG };
+}
+
+/**
+ * {{1}} the business's name.
+ *
+ * The whole message is one idea — the management happens in WhatsApp — because a template that
+ * lists four features gets skimmed and none of them get tried. The example instruction at the end
+ * is deliberate: an owner who reads this and does nothing has not learned anything, and "send this
+ * exact sentence to your own number" is the shortest path from reading to using.
+ */
+export const ANNOUNCE_TEMPLATE_BODY =
+  "היי, כאן תורי אונליין. מהיום אפשר לנהל את {{1}} ישירות מתוך וואטסאפ — לשנות שעות ומחירים, לראות מי מגיע היום, לחסום זמן ולהוסיף לקוחות. בלי להיכנס לשום מקום: פשוט שולחים הודעה למספר הוואטסאפ של העסק, מהמספר של המנהל, וכותבים מה רוצים. לניסיון ראשון שלחו לעצמכם: מה יש לי היום?";
+
+export const ANNOUNCE_TEMPLATE_EXAMPLE = ["מספרת רונית"];
+
+export const ANNOUNCE_TEMPLATE_FOOTER = "לא רוצים עדכונים כאלה? השיבו הסר.";
+export const ANNOUNCE_TEMPLATE_BUTTONS = ["הסירו אותי"];

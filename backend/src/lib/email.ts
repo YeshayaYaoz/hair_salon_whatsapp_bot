@@ -239,3 +239,62 @@ export async function sendWelcomeEmail(to: string, name: string) {
     }),
   });
 }
+
+/**
+ * Product announcement to an existing customer: the business can now be run from WhatsApp.
+ *
+ * Takes `managerPhoneSet` rather than describing the feature unconditionally, because an owner
+ * with no notification phone saved cannot use any of this — checkManager has nothing to compare
+ * the sender against and refuses every tool. Telling that owner to "message your bot" produces a
+ * bot that answers them like a customer, which reads as the feature being broken rather than
+ * unconfigured. So they get the one step that unblocks them instead.
+ */
+export async function sendManageFromWhatsAppEmail(
+  to: string,
+  businessName: string,
+  managerPhoneSet: boolean
+) {
+  await resendSend({
+    from: FROM,
+    to,
+    subject: "חדש בתורי: לנהל את העסק ישירות מוואטסאפ",
+    html: emailLayout({
+      headingAccent: `היי ${esc(businessName)},`,
+      heading: "עכשיו אפשר לנהל את העסק מוואטסאפ",
+      body:
+        paragraph(
+          "בלי להיכנס לדשבורד, בלי אפליקציה. שולחים הודעה למספר הוואטסאפ של העסק — " +
+          "<b>מהמספר של המנהל</b> — וכותבים מה רוצים, בשפה רגילה."
+        ) +
+        steps([
+          "מה יש לי היום? — כל התורים של היום",
+          "תשנה יום שלישי ל-10:00 עד 18:00",
+          "תספורת עכשיו 120 שקל",
+          "תחסום לי מחר 14:00 עד 16:00",
+          "תוסיף לקוחה חדשה, רותי, 050-1234567",
+          "כמה הכנסתי החודש?",
+        ]) +
+        paragraph(
+          "לפני כל שינוי הבוט מקריא בדיוק מה הוא עומד לעשות ומחכה לאישור. " +
+          "שום דבר לא קורה בלי אישור מכם."
+        ) +
+        (managerPhoneSet
+          ? callout(
+              "success",
+              "רק המספר שלכם יכול",
+              "הבוט בודק מאיזה מספר ההודעה נשלחה, לא מה כתוב בה. לקוח שיכתוב &quot;אני הבעלים&quot; " +
+                "יקבל שירות רגיל ולא יוכל לשנות דבר."
+            ) + button(`${APP_URL}/dashboard/settings`, "המספר שלי בהגדרות")
+          : callout(
+              "danger",
+              "צעד אחד לפני שזה יעבוד",
+              "עדיין לא הגדרתם מספר מנהל, ובלעדיו הבוט לא יזהה אתכם. " +
+                "נכנסים להגדרות, ממלאים את מספר הוואטסאפ שלכם — וזהו."
+            ) + button(`${APP_URL}/dashboard/settings`, "הגדרת מספר המנהל")) +
+        paragraph(
+          "רוצים לראות את כל מה שאפשר? שלחו לבוט: <b>מה אתה יודע לעשות?</b>"
+        ),
+      footerNote: "קיבלתם את המייל הזה כי יש לכם חשבון פעיל בתורי-אונליין.",
+    }),
+  });
+}

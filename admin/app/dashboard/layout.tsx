@@ -11,6 +11,7 @@ import { useNextSetupStep } from "../lib/useNextSetupStep";
 import { SectionTabs } from "../lib/SectionTabs";
 import { SECTION_FOLLOWER_HREFS } from "../lib/sections";
 import { useDialog } from "../lib/useDialog";
+import { ManageFromWhatsAppBanner } from "../lib/ManageFromWhatsAppBanner";
 
 // One nav item. Icons are Heroicons outline path data.
 // hideFor: verticals where this destination is meaningless. An overnight rental has no staff
@@ -373,13 +374,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [trial, setTrial] = useState<{ status: string; createdAt: string } | null>(null);
+  // null until /me answers — the announcement banner gives opposite instructions depending on it.
+  const [managerPhoneSet, setManagerPhoneSet] = useState<boolean | null>(null);
 
   // Single source of truth for the /me lookup — TrialBanner, the sidebar, and the mobile "More"
   // sheet all need bits of it, so fetch once here and pass down instead of three separate calls.
   useEffect(() => {
-    apiFetch<{ isSuperAdmin?: boolean; subscriptionStatus: string; createdAt: string; businessTypeChosenAt?: string | null }>("/api/business/me")
+    apiFetch<{ isSuperAdmin?: boolean; subscriptionStatus: string; createdAt: string; businessTypeChosenAt?: string | null; notificationPhone?: string | null }>("/api/business/me")
       .then((me) => {
         setIsSuperAdmin(Boolean(me.isSuperAdmin));
+        setManagerPhoneSet(Boolean(me.notificationPhone?.trim()));
         setTrial({ status: me.subscriptionStatus, createdAt: me.createdAt });
         // First-login category picker: if the owner hasn't chosen a vertical yet, send them to the
         // onboarding cards once (skip if they're already there, to avoid a redirect loop).
@@ -501,6 +505,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       >
         <ImpersonationBanner />
         <TrialBanner status={trial?.status ?? null} createdAt={trial?.createdAt ?? null} />
+        <ManageFromWhatsAppBanner managerPhoneSet={managerPhoneSet} />
         {/* Renders only on pages that have siblings; null everywhere else. Placed here rather than
             inside each member page so a section added later can't ship without its tabs. */}
         <SectionTabs />
