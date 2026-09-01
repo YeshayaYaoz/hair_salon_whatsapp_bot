@@ -126,11 +126,16 @@ export async function buildSystemPrompt(
       ? `\nברכה ראשונה (השתמש בה בפתיחת שיחה חדשה):\n${business.botGreeting}\n${PLACEHOLDER_RULE}\n`
       : "";
 
+  // Anchor the model to the real clock in the business timezone — without this it invents times.
+  // Declared before the CRM note because that formats a date too, and rendering it in the server's
+  // UTC named the wrong day for any visit in the last two or three hours of a local day.
+  const tz = business.timezone || "Asia/Jerusalem";
+
   let crmNote = "";
   if (customer?.appointments.length) {
     const firstName = customer.name?.split(" ")[0] ?? null;
     const lastAppt = customer.appointments[0];
-    const lastDate = lastAppt.startTime.toLocaleDateString("he-IL", { day: "numeric", month: "long" });
+    const lastDate = lastAppt.startTime.toLocaleDateString("he-IL", { timeZone: tz, day: "numeric", month: "long" });
     const recentServices = [...new Set(customer.appointments.map((a) => a.service.name))].join(", ");
     crmNote = `\nמידע על הלקוח החוזר:
 • שם: ${customer.name ?? "לא ידוע"}${firstName ? ` (פנה אליו/ה כ-${firstName})` : ""}
@@ -139,8 +144,6 @@ export async function buildSystemPrompt(
 • ברך בשם, והצע את השירות הרגיל שלו/ה אם לא ציינו שירות.\n`;
   }
 
-  // Anchor the model to the real clock in the business timezone — without this it invents times.
-  const tz = business.timezone || "Asia/Jerusalem";
   const now = new Date();
   const nowParts = instantPartsInTz(now, tz);
   const dateParts = zonedDateParts(now, tz);

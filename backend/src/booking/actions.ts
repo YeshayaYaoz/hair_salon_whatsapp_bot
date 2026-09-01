@@ -36,13 +36,17 @@ async function confirmBookingToCustomer(params: {
 }): Promise<void> {
   const business = await prisma.business.findUnique({
     where: { id: params.businessId },
-    select: { name: true, address: true, whatsappPhoneNumberId: true, whatsappAccessToken: true },
+    select: { name: true, address: true, timezone: true, whatsappPhoneNumberId: true, whatsappAccessToken: true },
   });
   if (!business?.whatsappPhoneNumberId || !business.whatsappAccessToken) return;
 
   // The same localized string the reminder uses, so a customer sees one format across both messages
   // rather than two renderings of the same appointment.
+  //
+  // timeZone is not optional: startTime is an absolute UTC instant and the server runs on UTC, so
+  // without it a 10:00 appointment was confirmed to the customer as 07:00.
   const when = params.startTime.toLocaleString("he-IL", {
+    timeZone: business.timezone || "Asia/Jerusalem",
     weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit",
   });
   const name = params.customerName ? params.customerName.split(" ")[0] : "היי";
@@ -117,9 +121,18 @@ export async function bookAppointmentWithSideEffects(params: {
 
   const customerLabel = params.customerName ?? params.customerPhone;
   const staffLine = params.staffName ? `\nעם: ${params.staffName}` : "";
+  // Same reason as the customer confirmation above: without timeZone the owner was alerted to a
+  // booking at the UTC hour, so every alert named a time two or three hours before the real one.
+  const tz = (await prisma.business.findUnique({
+    where: { id: params.businessId },
+    select: { timezone: true },
+  }))?.timezone || "Asia/Jerusalem";
+  const whenForOwner = appointment.startTime.toLocaleString("he-IL", {
+    timeZone: tz, weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit",
+  });
   notifyOwner(
     params.businessId,
-    `${params.ownerAlertPrefix}\nלקוח: ${customerLabel}\nשירות: ${params.serviceName}\nמועד: ${appointment.startTime.toLocaleString("he-IL")}${staffLine}`
+    `${params.ownerAlertPrefix}\nלקוח: ${customerLabel}\nשירות: ${params.serviceName}\nמועד: ${whenForOwner}${staffLine}`
   ).catch((err) => console.error("Owner notification failed:", err));
 
   syncAppointmentToCalendar(params.businessId, {

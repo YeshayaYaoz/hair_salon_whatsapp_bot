@@ -60,7 +60,7 @@ export async function runReminderJob() {
     include: {
       customer: true,
       service: true,
-      business: { select: { name: true, address: true, remindersEnabled: true, whatsappPhoneNumberId: true, whatsappAccessToken: true } },
+      business: { select: { name: true, address: true, timezone: true, remindersEnabled: true, whatsappPhoneNumberId: true, whatsappAccessToken: true } },
     },
   });
 
@@ -68,7 +68,10 @@ export async function runReminderJob() {
     if (!appt.business.remindersEnabled) continue;
     if (!appt.business.whatsappPhoneNumberId || !appt.business.whatsappAccessToken) continue;
     const accessToken = decryptSecret(appt.business.whatsappAccessToken);
+    // timeZone is not optional: startTime is an absolute UTC instant and the server runs on UTC, so
+    // without it the reminder told the customer an hour two or three hours before the real one.
     const when = appt.startTime.toLocaleString("he-IL", {
+      timeZone: appt.business.timezone || "Asia/Jerusalem",
       weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit",
     });
     const name = appt.customer.name ? appt.customer.name.split(" ")[0] : "היי";
