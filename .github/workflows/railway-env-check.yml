@@ -62,15 +62,19 @@ jobs:
           echo "$(wc -l < /tmp/names.txt) variable(s) set on $SERVICE ($RAILWAY_ENVIRONMENT)."
           echo
 
-          # The ones whose absence is silent. Everything here degrades a feature without erroring:
-          # sendAdminAlertEmail returns quietly with no SUPER_ADMIN_EMAIL, and a template name that
-          # is unset simply means the message is never sent outside the 24h window.
-          echo "Configuration whose absence fails silently:"
-          for v in SUPER_ADMIN_EMAIL RESEND_API_KEY APP_URL \
-                   TORI_OUTREACH_TEMPLATE_NAME TORI_OUTREACH_PHONE_NUMBER_ID TORI_OUTREACH_ACCESS_TOKEN \
-                   WHATSAPP_OWNER_ALERT_TEMPLATE WHATSAPP_REMINDER_TEMPLATE WHATSAPP_REVIEW_TEMPLATE \
+          # Split by what unset actually costs, because the two are not comparable and listing
+          # them together produced a false alarm: three of the template names have a matching
+          # default in whatsappTemplates.ts, so unset means "using the default", not "broken".
+          echo "Unset means the feature does not work:"
+          for v in SUPER_ADMIN_EMAIL RESEND_API_KEY APP_URL TORI_OUTREACH_TEMPLATE_NAME \
+                   TORI_OUTREACH_PHONE_NUMBER_ID TORI_OUTREACH_ACCESS_TOKEN \
                    TORI_WABA_ID META_SYSTEM_USER_TOKEN META_APP_ID WHATSAPP_APP_SECRET; do
             if grep -qx "$v" /tmp/names.txt; then echo "  ✓ $v"; else echo "  ✗ $v   NOT SET"; fi
+          done
+          echo
+          echo "Unset means the code default is used (fine unless the template was renamed):"
+          for v in WHATSAPP_OWNER_ALERT_TEMPLATE WHATSAPP_REMINDER_TEMPLATE WHATSAPP_REVIEW_TEMPLATE; do
+            if grep -qx "$v" /tmp/names.txt; then echo "  ✓ $v  (overriding the default)"; else echo "  · $v  unset — default"; fi
           done
 
       - name: Names that look misspelled
