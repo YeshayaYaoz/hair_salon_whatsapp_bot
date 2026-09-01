@@ -11,6 +11,11 @@ name: Check Railway configuration
 # API key is a rotated API key.
 on:
   workflow_dispatch:
+    inputs:
+      project:
+        description: "Railway project (as `railway status` prints it)"
+        type: string
+        default: "Tori"
 
 jobs:
   check:
@@ -19,6 +24,7 @@ jobs:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
       SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+      PROJECT: ${{ inputs.project }}
     steps:
       - uses: actions/checkout@v4
 
@@ -31,6 +37,16 @@ jobs:
 
       - name: Install the Railway CLI
         run: npm i -g @railway/cli@3
+
+      # Authenticating to a project and having one selected are separate states in this CLI:
+      # without the link, `railway variables` fails with "Project not found" even though the token
+      # is valid.
+      - name: Link the project
+        run: |
+          echo "Names visible to this token:"
+          railway status --json 2>/dev/null | jq -r '[.. | objects | select(has("name")) | .name] | unique | .[]' | sed 's/^/  - /' || true
+          railway link --project "$PROJECT" --environment "$RAILWAY_ENVIRONMENT" \
+            || echo "::warning::Could not link '$PROJECT' — the next step will say whether it could read anyway."
 
       - name: Which variables are set
         run: |
