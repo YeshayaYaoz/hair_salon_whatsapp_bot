@@ -1,0 +1,37 @@
+name: Submit the announcement template
+
+# Submits the product-announcement MARKETING template to Tori's own WABA.
+#
+# Dry run by default. A template's wording cannot be edited after approval — only deleted and
+# resubmitted at the cost of another review cycle — so the default prints the body with the
+# example substituted (what Meta's reviewer actually reads) and sends nothing.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Actually submit it for review"
+        type: boolean
+        default: false
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      META_SYSTEM_USER_TOKEN: ${{ secrets.META_SYSTEM_USER_TOKEN }}
+      TORI_WABA_ID: ${{ secrets.TORI_WABA_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      # Prisma's client is generated on install in this project; the script imports nothing that
+      # touches the database, but the import graph is type-checked by tsx at run time.
+      - run: npx prisma generate
+      - name: Submit
+        run: npx tsx scripts/submit-announce-template.ts ${{ inputs.confirm && '--confirm' || '' }}
