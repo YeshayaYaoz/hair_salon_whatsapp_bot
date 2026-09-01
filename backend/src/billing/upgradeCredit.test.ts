@@ -22,8 +22,9 @@ describe("unusedCreditIls", () => {
   });
 
   it("credits the untouched part of a monthly period", () => {
-    // 27 of 30 days left on ₪449 ≈ ₪404.
-    expect(unusedCreditIls(monthly(inDays(27)), NOW)).toBe(404);
+    // 27 of 30 days of the premium month, derived from the price table so a price change moves the
+    // expectation instead of failing here for no behavioural reason.
+    expect(unusedCreditIls(monthly(inDays(27)), NOW)).toBe(Math.round((PLAN_PRICES_ILS.premium * 27) / 30));
   });
 
   it("credits nothing on the last day of the period", () => {
@@ -36,7 +37,8 @@ describe("unusedCreditIls", () => {
   });
 
   it("caps at one period so a manually pushed date cannot manufacture credit", () => {
-    expect(unusedCreditIls(monthly(inDays(900)), NOW)).toBe(PLAN_PRICES_ILS.premium);
+    // Rounded: the credit is whole shekels, and the price no longer is.
+    expect(unusedCreditIls(monthly(inDays(900)), NOW)).toBe(Math.round(PLAN_PRICES_ILS.premium));
   });
 
   it("scales with the plan — a standard subscriber gets less back", () => {
@@ -50,9 +52,10 @@ describe("unusedCreditIls", () => {
       { subscriptionPlan: "premium", billingCycle: "annual", nextBillingDate: inDays(182) },
       NOW
     );
-    // Half a year of a 10-month charge (₪4,490 annual → ≈₪2,239).
-    expect(half).toBeGreaterThan(2200);
-    expect(half).toBeLessThan(2280);
+    // Half a year of the 10-month annual charge — bracketed around that, not a fixed figure.
+    const annualHalf = planPriceForCycle("premium", "annual") / 2;
+    expect(half).toBeGreaterThan(annualHalf * 0.97);
+    expect(half).toBeLessThan(annualHalf * 1.03);
   });
 
   it("returns 0 with no period end rather than guessing", () => {

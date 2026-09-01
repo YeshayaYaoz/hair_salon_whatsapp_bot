@@ -30,6 +30,8 @@ vi.mock("./payplusSubscription.js", async () => {
   };
 });
 
+const { PLAN_PRICES_ILS } = await import("./payplusSubscription.js");
+
 /**
  * The bug these cover: "טען יתרה" and "עבור למנוי שנתי" both answered
  * "No active PayPlus subscription" to a business that was visibly active and paying. The cause was
@@ -79,10 +81,19 @@ describe("billing actions without a saved card token", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.url).toBe("https://payplus.example/pay/annual");
-    // Fifth argument is the amount, already reduced by the unused part of the current month:
-    // 10 of 30 days left on ₪449 is ₪150 off the ₪4,490 annual price.
-    expect(createSubscriptionCheckoutLink).toHaveBeenCalledWith("biz1", "premium", expect.any(String), "annual", 4340);
-    expect(res.body.creditedIls).toBe(150);
+    // Fifth argument is the amount, already reduced by the unused part of the current month: 10 of
+    // 30 days of a premium month off the 10-month annual price. Derived from the price table so a
+    // price change moves the expectation instead of failing here for no behavioural reason.
+    const credit = Math.round((PLAN_PRICES_ILS.premium * 10) / 30);
+    const annual = PLAN_PRICES_ILS.premium * 10;
+    expect(createSubscriptionCheckoutLink).toHaveBeenCalledWith(
+      "biz1",
+      "premium",
+      expect.any(String),
+      "annual",
+      annual - credit
+    );
+    expect(res.body.creditedIls).toBe(credit);
     // The cycle must not flip to annual before the money actually arrives.
     expect(mockPrisma.business.update).not.toHaveBeenCalled();
   });
