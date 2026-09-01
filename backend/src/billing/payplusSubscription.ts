@@ -37,6 +37,22 @@ export const LOYALTY_DISCOUNT_ILS = 50;
 export const MANAGED_PAYMENT_SURCHARGE_ILS = 49;
 export const MANAGED_INVOICE_SURCHARGE_ILS = 39;
 
+/**
+ * Rounds a shekel amount to agorot before it is sent to PayPlus.
+ *
+ * Every price here is computed in floating point, and the prices are no longer whole shekels — so
+ * ordinary arithmetic on them produces amounts that cannot exist. ₪374.90 x 12 is
+ * 4498.799999999999, and a plan at ₪174.90 with a ₪111 coupon is 63.900000000000006. Sending that
+ * to a payment processor is asking for either a rejection or a silently different charge, and the
+ * receipt issued afterwards would not match the money taken.
+ *
+ * Applied at the two places an amount actually leaves for PayPlus rather than at every call site,
+ * so a new caller cannot forget it.
+ */
+export function toIlsAmount(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
 export function planPriceForCycle(plan: string, cycle: string): number {
   const base = PLAN_PRICES_ILS[plan];
   if (!base) throw new Error(`Unknown plan: ${plan}`);
@@ -230,7 +246,7 @@ async function generateCheckoutPage(params: {
       payment_page_uid: pageUid,
       charge_method: 1,
       create_token: true,
-      amount: amountIls,
+      amount: toIlsAmount(amountIls),
       currency_code: "ILS",
       sendEmailApproval: true,
       sendEmailFailure: false,
@@ -323,7 +339,7 @@ export async function chargeSubscriptionToken(
     body: JSON.stringify({
       terminal_uid: terminalUid,
       cashier_uid: cashierUid,
-      amount: amountIls,
+      amount: toIlsAmount(amountIls),
       currency_code: "ILS",
       // Required, despite the OpenAPI schema also giving it a default of 1 — the server does not
       // apply that default and answers `credit-terms-incorrect` when the field is absent, which is

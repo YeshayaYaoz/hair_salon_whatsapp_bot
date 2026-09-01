@@ -733,8 +733,8 @@ export default function BillingPage() {
                 </div>
                 <p className="text-xs text-white/80 mt-2 mb-4 leading-relaxed">
                   {lang === "he"
-                    ? `₪${PLAN_PRICES[activePlan] * 10} לשנה במקום ₪${PLAN_PRICES[activePlan] * 12} — חוסך לך ₪${PLAN_PRICES[activePlan] * 2} בשנה, מחויב פעם אחת.`
-                    : `₪${PLAN_PRICES[activePlan] * 10}/year instead of ₪${PLAN_PRICES[activePlan] * 12} — saves you ₪${PLAN_PRICES[activePlan] * 2}/year, billed once.`}
+                    ? `₪${fmtIls(PLAN_PRICES[activePlan] * 10)} לשנה במקום ₪${fmtIls(PLAN_PRICES[activePlan] * 12)} — חוסך לך ₪${fmtIls(PLAN_PRICES[activePlan] * 2)} בשנה, מחויב פעם אחת.`
+                    : `₪${fmtIls(PLAN_PRICES[activePlan] * 10)}/year instead of ₪${fmtIls(PLAN_PRICES[activePlan] * 12)} — saves you ₪${fmtIls(PLAN_PRICES[activePlan] * 2)}/year, billed once.`}
                 </p>
                 {/* Said before they commit, not discovered on the payment page. Switching mid-month
                     used to charge the full annual price on top of a month already paid for. */}
