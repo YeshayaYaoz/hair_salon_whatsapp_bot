@@ -77,7 +77,7 @@ async function resolveBusinessByCalledNumber(calledNumber: string): Promise<Reso
  *
  * Every other tenant surface goes through requireActiveSubscription (see businessRoutes.ts), but
  * this router only ever checked the shared Cartesia secret — which authenticates *Cartesia*, not
- * the salon. So a business on Standard (₪189 against Premium's ₪449, which is sold on exactly this)
+ * the salon. So a business on Standard (Premium costs more and is sold on exactly this capability)
  * got the full voice agent by putting a number in a text box, and a cancelled account kept it
  * indefinitely, while its WhatsApp bot had already stopped answering.
  *

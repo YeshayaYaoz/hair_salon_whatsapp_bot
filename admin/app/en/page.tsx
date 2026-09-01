@@ -37,7 +37,7 @@ const ALT = "#F9FAFB";   // this page's existing light-alt tint
    price drifts out of date the moment the rate moves. Naming them here rather than typing them
    into the markup is what stops a repeat of the old hardcoded $39/$79, which sat on this page
    long after the real prices changed. */
-const PLAN_ILS = { standard: "174.90", premium: "449", ultra: "849" } as const;
+const PLAN_ILS = { standard: "174.90", premium: "374.90", ultra: "749.90" } as const;
 const PAPER = "#ffffff";
 
 /* One wave period is 1440 units. The path is drawn twice, the second copy with every control point
@@ -1423,8 +1423,9 @@ export default function LandingPageEN() {
             {/* Prices are quoted in shekels, matching PLAN_PRICES_ILS in the billing code, because
                 shekels are what the card is actually charged — billing runs through an Israeli
                 provider and has no USD path. This block previously advertised $39 / $79 and listed
-                no Ultra plan at all: it was simply missed when pricing moved to ₪189 / ₪449 / ₪849,
-                so an English-speaking visitor was quoted a price we would never charge them. */}
+                no Ultra plan at all: it was simply missed when the shekel pricing was set, so an
+                English-speaking visitor was quoted a price we would never charge them. Every figure
+                here comes from PLAN_ILS above — keep it in step with PLAN_PRICES_ILS. */}
             <div className="lp-plans">
               <div className="lp-plan">
                 <div className="lp-plan-tag">Standard</div>

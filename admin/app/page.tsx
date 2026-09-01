@@ -1908,7 +1908,7 @@ export default function LandingPage() {
               <div className="lp-plan featured reveal d2">
                 <div className="lp-plan-tag">פרמיום</div>
                 <div className="lp-plan-name">Premium</div>
-                <div className="lp-plan-price">₪449</div>
+                <div className="lp-plan-price">₪374.90</div>
                 <div className="lp-plan-per">לחודש · ללא חוזה</div>
                 <div className="lp-plan-divider" />
                 <div className="lp-plan-features">
@@ -1921,7 +1921,7 @@ export default function LandingPage() {
               <div className="lp-plan reveal d3">
                 <div className="lp-plan-tag">אולטרה</div>
                 <div className="lp-plan-name">Ultra</div>
-                <div className="lp-plan-price">₪849</div>
+                <div className="lp-plan-price">₪749.90</div>
                 <div className="lp-plan-per">לחודש · לעסקים עם נפח גבוה</div>
                 <div className="lp-plan-divider" />
                 <div className="lp-plan-features">

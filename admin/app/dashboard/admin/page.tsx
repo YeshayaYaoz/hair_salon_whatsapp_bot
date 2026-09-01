@@ -76,7 +76,7 @@ type StatusFilter = "all" | "trial" | "active" | "past_due" | "canceled" | "bloc
 // Must match MESSAGE_QUOTA_BY_PLAN in backend/src/lib/wallet.ts — display-only, not authoritative.
 const MESSAGE_QUOTA_BY_PLAN: Record<string, number> = { standard: 300, premium: 1000, ultra: 3000 };
 // Must match PLAN_PRICES_ILS in backend/src/billing/payplusSubscription.ts.
-const PLAN_PRICES_ILS: Record<string, number> = { standard: 174.9, premium: 449, ultra: 849 };
+const PLAN_PRICES_ILS: Record<string, number> = { standard: 174.9, premium: 374.9, ultra: 749.9 };
 const ANNUAL_MONTHS_CHARGED = 10;
 
 function monthlyRevenueIls(b: AdminBusiness): number {

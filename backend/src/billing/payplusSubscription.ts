@@ -22,7 +22,7 @@ const BASE_URL =
 
 // standard is deliberately a .90 price point; every consumer of this table must format prices
 // with two decimals (or agorot), never assume whole shekels.
-export const PLAN_PRICES_ILS: Record<string, number> = { standard: 174.9, premium: 449, ultra: 849 };
+export const PLAN_PRICES_ILS: Record<string, number> = { standard: 174.9, premium: 374.9, ultra: 749.9 };
 // Annual plan: 10 months' worth charged upfront (2 months free) — a common SaaS annual incentive.
 export const ANNUAL_MONTHS_CHARGED = 10;
 export const BILLING_PERIOD_DAYS: Record<string, number> = { monthly: 30, annual: 365 };

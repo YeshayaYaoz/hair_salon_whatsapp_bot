@@ -15,7 +15,7 @@ const STATUS_COLORS: Record<string, string> = {
 type PlanKey = "standard" | "premium" | "ultra";
 const PLANS: PlanKey[] = ["standard", "premium", "ultra"];
 const PLAN_LABEL: Record<PlanKey, string> = { standard: "Standard", premium: "Premium", ultra: "Ultra" };
-const PLAN_PRICES: Record<PlanKey, number> = { standard: 174.9, premium: 449, ultra: 849 };
+const PLAN_PRICES: Record<PlanKey, number> = { standard: 174.9, premium: 374.9, ultra: 749.9 };
 // ₪174.9 must render as "174.90" — a price, not a float.
 const fmtIls = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
 // Must match ANNUAL_MONTHS_CHARGED in backend/src/billing/payplusSubscription.ts — the annual term

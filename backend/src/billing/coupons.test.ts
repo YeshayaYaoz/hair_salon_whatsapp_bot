@@ -17,6 +17,10 @@ const {
   normalizeCode,
   CouponError,
 } = await import("./coupons.js");
+const { PLAN_PRICES_ILS } = await import("./payplusSubscription.js");
+
+/** Half of premium, to whole shekels — the discount LAUNCH50 works out to at current prices. */
+const HALF_PREMIUM = Math.round(PLAN_PRICES_ILS.premium / 2);
 
 function coupon(overrides: Record<string, unknown> = {}) {
   return {
@@ -46,15 +50,20 @@ beforeEach(() => {
 
 describe("discountFor", () => {
   it("computes a percentage against the plan's own price", () => {
-    // Standard is ₪174.90 — half of it, to whole shekels.
-    expect(discountFor({ discountType: "percent", discountValue: 50 }, "standard")).toBe(87);
-    expect(discountFor({ discountType: "percent", discountValue: 50 }, "premium")).toBe(225);
+    // Derived from the price table rather than restated, so a price change moves the expectation
+    // with it instead of failing here for no behavioural reason.
+    expect(discountFor({ discountType: "percent", discountValue: 50 }, "standard")).toBe(
+      Math.round(PLAN_PRICES_ILS.standard / 2)
+    );
+    expect(discountFor({ discountType: "percent", discountValue: 50 }, "premium")).toBe(
+      Math.round(PLAN_PRICES_ILS.premium / 2)
+    );
   });
 
   it("caps a discount at the plan price instead of going negative", () => {
     // PayPlus rejects a non-positive amount with an error that says nothing about coupons.
-    expect(discountFor({ discountType: "fixed", discountValue: 9999 }, "standard")).toBe(174.9);
-    expect(discountFor({ discountType: "percent", discountValue: 100 }, "premium")).toBe(449);
+    expect(discountFor({ discountType: "fixed", discountValue: 9999 }, "standard")).toBe(PLAN_PRICES_ILS.standard);
+    expect(discountFor({ discountType: "percent", discountValue: 100 }, "premium")).toBe(PLAN_PRICES_ILS.premium);
   });
 
   it("is zero for an unknown plan rather than NaN", () => {
@@ -72,7 +81,7 @@ describe("validateCoupon", () => {
   it("returns the discount for a good code", async () => {
     mockPrisma.coupon.findUnique.mockResolvedValue(coupon());
     const preview = await validateCoupon("launch50", "premium", "b1");
-    expect(preview).toMatchObject({ code: "LAUNCH50", discountIls: 225, durationCycles: 3 });
+    expect(preview).toMatchObject({ code: "LAUNCH50", discountIls: HALF_PREMIUM, durationCycles: 3 });
   });
 
   it.each([
@@ -101,13 +110,13 @@ describe("redeemCoupon", () => {
 
     const result = await redeemCoupon("LAUNCH50", "premium", "b1");
 
-    expect(result).toEqual({ applied: true, discountIls: 225 });
+    expect(result).toEqual({ applied: true, discountIls: HALF_PREMIUM });
     expect(mockPrisma.couponRedemption.create).toHaveBeenCalledWith({
-      data: { couponId: "c1", businessId: "b1", discountIls: 225, plan: "premium" },
+      data: { couponId: "c1", businessId: "b1", discountIls: HALF_PREMIUM, plan: "premium" },
     });
     expect(mockPrisma.business.update).toHaveBeenCalledWith({
       where: { id: "b1" },
-      data: { couponCode: "LAUNCH50", couponDiscountIls: 225, couponCyclesRemaining: 3 },
+      data: { couponCode: "LAUNCH50", couponDiscountIls: HALF_PREMIUM, couponCyclesRemaining: 3 },
     });
   });
 
