@@ -249,6 +249,8 @@ export async function sendWelcomeEmail(to: string, name: string) {
  * bot that answers them like a customer, which reads as the feature being broken rather than
  * unconfigured. So they get the one step that unblocks them instead.
  */
+const MANAGER_PHONE_URL = `${APP_URL}/dashboard/settings#manager-phone`;
+
 export async function sendManageFromWhatsAppEmail(
   to: string,
   businessName: string,
@@ -278,19 +280,24 @@ export async function sendManageFromWhatsAppEmail(
           "לפני כל שינוי הבוט מקריא בדיוק מה הוא עומד לעשות ומחכה לאישור. " +
           "שום דבר לא קורה בלי אישור מכם."
         ) +
+        // The link goes to the field, not to the top of Settings: a page with six sections turns
+        // "go to settings" into a scavenger hunt, and the owner who gives up there is the one who
+        // never tries the feature. The Settings page scrolls to and focuses it on arrival.
         (managerPhoneSet
           ? callout(
               "success",
               "רק המספר שלכם יכול",
               "הבוט בודק מאיזה מספר ההודעה נשלחה, לא מה כתוב בה. לקוח שיכתוב &quot;אני הבעלים&quot; " +
                 "יקבל שירות רגיל ולא יוכל לשנות דבר."
-            ) + button(`${APP_URL}/dashboard/settings`, "המספר שלי בהגדרות")
+            ) +
+            // Nothing to set up, so the call to action is the first message itself.
+            paragraph("<b>נסו עכשיו:</b> שלחו למספר הוואטסאפ של העסק, מהמספר של המנהל — <b>מה יש לי היום?</b>") +
+            button(`${MANAGER_PHONE_URL}`, "לבדוק איזה מספר מוגדר")
           : callout(
               "danger",
               "צעד אחד לפני שזה יעבוד",
-              "עדיין לא הגדרתם מספר מנהל, ובלעדיו הבוט לא יזהה אתכם. " +
-                "נכנסים להגדרות, ממלאים את מספר הוואטסאפ שלכם — וזהו."
-            ) + button(`${APP_URL}/dashboard/settings`, "הגדרת מספר המנהל")) +
+              "עדיין לא הגדרתם מספר מנהל, ובלעדיו הבוט לא יזהה אתכם ויענה לכם כמו ללקוח רגיל."
+            ) + button(`${MANAGER_PHONE_URL}`, "הגדרת מספר המנהל — 30 שניות")) +
         paragraph(
           "רוצים לראות את כל מה שאפשר? שלחו לבוט: <b>מה אתה יודע לעשות?</b>"
         ),

@@ -313,6 +313,15 @@ export interface CreateTemplateParams {
   footerText?: string;
   /** Quick-reply buttons, by label. A marketing template needs an opt-out among them. */
   quickReplies?: string[];
+  /**
+   * A call-to-action button opening a link.
+   *
+   * Deliberately not combined with quickReplies at any call site: Meta's rules on mixing reply
+   * buttons with CTA buttons have changed between API versions, and a template rejected for button
+   * composition comes back with the same generic wording error as a content problem — which sends
+   * you rewriting perfectly good Hebrew. One kind of button per template.
+   */
+  urlButton?: { text: string; url: string };
 }
 
 /** How many distinct {{n}} placeholders a body uses. */
@@ -352,6 +361,11 @@ export async function createMessageTemplate(
     components.push({
       type: "BUTTONS",
       buttons: params.quickReplies.map((text) => ({ type: "QUICK_REPLY", text })),
+    });
+  } else if (params.urlButton) {
+    components.push({
+      type: "BUTTONS",
+      buttons: [{ type: "URL", text: params.urlButton.text, url: params.urlButton.url }],
     });
   }
 

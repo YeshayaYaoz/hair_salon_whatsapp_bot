@@ -92,6 +92,46 @@ describe("createMessageTemplate", () => {
     });
   });
 
+  it("sends a link button as a URL button", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ id: "1", status: "PENDING" })));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createMessageTemplate("waba", "tok", {
+      name: "announce",
+      languageCode: "he",
+      bodyText: "משהו על {{1}} כאן.",
+      bodyExample: ["מספרת רונית"],
+      category: "MARKETING",
+      urlButton: { text: "הגדרת מספר המנהל", url: "https://torionline.com/dashboard/settings#manager-phone" },
+    });
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).components).toContainEqual({
+      type: "BUTTONS",
+      buttons: [{ type: "URL", text: "הגדרת מספר המנהל", url: "https://torionline.com/dashboard/settings#manager-phone" }],
+    });
+  });
+
+  it("never sends reply buttons and a link button together", async () => {
+    // Meta's rules on mixing the two have changed between API versions, and a template rejected on
+    // button composition comes back with the same generic wording error as a content problem.
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ id: "1", status: "PENDING" })));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createMessageTemplate("waba", "tok", {
+      name: "both",
+      languageCode: "he",
+      bodyText: "טקסט בלי משתנים.",
+      quickReplies: ["הסירו אותי"],
+      urlButton: { text: "קישור", url: "https://torionline.com" },
+    });
+
+    const buttons = JSON.parse(fetchMock.mock.calls[0][1].body).components.filter(
+      (c: { type: string }) => c.type === "BUTTONS"
+    );
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0].buttons.every((b: { type: string }) => b.type === "QUICK_REPLY")).toBe(true);
+  });
+
   it("replaces a REJECTED template instead of reporting success", async () => {
     // The failure this closes: the zimmer ran for weeks with tori_appointment_reminder REJECTED.
     // Every retry hit "already exists", which was read as success, so the retry button reported

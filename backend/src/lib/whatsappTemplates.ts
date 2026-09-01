@@ -310,4 +310,16 @@ export const ANNOUNCE_TEMPLATE_BODY =
 export const ANNOUNCE_TEMPLATE_EXAMPLE = ["מספרת רונית"];
 
 export const ANNOUNCE_TEMPLATE_FOOTER = "לא רוצים עדכונים כאלה? השיבו הסר.";
-export const ANNOUNCE_TEMPLATE_BUTTONS = ["הסירו אותי"];
+
+/**
+ * A link button rather than a quick reply, and only one kind of button on this template.
+ *
+ * The link lands on the notification-phone field itself, not the top of Settings: an owner with no
+ * manager number saved cannot use any of what this message describes, and "open Settings" on a page
+ * of six sections is where that owner stops. The opt-out stays in the footer — mixing reply and CTA
+ * buttons is a rejection risk that reads like a wording problem.
+ */
+export const ANNOUNCE_TEMPLATE_BUTTON = {
+  text: "הגדרת מספר המנהל",
+  url: `${(process.env.APP_URL ?? "https://torionline.com").replace(/\/$/, "")}/dashboard/settings#manager-phone`,
+};

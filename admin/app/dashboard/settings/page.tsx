@@ -255,6 +255,20 @@ export default function SettingsPage() {
     });
   }, []);
 
+  // A deep link to #manager-phone has to wait for the fetch above: the browser resolves the hash
+  // while this page is still a spinner, finds no such element, and gives up silently — so the
+  // announcement banner's link would land at the top of Settings and the owner would be looking
+  // for a field nobody pointed at. Runs once the form exists, then focuses the input so the very
+  // next keystroke goes where it should.
+  useEffect(() => {
+    if (!loaded || typeof window === "undefined") return;
+    if (window.location.hash !== "#manager-phone") return;
+    const section = document.getElementById("manager-phone");
+    if (!section) return;
+    section.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("manager-phone-input")?.focus({ preventScroll: true });
+  }, [loaded]);
+
   function set(key: keyof BusinessProfile, value: string | boolean | number) {
     setFields((f) => ({ ...f, [key]: value }));
   }
@@ -364,7 +378,7 @@ export default function SettingsPage() {
           <EmailVerificationRow email={fields.email} verified={emailVerified} he={lang === "he"} />
         </Section>
 
-        <Section title={t.bookingNotifications} description={t.bookingNotificationsDesc}>
+        <Section id="manager-phone" title={t.bookingNotifications} description={t.bookingNotificationsDesc}>
           {!fields.notificationPhone?.trim() && (
             <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-4 py-3 mb-3">
               {lang === "he"
@@ -409,6 +423,9 @@ export default function SettingsPage() {
                 ))}
               </select>
               <input
+                id="manager-phone-input"
+                type="tel"
+                inputMode="tel"
                 placeholder="501234567"
                 value={fields.notificationPhone}
                 onChange={(e) => set("notificationPhone", e.target.value)}

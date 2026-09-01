@@ -21,9 +21,12 @@ export function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: 
   );
 }
 
-export function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+export function Section({ id, title, description, children }: { id?: string; title: string; description?: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
+    // scroll-mt keeps the heading clear of the sticky header when something links straight here:
+    // without it the browser aligns the section's top edge to the viewport's top edge, which is
+    // underneath the header, and the deep link appears to have landed one section too far down.
+    <div id={id} className="bg-white border border-gray-200 rounded-xl p-5 mb-4 scroll-mt-24">
       <h2 className="text-sm font-semibold text-gray-900 mb-0.5">{title}</h2>
       {description && <p className="text-xs text-gray-600 mb-4">{description}</p>}
       <div className="mt-4 flex flex-col gap-3">{children}</div>

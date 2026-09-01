@@ -19,6 +19,11 @@ import { useLanguage } from "./LanguageContext";
  */
 const DISMISS_KEY = "tori.announce.manageFromWhatsApp.v1";
 
+// Straight to the field, not to the top of Settings. "Go to Settings" on a page with six sections
+// is a scavenger hunt, and the owner who gives up there is exactly the one who never tries the
+// feature at all. The Settings page scrolls to and focuses this on arrival.
+const MANAGER_PHONE_HREF = "/dashboard/settings#manager-phone";
+
 export function ManageFromWhatsAppBanner({ managerPhoneSet }: { managerPhoneSet: boolean | null }) {
   const { lang } = useLanguage();
   const he = lang === "he";
@@ -98,22 +103,42 @@ export function ManageFromWhatsAppBanner({ managerPhoneSet }: { managerPhoneSet:
           </div>
 
           {managerPhoneSet ? (
-            <div className="text-white/85 text-[11px] sm:text-xs mt-2.5">
-              {he
-                ? "לפני כל שינוי הבוט מקריא מה הוא עומד לעשות ומחכה לאישור. רק המספר של המנהל יכול — הבוט בודק מאיפה נשלחה ההודעה, לא מה כתוב בה."
-                : "The bot reads back every change and waits for your yes. Only the manager's number can do this — it checks who sent the message, not what it claims."}
-            </div>
+            <>
+              <div className="text-white/85 text-[11px] sm:text-xs mt-2.5">
+                {he
+                  ? "לפני כל שינוי הבוט מקריא מה הוא עומד לעשות ומחכה לאישור. רק המספר של המנהל יכול — הבוט בודק מאיפה נשלחה ההודעה, לא מה כתוב בה."
+                  : "The bot reads back every change and waits for your yes. Only the manager's number can do this — it checks who sent the message, not what it claims."}
+              </div>
+              {/* An owner whose number is already saved needs no setup — the only thing left is to
+                  try it. So the primary action is the sentence to send, and the link to the number
+                  is secondary, for the one who wants to check which number it is. */}
+              <div className="mt-3 flex flex-wrap items-center gap-2.5">
+                <span className="text-white text-xs font-semibold">
+                  {he ? "נסו עכשיו — שלחו לבוט שלכם:" : "Try it now — send your bot:"}
+                </span>
+                <span
+                  className="bg-white text-xs font-bold px-3.5 py-1.5 rounded-lg"
+                  style={{ color: "#075E54" }}
+                  dir={he ? "rtl" : "ltr"}
+                >
+                  {he ? "מה יש לי היום?" : "What's on today?"}
+                </span>
+                <Link href={MANAGER_PHONE_HREF} className="text-white/85 text-xs underline underline-offset-2 hover:text-white">
+                  {he ? "מאיזה מספר?" : "From which number?"}
+                </Link>
+              </div>
+            </>
           ) : (
             <div className="mt-3 flex flex-wrap items-center gap-2.5">
               <span className="text-white text-xs font-semibold">
                 {he ? "עוד לא הגדרתם מספר מנהל — בלעדיו הבוט לא יזהה אתכם." : "No manager number saved yet — without it the bot can't recognise you."}
               </span>
               <Link
-                href="/dashboard/settings"
+                href={MANAGER_PHONE_HREF}
                 className="bg-white text-xs font-bold px-3.5 py-1.5 rounded-lg transition hover:bg-white/90"
                 style={{ color: "#075E54" }}
               >
-                {he ? "הגדרת המספר" : "Set the number"}
+                {he ? "הגדרת המספר — 30 שניות" : "Set the number — 30 seconds"}
               </Link>
             </div>
           )}

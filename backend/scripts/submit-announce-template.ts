@@ -16,7 +16,7 @@ import {
   ANNOUNCE_TEMPLATE_BODY,
   ANNOUNCE_TEMPLATE_EXAMPLE,
   ANNOUNCE_TEMPLATE_FOOTER,
-  ANNOUNCE_TEMPLATE_BUTTONS,
+  ANNOUNCE_TEMPLATE_BUTTON,
 } from "../src/lib/whatsappTemplates.js";
 
 const token = (process.env.META_SYSTEM_USER_TOKEN ?? process.env.TORI_OUTREACH_ACCESS_TOKEN)?.trim();
@@ -36,7 +36,7 @@ async function main() {
   console.log("Body with the example substituted in — this is what Meta's reviewer reads:");
   console.log(`  ${ANNOUNCE_TEMPLATE_BODY.replace("{{1}}", ANNOUNCE_TEMPLATE_EXAMPLE[0])}`);
   console.log(`Footer:    ${ANNOUNCE_TEMPLATE_FOOTER}`);
-  console.log(`Buttons:   ${ANNOUNCE_TEMPLATE_BUTTONS.join(", ")}`);
+  console.log(`Button:    [${ANNOUNCE_TEMPLATE_BUTTON.text}] → ${ANNOUNCE_TEMPLATE_BUTTON.url}`);
   console.log("");
 
   if (!process.argv.includes("--confirm")) {
@@ -51,7 +51,7 @@ async function main() {
     bodyExample: ANNOUNCE_TEMPLATE_EXAMPLE,
     category: "MARKETING",
     footerText: ANNOUNCE_TEMPLATE_FOOTER,
-    quickReplies: ANNOUNCE_TEMPLATE_BUTTONS,
+    urlButton: ANNOUNCE_TEMPLATE_BUTTON,
   });
 
   if (!result.submitted) {
