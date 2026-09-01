@@ -232,3 +232,22 @@ describe("fetchCustomerUidForToken", () => {
     expect(await fetchCustomerUidForToken("tok-1")).toBeUndefined();
   });
 });
+
+describe("amounts sent to PayPlus are real money", () => {
+  it("rounds float noise out of the charged amount", async () => {
+    // The prices are no longer whole shekels, so ordinary arithmetic produces amounts that cannot
+    // exist: ₪174.90 less a ₪111 coupon is 63.900000000000006 in floating point. Sending that to a
+    // processor invites a rejection or a silently different charge, and the receipt issued after
+    // would not match the money taken.
+    fetchMock.mockResolvedValue(okResponse({ transaction_uid: "tr-5" }));
+    await chargeSubscriptionToken("tok-1", 174.9 - 111, "x");
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.amount).toBe(63.9);
+  });
+
+  it("leaves an exact amount untouched", async () => {
+    fetchMock.mockResolvedValue(okResponse({ transaction_uid: "tr-6" }));
+    await chargeSubscriptionToken("tok-1", 3749, "x");
+    expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string).amount).toBe(3749);
+  });
+});
