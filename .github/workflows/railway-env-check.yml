@@ -1,0 +1,75 @@
+name: Check Railway configuration
+
+# Read-only, and NAMES ONLY — never a value.
+#
+# The backend already reports missing configuration at boot, but that report is a few lines in a
+# Railway deploy log that scrolls away, so the practical answer to "is SUPER_ADMIN_EMAIL actually
+# set in production" has been "log in and look". This answers it from here.
+#
+# Every step pipes `railway variables --json` through jq's `keys` before anything is printed. A
+# value must never reach these logs: they are readable by anyone with repo access, and a printed
+# API key is a rotated API key.
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+      SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Is a Railway token configured
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::error::RAILWAY_TOKEN is not set (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+
+      - name: Install the Railway CLI
+        run: npm i -g @railway/cli@3
+
+      - name: Which variables are set
+        run: |
+          # Names only. `|| echo '{}'` so a CLI failure reports as "nothing found" rather than
+          # dumping an error that might quote the JSON it was parsing.
+          raw=$(railway variables --service "$SERVICE" --environment "$RAILWAY_ENVIRONMENT" --json 2>/dev/null || echo '{}')
+          names=$(echo "$raw" | jq -r 'keys[]' 2>/dev/null || true)
+          if [ -z "$names" ]; then
+            echo "::error::Could not read variables for service '$SERVICE' in '$RAILWAY_ENVIRONMENT'."
+            exit 1
+          fi
+          echo "$names" > /tmp/names.txt
+          echo "$(wc -l < /tmp/names.txt) variable(s) set on $SERVICE ($RAILWAY_ENVIRONMENT)."
+          echo
+
+          # The ones whose absence is silent. Everything here degrades a feature without erroring:
+          # sendAdminAlertEmail returns quietly with no SUPER_ADMIN_EMAIL, and a template name that
+          # is unset simply means the message is never sent outside the 24h window.
+          echo "Configuration whose absence fails silently:"
+          for v in SUPER_ADMIN_EMAIL RESEND_API_KEY APP_URL \
+                   TORI_OUTREACH_TEMPLATE_NAME TORI_OUTREACH_PHONE_NUMBER_ID TORI_OUTREACH_ACCESS_TOKEN \
+                   WHATSAPP_OWNER_ALERT_TEMPLATE WHATSAPP_REMINDER_TEMPLATE WHATSAPP_REVIEW_TEMPLATE \
+                   TORI_WABA_ID META_SYSTEM_USER_TOKEN META_APP_ID WHATSAPP_APP_SECRET; do
+            if grep -qx "$v" /tmp/names.txt; then echo "  ✓ $v"; else echo "  ✗ $v   NOT SET"; fi
+          done
+
+      - name: Names that look misspelled
+        run: |
+          # A misnamed variable is worse than a missing one: it is visibly set in the Railway UI, so
+          # everything looks configured while the app reads nothing. Same pairs validateEnv checks.
+          while IFS=' ' read -r wrong right; do
+            if grep -qx "$wrong" /tmp/names.txt && ! grep -qx "$right" /tmp/names.txt; then
+              echo "::warning::$wrong is set, but the app reads $right. Rename it."
+            fi
+          done <<'PAIRS'
+          PAYPLUS_UID_PAGE PAYPLUS_PAGE_UID
+          PAYPLUS_PAGE_ID PAYPLUS_PAGE_UID
+          UPLOAD_DIR UPLOADS_DIR
+          DIRECT_DATABASE_URL DIRECT_URL
+          APP_URL_BASE APP_URL
+          PAIRS
+          echo "Checked for the known misspellings."
