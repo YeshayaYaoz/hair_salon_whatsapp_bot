@@ -28,7 +28,7 @@ import { AFFILIATE_PROVIDERS, AFFILIATE_KINDS, recordAffiliateClick, markAffilia
 import { normalizeOwnerPhone } from "../lib/phone.js";
 import { appendTurn, forgetCachedHistory, forgetAllCachedHistory } from "../bot/conversationStore.js";
 import { createAppointment, OutsideBusinessHoursError, SlotUnavailableError } from "../booking/availability.js";
-import { parseBookingTime } from "../lib/timezone.js";
+import { parseBookingTime, zonedDateParts, zonedWallTimeToUtc } from "../lib/timezone.js";
 import { getJobStatuses } from "../lib/jobStatus.js";
 import { listTemplates, BUSINESS_TYPES } from "../lib/businessTemplates.js";
 import { AI_PROVIDER_SELECTION_KEYS } from "../bot/providers/index.js";
@@ -2624,14 +2624,23 @@ businessRouter.delete("/waitlist/:id", async (req: AuthedRequest, res) => {
 businessRouter.get("/analytics", async (req: AuthedRequest, res) => {
   const bizId = req.businessId!;
   const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const sevenDaysAgo = new Date(now);
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-  sevenDaysAgo.setHours(0, 0, 0, 0);
+  // Every boundary below is a calendar boundary in the SALON's day, not the server's. These were
+  // built from UTC components on a UTC server, so "this month" began at 03:00 on the 1st Israel
+  // time and the 7-day window started three hours late — and around midnight on the 1st, "this
+  // month" resolved to the previous one entirely.
+  const tz = (await prisma.business.findUnique({ where: { id: bizId }, select: { timezone: true } }))?.timezone
+    || "Asia/Jerusalem";
+  const today = zonedDateParts(now, tz);
+  const startOfMonth = zonedWallTimeToUtc(today.year, today.month, 1, 0, tz);
+  // Local midnight six days back: from local midnight today, step back whole days. Going through
+  // the calendar rather than subtracting 6x24h keeps it exact across a DST change.
+  const midnightToday = zonedWallTimeToUtc(today.year, today.month, today.day, 0, tz);
+  const startParts = zonedDateParts(new Date(midnightToday.getTime() - 6 * 24 * 60 * 60 * 1000 + 12 * 60 * 60 * 1000), tz);
+  const sevenDaysAgo = zonedWallTimeToUtc(startParts.year, startParts.month, startParts.day, 0, tz);
 
   // Start of the 7-day window *before* the current one — used for the week-over-week trend.
-  const fourteenDaysAgo = new Date(sevenDaysAgo);
-  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 7);
+  const prevParts = zonedDateParts(new Date(sevenDaysAgo.getTime() - 7 * 24 * 60 * 60 * 1000 + 12 * 60 * 60 * 1000), tz);
+  const fourteenDaysAgo = zonedWallTimeToUtc(prevParts.year, prevParts.month, prevParts.day, 0, tz);
 
   const [monthAppts, weekAppts, prevWeekCount, topServices, newCustomers, allTimeCount] = await Promise.all([
     prisma.appointment.findMany({
@@ -2663,14 +2672,18 @@ businessRouter.get("/analytics", async (req: AuthedRequest, res) => {
   const revenueThisMonth = confirmedThisMonth.reduce((sum, a) => sum + a.service.priceCents, 0);
 
   // Build daily counts for the last 7 days
+  // Bucketed by the salon's calendar day. toISOString() buckets by the UTC day, which files an
+  // early-morning local appointment under the day before.
+  const localDayKey = (d: Date): string => {
+    const p = zonedDateParts(d, tz);
+    return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+  };
   const dailyMap: Record<string, number> = {};
   for (let i = 0; i < 7; i++) {
-    const d = new Date(sevenDaysAgo);
-    d.setDate(d.getDate() + i);
-    dailyMap[d.toISOString().slice(0, 10)] = 0;
+    dailyMap[localDayKey(new Date(sevenDaysAgo.getTime() + i * 24 * 60 * 60 * 1000 + 12 * 60 * 60 * 1000))] = 0;
   }
   for (const a of weekAppts) {
-    const key = a.startTime.toISOString().slice(0, 10);
+    const key = localDayKey(a.startTime);
     if (key in dailyMap) dailyMap[key]++;
   }
   const dailyThisWeek = Object.entries(dailyMap).map(([date, count]) => ({ date, count }));
