@@ -36,7 +36,7 @@ jobs:
           fi
 
       - name: Install the Railway CLI
-        run: npm i -g @railway/cli@3
+        run: npm i -g @railway/cli
 
       # Authenticating to a project and having one selected are separate states in this CLI:
       # without the link, `railway variables` fails with "Project not found" even though the token
