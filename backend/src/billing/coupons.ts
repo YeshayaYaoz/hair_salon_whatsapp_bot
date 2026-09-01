@@ -111,7 +111,11 @@ export function discountFor(
     coupon.discountType === "percent"
       ? (price * coupon.discountValue) / 100
       : coupon.discountValue;
-  return Math.min(price, Math.max(0, Math.round(raw)));
+  // Floor of the price, not the price: prices are no longer whole shekels, so a fixed coupon worth
+  // more than the plan used to clamp to 374.9 — and couponDiscountIls is an Int column, so writing
+  // it threw and the redemption failed after the customer had already paid. Flooring keeps the
+  // discount a whole shekel and still never exceeds the price.
+  return Math.min(Math.floor(price), Math.max(0, Math.round(raw)));
 }
 
 /**

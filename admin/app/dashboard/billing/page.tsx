@@ -179,7 +179,7 @@ function SavingsSummary({
       <div className="bg-[#1B7FA0]/10 border border-[#1B7FA0]/30 rounded-lg p-5 text-center">
         <div className="text-3xl font-extrabold text-[#197492] tabular-nums">₪{netSavings.toLocaleString()}</div>
         <div className="text-xs text-gray-600 mt-1 font-medium">
-          {he ? `חיסכון נטו החודש (אחרי עלות המנוי ₪${planPrice})` : `Net savings this month (after the ₪${planPrice} subscription)`}
+          {he ? `חיסכון נטו החודש (אחרי עלות המנוי ₪${fmtIls(planPrice)})` : `Net savings this month (after the ₪${fmtIls(planPrice)} subscription)`}
         </div>
       </div>
 
@@ -547,14 +547,14 @@ export default function BillingPage() {
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <p className="text-sm text-green-700 font-medium">
                   🎉 {he
-                    ? `הקוד ${coupon.code} פעיל — ₪${coupon.discountIls} הנחה${
+                    ? `הקוד ${coupon.code} פעיל — ₪${fmtIls(coupon.discountIls)} הנחה${
                         coupon.durationCycles === null
                           ? " בכל חודש, כל עוד המנוי פעיל"
                           : coupon.durationCycles === 1
                             ? " בחודש הראשון"
                             : ` בכל אחד מ-${coupon.durationCycles} החודשים הראשונים`
                       }`
-                    : `Code ${coupon.code} applied — ₪${coupon.discountIls} off${
+                    : `Code ${coupon.code} applied — ₪${fmtIls(coupon.discountIls)} off${
                         coupon.durationCycles === null
                           ? " every month, for as long as you subscribe"
                           : coupon.durationCycles === 1

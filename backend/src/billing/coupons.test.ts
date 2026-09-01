@@ -62,8 +62,19 @@ describe("discountFor", () => {
 
   it("caps a discount at the plan price instead of going negative", () => {
     // PayPlus rejects a non-positive amount with an error that says nothing about coupons.
-    expect(discountFor({ discountType: "fixed", discountValue: 9999 }, "standard")).toBe(PLAN_PRICES_ILS.standard);
-    expect(discountFor({ discountType: "percent", discountValue: 100 }, "premium")).toBe(PLAN_PRICES_ILS.premium);
+    // Whole shekels: couponDiscountIls is an Int column, so a cap of 174.9 threw on write and the
+    // redemption failed after the customer had already paid.
+    expect(discountFor({ discountType: "fixed", discountValue: 9999 }, "standard")).toBe(
+      Math.floor(PLAN_PRICES_ILS.standard)
+    );
+    expect(discountFor({ discountType: "percent", discountValue: 100 }, "premium")).toBe(
+      Math.floor(PLAN_PRICES_ILS.premium)
+    );
+    for (const plan of Object.keys(PLAN_PRICES_ILS)) {
+      const capped = discountFor({ discountType: "fixed", discountValue: 9999 }, plan);
+      expect(Number.isInteger(capped)).toBe(true);
+      expect(capped).toBeLessThanOrEqual(PLAN_PRICES_ILS[plan]);
+    }
   });
 
   it("is zero for an unknown plan rather than NaN", () => {

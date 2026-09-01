@@ -10,6 +10,7 @@
 
 import { randomBytes } from "crypto";
 import { prisma } from "../lib/prisma.js";
+import { fmtIls } from "../lib/money.js";
 
 const GRAPH_VERSION = "v1.0";
 // Sandbox and production are different hosts. PayPlus issues separate keys for each, so pointing
@@ -159,8 +160,8 @@ export async function createSubscriptionCheckoutLink(
   const planLabel = plan === "ultra" ? "Ultra" : plan === "premium" ? "Premium" : "Standard";
   const cycleLabel = cycle === "annual" ? "שנתי" : "חודשי";
   // Named on the payment page so the owner can see why it is not the list price.
-  const credited = beforeCoupon < fullPrice ? ` — בקיזוז ₪${fullPrice - beforeCoupon} ששולמו כבר` : "";
-  const couponNote = couponOff > 0 ? ` — קופון ${coupon!.code} (−₪${couponOff})` : "";
+  const credited = beforeCoupon < fullPrice ? ` — בקיזוז ₪${fmtIls(fullPrice - beforeCoupon)} ששולמו כבר` : "";
+  const couponNote = couponOff > 0 ? ` — קופון ${coupon!.code} (−₪${fmtIls(couponOff)})` : "";
 
   return generateCheckoutPage({
     businessId,

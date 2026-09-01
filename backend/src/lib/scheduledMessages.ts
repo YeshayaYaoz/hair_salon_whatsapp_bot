@@ -4,6 +4,7 @@ import { sendWhatsAppMessage, sendWhatsAppTemplate, WhatsAppSendError, RE_ENGAGE
 import { reminderTemplate, reviewTemplate, type TemplateConfig } from "./whatsappTemplates.js";
 import { meterOutboundMessage } from "./wallet.js";
 import { instantPartsInTz, dayOfWeekForDate } from "./timezone.js";
+import { fmtIlsGrouped } from "./money.js";
 
 /**
  * Send a free-form message, falling back to an approved template when the 24-hour customer service
@@ -265,7 +266,7 @@ export async function runRoiReportJob() {
     const monthName = heMonths[prevMonth - 1];
 
     const waitlistLine = waitlistFilled > 0 ? `\nמילאה ${waitlistFilled} ביטולים של הרגע האחרון דרך רשימת ההמתנה 🎯` : "";
-    const text = `📊 סיכום חודש ${monthName}!\n\nתורי החודש:\n✅ קבעה ${appointments.length} תורים\n💰 הכנסות שנסגרו דרך הבוט: ₪${revenueIls.toLocaleString()}\n⏱️ חסכה לך כ-${hoursSaved} שעות של התכתבויות מול לקוחות${waitlistLine}\n\nתודה שאתם איתנו! 🙏`;
+    const text = `📊 סיכום חודש ${monthName}!\n\nתורי החודש:\n✅ קבעה ${appointments.length} תורים\n💰 הכנסות שנסגרו דרך הבוט: ₪${fmtIlsGrouped(revenueIls)}\n⏱️ חסכה לך כ-${hoursSaved} שעות של התכתבויות מול לקוחות${waitlistLine}\n\nתודה שאתם איתנו! 🙏`;
 
     try {
       const accessToken = decryptSecret(biz.whatsappAccessToken!);

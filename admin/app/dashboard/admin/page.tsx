@@ -77,6 +77,8 @@ type StatusFilter = "all" | "trial" | "active" | "past_due" | "canceled" | "bloc
 const MESSAGE_QUOTA_BY_PLAN: Record<string, number> = { standard: 300, premium: 1000, ultra: 3000 };
 // Must match PLAN_PRICES_ILS in backend/src/billing/payplusSubscription.ts.
 const PLAN_PRICES_ILS: Record<string, number> = { standard: 174.9, premium: 374.9, ultra: 749.9 };
+/** Prices are not whole shekels, so a raw interpolation renders ₪174.9. Mirrors the billing page. */
+const fmtIls = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
 const ANNUAL_MONTHS_CHARGED = 10;
 
 function monthlyRevenueIls(b: AdminBusiness): number {
@@ -1090,9 +1092,9 @@ export default function AdminBusinessesPage() {
                   onChange={(e) => setPlanChoice(e.target.value as "standard" | "premium")}
                   className="text-xs flex-1"
                 >
-                  <option value="standard">{he ? "סטנדרט" : "Standard"} (₪{PLAN_PRICES_ILS.standard})</option>
-                  <option value="premium">{he ? "פרימיום" : "Premium"} (₪{PLAN_PRICES_ILS.premium})</option>
-                  <option value="ultra">{he ? "אולטרה" : "Ultra"} (₪{PLAN_PRICES_ILS.ultra})</option>
+                  <option value="standard">{he ? "סטנדרט" : "Standard"} (₪{fmtIls(PLAN_PRICES_ILS.standard)})</option>
+                  <option value="premium">{he ? "פרימיום" : "Premium"} (₪{fmtIls(PLAN_PRICES_ILS.premium)})</option>
+                  <option value="ultra">{he ? "אולטרה" : "Ultra"} (₪{fmtIls(PLAN_PRICES_ILS.ultra)})</option>
                 </select>
                 <button
                   disabled={actionBusy}
