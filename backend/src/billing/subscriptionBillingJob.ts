@@ -3,6 +3,8 @@ import { couponDiscountForCharge, couponStateAfterCharge } from "./coupons.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
 import { sendAdminAlertEmail } from "../lib/email.js";
+import { subscriptionChargeIls } from "./subscriptionAmount.js";
+import { fmtIls } from "../lib/money.js";
 import {
   chargeSubscriptionToken,
   fetchCustomerUidForToken,
@@ -98,23 +100,16 @@ export async function runSubscriptionBillingJob(): Promise<void> {
       continue;
     }
 
-    const basePrice = PLAN_PRICES_ILS[business.subscriptionPlan!];
-    if (!basePrice) {
+    const periodDays = BILLING_PERIOD_DAYS[business.billingCycle] ?? 30;
+    const periodMultiplier = business.billingCycle === "annual" ? 10 : 1;
+    // Shared with the pre-charge reminder, which used to compute its own version and quote a
+    // different number two days beforehand. See subscriptionAmount.ts.
+    const amountIls = subscriptionChargeIls(business);
+    if (amountIls === null) {
       console.error(`[subscriptionBilling] Unknown plan "${business.subscriptionPlan}" for business ${business.id} — skipping`);
       continue;
     }
-    const periodDays = BILLING_PERIOD_DAYS[business.billingCycle] ?? 30;
-    const periodMultiplier = business.billingCycle === "annual" ? 10 : 1;
-    const managedSurcharge =
-      (business.paymentProvider === "tori_managed" ? MANAGED_PAYMENT_SURCHARGE_ILS : 0) +
-      (business.invoiceProvider === "tori_managed" ? MANAGED_INVOICE_SURCHARGE_ILS : 0);
-    const fullAmount = basePrice * periodMultiplier + managedSurcharge * periodMultiplier;
-    // The coupon is a per-cycle discount, so an annual term gets it off each month charged — the
-    // same arithmetic the checkout page quoted, which is the number the owner agreed to.
     const couponOff = couponDiscountForCharge(business) * periodMultiplier;
-    // Floor of ₪1: PayPlus rejects a zero charge, and a discount that fully covers a plan is a
-    // real thing to hand someone. Clamping here rather than refusing keeps them subscribed.
-    const amountIls = Math.max(1, fullAmount - business.loyaltyDiscountIls - couponOff);
 
     const token = decryptSecret(business.subscriptionToken!);
 
@@ -165,7 +160,7 @@ export async function runSubscriptionBillingJob(): Promise<void> {
           ...couponStateAfterCharge(business),
         },
       });
-      console.log(`[subscriptionBilling] Charged ${business.id} (${business.name}) ₪${amountIls}`);
+      console.log(`[subscriptionBilling] Charged ${business.id} (${business.name}) ₪${fmtIls(amountIls)}`);
 
       if (justEarnedDiscount) {
         await notifyOwner(
@@ -201,15 +196,15 @@ export async function runSubscriptionBillingJob(): Promise<void> {
       await notifyOwner(
         business,
         givingUp
-          ? `⚠️ החיוב עבור תורי (₪${amountIls}) נכשל שוב והבוט נעצר. כדי להפעיל מחדש, עדכנו אמצעי תשלום: ${FRONTEND_URL}/dashboard/billing`
-          : `⚠️ החיוב עבור תורי (₪${amountIls}) לא עבר. הבוט ממשיך לעבוד כרגיל — ננסה שוב בעוד ${retryInDays} ימים. אם תרצו, אפשר לעדכן אמצעי תשלום כבר עכשיו: ${FRONTEND_URL}/dashboard/billing`
+          ? `⚠️ החיוב עבור תורי (₪${fmtIls(amountIls)}) נכשל שוב והבוט נעצר. כדי להפעיל מחדש, עדכנו אמצעי תשלום: ${FRONTEND_URL}/dashboard/billing`
+          : `⚠️ החיוב עבור תורי (₪${fmtIls(amountIls)}) לא עבר. הבוט ממשיך לעבוד כרגיל — ננסה שוב בעוד ${retryInDays} ימים. אם תרצו, אפשר לעדכן אמצעי תשלום כבר עכשיו: ${FRONTEND_URL}/dashboard/billing`
       );
       // Only worth waking the operator when the account has actually stopped. The intermediate
       // retries are routine and would just train us to ignore the alert.
       if (givingUp) {
         sendAdminAlertEmail(
           `⚠️ חיוב נכשל — ${business.name}`,
-          `<h2 style="color:#fff;margin-bottom:8px;">${business.name} עבר ל-past_due</h2><p style="color:#a1a1aa;">חיוב של ₪${amountIls} נכשל ${attempts} פעמים. השגיאה האחרונה: ${result.error}</p>`
+          `<h2 style="color:#fff;margin-bottom:8px;">${business.name} עבר ל-past_due</h2><p style="color:#a1a1aa;">חיוב של ₪${fmtIls(amountIls)} נכשל ${attempts} פעמים. השגיאה האחרונה: ${result.error}</p>`
         ).catch((err) => console.error("[subscriptionBilling] Churn-risk admin alert failed:", err));
       }
     }

@@ -25,6 +25,7 @@ import { sendAdminAlertEmail } from "../lib/email.js";
 import { validateCoupon, redeemCoupon, CouponError, COUPON_FAILURE_HE, normalizeCode } from "./coupons.js";
 import { explainPayPlusError } from "../lib/payplusErrors.js";
 import { parsePayPlusCallback, keyTree } from "../lib/payplusCallback.js";
+import { fmtIls } from "../lib/money.js";
 
 /** Fallback return URL when the caller sends none — the dashboard page these actions start from. */
 const APP_URL = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
@@ -811,8 +812,8 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
         `<h2>${paid?.name ?? business.id} נרשמו ל-${plan}</h2>
          <ul>
            <li>תוכנית: <strong>${plan}</strong> · חיוב ${cycleLabel}</li>
-           <li>מחיר מחירון: ₪${priceIls}</li>
-           ${paid?.couponCode ? `<li>קופון: <strong>${paid.couponCode}</strong> (−₪${paid.couponDiscountIls} לחיוב)</li>` : ""}
+           <li>מחיר מחירון: ₪${fmtIls(priceIls)}</li>
+           ${paid?.couponCode ? `<li>קופון: <strong>${paid.couponCode}</strong> (−₪${fmtIls(paid.couponDiscountIls)} לחיוב)</li>` : ""}
            <li>אימייל: ${paid?.email ?? "—"}</li>
            <li>מזהה עסק: <code>${business.id}</code></li>
          </ul>`

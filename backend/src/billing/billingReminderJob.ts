@@ -1,7 +1,8 @@
 import { prisma } from "../lib/prisma.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
-import { PLAN_PRICES_ILS } from "./payplusSubscription.js";
+import { subscriptionChargeIls } from "./subscriptionAmount.js";
+import { fmtIls } from "../lib/money.js";
 
 const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
 const WINDOW_MS = 60 * 60 * 1000; // 1-hour window around the "2 days before" mark, matches the hourly job cadence
@@ -25,6 +26,9 @@ export async function runBillingReminderJob(): Promise<void> {
     },
     select: {
       id: true, name: true, subscriptionPlan: true, billingCycle: true, loyaltyDiscountIls: true,
+      // Needed by subscriptionChargeIls — without these the reminder quotes a different amount
+      // from the one the nightly job charges.
+      couponDiscountIls: true, couponCyclesRemaining: true, paymentProvider: true, invoiceProvider: true,
       lastBillingReminderSentAt: true, nextBillingDate: true,
       notificationPhone: true, whatsappPhoneNumberId: true, whatsappAccessToken: true,
     },
@@ -37,12 +41,13 @@ export async function runBillingReminderJob(): Promise<void> {
       continue;
     }
 
-    const basePrice = PLAN_PRICES_ILS[business.subscriptionPlan!];
-    if (!basePrice) continue;
-    const fullAmount = business.billingCycle === "annual" ? basePrice * 10 : basePrice;
-    const amountIls = Math.max(0, fullAmount - business.loyaltyDiscountIls);
+    // The same function the nightly charge uses. This used to be a second copy that left out the
+    // managed-account surcharges and the coupon, so the figure announced two days ahead was not
+    // the figure taken off the card.
+    const amountIls = subscriptionChargeIls(business);
+    if (amountIls === null) continue;
 
-    const text = `היי! תזכורת קלה: מחרתיים יתבצע החיוב ה${business.billingCycle === "annual" ? "שנתי" : "חודשי"} עבור תורי על סך ₪${amountIls}. תודה שאתם איתנו! 🙏`;
+    const text = `היי! תזכורת קלה: מחרתיים יתבצע החיוב ה${business.billingCycle === "annual" ? "שנתי" : "חודשי"} עבור תורי על סך ₪${fmtIls(amountIls)}. תודה שאתם איתנו! 🙏`;
 
     try {
       const accessToken = decryptSecret(business.whatsappAccessToken!);
