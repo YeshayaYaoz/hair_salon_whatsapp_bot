@@ -1,0 +1,86 @@
+name: Set a Railway variable
+
+# Writes ONE variable on the backend service, by name, from an input.
+#
+# Deliberately not a general "run any railway command" workflow: the blast radius of a typo in
+# `railway variables --set` is a production service whose configuration nobody can diff afterwards.
+# One variable, echoed back by name only, and a redeploy that the deploy itself verifies.
+#
+# The value is echoed nowhere. Pass secrets through this only if you accept that whoever can
+# dispatch a workflow can set them — for an API key, prefer Railway's own UI.
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: "Variable name"
+        type: string
+        required: true
+      value:
+        description: "Value (printed nowhere)"
+        type: string
+        required: true
+      project:
+        description: "Railway project (as `railway status` prints it)"
+        type: string
+        default: "Tori"
+
+jobs:
+  set:
+    runs-on: ubuntu-latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+      SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+      PROJECT: ${{ inputs.project }}
+      VAR_NAME: ${{ inputs.name }}
+      VAR_VALUE: ${{ inputs.value }}
+    steps:
+      - name: Is a Railway token configured
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::error::RAILWAY_TOKEN is not set (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+          # Masked so that even an accidental echo downstream cannot print it.
+          echo "::add-mask::$VAR_VALUE"
+          case "$VAR_NAME" in
+            [A-Z_]*) ;;
+            *) echo "::error::'$VAR_NAME' is not a variable name."; exit 1 ;;
+          esac
+
+      # Not pinned: v3 queries a User.teams field the API no longer has and fails before the token
+      # is ever used.
+      - name: Install the Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Link the project
+        run: railway link --project "$PROJECT" --environment "$RAILWAY_ENVIRONMENT" || true
+
+      - name: Was it already set, and to what shape
+        run: |
+          before=$(railway variables --service "$SERVICE" --environment "$RAILWAY_ENVIRONMENT" --json 2>/dev/null || echo '{}')
+          if echo "$before" | jq -e --arg n "$VAR_NAME" 'has($n)' >/dev/null 2>&1; then
+            # Length only. Enough to tell "already correct" from "set to something else" without
+            # putting the old value — which may be a live credential — into this log.
+            echo "$VAR_NAME is already set (existing value is $(echo "$before" | jq -r --arg n "$VAR_NAME" '.[$n] | length') characters). It will be overwritten."
+          else
+            echo "$VAR_NAME is not currently set. It will be created."
+          fi
+
+      - name: Set it
+        run: |
+          railway variables --service "$SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+            --set "$VAR_NAME=$VAR_VALUE" >/dev/null
+          echo "Set $VAR_NAME on $SERVICE ($RAILWAY_ENVIRONMENT). Railway redeploys the service on a variable change."
+
+      - name: Confirm it is there
+        run: |
+          # Presence, by name. That the value is right is the caller's claim; that the variable
+          # exists is this workflow's.
+          after=$(railway variables --service "$SERVICE" --environment "$RAILWAY_ENVIRONMENT" --json 2>/dev/null || echo '{}')
+          if echo "$after" | jq -e --arg n "$VAR_NAME" 'has($n)' >/dev/null 2>&1; then
+            echo "✓ $VAR_NAME is present on the service."
+          else
+            echo "::error::$VAR_NAME is still not present — the set did not take."
+            exit 1
+          fi
