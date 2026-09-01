@@ -23,6 +23,10 @@ on:
         description: "Railway project (as `railway status` prints it)"
         type: string
         default: "Tori"
+      redeploy:
+        description: "Restart the service so the new value is actually read"
+        type: boolean
+        default: true
 
 jobs:
   set:
@@ -72,6 +76,15 @@ jobs:
           railway variables --service "$SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
             --set "$VAR_NAME=$VAR_VALUE" >/dev/null
           echo "Set $VAR_NAME on $SERVICE ($RAILWAY_ENVIRONMENT). Railway redeploys the service on a variable change."
+
+      # A variable the running process never read is not set in any sense that matters. Railway did
+      # not restart on its own after a CLI --set, and the first run of this workflow left the
+      # backend running a container whose environment was captured three seconds too early.
+      - name: Redeploy so the value is read
+        if: inputs.redeploy
+        run: |
+          railway redeploy --service "$SERVICE" --environment "$RAILWAY_ENVIRONMENT" --yes \
+            || echo "::warning::Redeploy did not start — the value will be picked up on the next deploy."
 
       - name: Confirm it is there
         run: |
