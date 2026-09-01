@@ -7,6 +7,7 @@ import { SavedBadge } from "../../lib/SavedBadge";
 import { SkeletonCard } from "../../lib/Skeleton";
 import { Toggle, Section, Field } from "../../lib/SettingsControls";
 import { NumberProvisionOffer } from "../../lib/NumberProvisionOffer";
+import { DEFAULT_TZ } from "../../lib/tz";
 
 interface BotProfile {
   botGreeting?: string;
@@ -412,6 +413,9 @@ function VoiceMinutes() {
     last30d: VoiceUsageWindow;
     recent: RecentVoiceCall[];
   } | null>(null);
+  // Call dates belong to the salon's calendar, not the device's — an owner checking from abroad
+  // should still see the day the call actually happened at the business.
+  const [tz, setTz] = useState(DEFAULT_TZ);
 
   useEffect(() => {
     // Silent on failure: this is a figure beside the settings, not the settings. An owner changing
@@ -420,6 +424,9 @@ function VoiceMinutes() {
       "/api/business/voice-usage"
     )
       .then(setUsage)
+      .catch(() => {});
+    apiFetch<{ timezone?: string }>("/api/business/me")
+      .then((me) => setTz(me.timezone || DEFAULT_TZ))
       .catch(() => {});
   }, []);
 
@@ -459,7 +466,7 @@ function VoiceMinutes() {
             {usage.recent.map((c, i) => (
               <li key={i} className="flex items-start gap-3 text-xs">
                 <span className="text-gray-600 tabular-nums whitespace-nowrap shrink-0">
-                  {new Date(c.createdAt).toLocaleDateString(he ? "he-IL" : "en-GB", { day: "numeric", month: "short" })}
+                  {new Date(c.createdAt).toLocaleDateString(he ? "he-IL" : "en-GB", { timeZone: tz, day: "numeric", month: "short" })}
                   {" · "}
                   {formatDuration(c.durationSeconds)}
                 </span>

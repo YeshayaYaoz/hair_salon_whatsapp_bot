@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useLanguage } from "../../lib/LanguageContext";
-import { formatDateTimeInTz, localeFor } from "../../lib/tz";
+import { formatDateTimeInTz, localeFor, dayKeyInTz } from "../../lib/tz";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -81,13 +81,22 @@ const COPY = {
   },
 } as const;
 
-/** Local calendar date `offset` days from today. Built from local date parts rather than
- *  `toISOString().slice(0, 10)`, which converts to UTC first and so returns the wrong day for
- *  anyone east of Greenwich during the evening — including the whole of Israel. */
-function isoDate(offset: number) {
-  const d = new Date();
-  d.setDate(d.getDate() + offset);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/**
+ * Calendar date `offset` days from today **at the salon**, not on the visitor's device.
+ *
+ * This used to read the device's own date. For a customer in the same country that is the same
+ * answer, but not for one booking from abroad: at 20:00 in New York it is already tomorrow in
+ * Israel, so "today" offered yesterday's slots and every label was a day out. A salon's opening
+ * hours belong to the salon's calendar, so the whole picker is anchored there.
+ *
+ * Anchored at noon before stepping days: midnight is the one hour a DST change can move across a
+ * date boundary, and noon never does.
+ */
+function isoDate(offset: number, timeZone: string) {
+  const [y, m, d] = dayKeyInTz(new Date(), timeZone).split("-").map(Number);
+  const anchor = new Date(Date.UTC(y, m - 1, d, 12));
+  anchor.setUTCDate(anchor.getUTCDate() + offset);
+  return anchor.toISOString().slice(0, 10);
 }
 
 function StepIndicator({ current, labels }: { current: number; labels: readonly string[] }) {
@@ -186,7 +195,7 @@ export default function BookPage() {
     setSlotsLoading(true);
     setSlots([]);
     try {
-      const r = await fetch(`${API}/api/public/${businessId}/slots?serviceId=${svc.id}&date=${isoDate(offset)}`);
+      const r = await fetch(`${API}/api/public/${businessId}/slots?serviceId=${svc.id}&date=${isoDate(offset, tz)}`);
       setSlots(await r.json().then((d) => Array.isArray(d) ? d : []));
     } finally {
       setSlotsLoading(false);
@@ -372,10 +381,15 @@ export default function BookPage() {
                 over simply comes back empty rather than bookable in the past. */}
             <div className="grid grid-cols-4 gap-2">
               {Array.from({ length: 14 }, (_, i) => i).map((offset) => {
+                // Deliberately formatted WITHOUT timeZone, unlike every appointment time on this
+                // page. This is a calendar-date label, not an instant: isoDate already resolved it
+                // in the salon's timezone, and noon anchoring keeps the date stable in any viewer's.
+                // Passing the salon zone here would re-convert an already-local date and could move
+                // the label a day for a far-eastern viewer.
                 // Anchored at noon on the same calendar date `isoDate` sends to the API, so the
                 // label can never name a different day than the one being requested. No timeZone
                 // here on purpose: this is a plain calendar date, not an instant.
-                const d = new Date(isoDate(offset) + "T12:00:00");
+                const d = new Date(isoDate(offset, tz) + "T12:00:00");
                 return (
                   <button
                     key={offset}
@@ -413,7 +427,7 @@ export default function BookPage() {
               {c.back}
             </button>
             <h2 className="text-sm font-semibold text-gray-900 mb-4">
-              {new Date(isoDate(dateOffset) + "T12:00:00").toLocaleDateString(locale, { weekday: "long", month: "long", day: "numeric" })}
+              {new Date(isoDate(dateOffset, tz) + "T12:00:00").toLocaleDateString(locale, { weekday: "long", month: "long", day: "numeric" })}
             </h2>
             {slotsLoading ? (
               <div className="flex justify-center py-8">
