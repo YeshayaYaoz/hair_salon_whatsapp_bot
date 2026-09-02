@@ -19,10 +19,11 @@
 import { prisma } from "../src/lib/prisma.js";
 import { sendWhatsAppTemplate } from "../src/webhook/whatsappClient.js";
 import { announceTemplate } from "../src/lib/whatsappTemplates.js";
+import { normalizeOwnerPhone } from "../src/lib/phone.js";
 
 const confirm = process.argv.includes("--confirm");
 const onlyIdx = process.argv.indexOf("--only");
-const only = onlyIdx >= 0 ? process.argv[onlyIdx + 1]?.replace(/\D/g, "") : undefined;
+const only = onlyIdx >= 0 ? normalizeOwnerPhone(process.argv[onlyIdx + 1] ?? "") ?? undefined : undefined;
 
 // Tori's own outreach number, never a customer's: this goes out from us, about us.
 const phoneNumberId = process.env.TORI_OUTREACH_PHONE_NUMBER_ID?.trim();
@@ -47,13 +48,25 @@ async function main() {
   const withPhone = businesses.filter((b) => b.notificationPhone?.trim());
   const withoutPhone = businesses.length - withPhone.length;
 
+  // Normalised, not merely stripped of punctuation. Stored numbers are not uniformly qualified —
+  // the dry run turned up "0525666655", a national number with its trunk zero and no country code,
+  // which Meta cannot route. Sending it would have failed for that one business while the run
+  // reported success for the rest, and the miss would have been invisible.
   const recipients = withPhone
-    .map((b) => ({ name: b.name, phone: b.notificationPhone!.replace(/\D/g, "") }))
-    .filter((r) => r.phone.length > 0 && (!only || r.phone === only));
+    .map((b) => ({ name: b.name, phone: normalizeOwnerPhone(b.notificationPhone!) }))
+    .filter((r): r is { name: string; phone: string } => r.phone !== null)
+    .filter((r) => !only || r.phone === only);
+
+  const unroutable = withPhone
+    .filter((b) => normalizeOwnerPhone(b.notificationPhone!) === null)
+    .map((b) => b.name);
 
   console.log(`Template:   ${templateName} [${languageCode}] from phone number id ${phoneNumberId}`);
   console.log(`Recipients: ${recipients.length}`);
   console.log(`Skipped:    ${withoutPhone} business(es) with no manager phone — email reaches those.`);
+  if (unroutable.length > 0) {
+    console.log(`Unroutable: ${unroutable.length} saved number(s) that are not a valid phone — ${unroutable.join(", ")}`);
+  }
   console.log("");
   for (const r of recipients) console.log(`  ${r.name}  ${r.phone}`);
   console.log("");
