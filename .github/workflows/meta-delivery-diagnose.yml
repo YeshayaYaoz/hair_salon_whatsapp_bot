@@ -9,6 +9,14 @@ name: Diagnose WhatsApp delivery
 on:
   workflow_dispatch:
     inputs:
+      test_to:
+        description: "Also send one test template to this number (blank = diagnose only)"
+        type: string
+        default: ""
+      test_template:
+        description: "Template to send — pick a UTILITY one to test against a MARKETING opt-out"
+        type: string
+        default: "tori_owner_alert"
       project:
         description: "Railway project (as `railway status` prints it)"
         type: string
@@ -39,3 +47,13 @@ jobs:
         run: |
           railway run --service "$SERVICE" --environment "$RAILWAY_ENVIRONMENT" -- \
             npx tsx scripts/meta-delivery-diagnose.ts
+
+      # A MARKETING template is dropped for a recipient who opted out of marketing, while a UTILITY
+      # one to the same number still arrives — with no error on either. Sending one of each is the
+      # only way to tell that apart from an account-level block.
+      - name: Send a test template
+        if: inputs.test_to != ''
+        run: |
+          railway run --service "$SERVICE" --environment "$RAILWAY_ENVIRONMENT" -- \
+            npx tsx scripts/send-test-template.ts \
+              --to "${{ inputs.test_to }}" --template "${{ inputs.test_template }}" --param "בדיקת מסירה"
