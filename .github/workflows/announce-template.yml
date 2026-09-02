@@ -8,6 +8,11 @@ name: Submit the announcement template
 on:
   workflow_dispatch:
     inputs:
+      variant:
+        description: "Which category to submit"
+        type: choice
+        options: ["utility", "marketing"]
+        default: "utility"
       confirm:
         description: "Actually submit it for review"
         type: boolean
@@ -34,4 +39,7 @@ jobs:
       # touches the database, but the import graph is type-checked by tsx at run time.
       - run: npx prisma generate
       - name: Submit
-        run: npx tsx scripts/submit-announce-template.ts ${{ inputs.confirm && '--confirm' || '' }}
+        run: |
+          npx tsx scripts/submit-announce-template.ts \
+            ${{ inputs.variant == 'utility' && '--utility' || '' }} \
+            ${{ inputs.confirm && '--confirm' || '' }}

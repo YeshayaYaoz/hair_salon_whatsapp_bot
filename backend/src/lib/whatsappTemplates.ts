@@ -323,3 +323,44 @@ export const ANNOUNCE_TEMPLATE_BUTTON = {
   text: "הגדרת מספר המנהל",
   url: `${(process.env.APP_URL ?? "https://torionline.com").replace(/\/$/, "")}/dashboard/settings#manager-phone`,
 };
+
+const DEFAULT_ANNOUNCE_UTILITY_NAME = "tori_service_update_manage";
+
+/**
+ * The same announcement as a UTILITY template.
+ *
+ * Exists because the MARKETING one is undeliverable to a large part of the audience and says so
+ * nowhere: Meta drops a marketing template for any recipient who has opted out of marketing —
+ * silently, with a 200 from the send endpoint and no failure webhook. That was measured, not
+ * assumed: on one number the MARKETING announcement never arrived while a UTILITY template sent
+ * moments later did.
+ *
+ * The category is honest rather than a workaround. This tells a paying customer that a capability
+ * of the service they already pay for now exists, and how to use it — a service update about their
+ * own account. What makes it utility is the content, so the wording carries no offer, no pitch and
+ * no cold opener; a promotional sentence here would be reclassified by Meta and rightly so.
+ */
+export function announceUtilityTemplate(): TemplateConfig {
+  return {
+    name: process.env.TORI_ANNOUNCE_UTILITY_TEMPLATE_NAME || DEFAULT_ANNOUNCE_UTILITY_NAME,
+    languageCode: DEFAULT_LANG,
+  };
+}
+
+/** {{1}} the business's name. Opens as an account notice, not an introduction. */
+export const ANNOUNCE_UTILITY_TEMPLATE_BODY =
+  "עדכון שירות עבור {{1}}: מהיום אפשר לנהל את העסק ישירות מהוואטסאפ — לעדכן שעות ומחירים, לראות את היומן, לחסום זמן ולהוסיף לקוחות. שולחים הודעה למספר הוואטסאפ של העסק, מהמספר של המנהל, וכותבים מה צריך. לבדיקה מהירה שלחו לעצמכם: מה יש לי היום?";
+
+export const ANNOUNCE_UTILITY_TEMPLATE_EXAMPLE = ["מספרת רונית"];
+
+/**
+ * No footer, deliberately.
+ *
+ * The marketing variant carries an opt-out line because Meta requires one there. Repeating it on a
+ * utility template invites exactly the reclassification this variant exists to avoid — an opt-out
+ * is the shape of marketing, and a reviewer reads the whole message.
+ */
+export const ANNOUNCE_UTILITY_TEMPLATE_BUTTON = {
+  text: "הגדרת מספר המנהל",
+  url: `${(process.env.APP_URL ?? "https://torionline.com").replace(/\/$/, "")}/dashboard/settings#manager-phone`,
+};
