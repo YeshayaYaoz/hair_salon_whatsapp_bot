@@ -364,3 +364,63 @@ export const ANNOUNCE_UTILITY_TEMPLATE_BUTTON = {
   text: "הגדרת מספר המנהל",
   url: `${(process.env.APP_URL ?? "https://torionline.com").replace(/\/$/, "")}/dashboard/settings#manager-phone`,
 };
+
+const DASHBOARD_URL = `${(process.env.APP_URL ?? "https://torionline.com").replace(/\/$/, "")}/dashboard`;
+
+const DEFAULT_OWNER_ALERT_CTA_NAME = "tori_owner_alert_cta";
+
+/**
+ * The owner alert again, with a button.
+ *
+ * The original ends "כל הפרטים מחכים לך בדשבורד" and then leaves the owner to find it — on a phone,
+ * from a notification, that is a browser, a bookmark and a login away, and the alert that most
+ * needs acting on is the one read while standing at a chair with a client in it. A tap is the
+ * whole difference.
+ *
+ * A separate name rather than an edit: an approved template's wording and buttons are frozen, and
+ * changing them means delete-and-resubmit — which tombstones the old name at Meta. Both exist, the
+ * old one stays as the fallback for a business whose WABA has not filed this one yet.
+ */
+export function ownerAlertCtaTemplate(): TemplateConfig {
+  return {
+    name: process.env.WHATSAPP_OWNER_ALERT_CTA_TEMPLATE || DEFAULT_OWNER_ALERT_CTA_NAME,
+    languageCode: DEFAULT_LANG,
+  };
+}
+
+/** {{1}} the alert itself. Opens with text so the body does not start on a variable. */
+export const OWNER_ALERT_CTA_BODY = "יש לך עדכון חדש בתורי: {{1}}";
+export const OWNER_ALERT_CTA_EXAMPLE = ["נועה כהן מעוניינת בתספורת ביום שלישי"];
+export const OWNER_ALERT_CTA_BUTTON = { text: "פתיחת הדשבורד", url: DASHBOARD_URL };
+
+const DEFAULT_PAYMENT_DETAILS_NAME = "tori_payment_details";
+
+/**
+ * Asks the owner to complete their payment details.
+ *
+ * Unambiguously UTILITY, and worth being precise about why after the announcement templates were
+ * reclassified: Meta's line is not who the recipient is but what the message does. An announcement
+ * tells someone about a capability — marketing, however service-like the wording. This one asks
+ * for an action on the recipient's own account, with a consequence for that account if it is not
+ * taken. That is the definition of a utility message, and it is why this one carries a link that
+ * the announcement could not.
+ */
+export function paymentDetailsTemplate(): TemplateConfig {
+  return {
+    name: process.env.WHATSAPP_PAYMENT_DETAILS_TEMPLATE || DEFAULT_PAYMENT_DETAILS_NAME,
+    languageCode: DEFAULT_LANG,
+  };
+}
+
+/**
+ * {{1}} the business's name.
+ *
+ * No urgency language and no deadline invented: what is true is that the subscription cannot be
+ * charged without card details, and the owner can fix it in a minute. A threat the product does
+ * not actually carry out is both a lie and, in Meta's reading, promotional pressure.
+ */
+export const PAYMENT_DETAILS_BODY =
+  "היי {{1}}, כדי להפעיל את המנוי בתורי חסרים פרטי התשלום בחשבון. אפשר להשלים אותם בקישור למטה — לוקח פחות מדקה, והפרטים נשמרים אצל חברת הסליקה ולא אצלנו.";
+
+export const PAYMENT_DETAILS_EXAMPLE = ["מספרת רונית"];
+export const PAYMENT_DETAILS_BUTTON = { text: "השלמת פרטי תשלום", url: `${DASHBOARD_URL}/billing` };
