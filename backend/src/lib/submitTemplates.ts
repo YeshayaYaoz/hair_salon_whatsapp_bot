@@ -8,6 +8,10 @@ import {
   ownerAlertTemplate,
   wordingFor,
   OWNER_ALERT_TEXT,
+  ownerAlertCtaTemplate,
+  OWNER_ALERT_CTA_BODY,
+  OWNER_ALERT_CTA_EXAMPLE,
+  OWNER_ALERT_CTA_BUTTON,
 } from "./whatsappTemplates.js";
 
 /**
@@ -39,6 +43,7 @@ export async function submitWhatsAppTemplates(
     const review = reviewTemplate();
     const confirmation = confirmationTemplate();
     const ownerAlert = ownerAlertTemplate();
+    const ownerAlertCta = ownerAlertCtaTemplate();
 
     // A zimmer has no "תור" and sells no "תספורת". Same template names and same variable order —
     // the sending code passes positional parameters and knows nothing about wording — but a guest
@@ -58,6 +63,17 @@ export async function submitWhatsAppTemplates(
       // call's lead reached nobody while every layer reported success.
       createMessageTemplate(wabaId, accessToken, { name: confirmation.name, languageCode: confirmation.languageCode, bodyText: wording.confirmation.body, bodyExample: wording.confirmation.example }),
       createMessageTemplate(wabaId, accessToken, { name: ownerAlert.name, languageCode: ownerAlert.languageCode, bodyText: OWNER_ALERT_TEXT.body, bodyExample: OWNER_ALERT_TEXT.example }),
+      // The owner alert again, with a button to the dashboard. Filed alongside the plain one rather
+      // than instead of it: every business connected before this existed has only the plain one
+      // approved, and notifyOwner falls back to it — so both have to be on the WABA for the ladder
+      // to have a rung to land on.
+      createMessageTemplate(wabaId, accessToken, {
+        name: ownerAlertCta.name,
+        languageCode: ownerAlertCta.languageCode,
+        bodyText: OWNER_ALERT_CTA_BODY,
+        bodyExample: OWNER_ALERT_CTA_EXAMPLE,
+        urlButton: OWNER_ALERT_CTA_BUTTON,
+      }),
     ]);
   } catch (err) {
     console.error(`[whatsapp] Automatic template submission failed for ${businessId} (non-fatal):`, err);

@@ -28,6 +28,7 @@ describe("notifyOwner", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.WHATSAPP_OWNER_ALERT_TEMPLATE;
+    delete process.env.WHATSAPP_OWNER_ALERT_CTA_TEMPLATE;
     mockPrisma.business.findUnique.mockResolvedValue({
       name: "בנחת רוח",
       email: "owner@zimmer.test",
@@ -60,31 +61,48 @@ describe("notifyOwner", () => {
   });
 
   it("falls back to the approved template outside the window", async () => {
-    process.env.WHATSAPP_OWNER_ALERT_TEMPLATE = "owner_alert";
+    process.env.WHATSAPP_OWNER_ALERT_CTA_TEMPLATE = "owner_alert_cta";
     mockPrisma.conversationMessage.findFirst.mockResolvedValue(null);
     expect(await notifyOwner("biz1", "הודעה")).toBe(true);
     expect(sendWhatsAppTemplate).toHaveBeenCalledWith(
-      expect.objectContaining({ templateName: "owner_alert", bodyParams: ["הודעה"] })
+      expect.objectContaining({ templateName: "owner_alert_cta", bodyParams: ["הודעה"] })
     );
     expect(sendWhatsAppMessage).not.toHaveBeenCalled();
   });
 
   it("tries the default template outside the window when no env var names one", async () => {
-    // The submission side files tori_owner_alert on every business's WABA automatically at
-    // connect; reading the raw env var here meant that approved template sat unused until an
-    // operator ALSO set an env var, and every alert quietly took the slower email path.
+    // The submission side files these on every business's WABA automatically at connect; reading
+    // the raw env var here meant the approved template sat unused until an operator ALSO set an
+    // env var, and every alert quietly took the slower email path.
     mockPrisma.conversationMessage.findFirst.mockResolvedValue(null);
     expect(await notifyOwner("biz1", "הודעה")).toBe(true);
     expect(sendWhatsAppTemplate).toHaveBeenCalledWith(
-      expect.objectContaining({ templateName: "tori_owner_alert", bodyParams: ["הודעה"] })
+      expect.objectContaining({ templateName: "tori_account_update", bodyParams: ["הודעה"] })
     );
     expect(sendWhatsAppMessage).not.toHaveBeenCalled();
     expect(sendBusinessNoticeEmail).not.toHaveBeenCalled();
   });
 
-  it("falls back to the business's email when the template send fails", async () => {
-    // A business connected before auto-submission existed has no approved template — Meta rejects
-    // the send (132001). The owner's answer to a lost alert, verbatim, was 'I want the messages' —
+  it("prefers the template with a button, then the plain one", async () => {
+    // The button is an upgrade, and an upgrade must not silence alerts for businesses that never
+    // received it: one connected months ago has only the plain template approved, and Meta rejects
+    // a send naming a template its WABA does not hold. So the plain one is a rung, not a relic.
+    mockPrisma.conversationMessage.findFirst.mockResolvedValue(null);
+    sendWhatsAppTemplate
+      .mockRejectedValueOnce(new Error("(#132001) Template name does not exist"))
+      .mockResolvedValueOnce(undefined);
+
+    expect(await notifyOwner("biz1", "הודעה")).toBe(true);
+
+    expect(sendWhatsAppTemplate.mock.calls[0][0].templateName).toBe("tori_account_update");
+    expect(sendWhatsAppTemplate.mock.calls[1][0].templateName).toBe("tori_owner_alert");
+    // The point of the second rung: email is slower and this business should not be pushed onto it.
+    expect(sendBusinessNoticeEmail).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the business's email when both template sends fail", async () => {
+    // A business connected before auto-submission existed has neither template approved — Meta
+    // rejects both sends (132001). The owner's answer to a lost alert, verbatim, was 'I want the messages' —
     // so it arrives by email rather than being refused. Late beats never; a lead that arrives is
     // a lead.
     mockPrisma.conversationMessage.findFirst.mockResolvedValue(null);

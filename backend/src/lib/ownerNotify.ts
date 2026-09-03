@@ -3,7 +3,7 @@ import { decryptSecret } from "./crypto.js";
 import { normalizePhone } from "./phone.js";
 import { sendWhatsAppMessage, sendWhatsAppTemplate } from "../webhook/whatsappClient.js";
 import { sendBusinessNoticeEmail } from "./email.js";
-import { ownerAlertTemplate } from "./whatsappTemplates.js";
+import { ownerAlertTemplate, ownerAlertCtaTemplate } from "./whatsappTemplates.js";
 
 /**
  * Sends a WhatsApp message to the business owner's own notification number — used for new-booking
@@ -79,7 +79,14 @@ export async function notifyOwner(businessId: string, message: string): Promise<
         to: business.notificationPhone, text: message,
       });
     } else {
-      const template = ownerAlertTemplate();
+      // Two templates, in order of usefulness. The first carries a button straight to the
+      // dashboard; the second is the plain one every business connected before that existed still
+      // has. Trying the plain one second rather than only having it is what stops the button being
+      // an upgrade that silences alerts for older businesses: submitWhatsAppTemplates files both,
+      // but a business connected months ago has whichever it was given at the time, and Meta
+      // rejects a send naming a template its WABA does not hold (132001).
+      const template = ownerAlertCtaTemplate();
+      const fallbackTemplate = ownerAlertTemplate();
       try {
         console.log(`[notifyOwner] ${businessId}: template '${template.name}' to ${business.notificationPhone} (window closed)`);
         await sendWhatsAppTemplate({
@@ -89,18 +96,31 @@ export async function notifyOwner(businessId: string, message: string): Promise<
           languageCode: template.languageCode,
           bodyParams: [message],
         });
-      } catch (templateErr) {
-        // Most commonly 132001: the template is not (yet) approved on this business's WABA —
-        // either Meta is still reviewing it, or the business connected before auto-submission
-        // existed and never filed it. The owner still said, in as many words, "I want the
-        // messages" — so the alert falls back to the business's own email rather than being
-        // refused. Slower to be noticed than WhatsApp, but it arrives, and a lead that arrives
-        // late beats a lead that never existed.
-        console.warn(
-          `[notifyOwner] ${businessId}: template '${template.name}' failed (${templateErr instanceof Error ? templateErr.message : templateErr}) — falling back to email`
-        );
-        console.log(`[notifyOwner] ${businessId}: email to ${business.email} (window closed, template failed)`);
-        await sendBusinessNoticeEmail(business.email, business.name, message);
+      } catch (ctaErr) {
+        try {
+          console.warn(
+            `[notifyOwner] ${businessId}: '${template.name}' failed (${ctaErr instanceof Error ? ctaErr.message : ctaErr}) — trying '${fallbackTemplate.name}'`
+          );
+          await sendWhatsAppTemplate({
+            phoneNumberId: business.whatsappPhoneNumberId, accessToken,
+            to: business.notificationPhone,
+            templateName: fallbackTemplate.name,
+            languageCode: fallbackTemplate.languageCode,
+            bodyParams: [message],
+          });
+        } catch (templateErr) {
+          // Most commonly 132001: neither template is approved on this business's WABA — Meta is
+          // still reviewing them, or the business connected before auto-submission existed and
+          // never filed any. The owner still said, in as many words, "I want the messages" — so
+          // the alert falls back to the business's own email rather than being refused. Slower to
+          // be noticed than WhatsApp, but it arrives, and a lead that arrives late beats a lead
+          // that never existed.
+          console.warn(
+            `[notifyOwner] ${businessId}: '${fallbackTemplate.name}' failed too (${templateErr instanceof Error ? templateErr.message : templateErr}) — falling back to email`
+          );
+          console.log(`[notifyOwner] ${businessId}: email to ${business.email} (window closed, templates failed)`);
+          await sendBusinessNoticeEmail(business.email, business.name, message);
+        }
       }
     }
 
