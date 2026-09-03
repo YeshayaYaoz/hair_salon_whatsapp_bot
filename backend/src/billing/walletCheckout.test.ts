@@ -219,6 +219,56 @@ describe("wallet top-up webhook", () => {
     expect(mockPrisma.business.update.mock.calls[0][0].data.subscriptionStatus).toBe("active");
   });
 
+  /**
+   * The subscription branch had the mirror-image of the bug the wallet branch is guarded against
+   * two tests up: it wrote `subscriptionToken: null` whenever a callback came back without one.
+   * Nothing else in the codebase ever nulls that column, so a cancelled or past-due business keeps
+   * the card that used to work — and a hosted checkout page is exactly how such a business
+   * re-subscribes. One callback without a token (PayPlus omitted it, or the Token/List recovery
+   * timed out) turned a paying customer into an active subscription that the nightly job then
+   * skipped for having no card.
+   */
+  it("saves the token and customer id together when the subscription callback carries them", async () => {
+    mockPrisma.business.findUnique.mockResolvedValue({
+      id: "biz1",
+      checkoutPurpose: "subscription",
+      checkoutPlan: "premium",
+      checkoutCycle: "monthly",
+      checkoutAmountIls: null,
+    });
+    mockPrisma.business.update.mockResolvedValue({});
+
+    await post({
+      data: { status_code: "000", more_info: "a1b2c3d4e5f60718", token_uid: "tok_sub", customer_uid: "cust_sub" },
+    });
+    await settle();
+
+    const data = mockPrisma.business.update.mock.calls[0][0].data;
+    expect(data.subscriptionToken).toBe("enc:tok_sub");
+    // Both halves or neither: PayPlus rejects a token charge that arrives without customer_uid.
+    expect(data.subscriptionCustomerUid).toBe("cust_sub");
+  });
+
+  it("never clears an existing card when the subscription callback returns no token", async () => {
+    mockPrisma.business.findUnique.mockResolvedValue({
+      id: "biz1",
+      checkoutPurpose: "subscription",
+      checkoutPlan: "premium",
+      checkoutCycle: "monthly",
+      checkoutAmountIls: null,
+    });
+    mockPrisma.business.update.mockResolvedValue({});
+
+    await post({ data: { status_code: "000", more_info: "a1b2c3d4e5f60718" } });
+    await settle();
+
+    const data = mockPrisma.business.update.mock.calls[0][0].data;
+    // Still activated — the customer paid — but the card they already had is left alone.
+    expect(data.subscriptionStatus).toBe("active");
+    expect(data).not.toHaveProperty("subscriptionToken");
+    expect(data).not.toHaveProperty("subscriptionCustomerUid");
+  });
+
   it("ignores a wallet callback with no stored amount rather than crediting zero", async () => {
     mockPrisma.business.findUnique.mockResolvedValue({
       id: "biz1",

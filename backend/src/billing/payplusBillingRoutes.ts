@@ -765,8 +765,14 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
       data: {
         subscriptionStatus: "active",
         subscriptionPlan: plan,
-        subscriptionToken: tokenUid ? encryptSecret(tokenUid) : null,
-        subscriptionCustomerUid: tokenUid ? event.customerUid ?? null : null,
+        // Only ever set, never cleared — the same rule the wallet branch above follows, and for a
+        // sharper reason. Nothing else in the codebase ever nulls subscriptionToken, so a lapsed
+        // business still holds the card that used to work; coming back through a hosted page is
+        // exactly how it re-subscribes. Writing null here on a callback that returned no token
+        // (PayPlus omitted it, or the Token/List recovery above timed out — it retries because
+        // listing is not instant) would throw that working card away and leave a customer who has
+        // just paid with an active subscription the nightly job then refuses to renew.
+        ...(tokenUid ? { subscriptionToken: encryptSecret(tokenUid), subscriptionCustomerUid: event.customerUid ?? null } : {}),
         billingCycle,
         nextBillingDate: new Date(Date.now() + BILLING_PERIOD_DAYS[billingCycle] * 24 * 60 * 60 * 1000),
         lastBillingAttemptAt: new Date(),
