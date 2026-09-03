@@ -17,6 +17,7 @@ interface BotProfile {
   cancellationPolicy?: string;
   referralText?: string;
   digestEnabled?: boolean;
+  digestFrequency?: string;
   availabilityInfo?: string;
   pricingNotes?: string;
   availabilitySuggestionsEnabled?: boolean;
@@ -512,7 +513,7 @@ export default function BotPage() {
   const [fields, setFields] = useState<BotProfile>({
     botGreeting: "", botPersonality: "",
     remindersEnabled: true, reviewsEnabled: true,
-    cancellationPolicy: "", referralText: "", digestEnabled: true, availabilityInfo: "",
+    cancellationPolicy: "", referralText: "", digestEnabled: true, digestFrequency: "daily", availabilityInfo: "",
     pricingNotes: "", availabilitySuggestionsEnabled: true, notifyOnDetailsSent: false, greetingSeparateMessage: false, aiProvider: "anthropic", aiModel: null, aiTemperature: null,
     greetingButtonText: "", greetingButtonUrl: "", quickReplies: [],
   });
@@ -539,6 +540,9 @@ export default function BotPage() {
         cancellationPolicy: me.cancellationPolicy ?? "",
         referralText: me.referralText ?? "",
         digestEnabled: me.digestEnabled ?? true,
+        // digestEnabled is the older switch and still wins when it is off, so the control shows
+        // "off" for either — otherwise an owner who had turned the digest off would see "daily".
+        digestFrequency: me.digestEnabled === false ? "off" : (me.digestFrequency ?? "daily"),
         availabilityInfo: me.availabilityInfo ?? "",
         pricingNotes: me.pricingNotes ?? "",
         availabilitySuggestionsEnabled: me.availabilitySuggestionsEnabled ?? true,
@@ -977,9 +981,35 @@ export default function BotPage() {
             <span className="text-xs text-gray-700">{t.reviewsLabel}</span>
             <Toggle checked={fields.reviewsEnabled ?? true} onChange={(v) => set("reviewsEnabled", v)} />
           </label>
+          {/* A frequency rather than a toggle: the summary was useful daily to a busy salon and
+              noise to a therapist with four appointments a week, and the only way to stop it was
+              to lose it entirely. "off" and digestEnabled:false are kept in step so the older
+              switch and this control can never disagree. */}
           <label className="flex items-center justify-between gap-3">
-            <span className="text-xs text-gray-700">{he ? "סיכום יומי בבוקר (וואטסאפ)" : "Morning daily digest (WhatsApp)"}</span>
-            <Toggle checked={fields.digestEnabled ?? true} onChange={(v) => set("digestEnabled", v)} />
+            <span className="min-w-0">
+              <span className="block text-xs text-gray-700">
+                {he ? "סיכום לוח הזמנים בוואטסאפ" : "Schedule summary on WhatsApp"}
+              </span>
+              <span className="block text-[11px] text-gray-600 mt-0.5">
+                {he
+                  ? "מגיע ב-07:00. יומי מראה את היום, שבועי את השבוע הקרוב, חודשי את החודש."
+                  : "Arrives at 07:00. Daily covers today, weekly the next 7 days, monthly the month."}
+              </span>
+            </span>
+            <select
+              value={fields.digestFrequency ?? "daily"}
+              onChange={(e) => {
+                const v = e.target.value;
+                set("digestFrequency", v);
+                set("digestEnabled", v !== "off");
+              }}
+              className="shrink-0"
+            >
+              <option value="daily">{he ? "יומי" : "Daily"}</option>
+              <option value="weekly">{he ? "שבועי" : "Weekly"}</option>
+              <option value="monthly">{he ? "חודשי" : "Monthly"}</option>
+              <option value="off">{he ? "כבוי" : "Off"}</option>
+            </select>
           </label>
           <label className="flex items-start justify-between gap-3">
             <span className="min-w-0">

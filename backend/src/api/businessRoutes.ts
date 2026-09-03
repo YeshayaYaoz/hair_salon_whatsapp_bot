@@ -703,6 +703,9 @@ const profileSchema = z.object({
   cancellationPolicy: z.string().max(500).optional(),
   referralText: z.string().max(500).optional(),
   digestEnabled: z.boolean().optional(),
+  // Validated as a closed set rather than a free string: an unrecognised value would be coerced to
+  // "daily" by digestFrequencyOf, silently giving an owner a cadence they did not pick.
+  digestFrequency: z.enum(["daily", "weekly", "monthly", "off"]).optional(),
   depositEnabled: z.boolean().optional(),
   depositAmountIls: z.number().int().nonnegative().max(100000).optional(),
   depositHoldMinutes: z.number().int().min(5).max(1440).optional(),

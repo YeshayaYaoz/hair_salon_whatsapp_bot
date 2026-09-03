@@ -10,6 +10,12 @@ vi.mock("../webhook/whatsappClient.js", () => ({
   sendWhatsAppMessage: (...a: unknown[]) => sendWhatsAppMessage(...a),
 }));
 
+// The job no longer sends free-form WhatsApp itself — lib/ownerNotify picks the session message,
+// the approved template or email depending on the owner's 24-hour window. That helper is the seam
+// the owner-facing wording is asserted through.
+const notifyOwner = vi.fn();
+vi.mock("../lib/ownerNotify.js", () => ({ notifyOwner: (...a: unknown[]) => notifyOwner(...a) }));
+
 const sendAdminAlertEmail = vi.fn();
 vi.mock("../lib/email.js", () => ({ sendAdminAlertEmail: (...a: unknown[]) => sendAdminAlertEmail(...a) }));
 
@@ -250,7 +256,8 @@ describe("a due subscription with no saved card", () => {
 
     await runSubscriptionBillingJob();
 
-    const text = sendWhatsAppMessage.mock.calls.at(-1)![0].text as string;
+    const [businessId, text] = notifyOwner.mock.calls.at(-1)! as [string, string];
+    expect(businessId).toBe("biz1");
     expect(text).toContain("אין אמצעי תשלום שמור");
     expect(text).toContain("/dashboard/billing");
     // "The charge did not go through" would send them hunting through their bank statement.

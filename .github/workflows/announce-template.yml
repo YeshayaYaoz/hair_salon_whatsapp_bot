@@ -9,10 +9,10 @@ on:
   workflow_dispatch:
     inputs:
       variant:
-        description: "Which category to submit"
+        description: "Which template set to submit"
         type: choice
-        options: ["utility", "marketing"]
-        default: "utility"
+        options: ["owner-cta", "utility", "marketing"]
+        default: "owner-cta"
       confirm:
         description: "Actually submit it for review"
         type: boolean
@@ -38,8 +38,14 @@ jobs:
       # Prisma's client is generated on install in this project; the script imports nothing that
       # touches the database, but the import graph is type-checked by tsx at run time.
       - run: npx prisma generate
+      # owner-cta files the two owner-facing UTILITY templates that carry a button; the other two
+      # are the announcement, which Meta classifies as marketing whatever the wording.
       - name: Submit
         run: |
-          npx tsx scripts/submit-announce-template.ts \
-            ${{ inputs.variant == 'utility' && '--utility' || '' }} \
-            ${{ inputs.confirm && '--confirm' || '' }}
+          if [ "${{ inputs.variant }}" = "owner-cta" ]; then
+            npx tsx scripts/submit-owner-templates.ts ${{ inputs.confirm && '--confirm' || '' }}
+          else
+            npx tsx scripts/submit-announce-template.ts \
+              ${{ inputs.variant == 'utility' && '--utility' || '' }} \
+              ${{ inputs.confirm && '--confirm' || '' }}
+          fi

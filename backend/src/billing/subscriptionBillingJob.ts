@@ -1,7 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { couponDiscountForCharge, couponStateAfterCharge } from "./coupons.js";
 import { decryptSecret } from "../lib/crypto.js";
-import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
+import { notifyOwner } from "../lib/ownerNotify.js";
 import { sendAdminAlertEmail } from "../lib/email.js";
 import { subscriptionChargeIls } from "./subscriptionAmount.js";
 import { fmtIls } from "../lib/money.js";
@@ -18,16 +18,18 @@ import {
 
 const FRONTEND_URL = process.env.FRONTEND_URL?.split(",")[0]?.trim() ?? "https://torionline.com";
 
-/** Best-effort WhatsApp notice to the owner — billing must never fail because a notification did. */
-async function notifyOwner(business: {
-  notificationPhone: string | null;
-  whatsappPhoneNumberId: string | null;
-  whatsappAccessToken: string | null;
-}, text: string): Promise<void> {
-  if (!business.notificationPhone || !business.whatsappPhoneNumberId || !business.whatsappAccessToken) return;
+/**
+ * Best-effort notice to the owner — billing must never fail because a notification did.
+ *
+ * Delegates to lib/ownerNotify rather than sending free-form here. This used to be a bare
+ * sendWhatsAppMessage, which Meta accepts with a 200 and then drops when the owner's 24-hour
+ * window is shut — so the one message that must arrive, "we are about to charge your card", was
+ * the one most likely to be silently lost, since an owner has no reason to have messaged their own
+ * bot that day. The shared path checks the window, uses the approved template, then email.
+ */
+async function notifyOwnerOfBilling(businessId: string, text: string): Promise<void> {
   try {
-    const accessToken = decryptSecret(business.whatsappAccessToken);
-    await sendWhatsAppMessage({ phoneNumberId: business.whatsappPhoneNumberId, accessToken, to: business.notificationPhone, text });
+    await notifyOwner(businessId, text);
   } catch (err) {
     console.error("[subscriptionBilling] Owner notification failed (non-fatal):", err);
   }
@@ -179,8 +181,8 @@ export async function runSubscriptionBillingJob(): Promise<void> {
       console.log(`[subscriptionBilling] Charged ${business.id} (${business.name}) ₪${fmtIls(amountIls)}`);
 
       if (justEarnedDiscount) {
-        await notifyOwner(
-          business,
+        await notifyOwnerOfBilling(
+          business.id,
           `🎁 הרווחת! בתור הערכה על ${LOYALTY_DISCOUNT_AFTER_CYCLES} חודשים איתנו, מהחיוב הבא תשלמו ₪${LOYALTY_DISCOUNT_ILS} פחות על תורי כל חודש. תודה שאתם איתנו!`
         );
       }
@@ -213,8 +215,8 @@ export async function runSubscriptionBillingJob(): Promise<void> {
       // the owner would go looking at their bank for a decline that never happened. Say what is
       // actually missing, and ask for the one thing that fixes it.
       const noCard = !token;
-      await notifyOwner(
-        business,
+      await notifyOwnerOfBilling(
+        business.id,
         noCard
           ? givingUp
             ? `⚠️ אין אמצעי תשלום שמור לתורי, והחיוב של ₪${fmtIls(amountIls)} לא נגבה — הבוט נעצר. להוספת כרטיס והפעלה מחדש: ${FRONTEND_URL}/dashboard/billing`

@@ -3,6 +3,7 @@ import { decryptSecret } from "./crypto.js";
 import { sendWhatsAppMessage, sendWhatsAppTemplate, WhatsAppSendError, RE_ENGAGEMENT_ERROR_CODE } from "../webhook/whatsappClient.js";
 import { reminderTemplate, reviewTemplate, type TemplateConfig } from "./whatsappTemplates.js";
 import { meterOutboundMessage } from "./wallet.js";
+import { notifyOwner } from "./ownerNotify.js";
 import { instantPartsInTz, dayOfWeekForDate } from "./timezone.js";
 import { fmtIlsGrouped } from "./money.js";
 
@@ -148,9 +149,55 @@ export async function runReviewJob() {
 }
 
 /**
- * Morning digest: once per day, message each owner their day's schedule.
- * Runs hourly and fires only for businesses whose local time is in the 07:00–07:59 window
- * and that haven't already received a digest today.
+ * How often an owner wants the summary, and what period it covers.
+ *
+ * The period follows the cadence rather than staying "today" for all three: a weekly digest that
+ * listed only Sunday's appointments would be a daily digest sent once a week, and an owner who
+ * chose weekly would quietly stop seeing six days out of seven.
+ */
+export type DigestFrequency = "daily" | "weekly" | "monthly" | "off";
+
+export function digestFrequencyOf(biz: { digestEnabled: boolean; digestFrequency: string }): DigestFrequency {
+  // digestEnabled is the older switch and still set by the business templates. Either one being
+  // off means off — a stored "daily" must not resurrect a digest the owner turned off.
+  if (!biz.digestEnabled) return "off";
+  const f = biz.digestFrequency;
+  return f === "daily" || f === "weekly" || f === "monthly" || f === "off" ? f : "daily";
+}
+
+/**
+ * Whether this is the run that should send, given the owner's local calendar.
+ *
+ * Weekly lands on Sunday because the Israeli work week starts there — a Monday digest would arrive
+ * with the week already underway. Monthly lands on the 1st.
+ */
+export function isDigestDay(freq: DigestFrequency, dow: number, day: number): boolean {
+  if (freq === "daily") return true;
+  if (freq === "weekly") return dow === 0;
+  if (freq === "monthly") return day === 1;
+  return false;
+}
+
+/** Long enough that an hourly job cannot send twice, short enough that the next period is not skipped. */
+const DIGEST_COOLDOWN_MS: Record<Exclude<DigestFrequency, "off">, number> = {
+  daily: 20 * 60 * 60 * 1000,
+  weekly: 6 * 24 * 60 * 60 * 1000,
+  monthly: 25 * 24 * 60 * 60 * 1000,
+};
+
+/**
+ * The owner's schedule summary, at the cadence they chose.
+ *
+ * Runs hourly and fires only for businesses whose local time is in the 07:00–07:59 window, on the
+ * right day for their cadence, and that have not already had one this period.
+ *
+ * Delivery goes through notifyOwner rather than a bare send. This job used to call
+ * sendWhatsAppMessage directly, which meant a free-form message to an owner whose 24-hour window
+ * was shut: Meta answered 200, the job logged "Sent morning digest" and stamped lastDigestSentAt,
+ * and the real verdict (131047) arrived minutes later on the status webhook where nothing was
+ * reading it. Every morning, for every owner who had not messaged their own bot that day, the
+ * digest was reported sent and never arrived. notifyOwner checks the window first, uses the
+ * approved template when it is closed, and falls back to email after that.
  */
 export async function runDigestJob() {
   const businesses = await prisma.business.findMany({
@@ -161,8 +208,8 @@ export async function runDigestJob() {
       whatsappAccessToken: { not: null },
     },
     select: {
-      id: true, name: true, timezone: true, notificationPhone: true,
-      whatsappPhoneNumberId: true, whatsappAccessToken: true, lastDigestSentAt: true,
+      id: true, name: true, timezone: true, notificationPhone: true, digestEnabled: true,
+      digestFrequency: true, whatsappPhoneNumberId: true, whatsappAccessToken: true, lastDigestSentAt: true,
     },
   });
 
@@ -171,45 +218,69 @@ export async function runDigestJob() {
     // notificationPhone passes the `not: null` filter as an empty string; Meta then rejects the
     // send with "parameter to is required". Skip these rather than logging a failure every run.
     if (!biz.notificationPhone?.trim()) continue;
+    const freq = digestFrequencyOf(biz);
+    if (freq === "off") continue;
+
     const tz = biz.timezone || "Asia/Jerusalem";
     const local = instantPartsInTz(now, tz);
     // Send once, in the 07:00 local hour.
     if (Math.floor(local.minutes / 60) !== 7) continue;
-    // Guard against duplicates: skip if already sent within the last 20 hours.
-    if (biz.lastDigestSentAt && now.getTime() - biz.lastDigestSentAt.getTime() < 20 * 60 * 60 * 1000) continue;
 
-    // Today's window in the business timezone → UTC bounds.
     const { year, month, day } = ymdInTz(now, tz);
-    const startUtc = wallToUtc(year, month, day, 0, tz);
-    const endUtc = wallToUtc(year, month, day, 24 * 60, tz);
+    const dow = dayOfWeekForDate(year, month, day);
+    if (!isDigestDay(freq, dow, day)) continue;
+    if (biz.lastDigestSentAt && now.getTime() - biz.lastDigestSentAt.getTime() < DIGEST_COOLDOWN_MS[freq]) continue;
 
-    const todays = await prisma.appointment.findMany({
+    // The period the summary covers, in the business's own timezone.
+    const startUtc = wallToUtc(year, month, day, 0, tz);
+    const endUtc =
+      freq === "daily"
+        ? wallToUtc(year, month, day, 24 * 60, tz)
+        : freq === "weekly"
+          ? wallToUtc(year, month, day + 7, 0, tz)
+          : wallToUtc(year, month + 1, day, 0, tz);
+
+    const upcoming = await prisma.appointment.findMany({
       where: { businessId: biz.id, status: "confirmed", startTime: { gte: startUtc, lt: endUtc } },
       include: { customer: true, service: true },
       orderBy: { startTime: "asc" },
     });
 
     const heDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-    const dow = dayOfWeekForDate(year, month, day);
+    const periodHe = freq === "daily" ? "היום" : freq === "weekly" ? "בשבוע הקרוב" : "בחודש הקרוב";
     let text: string;
-    if (todays.length === 0) {
-      text = `☀️ בוקר טוב! יום ${heDays[dow]}.\nאין לך תורים מתוזמנים להיום. יום נעים! 😊`;
+    if (upcoming.length === 0) {
+      text =
+        freq === "daily"
+          ? `☀️ בוקר טוב! יום ${heDays[dow]}.\nאין לך תורים מתוזמנים להיום. יום נעים! 😊`
+          : `☀️ בוקר טוב!\nאין לך תורים מתוזמנים ${periodHe}.`;
     } else {
-      const lines = todays.map((a) => {
+      const lines = upcoming.slice(0, 30).map((a) => {
         const t = a.startTime.toLocaleTimeString("he-IL", { timeZone: tz, hour: "2-digit", minute: "2-digit" });
-        return `• ${t} — ${a.customer.name ?? a.customer.phone} (${a.service.name})`;
+        // Beyond a day, the time alone is ambiguous — the same 10:00 could be any of seven days.
+        const d =
+          freq === "daily"
+            ? ""
+            : `${a.startTime.toLocaleDateString("he-IL", { timeZone: tz, day: "numeric", month: "numeric" })} `;
+        return `• ${d}${t} — ${a.customer.name ?? a.customer.phone} (${a.service.name})`;
       });
-      text = `☀️ בוקר טוב! יש לך ${todays.length} תורים היום (יום ${heDays[dow]}):\n${lines.join("\n")}\n\nיום מוצלח! 💪`;
+      const more = upcoming.length > lines.length ? `\n…ועוד ${upcoming.length - lines.length} תורים` : "";
+      text =
+        freq === "daily"
+          ? `☀️ בוקר טוב! יש לך ${upcoming.length} תורים היום (יום ${heDays[dow]}):\n${lines.join("\n")}${more}\n\nיום מוצלח! 💪`
+          : `☀️ בוקר טוב! יש לך ${upcoming.length} תורים ${periodHe}:\n${lines.join("\n")}${more}\n\nבהצלחה! 💪`;
     }
 
-    try {
-      const accessToken = decryptSecret(biz.whatsappAccessToken!);
-      await sendWhatsAppMessage({ phoneNumberId: biz.whatsappPhoneNumberId!, accessToken, to: biz.notificationPhone!, text });
+    // notifyOwner reports honestly, so lastDigestSentAt is only stamped when something actually
+    // carried the message. A failed run is retried on the next hourly pass rather than being
+    // recorded as delivered — which is precisely what went wrong before.
+    const delivered = await notifyOwner(biz.id, text);
+    if (delivered) {
       await meterOutboundMessage(biz.id);
       await prisma.business.update({ where: { id: biz.id }, data: { lastDigestSentAt: now } });
-      console.log(`[digest] Sent morning digest to business ${biz.id}`);
-    } catch (err) {
-      console.error(`[digest] Failed for business ${biz.id}:`, err);
+      console.log(`[digest] Sent ${freq} digest to business ${biz.id}`);
+    } else {
+      console.error(`[digest] Could not deliver ${freq} digest to business ${biz.id} on any channel`);
     }
     await new Promise((r) => setTimeout(r, 300));
   }
@@ -272,8 +343,13 @@ export async function runRoiReportJob() {
     const text = `📊 סיכום חודש ${monthName}!\n\nתורי החודש:\n✅ קבעה ${appointments.length} תורים\n💰 הכנסות שנסגרו דרך הבוט: ₪${fmtIlsGrouped(revenueIls)}\n⏱️ חסכה לך כ-${hoursSaved} שעות של התכתבויות מול לקוחות${waitlistLine}\n\nתודה שאתם איתנו! 🙏`;
 
     try {
-      const accessToken = decryptSecret(biz.whatsappAccessToken!);
-      await sendWhatsAppMessage({ phoneNumberId: biz.whatsappPhoneNumberId!, accessToken, to: biz.notificationPhone!, text });
+      // Through notifyOwner for the same reason as the digest: a bare free-form send to an owner
+      // whose 24-hour window is shut is accepted by Meta and dropped afterwards, and this job runs
+      // once a month — the one cadence where nobody would notice the silence.
+      if (!(await notifyOwner(biz.id, text))) {
+        console.error(`[roiReport] Could not deliver to business ${biz.id} on any channel`);
+        continue;
+      }
       await meterOutboundMessage(biz.id);
       await prisma.business.update({ where: { id: biz.id }, data: { lastRoiReportSentAt: now } });
       console.log(`[roiReport] Sent monthly ROI report to business ${biz.id}`);

@@ -364,3 +364,79 @@ export const ANNOUNCE_UTILITY_TEMPLATE_BUTTON = {
   text: "הגדרת מספר המנהל",
   url: `${(process.env.APP_URL ?? "https://torionline.com").replace(/\/$/, "")}/dashboard/settings#manager-phone`,
 };
+
+const DASHBOARD_URL = `${(process.env.APP_URL ?? "https://torionline.com").replace(/\/$/, "")}/dashboard`;
+
+const DEFAULT_OWNER_ALERT_CTA_NAME = "tori_account_update";
+
+/**
+ * The owner alert again, with a button.
+ *
+ * The original ends "כל הפרטים מחכים לך בדשבורד" and then leaves the owner to find it — on a phone,
+ * from a notification, that is a browser, a bookmark and a login away, and the alert that most
+ * needs acting on is the one read while standing at a chair with a client in it. A tap is the
+ * whole difference.
+ *
+ * A separate name rather than an edit: an approved template's wording and buttons are frozen, and
+ * changing them means delete-and-resubmit — which tombstones the old name at Meta. Both exist, the
+ * old one stays as the fallback for a business whose WABA has not filed this one yet.
+ */
+export function ownerAlertCtaTemplate(): TemplateConfig {
+  return {
+    name: process.env.WHATSAPP_OWNER_ALERT_CTA_TEMPLATE || DEFAULT_OWNER_ALERT_CTA_NAME,
+    languageCode: DEFAULT_LANG,
+  };
+}
+
+/**
+ * {{1}} the alert itself.
+ *
+ * Text on BOTH sides of the parameter. Meta rejects a body that starts or ends on a variable, and
+ * a first attempt here ended on one and was refused — the same trap the original owner alert was
+ * already shaped around. The closing line is kept to four words because the button underneath is
+ * the actual way in; the original spent a whole sentence telling the owner to go and find the
+ * dashboard themselves.
+ */
+export const OWNER_ALERT_CTA_BODY = "עדכון בחשבון תורי: {{1}}. הפרטים המלאים בדשבורד.";
+export const OWNER_ALERT_CTA_EXAMPLE = ["נועה כהן מעוניינת בתספורת ביום שלישי"];
+export const OWNER_ALERT_CTA_BUTTON = { text: "פתיחת הדשבורד", url: DASHBOARD_URL };
+
+const DEFAULT_PAYMENT_DETAILS_NAME = "tori_payment_method";
+
+/**
+ * Asks the owner to complete their payment details.
+ *
+ * Unambiguously UTILITY, and worth being precise about why after the announcement templates were
+ * reclassified: Meta's line is not who the recipient is but what the message does. An announcement
+ * tells someone about a capability — marketing, however service-like the wording. This one asks
+ * for an action on the recipient's own account, with a consequence for that account if it is not
+ * taken. That is the definition of a utility message, and it is why this one carries a link that
+ * the announcement could not.
+ */
+export function paymentDetailsTemplate(): TemplateConfig {
+  return {
+    name: process.env.WHATSAPP_PAYMENT_DETAILS_TEMPLATE || DEFAULT_PAYMENT_DETAILS_NAME,
+    languageCode: DEFAULT_LANG,
+  };
+}
+
+/**
+ * {{1}} the business's name.
+ *
+ * Written the way a payment notice from Stripe or an AI vendor reads: state the fact, name the
+ * action, stop. Two sentences, no greeting warmth, no "it only takes a minute", no reassurance
+ * about where the card is stored — that belongs on the billing page where it can be read next to
+ * the form, not in a notification.
+ *
+ * No price, by decision: the prices are published and there is no quote in the loop. No deadline
+ * or consequence either — a threat the product does not carry out is both untrue and, in Meta's
+ * reading, promotional pressure on a utility message.
+ *
+ * The redundancy with the button is deliberate. Meta rejects a body that ends on a variable, and a
+ * closing clause naming the destination is the most useful thing that space can hold.
+ */
+export const PAYMENT_DETAILS_BODY =
+  "שלום {{1}}, בחשבון תורי שלכם לא נשמר אמצעי תשלום. ניתן להוסיף כרטיס אשראי בעמוד החיוב.";
+
+export const PAYMENT_DETAILS_EXAMPLE = ["מספרת רונית"];
+export const PAYMENT_DETAILS_BUTTON = { text: "הוספת אמצעי תשלום", url: `${DASHBOARD_URL}/billing` };
