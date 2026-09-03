@@ -267,7 +267,14 @@ function ConversationPanel({
                 )}
             </div>
             <div className="min-w-0">
-              <div className="text-sm font-semibold text-gray-900 truncate">{customer.name?.trim() || formatPhone(customer.phone)}</div>
+              {/* bdi, because the fallback is a phone number and this heading is not otherwise
+                  direction-isolated: formatPhone returns "(+972) 50-123-4567", and under dir=rtl
+                  the brackets mirror and the country code lands after the subscriber number —
+                  "50-123-4567 (972+)". The name branch needs no isolation but gets it harmlessly,
+                  and a customer named in Latin letters is steadier inside a bdi anyway. */}
+              <div className="text-sm font-semibold text-gray-900 truncate">
+                <bdi>{customer.name?.trim() || formatPhone(customer.phone)}</bdi>
+              </div>
               <button
                 onClick={() => { setEditOpen((v) => !v); setEditError(null); }}
                 className="text-xs text-gray-600 font-mono hover:text-[#145F78] transition flex items-center gap-1"

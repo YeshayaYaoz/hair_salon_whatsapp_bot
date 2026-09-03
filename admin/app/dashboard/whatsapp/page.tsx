@@ -659,7 +659,7 @@ export default function WhatsAppPage() {
             className="text-xs text-gray-600 hover:text-gray-700 transition underline underline-offset-2"
           >
             {showManual
-              ? (lang === "he" ? "← חזור לחיבור אוטומטי" : "← Back to automatic setup")
+              ? (lang === "he" ? "→ חזור לחיבור אוטומטי" : "← Back to automatic setup")
               : (lang === "he" ? "חיבור ידני (מפתחים)" : "Manual setup (developers)")}
           </button>
           {showManual && (
