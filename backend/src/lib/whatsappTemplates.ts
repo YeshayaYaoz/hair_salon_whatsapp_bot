@@ -415,12 +415,17 @@ export function paymentDetailsTemplate(): TemplateConfig {
 /**
  * {{1}} the business's name.
  *
- * No urgency language and no deadline invented: what is true is that the subscription cannot be
- * charged without card details, and the owner can fix it in a minute. A threat the product does
- * not actually carry out is both a lie and, in Meta's reading, promotional pressure.
+ * Shaped the way every large AI vendor does it: the card is stored, the prices are published, and
+ * there is no quote in the loop. So the message asks for one thing and does not negotiate — no
+ * figure, no plan comparison, no "talk to us". Naming a price here would also invite exactly the
+ * reply this template cannot receive, since a template opens no conversation the owner is in.
+ *
+ * No urgency language and no invented deadline either. What is true is that a card has not been
+ * saved and it takes a minute; a consequence the product does not actually carry out would be both
+ * a lie and, in Meta's reading, promotional pressure on a utility message.
  */
 export const PAYMENT_DETAILS_BODY =
-  "היי {{1}}, כדי להפעיל את המנוי בתורי חסרים פרטי התשלום בחשבון. אפשר להשלים אותם בקישור למטה — לוקח פחות מדקה, והפרטים נשמרים אצל חברת הסליקה ולא אצלנו.";
+  "היי {{1}}, נשאר רק לשמור אמצעי תשלום בחשבון תורי. המחירים מפורסמים באתר, והכרטיס נשמר אצל חברת הסליקה ולא אצלנו. שמירה בקישור למטה, פחות מדקה.";
 
 export const PAYMENT_DETAILS_EXAMPLE = ["מספרת רונית"];
 export const PAYMENT_DETAILS_BUTTON = { text: "השלמת פרטי תשלום", url: `${DASHBOARD_URL}/billing` };
