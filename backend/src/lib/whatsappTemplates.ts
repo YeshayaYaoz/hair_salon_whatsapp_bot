@@ -367,7 +367,7 @@ export const ANNOUNCE_UTILITY_TEMPLATE_BUTTON = {
 
 const DASHBOARD_URL = `${(process.env.APP_URL ?? "https://torionline.com").replace(/\/$/, "")}/dashboard`;
 
-const DEFAULT_OWNER_ALERT_CTA_NAME = "tori_owner_alert_cta";
+const DEFAULT_OWNER_ALERT_CTA_NAME = "tori_account_update";
 
 /**
  * The owner alert again, with a button.
@@ -397,11 +397,11 @@ export function ownerAlertCtaTemplate(): TemplateConfig {
  * the actual way in; the original spent a whole sentence telling the owner to go and find the
  * dashboard themselves.
  */
-export const OWNER_ALERT_CTA_BODY = "עדכון חדש מתורי: {{1}}. הפרטים המלאים בדשבורד.";
+export const OWNER_ALERT_CTA_BODY = "עדכון בחשבון תורי: {{1}}. הפרטים המלאים בדשבורד.";
 export const OWNER_ALERT_CTA_EXAMPLE = ["נועה כהן מעוניינת בתספורת ביום שלישי"];
 export const OWNER_ALERT_CTA_BUTTON = { text: "פתיחת הדשבורד", url: DASHBOARD_URL };
 
-const DEFAULT_PAYMENT_DETAILS_NAME = "tori_payment_details";
+const DEFAULT_PAYMENT_DETAILS_NAME = "tori_payment_method";
 
 /**
  * Asks the owner to complete their payment details.
@@ -423,17 +423,20 @@ export function paymentDetailsTemplate(): TemplateConfig {
 /**
  * {{1}} the business's name.
  *
- * Shaped the way every large AI vendor does it: the card is stored, the prices are published, and
- * there is no quote in the loop. So the message asks for one thing and does not negotiate — no
- * figure, no plan comparison, no "talk to us". Naming a price here would also invite exactly the
- * reply this template cannot receive, since a template opens no conversation the owner is in.
+ * Written the way a payment notice from Stripe or an AI vendor reads: state the fact, name the
+ * action, stop. Two sentences, no greeting warmth, no "it only takes a minute", no reassurance
+ * about where the card is stored — that belongs on the billing page where it can be read next to
+ * the form, not in a notification.
  *
- * No urgency language and no invented deadline either. What is true is that a card has not been
- * saved and it takes a minute; a consequence the product does not actually carry out would be both
- * a lie and, in Meta's reading, promotional pressure on a utility message.
+ * No price, by decision: the prices are published and there is no quote in the loop. No deadline
+ * or consequence either — a threat the product does not carry out is both untrue and, in Meta's
+ * reading, promotional pressure on a utility message.
+ *
+ * The redundancy with the button is deliberate. Meta rejects a body that ends on a variable, and a
+ * closing clause naming the destination is the most useful thing that space can hold.
  */
 export const PAYMENT_DETAILS_BODY =
-  "היי {{1}}, נשאר רק לשמור אמצעי תשלום בחשבון תורי. המחירים מפורסמים באתר, והכרטיס נשמר אצל חברת הסליקה ולא אצלנו. שמירה בקישור למטה, פחות מדקה.";
+  "שלום {{1}}, בחשבון תורי שלכם לא נשמר אמצעי תשלום. ניתן להוסיף כרטיס אשראי בעמוד החיוב.";
 
 export const PAYMENT_DETAILS_EXAMPLE = ["מספרת רונית"];
-export const PAYMENT_DETAILS_BUTTON = { text: "השלמת פרטי תשלום", url: `${DASHBOARD_URL}/billing` };
+export const PAYMENT_DETAILS_BUTTON = { text: "הוספת אמצעי תשלום", url: `${DASHBOARD_URL}/billing` };
