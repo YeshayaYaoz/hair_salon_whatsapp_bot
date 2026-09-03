@@ -1,5 +1,5 @@
 /**
- * Resubmits a business's four templates to its WABA.
+ * Resubmits a business's templates to its WABA.
  *
  * Usage (from backend/, against the environment holding the database):
  *   railway run npx tsx scripts/resubmit-templates.ts --list
@@ -19,7 +19,13 @@
 import { prisma } from "../src/lib/prisma.js";
 import { submitWhatsAppTemplates } from "../src/lib/submitTemplates.js";
 import { decryptSecret } from "../src/lib/crypto.js";
-import { wordingFor, OWNER_ALERT_TEXT } from "../src/lib/whatsappTemplates.js";
+import {
+  wordingFor,
+  OWNER_ALERT_TEXT,
+  OWNER_ALERT_CTA_BODY,
+  OWNER_ALERT_CTA_EXAMPLE,
+  OWNER_ALERT_CTA_BUTTON,
+} from "../src/lib/whatsappTemplates.js";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -62,17 +68,22 @@ async function main() {
   console.log(`${business.name} — type ${business.businessType ?? "unset"} — WABA ${business.whatsappWabaId ?? "(will be resolved)"}\n`);
   // Printed before sending, because an approved template's wording cannot be edited afterwards —
   // only deleted and resubmitted, at another review cycle.
+  // Every template submitWhatsAppTemplates files, not a subset. The list here drifted behind it
+  // once already — the preview said four while five were sent — and a preview that under-reports
+  // is worse than none, since it is read as the complete answer to "what am I about to submit".
   for (const [label, t] of [
     ["reminder", wording.reminder],
     ["review", wording.review],
     ["confirmation", wording.confirmation],
     ["owner alert", OWNER_ALERT_TEXT],
+    ["owner alert (button)", { body: OWNER_ALERT_CTA_BODY, example: OWNER_ALERT_CTA_EXAMPLE }],
   ] as const) {
     let filled = t.body;
     t.example.forEach((v, i) => (filled = filled.replace(`{{${i + 1}}}`, v)));
     console.log(`  ${label}:`);
     console.log(`    ${filled}`);
   }
+  console.log(`    button: [${OWNER_ALERT_CTA_BUTTON.text}] → ${OWNER_ALERT_CTA_BUTTON.url}`);
   console.log("");
 
   if (!has("confirm")) {
