@@ -826,7 +826,7 @@ function CampaignDetailView({
 
   return (
     <>
-      <button onClick={onBack} className="text-sm text-gray-600 mb-4 hover:text-gray-800">← חזרה לקמפיינים</button>
+      <button onClick={onBack} className="text-sm text-gray-600 mb-4 hover:text-gray-800">→ חזרה לקמפיינים</button>
 
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -1357,7 +1357,7 @@ function LeadDetailView({ leadId, onBack }: { leadId: string; onBack: () => void
   if (!lead) {
     return (
       <>
-        <button onClick={onBack} className="text-sm text-gray-600 mb-4 hover:text-gray-800">← חזרה</button>
+        <button onClick={onBack} className="text-sm text-gray-600 mb-4 hover:text-gray-800">→ חזרה</button>
         {error ? <div className="text-red-600 text-sm">{error}</div> : <div className="text-gray-600 text-sm">טוען…</div>}
       </>
     );
@@ -1367,7 +1367,7 @@ function LeadDetailView({ leadId, onBack }: { leadId: string; onBack: () => void
 
   return (
     <>
-      <button onClick={onBack} className="text-sm text-gray-600 mb-4 hover:text-gray-800">← חזרה לקמפיין</button>
+      <button onClick={onBack} className="text-sm text-gray-600 mb-4 hover:text-gray-800">→ חזרה לקמפיין</button>
 
       <div className="mb-6 flex items-start justify-between flex-wrap gap-3">
         <div>

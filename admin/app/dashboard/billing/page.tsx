@@ -170,7 +170,10 @@ function SavingsSummary({
         <span className="w-8 h-8 rounded-lg bg-[#1B7FA0]/10 flex items-center justify-center text-base flex-shrink-0" aria-hidden>📈</span>
         <h2 className="text-sm font-semibold text-gray-900">{he ? "החיסכון שלך" : "Your savings"}</h2>
       </div>
-      <p className="text-xs text-gray-600 mb-5 mr-10">
+      {/* ms, not mr: this line is indented to sit under the heading, past the w-8 icon and its gap.
+          A physical right margin does that in Hebrew and the exact opposite in English, where the
+          icon is on the left and the text ends up pushed away from it. */}
+      <p className="text-xs text-gray-600 mb-5 ms-10">
         {he
           ? `לפי ${confirmedThisMonth} תורים שנקבעו החודש, במחיר ממוצע של ₪${Math.round(avgPrice)}`
           : `Based on ${confirmedThisMonth} bookings this month, averaging ₪${Math.round(avgPrice)}`}
@@ -611,12 +614,12 @@ export default function BillingPage() {
                   }`}
                 >
                   {p === "premium" && (
-                    <span className="absolute -top-2.5 right-5 bg-[#B45309] text-white text-[10px] font-bold px-2.5 py-1 rounded-full tracking-wide">
+                    <span className="absolute -top-2.5 start-5 bg-[#B45309] text-white text-[10px] font-bold px-2.5 py-1 rounded-full tracking-wide">
                       {lang === "he" ? "הכי פופולרי" : "MOST POPULAR"}
                     </span>
                   )}
                   {isCurrent && (
-                    <span className="absolute -top-2.5 left-5 bg-green-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full tracking-wide">
+                    <span className="absolute -top-2.5 end-5 bg-green-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full tracking-wide">
                       {lang === "he" ? "התוכנית שלך" : "YOUR PLAN"}
                     </span>
                   )}
@@ -710,7 +713,7 @@ export default function BillingPage() {
               worth it" at a glance. */}
           <div className={`relative rounded-xl p-5 overflow-hidden ${billingCycle === "annual" ? "bg-white border border-gray-200" : "bg-gradient-to-br from-[#1B7FA0] to-[#155F79] border border-[#1B7FA0]"}`}>
             {billingCycle !== "annual" && (
-              <span className="absolute top-3 left-3 bg-[#B45309] text-white text-[10px] font-bold px-2.5 py-1 rounded-full tracking-wide">
+              <span className="absolute top-3 end-3 bg-[#B45309] text-white text-[10px] font-bold px-2.5 py-1 rounded-full tracking-wide">
                 {lang === "he" ? "חודשיים מתנה" : "2 MONTHS FREE"}
               </span>
             )}
