@@ -17,6 +17,10 @@ on:
         description: "Template to send — pick a UTILITY one to test against a MARKETING opt-out"
         type: string
         default: "tori_owner_alert"
+      test_param:
+        description: "Text for the template's {{1}} — one line, no newlines (Meta rejects them)"
+        type: string
+        default: "בדיקת מסירה"
       project:
         description: "Railway project (as `railway status` prints it)"
         type: string
@@ -56,4 +60,4 @@ jobs:
         run: |
           railway run --service "$SERVICE" --environment "$RAILWAY_ENVIRONMENT" -- \
             npx tsx scripts/send-test-template.ts \
-              --to "${{ inputs.test_to }}" --template "${{ inputs.test_template }}" --param "בדיקת מסירה"
+              --to "${{ inputs.test_to }}" --template "${{ inputs.test_template }}" --param "${{ inputs.test_param }}"
