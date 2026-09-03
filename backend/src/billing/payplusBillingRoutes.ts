@@ -118,6 +118,43 @@ payplusBillingRouter.get("/payplus/health", requireAuth, requireSuperAdmin, asyn
           `אבל אם המספר לא יורד אחרי הריצה הבאה — Token/View נכשל וצריך לבדוק את זה`,
   });
 
+  // Active, on a plan, and no card on file at all — so the next renewal has nothing to charge.
+  // Distinct from the row above: there the card exists and is merely missing its customer_uid,
+  // which the nightly job repairs by itself. Here there is nothing to repair, and only the owner
+  // can fix it by entering a card. The job now duns these instead of passing over them, so the
+  // owner is told — but this is where it is visible before their renewal date arrives.
+  const noCardBusinesses = await prisma.business.findMany({
+    where: { subscriptionStatus: "active", subscriptionPlan: { not: null }, subscriptionToken: null },
+    select: { name: true, nextBillingDate: true },
+    orderBy: { nextBillingDate: "asc" },
+    take: 10,
+  });
+  const noCardCount = await prisma.business.count({
+    where: { subscriptionStatus: "active", subscriptionPlan: { not: null }, subscriptionToken: null },
+  });
+  checks.push({
+    name: "מנויים פעילים עם אמצעי תשלום",
+    ok: noCardCount === 0,
+    detail:
+      noCardCount === 0
+        ? "לכל מנוי פעיל יש כרטיס שמור לחידוש"
+        : `ל-${noCardCount} מנויים פעילים אין כרטיס שמור, כך שהחידוש שלהם לא ייגבה: ` +
+          noCardBusinesses
+            .map(
+              (b) =>
+                `${b.name}${
+                  b.nextBillingDate
+                    ? // Explicit zone, not toISOString().slice(0,10): the server runs UTC, and a
+                      // renewal dated the 1st at 01:00 Israel time would otherwise be shown as the
+                      // previous month.
+                      ` (${b.nextBillingDate.toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem", day: "numeric", month: "numeric", year: "numeric" })})`
+                    : ""
+                }`
+            )
+            .join(", ") +
+          (noCardCount > noCardBusinesses.length ? ` ועוד ${noCardCount - noCardBusinesses.length}` : ""),
+  });
+
   // What actually happened on the last callback — the webhook records every hop of the token
   // capture, so "paid and the card still was not saved" is diagnosable from this page instead of
   // from production logs.
@@ -627,11 +664,16 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
     // 200 was already acknowledged above, so this costs the caller nothing. Retried with a pause:
     // the callback fires at transaction time and nothing promises the stored card is listable in
     // the same instant.
-    if (!event.tokenUid && event.terminalUid && event.customerUid) {
+    // The terminal belongs to our PayPlus account, not to this transaction, so a callback that
+    // omits it is no reason to abandon the lookup — the configured or previously captured one is
+    // the same terminal. Only customer_uid is genuinely per-payer and irreplaceable here.
+    const lookupTerminal = event.terminalUid ?? (await resolveTerminalConfig()).terminalUid;
+    debug.terminalViaConfig = !event.terminalUid && Boolean(lookupTerminal);
+    if (!event.tokenUid && lookupTerminal && event.customerUid) {
       for (let attempt = 0; attempt <= TOKEN_LIST_RETRY_DELAYS_MS.length; attempt++) {
         if (attempt > 0) await new Promise((r) => setTimeout(r, TOKEN_LIST_RETRY_DELAYS_MS[attempt - 1]));
         try {
-          const lookup = await lookupCustomerTokens(event.terminalUid, event.customerUid);
+          const lookup = await lookupCustomerTokens(lookupTerminal, event.customerUid);
           debug.tokenListCount = lookup.count;
           debug.tokenListError = lookup.error ?? null;
           if (lookup.token) {

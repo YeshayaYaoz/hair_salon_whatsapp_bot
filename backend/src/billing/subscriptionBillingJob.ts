@@ -80,9 +80,15 @@ export async function runSubscriptionBillingJob(): Promise<void> {
   const due = await prisma.business.findMany({
     where: {
       subscriptionStatus: "active",
-      subscriptionToken: { not: null },
       subscriptionPlan: { not: null },
       nextBillingDate: { lte: now },
+      // Deliberately NOT filtered on subscriptionToken. It used to be, and that made a whole class
+      // of unbillable subscription invisible: active, on a plan, due weeks ago, no saved card, and
+      // never selected here — so no charge, no failure, no dunning, no notice to anyone. A business
+      // can reach that state legitimately (activated by hand, or a checkout whose callback carried
+      // no token and whose Token/List recovery came up empty). Money was owed and nobody was told.
+      // Now they are selected and run through the same dunning ladder as a declined card, which is
+      // what this is: a charge that cannot be collected.
     },
     select: {
       id: true, name: true, subscriptionToken: true, subscriptionCustomerUid: true, subscriptionPlan: true, billingCycle: true,
@@ -111,29 +117,39 @@ export async function runSubscriptionBillingJob(): Promise<void> {
     }
     const couponOff = couponDiscountForCharge(business) * periodMultiplier;
 
-    const token = decryptSecret(business.subscriptionToken!);
+    const token = business.subscriptionToken ? decryptSecret(business.subscriptionToken) : null;
 
-    // A card stored before customer_uid was persisted next to it leaves the row holding half of
-    // what Transactions/Charge requires. Recover the missing half from the token rather than
-    // failing the renewal and asking a paying customer to enter their card again — and store it,
-    // so this costs one extra request per stranded business exactly once.
-    let customerUid = business.subscriptionCustomerUid ?? undefined;
-    if (!customerUid) {
-      customerUid = await fetchCustomerUidForToken(token);
-      if (customerUid) {
-        await prisma.business.update({ where: { id: business.id }, data: { subscriptionCustomerUid: customerUid } });
-        console.log(`[subscriptionBilling] Recovered customer_uid for business ${business.id} from its saved token`);
-      } else {
-        console.warn(`[subscriptionBilling] Business ${business.id} has a token but no customer_uid, and Token/View could not supply one`);
+    let result: { success: boolean; error?: string };
+    if (!token) {
+      // Nothing to charge with. Reported as a failure rather than skipped, so it travels down the
+      // dunning path below and the owner actually hears about it.
+      result = { success: false, error: "no-saved-card" };
+      console.error(
+        `[subscriptionBilling] ${business.id} (${business.name}) is due ₪${fmtIls(amountIls)} but has no saved card — dunning instead of charging`
+      );
+    } else {
+      // A card stored before customer_uid was persisted next to it leaves the row holding half of
+      // what Transactions/Charge requires. Recover the missing half from the token rather than
+      // failing the renewal and asking a paying customer to enter their card again — and store it,
+      // so this costs one extra request per stranded business exactly once.
+      let customerUid = business.subscriptionCustomerUid ?? undefined;
+      if (!customerUid) {
+        customerUid = await fetchCustomerUidForToken(token);
+        if (customerUid) {
+          await prisma.business.update({ where: { id: business.id }, data: { subscriptionCustomerUid: customerUid } });
+          console.log(`[subscriptionBilling] Recovered customer_uid for business ${business.id} from its saved token`);
+        } else {
+          console.warn(`[subscriptionBilling] Business ${business.id} has a token but no customer_uid, and Token/View could not supply one`);
+        }
       }
-    }
 
-    const result = await chargeSubscriptionToken(
-      token,
-      amountIls,
-      `תורי — חיוב ${business.billingCycle === "annual" ? "שנתי" : "חודשי"} (${business.name})`,
-      customerUid
-    );
+      result = await chargeSubscriptionToken(
+        token,
+        amountIls,
+        `תורי — חיוב ${business.billingCycle === "annual" ? "שנתי" : "חודשי"} (${business.name})`,
+        customerUid
+      );
+    }
 
     if (result.success) {
       // Loyalty discount: only tracked for monthly billing — award it once tenure crosses the
@@ -193,11 +209,19 @@ export async function runSubscriptionBillingJob(): Promise<void> {
           (givingUp ? " — giving up, marked past_due" : ` — retrying in ${retryInDays} days`)
       );
 
+      // "The charge didn't go through" would be misleading when there was never a card to charge —
+      // the owner would go looking at their bank for a decline that never happened. Say what is
+      // actually missing, and ask for the one thing that fixes it.
+      const noCard = !token;
       await notifyOwner(
         business,
-        givingUp
-          ? `⚠️ החיוב עבור תורי (₪${fmtIls(amountIls)}) נכשל שוב והבוט נעצר. כדי להפעיל מחדש, עדכנו אמצעי תשלום: ${FRONTEND_URL}/dashboard/billing`
-          : `⚠️ החיוב עבור תורי (₪${fmtIls(amountIls)}) לא עבר. הבוט ממשיך לעבוד כרגיל — ננסה שוב בעוד ${retryInDays} ימים. אם תרצו, אפשר לעדכן אמצעי תשלום כבר עכשיו: ${FRONTEND_URL}/dashboard/billing`
+        noCard
+          ? givingUp
+            ? `⚠️ אין אמצעי תשלום שמור לתורי, והחיוב של ₪${fmtIls(amountIls)} לא נגבה — הבוט נעצר. להוספת כרטיס והפעלה מחדש: ${FRONTEND_URL}/dashboard/billing`
+            : `⚠️ אין אמצעי תשלום שמור לתורי, כך שהחיוב של ₪${fmtIls(amountIls)} לא נגבה. הבוט ממשיך לעבוד כרגיל — נבדוק שוב בעוד ${retryInDays} ימים. להוספת כרטיס: ${FRONTEND_URL}/dashboard/billing`
+          : givingUp
+            ? `⚠️ החיוב עבור תורי (₪${fmtIls(amountIls)}) נכשל שוב והבוט נעצר. כדי להפעיל מחדש, עדכנו אמצעי תשלום: ${FRONTEND_URL}/dashboard/billing`
+            : `⚠️ החיוב עבור תורי (₪${fmtIls(amountIls)}) לא עבר. הבוט ממשיך לעבוד כרגיל — ננסה שוב בעוד ${retryInDays} ימים. אם תרצו, אפשר לעדכן אמצעי תשלום כבר עכשיו: ${FRONTEND_URL}/dashboard/billing`
       );
       // Only worth waking the operator when the account has actually stopped. The intermediate
       // retries are routine and would just train us to ignore the alert.
