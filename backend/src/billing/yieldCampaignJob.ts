@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
+import { notifyOwner } from "../lib/ownerNotify.js";
 import { instantPartsInTz, zonedDateParts, zonedWallTimeToUtc } from "../lib/timezone.js";
 import { SLOT_BLOCKING_STATUSES } from "../booking/availability.js";
 
@@ -110,8 +111,15 @@ async function scanBusiness(
 
   const text = `היי 👋 זיהיתי שמחר יש לך ${emptySlots} מקומות פנויים ביומן.\nרוצה שאשלח הצעה ל-${candidates.length} לקוחות שלא היו אצלך מעל ${LAPSED_DAYS} יום, עם ${DEFAULT_DISCOUNT_PERCENT}% הנחה אם יגיעו מחר?\n\nיש לענות "כן" כדי לשלוח, או "לא" כדי לדלג.`;
 
-  const accessToken = decryptSecret(biz.whatsappAccessToken!);
-  await sendWhatsAppMessage({ phoneNumberId: biz.whatsappPhoneNumberId!, accessToken, to: biz.notificationPhone!, text });
+  // Through the shared owner path — a free-form send here is dropped whenever the owner's 24-hour
+  // window is shut, and this message asks a question ("reply yes to send"), so a silent loss looks
+  // to us like an owner who declined.
+  if (!(await notifyOwner(biz.id, text))) {
+    console.error(`[yieldCampaign] Could not reach business ${biz.id} — not storing a pending campaign`);
+    return;
+  }
+  // Only stored once the owner has actually been asked: a pending campaign nobody was told about
+  // would sit there waiting for a "yes" that cannot come.
   await prisma.business.update({ where: { id: biz.id }, data: { pendingYieldCampaign: campaign as any } });
   console.log(`[yieldCampaign] Proposed campaign to business ${biz.id}: ${candidates.length} candidates, ${emptySlots} empty slots`);
 }

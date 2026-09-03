@@ -1,6 +1,5 @@
 import { prisma } from "../lib/prisma.js";
-import { decryptSecret } from "../lib/crypto.js";
-import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
+import { notifyOwner } from "../lib/ownerNotify.js";
 import { subscriptionChargeIls } from "./subscriptionAmount.js";
 import { fmtIls } from "../lib/money.js";
 
@@ -50,8 +49,13 @@ export async function runBillingReminderJob(): Promise<void> {
     const text = `היי! תזכורת קלה: מחרתיים יתבצע החיוב ה${business.billingCycle === "annual" ? "שנתי" : "חודשי"} עבור תורי על סך ₪${fmtIls(amountIls)}. תודה שאתם איתנו! 🙏`;
 
     try {
-      const accessToken = decryptSecret(business.whatsappAccessToken!);
-      await sendWhatsAppMessage({ phoneNumberId: business.whatsappPhoneNumberId!, accessToken, to: business.notificationPhone!, text });
+      // Through the shared owner path: a bare free-form send is accepted by Meta and dropped when
+      // the owner's 24-hour window is shut, and this is the notice whose whole purpose is to reach
+      // someone before money leaves their account.
+      if (!(await notifyOwner(business.id, text))) {
+        console.error(`[billingReminder] Could not deliver pre-charge notice to business ${business.id}`);
+        continue;
+      }
       await prisma.business.update({ where: { id: business.id }, data: { lastBillingReminderSentAt: now } });
       console.log(`[billingReminder] Sent pre-charge notice to business ${business.id}`);
     } catch (err) {
