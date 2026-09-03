@@ -388,8 +388,16 @@ export function ownerAlertCtaTemplate(): TemplateConfig {
   };
 }
 
-/** {{1}} the alert itself. Opens with text so the body does not start on a variable. */
-export const OWNER_ALERT_CTA_BODY = "יש לך עדכון חדש בתורי: {{1}}";
+/**
+ * {{1}} the alert itself.
+ *
+ * Text on BOTH sides of the parameter. Meta rejects a body that starts or ends on a variable, and
+ * a first attempt here ended on one and was refused — the same trap the original owner alert was
+ * already shaped around. The closing line is kept to four words because the button underneath is
+ * the actual way in; the original spent a whole sentence telling the owner to go and find the
+ * dashboard themselves.
+ */
+export const OWNER_ALERT_CTA_BODY = "עדכון חדש מתורי: {{1}}. הפרטים המלאים בדשבורד.";
 export const OWNER_ALERT_CTA_EXAMPLE = ["נועה כהן מעוניינת בתספורת ביום שלישי"];
 export const OWNER_ALERT_CTA_BUTTON = { text: "פתיחת הדשבורד", url: DASHBOARD_URL };
 
