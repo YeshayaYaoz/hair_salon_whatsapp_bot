@@ -1,0 +1,50 @@
+name: Read WhatsApp delivery failures
+
+# Pulls the backend's recent logs and shows only the delivery-failure lines.
+#
+# These are the verdict the send endpoint cannot give: Meta returns 200 and a message id, then
+# reports the real outcome asynchronously on the status webhook. recordWhatsAppBillingStatuses
+# already logs every `failed` status with Meta's error code — this just reads them back, so
+# "did that broadcast actually arrive" stops being a matter of inference.
+#
+# Read-only. Railway keeps logs per deployment, so a restart since the send means there is nothing
+# left to find — an empty result is "no evidence", not "no failures".
+on:
+  workflow_dispatch:
+    inputs:
+      lines:
+        description: "How many recent log lines to scan"
+        type: string
+        default: "5000"
+      project:
+        description: "Railway project (as `railway status` prints it)"
+        type: string
+        default: "Tori"
+
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+      SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+      PROJECT: ${{ inputs.project }}
+      LINES: ${{ inputs.lines }}
+    steps:
+      - run: npm i -g @railway/cli
+      - run: railway link --project "$PROJECT" --environment "$RAILWAY_ENVIRONMENT" || true
+
+      - name: Delivery failures
+        run: |
+          # `railway logs` streams; --json plus a line cap keeps it bounded and parseable.
+          railway logs --service "$SERVICE" --environment "$RAILWAY_ENVIRONMENT" --json 2>/dev/null \
+            | head -n "$LINES" > /tmp/logs.json || true
+
+          echo "Scanned $(wc -l < /tmp/logs.json) log line(s)."
+          echo ""
+          echo "Delivery failures reported by Meta's status webhook:"
+          # The message recordWhatsAppBillingStatuses prints, with Meta's numeric error code.
+          grep -i "delivery failed\|FAILED:" /tmp/logs.json | head -60 || true
+          echo ""
+          echo "Status callbacks seen at all (is the webhook even reaching us):"
+          grep -ci "whatsapp webhook" /tmp/logs.json || echo "0"
