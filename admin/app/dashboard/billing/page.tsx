@@ -208,25 +208,31 @@ function SavingsSummary({
 }
 
 /**
- * Confirms a plan change that will charge a card immediately.
+ * Confirms anything that will charge the saved card the moment it is clicked.
  *
- * Says the direction, the new monthly price, and — for an upgrade — that a prorated amount is
- * charged now. It deliberately does not name that amount: the server computes it from the days
- * left in the period, and a number invented here to look helpful would be wrong often enough to
- * be worse than the honest sentence.
+ * Three actions on this page do that — changing plan, topping up the wallet, and switching to
+ * annual — and none of them had a step in between. An active subscriber with a card on file gets
+ * no payment page, no PayPlus email first, nothing to abandon: the click is the purchase. Switching
+ * to annual is the sharpest case, since it takes ten months at once.
+ *
+ * Generic rather than one dialog per action, because the thing being confirmed is the same in all
+ * three: money leaves now, this is how much, here is what you get. `amount` is omitted where the
+ * server computes it from days remaining — a figure invented in the browser to look helpful would
+ * be wrong often enough to be worse than saying plainly that it is prorated.
  */
-function PlanChangeDialog({
-  lang, from, to, onCancel, onConfirm, busy,
+function ConfirmChargeDialog({
+  lang, title, body, amountIls, confirmLabel, onCancel, onConfirm, busy,
 }: {
   lang: "he" | "en";
-  from: PlanKey;
-  to: PlanKey;
+  title: string;
+  body: string;
+  amountIls?: number;
+  confirmLabel: string;
   onCancel: () => void;
   onConfirm: () => void;
   busy: boolean;
 }) {
   const he = lang === "he";
-  const isUpgrade = PLAN_PRICES[to] > PLAN_PRICES[from];
   const panelRef = useDialog<HTMLDivElement>(onCancel);
 
   return (
@@ -235,27 +241,18 @@ function PlanChangeDialog({
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="plan-change-title"
+        aria-labelledby="confirm-charge-title"
         onClick={(e) => e.stopPropagation()}
         className="bg-white rounded-xl border border-gray-200 shadow-xl max-w-md w-full p-6"
       >
-        <h2 id="plan-change-title" className="text-base font-bold text-gray-900">
-          {isUpgrade
-            ? he ? `לשדרג ל-${PLAN_LABEL[to]}?` : `Upgrade to ${PLAN_LABEL[to]}?`
-            : he ? `לעבור ל-${PLAN_LABEL[to]}?` : `Switch to ${PLAN_LABEL[to]}?`}
-        </h2>
-        <p className="text-sm text-gray-600 mt-2 leading-relaxed">
-          {he
-            ? `המסלול ישתנה מ-${PLAN_LABEL[from]} ל-${PLAN_LABEL[to]}, ומהחיוב הבא תשלמו ₪${fmtIls(PLAN_PRICES[to])} לחודש.`
-            : `Your plan changes from ${PLAN_LABEL[from]} to ${PLAN_LABEL[to]}, and from your next bill you pay ₪${fmtIls(PLAN_PRICES[to])} a month.`}
-        </p>
-        {isUpgrade && (
-          // The part worth stopping for: this one takes money now, from the card already on file.
-          <p className="text-sm text-gray-900 font-medium mt-2 leading-relaxed">
-            {he
-              ? "בנוסף יתבצע חיוב יחסי עכשיו, בכרטיס השמור, עבור יתרת התקופה הנוכחית."
-              : "A prorated amount for the rest of the current period is charged now, to your saved card."}
-          </p>
+        <h2 id="confirm-charge-title" className="text-base font-bold text-gray-900">{title}</h2>
+        <p className="text-sm text-gray-600 mt-2 leading-relaxed">{body}</p>
+        {amountIls !== undefined && (
+          // The number, on its own line, in the size that matches its consequence.
+          <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mt-3 flex items-baseline justify-between">
+            <span className="text-xs text-gray-600">{he ? "יחויב עכשיו" : "Charged now"}</span>
+            <span className="text-xl font-extrabold text-gray-900 tabular-nums">₪{fmtIls(amountIls)}</span>
+          </div>
         )}
         <div className="flex gap-2 justify-end mt-5">
           <button
@@ -271,11 +268,7 @@ function PlanChangeDialog({
             disabled={busy}
             className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
           >
-            {busy
-              ? he ? "מחייב…" : "Charging…"
-              : isUpgrade
-                ? he ? "אישור ושדרוג" : "Confirm & upgrade"
-                : he ? "אישור ומעבר" : "Confirm & switch"}
+            {busy ? (he ? "מחייב…" : "Charging…") : confirmLabel}
           </button>
         </div>
       </div>
@@ -313,16 +306,22 @@ export default function BillingPage() {
   const [bookingStats, setBookingStats] = useState<{ confirmedThisMonth: number; revenueThisMonth: number } | null>(null);
   const [hasPaymentMethod, setHasPaymentMethod] = useState<boolean | null>(null);
   const [cardLoading, setCardLoading] = useState(false);
-  // The plan the owner clicked and has not confirmed yet. Null means no dialog is open.
+  // Whichever instant charge is waiting to be confirmed. Null means no dialog is open.
   const [pendingPlan, setPendingPlan] = useState<PlanKey | null>(null);
+  const [confirming, setConfirming] = useState<"annual" | "topup" | null>(null);
+  // A downgrade already armed for the next renewal, and when that renewal is.
+  const [scheduledPlan, setScheduledPlan] = useState<PlanKey | null>(null);
+  const [nextBillingDate, setNextBillingDate] = useState<string | null>(null);
 
   async function load() {
     const me = await apiFetch<{
       subscriptionStatus: string; whatsappConnected: boolean; createdAt: string;
       subscriptionPlan?: string | null; billingCycle?: string; loyaltyDiscountIls?: number; walletBalanceAgorot?: number;
-      hasPaymentMethod?: boolean;
+      hasPaymentMethod?: boolean; scheduledPlan?: string | null; nextBillingDate?: string | null;
     }>("/api/business/me");
     setHasPaymentMethod(me.hasPaymentMethod ?? false);
+    setScheduledPlan((PLANS as string[]).includes(me.scheduledPlan ?? "") ? (me.scheduledPlan as PlanKey) : null);
+    setNextBillingDate(me.nextBillingDate ?? null);
     setStatus(me.subscriptionStatus);
     setWhatsappConnected(me.whatsappConnected);
     setCreatedAt(me.createdAt);
@@ -343,8 +342,25 @@ export default function BillingPage() {
     load();
   }, []);
 
+  /**
+   * Both of these charge the saved card outright, so both ask first.
+   *
+   * Only when a card is actually saved: with no token each falls back to a hosted PayPlus page,
+   * which is its own confirmation step and shows the amount before anything is taken.
+   */
+  function requestAnnual() {
+    if (!hasPaymentMethod) return switchToAnnual();
+    setConfirming("annual");
+  }
+
+  function requestTopUp() {
+    if (!hasPaymentMethod) return topUpWallet();
+    setConfirming("topup");
+  }
+
   async function switchToAnnual() {
     setError(null);
+    setConfirming(null);
     setAnnualLoading(true);
     try {
       // A business with a saved card is charged on the spot; one without gets a hosted PayPlus
@@ -396,6 +412,7 @@ export default function BillingPage() {
 
   async function topUpWallet() {
     setError(null);
+    setConfirming(null);
     setTopupLoading(true);
     try {
       const result = await apiFetch<{ walletBalanceAgorot?: number; url?: string }>("/api/billing/payplus/wallet/topup", {
@@ -493,17 +510,31 @@ export default function BillingPage() {
     if (status !== "active" || !currentPlan) return; // just a pre-checkout selection, nothing to charge yet
     setCheckoutLoading(true);
     try {
-      const result = await apiFetch<{ ok: boolean; proratedChargeIls?: number }>("/api/billing/payplus/plan", {
+      const result = await apiFetch<{
+        ok: boolean; proratedChargeIls?: number; scheduledPlan?: string; scheduledFor?: string; scheduledPlanCancelled?: boolean;
+      }>("/api/billing/payplus/plan", {
         method: "PUT",
         body: JSON.stringify({ plan: newPlan }),
       });
-      setCurrentPlan(newPlan);
+      // Re-read rather than patching state by hand: a downgrade leaves subscriptionPlan alone and
+      // sets scheduledPlan instead, so guessing here would show the wrong plan as current.
+      await load();
       if (result.proratedChargeIls) {
         setNotice(
           lang === "he"
             ? `חויבת ₪${result.proratedChargeIls} עבור יתרת התקופה`
             : `Charged ₪${result.proratedChargeIls} for the remainder of this period`
         );
+      }
+      if (result.scheduledPlan && result.scheduledFor) {
+        setNotice(
+          lang === "he"
+            ? `המעבר ל-${PLAN_LABEL[newPlan]} נקבע ל-${new Date(result.scheduledFor).toLocaleDateString("he-IL")}. עד אז שום דבר לא משתנה.`
+            : `The move to ${PLAN_LABEL[newPlan]} is set for ${new Date(result.scheduledFor).toLocaleDateString("en-GB")}. Nothing changes until then.`
+        );
+      }
+      if (result.scheduledPlanCancelled) {
+        setNotice(lang === "he" ? "המעבר בוטל — המסלול נשאר כפי שהוא." : "The scheduled change is cancelled — your plan stays as it is.");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not change plan");
@@ -633,6 +664,26 @@ export default function BillingPage() {
                     <span className="text-xs text-gray-600">{lang === "he" ? "/חודש" : "/month"}</span>
                   </div>
                 </div>
+                {/* A change armed for the next renewal, and the way out of it. Without this the
+                    only trace of a scheduled downgrade was a toast the owner saw once — and the
+                    plan card would keep showing the old tier, correctly but confusingly, for up to
+                    a year on an annual term. */}
+                {scheduledPlan && scheduledPlan !== activePlan && (
+                  <p className="text-xs font-medium text-amber-700 mt-1">
+                    📅 {lang === "he"
+                      ? `מעבר ל-${PLAN_LABEL[scheduledPlan]} ${nextBillingDate ? `ב-${new Date(nextBillingDate).toLocaleDateString("he-IL")}` : "בחידוש הבא"}. עד אז ${PLAN_LABEL[activePlan]} ממשיך כרגיל.`
+                      : `Moving to ${PLAN_LABEL[scheduledPlan]} ${nextBillingDate ? `on ${new Date(nextBillingDate).toLocaleDateString("en-GB")}` : "at your next renewal"}. ${PLAN_LABEL[activePlan]} keeps running until then.`}
+                    {" "}
+                    <button
+                      type="button"
+                      onClick={() => changePlan(activePlan)}
+                      disabled={checkoutLoading}
+                      className="underline hover:text-amber-900 disabled:opacity-50"
+                    >
+                      {lang === "he" ? `ביטול, להישאר ב-${PLAN_LABEL[activePlan]}` : `Cancel, stay on ${PLAN_LABEL[activePlan]}`}
+                    </button>
+                  </p>
+                )}
                 {loyaltyDiscountIls > 0 ? (
                   <p className="text-xs font-medium text-green-700 mt-0.5">
                     🎁 {lang === "he" ? "הנחת נאמנות מוחלת אוטומטית" : "Loyalty discount applied automatically"}
@@ -920,7 +971,7 @@ export default function BillingPage() {
                     : "Whatever you've already paid for the current period and not used is deducted."}
                 </p>
                 <button
-                  onClick={switchToAnnual}
+                  onClick={requestAnnual}
                   disabled={annualLoading}
                   className="bg-white hover:bg-gray-50 disabled:opacity-50 text-[#197492] text-sm font-bold px-4 py-2 rounded-lg transition"
                 >
@@ -949,7 +1000,7 @@ export default function BillingPage() {
                 {[20, 50, 100, 200].map((v) => <option key={v} value={v}>₪{v}</option>)}
               </select>
               <button
-                onClick={topUpWallet}
+                onClick={requestTopUp}
                 disabled={topupLoading}
                 className="bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-800 text-sm font-semibold px-4 py-2 rounded-lg transition"
               >
@@ -960,14 +1011,72 @@ export default function BillingPage() {
         </div>
       )}
 
-      {pendingPlan && (
-        <PlanChangeDialog
+      {pendingPlan && (() => {
+        const isUpgrade = PLAN_PRICES[pendingPlan] > PLAN_PRICES[activePlan];
+        return (
+          <ConfirmChargeDialog
+            lang={lang}
+            busy={checkoutLoading}
+            title={
+              isUpgrade
+                ? he ? `לשדרג ל-${PLAN_LABEL[pendingPlan]}?` : `Upgrade to ${PLAN_LABEL[pendingPlan]}?`
+                : he ? `לעבור ל-${PLAN_LABEL[pendingPlan]}?` : `Switch to ${PLAN_LABEL[pendingPlan]}?`
+            }
+            body={
+              isUpgrade
+                ? he
+                  ? `מהחיוב הבא תשלמו ₪${fmtIls(PLAN_PRICES[pendingPlan])} לחודש. בנוסף יתבצע חיוב יחסי עכשיו, בכרטיס השמור, עבור יתרת התקופה הנוכחית.`
+                  : `From your next bill you pay ₪${fmtIls(PLAN_PRICES[pendingPlan])} a month. A prorated amount for the rest of the current period is charged now, to your saved card.`
+                : he
+                  ? `אין חיוב עכשיו, ולא תאבדו כלום: ${PLAN_LABEL[activePlan]} ימשיך לעבוד עד סוף התקופה ששילמתם עליה, והמעבר ל-${PLAN_LABEL[pendingPlan]} (₪${fmtIls(PLAN_PRICES[pendingPlan])} לחודש) יתבצע בחידוש הבא.`
+                  : `Nothing is charged now and nothing is lost: ${PLAN_LABEL[activePlan]} keeps running until the period you have paid for ends, and the move to ${PLAN_LABEL[pendingPlan]} (₪${fmtIls(PLAN_PRICES[pendingPlan])}/month) happens at your next renewal.`
+            }
+            confirmLabel={
+              isUpgrade
+                ? he ? "אישור ושדרוג" : "Confirm & upgrade"
+                : he ? "אישור המעבר" : "Confirm the change"
+            }
+            onCancel={() => setPendingPlan(null)}
+            onConfirm={() => changePlan(pendingPlan)}
+          />
+        );
+      })()}
+
+      {confirming === "annual" && (
+        <ConfirmChargeDialog
           lang={lang}
-          from={activePlan}
-          to={pendingPlan}
-          busy={checkoutLoading}
-          onCancel={() => setPendingPlan(null)}
-          onConfirm={() => changePlan(pendingPlan)}
+          busy={annualLoading}
+          title={he ? "לעבור למנוי שנתי?" : "Switch to annual?"}
+          // The one on this page that most needs asking: ten months, taken at once, from a card
+          // already on file. The credit for the unused remainder is named because the amount shown
+          // is the list price and the charge will be lower — a surprise in the customer's favour
+          // still reads as a number that does not match.
+          body={
+            he
+              ? `${ANNUAL_MONTHS_CHARGED} חודשים מחויבים מראש עבור 12 חודשי שירות. מה ששילמתם על התקופה הנוכחית ועוד לא ניצלתם יקוזז מהסכום.`
+              : `${ANNUAL_MONTHS_CHARGED} months charged upfront for 12 months of service. Whatever you have already paid for the current period and not used is deducted.`
+          }
+          amountIls={PLAN_PRICES[activePlan] * ANNUAL_MONTHS_CHARGED}
+          confirmLabel={he ? "אישור ומעבר לשנתי" : "Confirm & switch"}
+          onCancel={() => setConfirming(null)}
+          onConfirm={switchToAnnual}
+        />
+      )}
+
+      {confirming === "topup" && (
+        <ConfirmChargeDialog
+          lang={lang}
+          busy={topupLoading}
+          title={he ? "לטעון את הארנק?" : "Top up the wallet?"}
+          body={
+            he
+              ? "הסכום ייטען ליתרה לשימוש בהודעות מעבר למכסת המנוי, ויחויב עכשיו בכרטיס השמור."
+              : "The amount is credited to your balance for messages beyond your plan quota, and charged now to your saved card."
+          }
+          amountIls={topupAmount}
+          confirmLabel={he ? "אישור וטעינה" : "Confirm & top up"}
+          onCancel={() => setConfirming(null)}
+          onConfirm={topUpWallet}
         />
       )}
 

@@ -55,6 +55,8 @@ describe("changing plan mid-period", () => {
     subscriptionToken: "tok",
     subscriptionCustomerUid: "cus",
     billingCycle: "monthly",
+    subscriptionStatus: "active",
+    scheduledPlan: null,
     nextBillingDate: new Date(Date.now() + 30 * DAY_MS),
     ...overrides,
   });
@@ -115,14 +117,54 @@ describe("changing plan mid-period", () => {
     expect(charged()).toBeCloseTo(750, -2);
   });
 
-  it("takes nothing for a downgrade", async () => {
-    mockPrisma.business.findUniqueOrThrow.mockResolvedValue(subscriber());
+  /**
+   * A downgrade is scheduled, never taken.
+   *
+   * Switching on the spot forfeited the rest of a period already paid for — 28 days of Ultra for
+   * someone dropping on the 2nd of a month, and most of a year on an annual term. Nobody was
+   * charged for that; they just stopped getting what they had bought.
+   */
+  describe("downgrading", () => {
+    it("takes no money and leaves the current plan running", async () => {
+      mockPrisma.business.findUniqueOrThrow.mockResolvedValue(subscriber());
 
-    const res = await put("standard");
+      const res = await put("standard");
 
-    expect(chargeSubscriptionToken).not.toHaveBeenCalled();
-    expect(res.body.proratedChargeIls).toBe(0);
-    expect(mockPrisma.business.update.mock.calls.at(-1)![0].data.subscriptionPlan).toBe("standard");
+      expect(chargeSubscriptionToken).not.toHaveBeenCalled();
+      expect(res.body.proratedChargeIls).toBe(0);
+      const data = mockPrisma.business.update.mock.calls.at(-1)![0].data;
+      expect(data).not.toHaveProperty("subscriptionPlan");
+      expect(data.scheduledPlan).toBe("standard");
+    });
+
+    it("tells the caller when the change takes effect", async () => {
+      const renewal = new Date(Date.now() + 12 * DAY_MS);
+      mockPrisma.business.findUniqueOrThrow.mockResolvedValue(subscriber({ nextBillingDate: renewal }));
+
+      const res = await put("standard");
+
+      expect(res.body.scheduledPlan).toBe("standard");
+      expect(new Date(res.body.scheduledFor).getTime()).toBe(renewal.getTime());
+    });
+
+    it("is called off by asking for the plan already held", async () => {
+      mockPrisma.business.findUniqueOrThrow.mockResolvedValue(subscriber({ scheduledPlan: "standard" }));
+
+      const res = await put("premium");
+
+      expect(res.body.scheduledPlanCancelled).toBe(true);
+      expect(mockPrisma.business.update.mock.calls.at(-1)![0].data.scheduledPlan).toBeNull();
+    });
+
+    it("is cleared by an upgrade, so paying to go up cannot drop you later", async () => {
+      mockPrisma.business.findUniqueOrThrow.mockResolvedValue(subscriber({ scheduledPlan: "standard" }));
+
+      await put("ultra");
+
+      const data = mockPrisma.business.update.mock.calls.at(-1)![0].data;
+      expect(data.subscriptionPlan).toBe("ultra");
+      expect(data.scheduledPlan).toBeNull();
+    });
   });
 
   it("charges nothing when the period has already run out", async () => {

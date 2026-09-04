@@ -50,6 +50,13 @@ model Business {
   // credit must come from what we asked for, never from an amount echoed back in the callback.
   checkoutAmountIls              Int?
   nextBillingDate                DateTime?
+  // A downgrade the owner asked for, applied at the next renewal rather than immediately.
+  // Downgrading used to switch the plan on the spot, which forfeited the rest of a period the
+  // business had already paid for — someone dropping from Ultra on the second day of the month
+  // lost 28 days of the plan they bought. They keep the higher plan until the period they paid
+  // for ends, and this is what the nightly charge then moves them to. Null means no change is
+  // scheduled. Upgrades do not use it: those take effect at once, and are paid for at once.
+  scheduledPlan                  String?
   lastBillingAttemptAt           DateTime?
   billingCycle                   String             @default("monthly") // "monthly" | "annual"
   billingCyclesCompleted         Int                @default(0) // successful charges — drives the loyalty discount

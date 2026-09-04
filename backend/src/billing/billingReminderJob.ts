@@ -24,7 +24,7 @@ export async function runBillingReminderJob(): Promise<void> {
       whatsappAccessToken: { not: null },
     },
     select: {
-      id: true, name: true, subscriptionPlan: true, billingCycle: true, loyaltyDiscountIls: true,
+      id: true, name: true, subscriptionPlan: true, scheduledPlan: true, billingCycle: true, loyaltyDiscountIls: true,
       // Needed by subscriptionChargeIls — without these the reminder quotes a different amount
       // from the one the nightly job charges.
       couponDiscountIls: true, couponCyclesRemaining: true, paymentProvider: true, invoiceProvider: true,
@@ -40,10 +40,16 @@ export async function runBillingReminderJob(): Promise<void> {
       continue;
     }
 
-    // The same function the nightly charge uses. This used to be a second copy that left out the
-    // managed-account surcharges and the coupon, so the figure announced two days ahead was not
-    // the figure taken off the card.
-    const amountIls = subscriptionChargeIls(business);
+    // The same function the nightly charge uses, AND the same plan it will use. This used to be a
+    // second copy that left out the managed-account surcharges and the coupon, so the figure
+    // announced two days ahead was not the figure taken off the card. A scheduled downgrade is the
+    // same failure wearing different clothes: the charge two days from now opens the new plan's
+    // period at the new plan's price, so quoting the outgoing tier would overstate it — to someone
+    // whose last action was asking to pay less.
+    const amountIls = subscriptionChargeIls({
+      ...business,
+      subscriptionPlan: business.scheduledPlan ?? business.subscriptionPlan,
+    });
     if (amountIls === null) continue;
 
     const text = `היי! תזכורת קלה: מחרתיים יתבצע החיוב ה${business.billingCycle === "annual" ? "שנתי" : "חודשי"} עבור תורי על סך ₪${fmtIls(amountIls)}. תודה שאתם איתנו! 🙏`;

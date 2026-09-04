@@ -520,7 +520,46 @@ payplusBillingRouter.put("/payplus/plan", requireAuth, async (req: AuthedRequest
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! } });
-  if (business.subscriptionPlan === parsed.data.plan) return res.json({ ok: true });
+  if (business.subscriptionPlan === parsed.data.plan) {
+    // Asking for the plan they are already on is how a scheduled downgrade gets called off: the
+    // dashboard offers it as "keep Ultra", and without this the click would do nothing at all
+    // while the downgrade stayed armed for the next renewal.
+    if (business.scheduledPlan) {
+      await prisma.business.update({ where: { id: business.id }, data: { scheduledPlan: null } });
+      return res.json({ ok: true, scheduledPlanCancelled: true });
+    }
+    return res.json({ ok: true });
+  }
+
+  /**
+   * A downgrade is scheduled, not taken.
+   *
+   * It used to switch the plan on the spot, which quietly forfeited the rest of a period the
+   * business had already paid for — dropping from Ultra on the second day of a month cost 28 days
+   * of Ultra, and on an annual term it could cost most of a year. Nothing charged them for that;
+   * they simply stopped receiving what they had bought.
+   *
+   * So the plan stays as it is until the period ends, and the nightly charge moves them then, at
+   * the lower price. Read before the token/proration branches below because it needs neither: no
+   * money changes hands today either way.
+   */
+  const isDowngrade =
+    !!business.subscriptionPlan &&
+    !!PLAN_PRICES_ILS[business.subscriptionPlan] &&
+    PLAN_PRICES_ILS[parsed.data.plan] < PLAN_PRICES_ILS[business.subscriptionPlan];
+
+  if (isDowngrade && business.subscriptionStatus === "active" && business.nextBillingDate) {
+    await prisma.business.update({
+      where: { id: business.id },
+      data: { scheduledPlan: parsed.data.plan },
+    });
+    return res.json({
+      ok: true,
+      scheduledPlan: parsed.data.plan,
+      scheduledFor: business.nextBillingDate,
+      proratedChargeIls: 0,
+    });
+  }
 
   // Proration needs both a saved card and a known cycle end. Without either, the honest move is a
   // hosted page for a fresh period on the new plan rather than an English dead end.
@@ -577,7 +616,13 @@ payplusBillingRouter.put("/payplus/plan", requireAuth, async (req: AuthedRequest
     if (!result.success) return res.status(502).json({ error: `חיוב ההפרש נכשל. ${explainPayPlusError(result.error ?? "")}` });
   }
 
-  await prisma.business.update({ where: { id: business.id }, data: { subscriptionPlan: parsed.data.plan } });
+  // Clears any downgrade already armed: an owner who schedules Standard and then upgrades to Ultra
+  // has changed their mind, and leaving the old instruction in place would drop them to Standard at
+  // the next renewal — days after paying to go up.
+  await prisma.business.update({
+    where: { id: business.id },
+    data: { subscriptionPlan: parsed.data.plan, scheduledPlan: null },
+  });
   res.json({ ok: true, proratedChargeIls: Math.max(0, proratedDiff) });
 });
 

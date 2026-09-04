@@ -90,7 +90,7 @@ export async function runSubscriptionBillingJob(): Promise<void> {
       // what this is: a charge that cannot be collected.
     },
     select: {
-      id: true, name: true, subscriptionToken: true, subscriptionCustomerUid: true, subscriptionPlan: true, billingCycle: true,
+      id: true, name: true, subscriptionToken: true, subscriptionCustomerUid: true, subscriptionPlan: true, scheduledPlan: true, billingCycle: true,
       billingCyclesCompleted: true, loyaltyDiscountIls: true, paymentProvider: true, invoiceProvider: true,
       couponDiscountIls: true, couponCyclesRemaining: true,
       billingFailedAttempts: true,
@@ -106,12 +106,20 @@ export async function runSubscriptionBillingJob(): Promise<void> {
     }
 
     const periodDays = BILLING_PERIOD_DAYS[business.billingCycle] ?? 30;
+
+    // A downgrade the owner scheduled takes effect now, because "now" is the start of the period
+    // it applies to. Resolved BEFORE the amount is worked out, not after: the charge opening a
+    // Standard period has to be Standard's price, and computing it from the outgoing plan would
+    // bill a full extra period of the tier they asked to leave.
+    const effectivePlan = business.scheduledPlan ?? business.subscriptionPlan;
+    const planChanging = !!business.scheduledPlan && business.scheduledPlan !== business.subscriptionPlan;
+
     // Shared with the pre-charge reminder, which used to compute its own version and quote a
     // different number two days beforehand. See subscriptionAmount.ts — which also applies the
     // coupon and the annual multiplier, so nothing here may recompute either. A second copy of
     // that arithmetic sat right below this line, unused, for exactly as long as it took someone
     // to notice; the next person to touch it would have wired it in and double-counted.
-    const amountIls = subscriptionChargeIls(business);
+    const amountIls = subscriptionChargeIls({ ...business, subscriptionPlan: effectivePlan });
     if (amountIls === null) {
       console.error(`[subscriptionBilling] Unknown plan "${business.subscriptionPlan}" for business ${business.id} — skipping`);
       continue;
@@ -169,6 +177,10 @@ export async function runSubscriptionBillingJob(): Promise<void> {
           billingCyclesCompleted: cyclesCompleted,
           billingFailedAttempts: 0, // paid — any dunning run in progress is over
           messagesUsedThisCycle: 0, // new cycle paid for — reset the plan's message quota
+          // Applied only alongside a charge that actually collected. On a decline the business
+          // keeps the plan it has and the instruction stays armed for the retry — dropping them a
+          // tier because a card failed would take away service they are still paid up for.
+          ...(planChanging ? { subscriptionPlan: effectivePlan, scheduledPlan: null } : {}),
           ...(justEarnedDiscount ? { loyaltyDiscountIls: LOYALTY_DISCOUNT_ILS } : {}),
           // Counted down only on success. A failed attempt that consumed a discounted cycle would
           // quietly raise the price of the retry — the last thing a business with a declined card
@@ -177,6 +189,16 @@ export async function runSubscriptionBillingJob(): Promise<void> {
         },
       });
       console.log(`[subscriptionBilling] Charged ${business.id} (${business.name}) ₪${fmtIls(amountIls)}`);
+
+      if (planChanging) {
+        console.log(`[subscriptionBilling] ${business.id} moved ${business.subscriptionPlan} → ${effectivePlan} as scheduled`);
+        // Told at the moment it happens rather than when it was requested, which may have been a
+        // year earlier on an annual term. The quota changes today and so does the price.
+        await notifyOwnerOfBilling(
+          business.id,
+          `המסלול שלכם בתורי עודכן ל-${effectivePlan} כפי שביקשתם, ומהיום זה המחיר שתשלמו. הפרטים בדשבורד: ${FRONTEND_URL}/dashboard/billing`
+        );
+      }
 
       if (justEarnedDiscount) {
         await notifyOwnerOfBilling(

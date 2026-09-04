@@ -46,6 +46,7 @@ function dueBusiness(overrides: Record<string, unknown> = {}) {
     paymentProvider: null,
     invoiceProvider: null,
     billingFailedAttempts: 0,
+    scheduledPlan: null,
     notificationPhone: null,
     whatsappPhoneNumberId: null,
     whatsappAccessToken: null,
@@ -440,5 +441,69 @@ describe("notification failures", () => {
     await expect(runSubscriptionBillingJob()).resolves.toBeUndefined();
     // Both businesses were still charged — the first one's failed notice did not abort the loop.
     expect(chargeSubscriptionToken).toHaveBeenCalledTimes(2);
+  });
+});
+
+/**
+ * A downgrade the owner scheduled lands here, on the renewal that opens the period it applies to.
+ *
+ * The ordering is the whole thing: the plan has to be resolved before the amount is worked out, or
+ * the charge that starts a Standard period is computed from Ultra and bills a full extra period of
+ * the tier they asked to leave — the exact opposite of what they clicked.
+ */
+describe("a scheduled downgrade", () => {
+  const scheduled = () => dueBusiness({ subscriptionPlan: "ultra", scheduledPlan: "standard" });
+
+  it("charges the new plan's price, not the outgoing one", async () => {
+    chargeSubscriptionToken.mockResolvedValue({ success: true });
+    mockPrisma.business.findMany.mockResolvedValue([scheduled()]);
+
+    await runSubscriptionBillingJob();
+
+    // Standard, not Ultra's 749.90.
+    expect(chargeSubscriptionToken.mock.calls[0][1]).toBeCloseTo(174.9, 2);
+  });
+
+  it("moves the business onto it and disarms the instruction", async () => {
+    chargeSubscriptionToken.mockResolvedValue({ success: true });
+    mockPrisma.business.findMany.mockResolvedValue([scheduled()]);
+
+    await runSubscriptionBillingJob();
+
+    expect(lastData().subscriptionPlan).toBe("standard");
+    expect(lastData().scheduledPlan).toBeNull();
+  });
+
+  it("tells the owner, at the moment it actually happens", async () => {
+    // Which may be a year after they asked, on an annual term. Their quota and their price both
+    // change today, and nothing else would say so.
+    chargeSubscriptionToken.mockResolvedValue({ success: true });
+    mockPrisma.business.findMany.mockResolvedValue([scheduled()]);
+
+    await runSubscriptionBillingJob();
+
+    expect(notifyOwner).toHaveBeenCalled();
+  });
+
+  it("does not apply when the charge is declined", async () => {
+    // The business is still paid up for the period it is on; taking a tier away because a card
+    // failed would remove service they have already bought. The instruction stays armed.
+    chargeSubscriptionToken.mockResolvedValue({ success: false, error: "declined" });
+    mockPrisma.business.findMany.mockResolvedValue([scheduled()]);
+
+    await runSubscriptionBillingJob();
+
+    expect(lastData()).not.toHaveProperty("subscriptionPlan");
+    expect(lastData()).not.toHaveProperty("scheduledPlan");
+  });
+
+  it("leaves a business with nothing scheduled completely alone", async () => {
+    chargeSubscriptionToken.mockResolvedValue({ success: true });
+    mockPrisma.business.findMany.mockResolvedValue([dueBusiness()]);
+
+    await runSubscriptionBillingJob();
+
+    expect(lastData()).not.toHaveProperty("subscriptionPlan");
+    expect(notifyOwner).not.toHaveBeenCalled();
   });
 });
