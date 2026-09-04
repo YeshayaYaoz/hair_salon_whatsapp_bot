@@ -754,13 +754,13 @@ export default function BillingPage() {
                       ? "לא נשמר כרטיס. בלי כרטיס שמור כל חיוב דורש מעבר לעמוד תשלום מחדש."
                       : "No card saved. Without one, every charge sends you back to a payment page."}
                 </p>
-                {/* Said before the click, not discovered on the statement. The page must charge
-                    something — so the shekel is credited to the wallet and spent on their own sends. */}
+                {/* The two questions anyone hesitates over before typing a card number: does this
+                    charge me, and who ends up holding the number. Both answered before the click. */}
                 {!hasPaymentMethod && (
                   <p className="text-[11px] text-gray-600 mt-1.5 leading-relaxed">
                     {he
-                      ? "לשמירת הכרטיס מתבצע חיוב אימות של ₪1, שנטען במלואו לארנק ההודעות שלכם. פרטי הכרטיס נשמרים אצל חברת הסליקה ולא אצלנו."
-                      : "Saving a card runs a ₪1 verification charge, credited in full to your message wallet. Card details are held by the payment processor, not by us."}
+                      ? "שמירת הכרטיס לא מחייבת אתכם בכלום. פרטי הכרטיס נשמרים אצל חברת הסליקה ולא אצלנו."
+                      : "Saving a card charges you nothing. Card details are held by the payment processor, not by us."}
                   </p>
                 )}
               </div>

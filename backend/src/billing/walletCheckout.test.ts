@@ -370,3 +370,44 @@ describe("payment-method webhook", () => {
     expect(data.checkoutAmountIls).toBeNull();
   });
 });
+
+/**
+ * A ₪0 card page credits nothing.
+ *
+ * The crediting branch is still there for the ₪1 fallback, and an `increment: 0` write would be
+ * harmless — but it would also make the log and the ledger claim a top-up happened, which is the
+ * kind of phantom entry that costs an hour to explain later.
+ */
+describe("payment-method webhook at zero", () => {
+  let app: express.Express;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    vi.resetModules();
+    process.env.PAYPLUS_BILLING_WEBHOOK_SECRET = "correct-horse-battery-staple";
+    const { payplusBillingWebhookRouter } = await import("./payplusBillingRoutes.js");
+    app = express();
+    app.use(express.json());
+    app.use("/webhook/billing/payplus", payplusBillingWebhookRouter);
+  });
+
+  it("saves the card without touching the wallet", async () => {
+    mockPrisma.business.findUnique.mockResolvedValue({
+      id: "biz1",
+      checkoutPurpose: "card",
+      checkoutAmountIls: 0,
+      checkoutPlan: null,
+      checkoutCycle: null,
+    });
+    mockPrisma.business.update.mockResolvedValue({});
+
+    await request(app)
+      .post("/webhook/billing/payplus/correct-horse-battery-staple")
+      .send({ data: { status_code: "000", more_info: "a1b2c3d4e5f60718", token_uid: "tok_free" } });
+    await new Promise((r) => setImmediate(r));
+
+    const data = mockPrisma.business.update.mock.calls[0][0].data;
+    expect(data.subscriptionToken).toBe("enc:tok_free");
+    expect(data).not.toHaveProperty("walletBalanceAgorot");
+  });
+});
