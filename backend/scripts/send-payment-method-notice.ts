@@ -71,9 +71,15 @@ async function main() {
     process.exit(1);
   }
 
+  // {{1}} is a plain text parameter, so it can carry the owner's own name instead of the
+  // business's. It reads as a message to a person rather than to a company — 'שלום שולי' against
+  // 'שלום צימר "בנחת רוח"' — and a name in quotation marks at the front of a WhatsApp message is
+  // one of the things that makes an automated notice look automated.
+  const greeting = arg("name") ?? business.name;
+
   const template = paymentDetailsTemplate();
   console.log(`Would send '${template.name}' to ${to}:`);
-  console.log(`  ${PAYMENT_DETAILS_BODY.replace("{{1}}", business.name)}`);
+  console.log(`  ${PAYMENT_DETAILS_BODY.replace("{{1}}", greeting)}`);
   console.log(`  button: [${PAYMENT_DETAILS_BUTTON.text}] → ${PAYMENT_DETAILS_BUTTON.url}`);
   console.log("");
 
@@ -88,7 +94,7 @@ async function main() {
     to,
     templateName: template.name,
     languageCode: template.languageCode,
-    bodyParams: [business.name],
+    bodyParams: [greeting],
   });
   console.log("Accepted by Meta. Acceptance is not delivery — the handset is the answer.");
 }

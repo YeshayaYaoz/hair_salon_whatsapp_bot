@@ -37,6 +37,9 @@ on:
       to:
         description: "Recipient (send-templates) — blank uses the business's own notification phone"
         default: ""
+      greeting:
+        description: "Who to greet (payment-method-notice) — blank uses the business name"
+        default: ""
       confirm:
         description: "Actually submit or send. Unticked prints what would happen and stops."
         type: boolean
@@ -72,6 +75,7 @@ jobs:
           CODE_METHOD: ${{ inputs.code_method }}
           BUSINESS: ${{ inputs.business }}
           TO: ${{ inputs.to }}
+          GREETING: ${{ inputs.greeting }}
           CONFIRM: ${{ inputs.confirm && 'yes' || '' }}
         run: |
           # Single-use and short-lived, but a verification code in a build log is still a
@@ -156,7 +160,8 @@ jobs:
               [ -z "$BUSINESS" ] && { echo "::error::'payment-method-notice' needs the business input."; exit 1; }
               npm i -g @railway/cli >/dev/null 2>&1
               railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
-                npx tsx scripts/send-payment-method-notice.ts --business "$BUSINESS" ${TO:+--to "$TO"} ${CONFIRM:+--confirm}
+                npx tsx scripts/send-payment-method-notice.ts --business "$BUSINESS" \
+                  ${TO:+--to "$TO"} ${GREETING:+--name "$GREETING"} ${CONFIRM:+--confirm}
               exit $? ;;
             # Needs the database, which lives in Railway rather than in Actions secrets.
             wiring)
