@@ -4,6 +4,12 @@
  *
  * Usage (from backend/, against the environment holding the credentials):
  *   railway run npx tsx scripts/send-business-templates.ts --business <id> [--to 0501234567] --confirm
+ *   railway run npx tsx scripts/send-business-templates.ts --tori --to 0501234567 --confirm
+ *
+ * --tori sends from Tori's own number instead of a business's. It is the only way to look at a
+ * template's rendered form while a business's copy is still in review: the wording, buttons and
+ * variable order are the same submission, so what arrives is what that business's customers will
+ * get once Meta approves it there.
  *
  * Why the business's own credentials rather than send-test-template.ts: templates live at the WABA
  * level, and each business connects its own. Tori's outreach number cannot send a salon's
@@ -58,18 +64,44 @@ function bodyText(t: MetaTemplate): string {
   return t.components?.find((c) => c.type === "BODY")?.text ?? "";
 }
 
-async function main() {
-  const businessId = arg("business");
-  if (!businessId) {
-    console.error("--business needs a business id");
+/**
+ * Whether this template's variables are positional ({{1}}) rather than named ({{customer_name}}).
+ *
+ * Meta supports both, and sendWhatsAppTemplate sends positional parameters only. A named-parameter
+ * template — Tori's WABA carries one inherited from an earlier tool — would be sent an array Meta
+ * cannot map onto the body and refused, which reads in the output as "this template is broken"
+ * rather than "this sender cannot address it".
+ */
+function isPositional(t: MetaTemplate): boolean {
+  const vars = bodyText(t).match(/\{\{([^}]+)\}\}/g) ?? [];
+  return vars.every((v) => /^\{\{\d+\}\}$/.test(v));
+}
+
+interface Sender {
+  label: string;
+  phoneNumberId: string;
+  accessToken: string;
+  wabaId: string;
+  defaultTo: string | null;
+}
+
+/** Tori's own number and WABA, from the same env vars the outreach sender uses. */
+function toriSender(): Sender {
+  const phoneNumberId = process.env.TORI_OUTREACH_PHONE_NUMBER_ID?.trim();
+  const accessToken = process.env.TORI_OUTREACH_ACCESS_TOKEN?.trim();
+  const wabaId = process.env.TORI_WABA_ID?.trim();
+  if (!phoneNumberId || !accessToken || !wabaId) {
+    console.error("--tori needs TORI_OUTREACH_PHONE_NUMBER_ID, TORI_OUTREACH_ACCESS_TOKEN and TORI_WABA_ID.");
     process.exit(1);
   }
+  return { label: "תורי אונליין", phoneNumberId, accessToken, wabaId, defaultTo: null };
+}
 
+async function businessSender(businessId: string): Promise<Sender> {
   const business = await prisma.business.findUnique({
     where: { id: businessId },
     select: {
       name: true,
-      businessType: true,
       notificationPhone: true,
       whatsappPhoneNumberId: true,
       whatsappAccessToken: true,
@@ -84,16 +116,34 @@ async function main() {
     console.error(`${business.name} has no connected WhatsApp number — nothing can be sent from it.`);
     process.exit(1);
   }
+  return {
+    label: business.name,
+    phoneNumberId: business.whatsappPhoneNumberId,
+    accessToken: decryptSecret(business.whatsappAccessToken),
+    wabaId: business.whatsappWabaId,
+    defaultTo: business.notificationPhone,
+  };
+}
 
-  const to = normalizeOwnerPhone(arg("to") ?? business.notificationPhone ?? "");
-  if (!to) {
-    console.error("--to needs a number that can be qualified, and the business has no usable notificationPhone");
+async function main() {
+  const businessId = arg("business");
+  const useTori = process.argv.includes("--tori");
+  if (!businessId && !useTori) {
+    console.error("Needs --business <id>, or --tori to send from Tori's own number.");
     process.exit(1);
   }
 
-  const accessToken = decryptSecret(business.whatsappAccessToken);
+  const sender = useTori ? toriSender() : await businessSender(businessId!);
+
+  const to = normalizeOwnerPhone(arg("to") ?? sender.defaultTo ?? "");
+  if (!to) {
+    console.error("--to needs a number that can be qualified, and no usable default was found");
+    process.exit(1);
+  }
+
+  const accessToken = sender.accessToken;
   const res = await fetch(
-    `${GRAPH}/${business.whatsappWabaId}/message_templates?fields=name,status,category,language,components&limit=100`,
+    `${GRAPH}/${sender.wabaId}/message_templates?fields=name,status,category,language,components&limit=100`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
   const json = (await res.json()) as { data?: MetaTemplate[]; error?: { message: string } };
@@ -102,10 +152,12 @@ async function main() {
     process.exit(1);
   }
 
-  const approved = (json.data ?? []).filter((t) => t.status === "APPROVED");
-  const pending = (json.data ?? []).filter((t) => t.status !== "APPROVED");
+  const all = json.data ?? [];
+  const approved = all.filter((t) => t.status === "APPROVED" && isPositional(t));
+  const pending = all.filter((t) => t.status !== "APPROVED");
+  const skipped = all.filter((t) => t.status === "APPROVED" && !isPositional(t));
 
-  console.log(`${business.name} — WABA ${business.whatsappWabaId} — sending to ${to}`);
+  console.log(`${sender.label} — WABA ${sender.wabaId} — sending to ${to}`);
   console.log("");
   for (const t of approved) {
     const params = exampleParams(t);
@@ -116,6 +168,11 @@ async function main() {
     console.log("");
     console.log("Not sent — not APPROVED yet:");
     for (const t of pending) console.log(`  ${t.name} — ${t.status}`);
+  }
+  if (skipped.length) {
+    console.log("");
+    console.log("Not sent — named parameters, which this sender cannot address:");
+    for (const t of skipped) console.log(`  ${t.name}`);
   }
   console.log("");
 
@@ -130,7 +187,7 @@ async function main() {
   for (const t of approved) {
     try {
       await sendWhatsAppTemplate({
-        phoneNumberId: business.whatsappPhoneNumberId,
+        phoneNumberId: sender.phoneNumberId,
         accessToken,
         to,
         templateName: t.name,

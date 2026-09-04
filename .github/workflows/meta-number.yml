@@ -141,10 +141,14 @@ jobs:
             # Sends real messages to a real handset from the business's own number, so --confirm is
             # what separates "show me what would go out" from "put it on someone's phone".
             send-templates)
-              [ -z "$BUSINESS" ] && { echo "::error::'send-templates' needs the business input."; exit 1; }
+              [ -z "$BUSINESS" ] && { echo "::error::'send-templates' needs the business input (or 'tori')."; exit 1; }
+              # "tori" as the business id sends from Tori's own number. Useful while a business's
+              # own copies are still in review — same submission, so the rendered result is what
+              # that business will send once approved.
+              if [ "$BUSINESS" = "tori" ]; then who=(--tori); else who=(--business "$BUSINESS"); fi
               npm i -g @railway/cli >/dev/null 2>&1
               railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
-                npx tsx scripts/send-business-templates.ts --business "$BUSINESS" ${TO:+--to "$TO"} ${CONFIRM:+--confirm}
+                npx tsx scripts/send-business-templates.ts "${who[@]}" ${TO:+--to "$TO"} ${CONFIRM:+--confirm}
               exit $? ;;
             # Needs the database, which lives in Railway rather than in Actions secrets.
             wiring)
