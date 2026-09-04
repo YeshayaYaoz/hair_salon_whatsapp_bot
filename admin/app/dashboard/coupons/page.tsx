@@ -245,7 +245,7 @@ export default function CouponsPage() {
           />
         </div>
 
-        <label className="flex items-center gap-2 mt-3">
+        <label className="row-action flex items-center gap-2 mt-3">
           <input type="checkbox" checked={onePerCustomer} onChange={(e) => setOnePerCustomer(e.target.checked)} />
           <span className="text-xs text-gray-700">
             {he ? "פעם אחת ללקוח (לפי מספר טלפון)" : "Once per customer (by phone number)"}

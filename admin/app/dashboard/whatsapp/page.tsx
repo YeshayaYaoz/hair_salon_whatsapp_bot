@@ -656,7 +656,7 @@ export default function WhatsAppPage() {
         <div className="mb-4">
           <button
             onClick={() => setShowManual((v) => !v)}
-            className="text-xs text-gray-600 hover:text-gray-700 transition underline underline-offset-2"
+            className="row-action text-xs text-gray-600 hover:text-gray-700 transition underline underline-offset-2"
           >
             {showManual
               ? (lang === "he" ? "→ חזור לחיבור אוטומטי" : "← Back to automatic setup")

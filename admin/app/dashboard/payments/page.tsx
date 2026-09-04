@@ -270,7 +270,7 @@ function ProviderCard<T extends string>({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="text-xs font-medium text-gray-500 hover:text-gray-700 transition shrink-0"
+          className="row-action text-xs font-medium text-gray-500 hover:text-gray-700 transition shrink-0"
           aria-expanded={expanded}
         >
           {expanded

@@ -479,6 +479,9 @@ export default function LoginPage() {
         }
         .login-forgot:hover { color: #1B7FA0; }
         .login-forgot:focus-visible, .login-eye-btn:focus-visible, .login-back-btn:focus-visible,
+        @media (pointer: coarse) {
+          .login-switch button { min-height: 44px; padding-inline: 0.625rem; }
+        }
         .login-switch button:focus-visible {
           outline: 2px solid #1B7FA0; outline-offset: 2px; border-radius: 4px;
         }
@@ -553,6 +556,9 @@ export default function LoginPage() {
         .login-switch button {
           background: none; border: none; color: #1B7FA0;
           font-size: 15.5px; font-weight: 700; cursor: pointer;
+          /* Same rule .row-action applies in globals: a text-styled button is still an action
+             button, and at 23px tall this one is under the 24px floor on a phone. */
+          display: inline-flex; align-items: center; justify-content: center; min-height: 32px;
           font-family: inherit; transition: color 0.15s;
         }
         .login-switch button:hover { color: #145F78; }

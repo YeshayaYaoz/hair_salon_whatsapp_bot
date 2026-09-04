@@ -208,7 +208,7 @@ export function NumberProvisionOffer({
             type="button"
             onClick={openPicker}
             disabled={ordering || requested}
-            className="text-xs text-[#197492] hover:underline disabled:opacity-50 font-medium"
+            className="row-action text-xs text-[#197492] hover:underline disabled:opacity-50 font-medium"
           >
             {he ? "לבחור מספר מרשימה" : "Pick from a list"}
           </button>

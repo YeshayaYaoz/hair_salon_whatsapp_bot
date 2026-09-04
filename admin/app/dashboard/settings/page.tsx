@@ -195,7 +195,7 @@ function EmailVerificationRow({ email, verified, he }: { email: string; verified
           type="button"
           onClick={resend}
           disabled={sending}
-          className="text-xs font-semibold mt-1.5 underline disabled:opacity-50"
+          className="row-action text-xs font-semibold mt-1.5 underline disabled:opacity-50"
           style={{ color: "#B45309" }}
         >
           {sending ? (he ? "שולח…" : "Sending…") : he ? "שליחת קישור אימות" : "Send verification link"}

@@ -1184,12 +1184,17 @@ export default function LandingPage() {
         .lp-roi-slider-wrap { margin: 36px 0 8px; }
         .roi-slider-label { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
         .roi-slider-val { font-size: 22px; font-weight: 800; color: #25D366; letter-spacing: -1px; text-transform: none; }
+        /* The visible track is 6px, but a 6px-tall input is a 18px-tall tap target — the hardest
+           control on the page to grab with a thumb. The track moves to the pseudo-element so the
+           input itself can be 44px tall and look exactly the same. */
         .roi-slider {
-          -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
-          border-radius: 4px; outline: none; cursor: pointer;
-          background: rgba(255,255,255,0.12);
+          -webkit-appearance: none; appearance: none; width: 100%; height: 44px;
+          outline: none; cursor: pointer; background: transparent;
         }
-        .roi-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #25D366; border: 3px solid #0F0F0F; box-shadow: 0 2px 8px rgba(37,211,102,0.5); cursor: pointer; transition: transform 0.15s; }
+        .roi-slider::-webkit-slider-runnable-track { height: 6px; border-radius: 4px; background: rgba(255,255,255,0.12); }
+        .roi-slider::-moz-range-track { height: 6px; border-radius: 4px; background: rgba(255,255,255,0.12); }
+        /* -8px centres a 22px thumb on the 6px track (webkit measures the thumb from the track). */
+        .roi-slider::-webkit-slider-thumb { -webkit-appearance: none; margin-top: -8px; width: 22px; height: 22px; border-radius: 50%; background: #25D366; border: 3px solid #0F0F0F; box-shadow: 0 2px 8px rgba(37,211,102,0.5); cursor: pointer; transition: transform 0.15s; }
         .roi-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
         .roi-slider::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: #25D366; border: 3px solid #0F0F0F; cursor: pointer; }
         .roi-slider:focus-visible::-webkit-slider-thumb { outline: 2px solid #25D366; outline-offset: 3px; }

@@ -370,7 +370,7 @@ export default function ServicesPage() {
             <button
               type="button"
               onClick={() => setShowLinkInput((v) => !v)}
-              className="text-xs text-gray-600 hover:text-[#197492] underline underline-offset-2"
+              className="row-action text-xs text-gray-600 hover:text-[#197492] underline underline-offset-2"
             >
               {t.orPasteLink}
             </button>
