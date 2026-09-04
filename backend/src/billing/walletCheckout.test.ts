@@ -284,3 +284,89 @@ describe("wallet top-up webhook", () => {
     expect(mockPrisma.business.update).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * Saving a card is the one checkout that buys nothing, and both halves of that are worth pinning.
+ *
+ * It must store the token — that is the entire point — and it must NOT activate a subscription.
+ * A lapsed business adding a card is not paying for a period, and reactivating it here would give
+ * away a month and leave the nightly job to charge for one that had already been granted.
+ */
+describe("payment-method webhook", () => {
+  let app: express.Express;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    vi.resetModules();
+    process.env.PAYPLUS_BILLING_WEBHOOK_SECRET = "correct-horse-battery-staple";
+    const { payplusBillingWebhookRouter } = await import("./payplusBillingRoutes.js");
+    app = express();
+    app.use(express.json());
+    app.use("/webhook/billing/payplus", payplusBillingWebhookRouter);
+  });
+
+  const post = (body: unknown) =>
+    request(app).post("/webhook/billing/payplus/correct-horse-battery-staple").send(body);
+  const settle = () => new Promise((r) => setImmediate(r));
+
+  const pendingCard = {
+    id: "biz1",
+    checkoutPurpose: "card",
+    checkoutAmountIls: 1,
+    checkoutPlan: null,
+    checkoutCycle: null,
+  };
+
+  it("saves the card and credits the verification charge to the wallet", async () => {
+    mockPrisma.business.findUnique.mockResolvedValue(pendingCard);
+    mockPrisma.business.update.mockResolvedValue({});
+
+    await post({ data: { status_code: "000", more_info: "a1b2c3d4e5f60718", token_uid: "tok_card", customer_uid: "cus_1" } });
+    await settle();
+
+    const data = mockPrisma.business.update.mock.calls[0][0].data;
+    expect(data.subscriptionToken).toBe("enc:tok_card");
+    expect(data.subscriptionCustomerUid).toBe("cus_1");
+    // The shekel comes back as wallet credit rather than staying ours.
+    expect(data.walletBalanceAgorot).toEqual({ increment: 100 });
+  });
+
+  it("does not activate a subscription", async () => {
+    mockPrisma.business.findUnique.mockResolvedValue(pendingCard);
+    mockPrisma.business.update.mockResolvedValue({});
+
+    await post({ data: { status_code: "000", more_info: "a1b2c3d4e5f60718", token_uid: "tok_card" } });
+    await settle();
+
+    const data = mockPrisma.business.update.mock.calls[0][0].data;
+    expect(data).not.toHaveProperty("subscriptionStatus");
+    expect(data).not.toHaveProperty("subscriptionPlan");
+    expect(data).not.toHaveProperty("nextBillingDate");
+  });
+
+  it("never clears an existing card when no token comes back", async () => {
+    mockPrisma.business.findUnique.mockResolvedValue(pendingCard);
+    mockPrisma.business.update.mockResolvedValue({});
+
+    await post({ data: { status_code: "000", more_info: "a1b2c3d4e5f60718" } });
+    await settle();
+
+    const data = mockPrisma.business.update.mock.calls[0][0].data;
+    expect(data).not.toHaveProperty("subscriptionToken");
+    // The shekel was still taken, so it is still credited.
+    expect(data.walletBalanceAgorot).toEqual({ increment: 100 });
+  });
+
+  it("consumes the pending checkout so a replayed callback cannot credit twice", async () => {
+    mockPrisma.business.findUnique.mockResolvedValue(pendingCard);
+    mockPrisma.business.update.mockResolvedValue({});
+
+    await post({ data: { status_code: "000", more_info: "a1b2c3d4e5f60718", token_uid: "tok_card" } });
+    await settle();
+
+    const data = mockPrisma.business.update.mock.calls[0][0].data;
+    expect(data.checkoutRef).toBeNull();
+    expect(data.checkoutPurpose).toBeNull();
+    expect(data.checkoutAmountIls).toBeNull();
+  });
+});

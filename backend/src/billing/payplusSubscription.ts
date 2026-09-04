@@ -199,9 +199,40 @@ export async function createWalletTopupLink(businessId: string, amountIls: numbe
   });
 }
 
+/**
+ * What a card-on-file page charges.
+ *
+ * PayPlus's generateLink has no zero-amount mode — every page is a payment, and `create_token` is
+ * a flag on top of one. So saving a card means charging something, and the smallest real amount is
+ * a shekel.
+ *
+ * The shekel is not kept: the callback credits it to the message wallet, where it is spent on the
+ * business's own sends. That is the difference between a verification charge and a fee, and it is
+ * why the page can say so plainly instead of hoping nobody reads their statement.
+ */
+export const CARD_ON_FILE_CHARGE_ILS = MIN_CHARGE_ILS;
+
+/**
+ * A hosted page whose purpose is storing the card, not collecting money.
+ *
+ * Needed because every other path to a saved token is a side effect of paying for something:
+ * subscribing, topping up, switching to annual. A business that activated before tokenisation, or
+ * whose card expired, or that was activated by hand, has no way to hand us a card at all — and
+ * the payment-method reminder we send them pointed at a billing page with nothing on it to press.
+ */
+export async function createPaymentMethodLink(businessId: string, returnUrl: string): Promise<string> {
+  return generateCheckoutPage({
+    businessId,
+    amountIls: CARD_ON_FILE_CHARGE_ILS,
+    itemName: `תורי — שמירת אמצעי תשלום (₪${CARD_ON_FILE_CHARGE_ILS}, נטען לארנק ההודעות)`,
+    returnUrl,
+    pending: { checkoutPurpose: "card", checkoutAmountIls: CARD_ON_FILE_CHARGE_ILS },
+  });
+}
+
 /** Fields parked on the Business row for the webhook to read back — see the more_info note above. */
 interface PendingCheckout {
-  checkoutPurpose: "subscription" | "wallet";
+  checkoutPurpose: "subscription" | "wallet" | "card";
   checkoutPlan?: string;
   checkoutCycle?: string;
   checkoutAmountIls?: number;

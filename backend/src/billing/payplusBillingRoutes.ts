@@ -7,6 +7,8 @@ import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import {
   createSubscriptionCheckoutLink,
   createWalletTopupLink,
+  createPaymentMethodLink,
+  CARD_ON_FILE_CHARGE_ILS,
   chargeSubscriptionToken,
   PLAN_PRICES_ILS,
   BILLING_PERIOD_DAYS,
@@ -485,6 +487,32 @@ payplusBillingRouter.post("/payplus/wallet/topup", requireAuth, async (req: Auth
   res.json({ ok: true, walletBalanceAgorot: updated.walletBalanceAgorot });
 });
 
+/**
+ * Starts a hosted page whose only job is to save a card.
+ *
+ * Returns a URL in every case, including for a business that already has a card saved: replacing
+ * an expired one is the same operation, and refusing it would leave the owner with no way to fix
+ * a card that is about to start failing.
+ */
+payplusBillingRouter.post("/payplus/payment-method", requireAuth, async (req: AuthedRequest, res) => {
+  const parsed = z.object({ returnUrl: z.string().url().optional() }).safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const returnUrl = parsed.data.returnUrl ?? `${APP_URL}/dashboard/billing`;
+  try {
+    const url = await createPaymentMethodLink(req.businessId!, returnUrl);
+    res.json({ url, chargeIls: CARD_ON_FILE_CHARGE_ILS });
+  } catch (err) {
+    console.error("PayPlus payment-method checkout failed:", err);
+    captureError(err, { businessId: req.businessId, kind: "payplusPaymentMethod" });
+    if (err instanceof PayPlusBillingNotConfiguredError) {
+      return res.status(503).json({ error: "חיוב מנויים אינו מוגדר בשרת. פנו לתמיכה." });
+    }
+    const detail = explainPayPlusError(err instanceof Error ? err.message : String(err));
+    return res.status(502).json({ error: `יצירת קישור התשלום נכשלה. ${detail}` });
+  }
+});
+
 /** Upgrades/downgrades the plan and charges a prorated top-up immediately for the remainder of
  * the current billing period — the next scheduled charge picks up the new plan price automatically. */
 payplusBillingRouter.put("/payplus/plan", requireAuth, async (req: AuthedRequest, res) => {
@@ -753,6 +781,34 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
     });
     if (!business) {
       console.warn(`[payplus subscription webhook] No pending checkout for ref ${checkoutRef}`);
+      return;
+    }
+
+    // Saving a card, not buying anything. The shekel the page had to charge is credited to the
+    // wallet rather than kept — the owner was told that before they paid, and a verification
+    // charge that quietly stays ours is the kind of thing that ends up in a chargeback.
+    //
+    // Deliberately does NOT touch subscriptionStatus, plan or nextBillingDate: an owner adding a
+    // card is not subscribing, and a lapsed business that saves one must not be silently
+    // reactivated without a charge for the period.
+    if (business.checkoutPurpose === "card") {
+      if (!tokenUid) {
+        // The one outcome worth shouting about: they paid the shekel and we got no card, so the
+        // page they came from will still say no payment method is saved. Nothing to undo, but
+        // the reason has to be findable when they ask why it did not work.
+        console.warn(`[payplus card webhook] No token returned for business ${business.id} — card NOT saved`);
+      }
+      await prisma.business.update({
+        where: { id: business.id },
+        data: {
+          ...(tokenUid ? { subscriptionToken: encryptSecret(tokenUid), subscriptionCustomerUid: event.customerUid ?? null } : {}),
+          ...(business.checkoutAmountIls ? { walletBalanceAgorot: { increment: business.checkoutAmountIls * 100 } } : {}),
+          checkoutRef: null,
+          checkoutPurpose: null,
+          checkoutAmountIls: null,
+        },
+      });
+      if (tokenUid) console.log(`[payplus card webhook] Saved a payment method for business ${business.id}`);
       return;
     }
 

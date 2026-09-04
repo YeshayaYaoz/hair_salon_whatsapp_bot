@@ -234,12 +234,16 @@ export default function BillingPage() {
   const [topupAmount, setTopupAmount] = useState(50);
   const [topupLoading, setTopupLoading] = useState(false);
   const [bookingStats, setBookingStats] = useState<{ confirmedThisMonth: number; revenueThisMonth: number } | null>(null);
+  const [hasPaymentMethod, setHasPaymentMethod] = useState<boolean | null>(null);
+  const [cardLoading, setCardLoading] = useState(false);
 
   async function load() {
     const me = await apiFetch<{
       subscriptionStatus: string; whatsappConnected: boolean; createdAt: string;
       subscriptionPlan?: string | null; billingCycle?: string; loyaltyDiscountIls?: number; walletBalanceAgorot?: number;
+      hasPaymentMethod?: boolean;
     }>("/api/business/me");
+    setHasPaymentMethod(me.hasPaymentMethod ?? false);
     setStatus(me.subscriptionStatus);
     setWhatsappConnected(me.whatsappConnected);
     setCreatedAt(me.createdAt);
@@ -286,6 +290,28 @@ export default function BillingPage() {
       setError(err instanceof Error ? err.message : "Could not switch to annual");
     } finally {
       setAnnualLoading(false);
+    }
+  }
+
+  /**
+   * Sends the owner to a hosted PayPlus page that stores the card.
+   *
+   * Always a redirect, never an inline form: card details must not touch this origin, and PayPlus
+   * is what issues the token. The page charges CARD_ON_FILE_CHARGE_ILS because generateLink has no
+   * zero-amount mode — the copy below says so, and the callback credits it to the wallet.
+   */
+  async function savePaymentMethod() {
+    setError(null);
+    setCardLoading(true);
+    try {
+      const { url } = await apiFetch<{ url: string }>("/api/billing/payplus/payment-method", {
+        method: "POST",
+        body: JSON.stringify({ returnUrl: window.location.href }),
+      });
+      window.location.href = url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : he ? "לא הצלחנו לפתוח את עמוד התשלום" : "Could not open the payment page");
+      setCardLoading(false);
     }
   }
 
@@ -703,6 +729,55 @@ export default function BillingPage() {
 
           {error && <p className="text-red-600 text-xs mt-3">{error}</p>}
         </>
+      )}
+
+      {/* Payment method — shown at every subscription status, not only when active.
+          A trial business saving a card is how the first charge succeeds instead of bouncing, and
+          a past-due one needs this before anything else on the page will work. Until this existed
+          the only way to hand us a card was to buy something, so a business whose card expired had
+          no route back, and the reminder we send about it pointed at a page with nothing to press. */}
+      {hasPaymentMethod !== null && (
+        <div className="bg-white border border-gray-200 rounded-xl p-5 mt-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-start gap-2 min-w-0">
+              <span className="w-8 h-8 rounded-lg bg-[#1B7FA0]/10 flex items-center justify-center text-base flex-shrink-0" aria-hidden>
+                {hasPaymentMethod ? "🔒" : "💳"}
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-gray-900">{he ? "אמצעי תשלום" : "Payment method"}</h2>
+                <p className="text-xs text-gray-600 mt-0.5 leading-relaxed">
+                  {hasPaymentMethod
+                    ? he
+                      ? "כרטיס שמור — החיוב החודשי מתבצע אוטומטית, ואפשר לטעון את הארנק בלחיצה אחת."
+                      : "Card on file — your monthly charge runs automatically, and wallet top-ups are one click."
+                    : he
+                      ? "לא נשמר כרטיס. בלי כרטיס שמור כל חיוב דורש מעבר לעמוד תשלום מחדש."
+                      : "No card saved. Without one, every charge sends you back to a payment page."}
+                </p>
+                {/* Said before the click, not discovered on the statement. The page must charge
+                    something — so the shekel is credited to the wallet and spent on their own sends. */}
+                {!hasPaymentMethod && (
+                  <p className="text-[11px] text-gray-600 mt-1.5 leading-relaxed">
+                    {he
+                      ? "לשמירת הכרטיס מתבצע חיוב אימות של ₪1, שנטען במלואו לארנק ההודעות שלכם. פרטי הכרטיס נשמרים אצל חברת הסליקה ולא אצלנו."
+                      : "Saving a card runs a ₪1 verification charge, credited in full to your message wallet. Card details are held by the payment processor, not by us."}
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={savePaymentMethod}
+              disabled={cardLoading}
+              className={`inline-flex items-center justify-center gap-2 disabled:opacity-50 text-sm font-semibold px-4 py-2 rounded-lg transition ${
+                hasPaymentMethod
+                  ? "bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200"
+                  : "bg-[#1B7FA0] hover:bg-[#2A9BBF] text-white"
+              }`}
+            >
+              {cardLoading ? t.redirecting : hasPaymentMethod ? (he ? "החלפת כרטיס" : "Replace card") : he ? "הוספת כרטיס אשראי" : "Add a card"}
+            </button>
+          </div>
+        </div>
       )}
 
       {status === "active" && (

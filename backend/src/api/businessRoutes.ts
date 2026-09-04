@@ -59,9 +59,19 @@ businessRouter.use((req, res, next) => {
 
 businessRouter.get("/me", async (req: AuthedRequest, res) => {
   const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! } });
-  const { passwordHash, whatsappAccessToken, paymentApiKey, paymentApiSecret, invoiceApiKey, invoiceApiSecret, ...safe } = business;
+  // subscriptionToken is stripped for the same reason as the keys beside it. It is encrypted at
+  // rest, so what was going out was ciphertext rather than a usable card token — but it is a
+  // payment credential either way, it was reaching the browser on every dashboard load, and
+  // nothing on the client has ever read it. What the client actually needs is the one bit below.
+  const {
+    passwordHash, whatsappAccessToken, paymentApiKey, paymentApiSecret, invoiceApiKey, invoiceApiSecret,
+    subscriptionToken, ...safe
+  } = business;
   res.json({
     ...safe,
+    // Whether a card is saved — the whole of what the billing page needs to decide between asking
+    // for one and confirming there is one.
+    hasPaymentMethod: Boolean(subscriptionToken),
     // Re-pointed at the current host, same as service photos: the URL was absolute when written,
     // so a row created under an old/wrong PUBLIC_BACKEND_URL would otherwise stay a dead link.
     whatsappProfilePictureUrl: safe.whatsappProfilePictureUrl ? toPublicUploadUrl(safe.whatsappProfilePictureUrl) : null,
