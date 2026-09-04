@@ -691,7 +691,7 @@ export default function LandingPageEN() {
         .mock-stat-n .g { color: #F59E0B; }
         .mock-stat-l { font-size: 11px; color: #A0A0A0; }
         .mock-stat-trend { font-size: 10px; color: #25D366; margin-top: 6px; }
-        .mock-section-title { font-size: 12px; font-weight: 600; color: #555; margin-bottom: 12px; letter-spacing: 0.05em; text-transform: uppercase; }
+        .mock-section-title { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.6); margin-bottom: 12px; letter-spacing: 0.05em; text-transform: uppercase; }
         .mock-appt-list { display: flex; flex-direction: column; gap: 8px; }
         .mock-appt { background: #1E1E1E; border-radius: 10px; padding: 13px 18px; display: flex; align-items: center; gap: 16px; font-size: 12px; border: 1px solid rgba(255,255,255,0.06); }
         .mock-appt-time { color: #F59E0B; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 36px; }
@@ -778,7 +778,7 @@ export default function LandingPageEN() {
         .lp-footer-tagline { font-size: 13px; color: rgba(255,255,255,0.6); line-height: 1.6; max-width: 280px; }
         .lp-footer-col { display: flex; flex-direction: column; gap: 10px; }
         .lp-footer-col h4 { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.6); margin-bottom: 4px; }
-        .lp-footer-col a { font-size: 13px; color: rgba(255,255,255,0.45); text-decoration: none; transition: color 0.15s; }
+        .lp-footer-col a { font-size: 13px; color: rgba(255,255,255,0.65); text-decoration: none; transition: color 0.15s; }
         .lp-footer-col a:hover { color: #fff; }
         .lp-footer-bottom { max-width: 1080px; margin: 0 auto; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 24px; }
         .lp-footer-copy { font-size: 12px; color: rgba(255,255,255,0.6); }
