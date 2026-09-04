@@ -166,17 +166,22 @@ export default function CouponsPage() {
             </p>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "ההנחה" : "Discount"}</label>
+            {/* One visible label over two controls, so it is tied to the amount (the field being
+                labelled) and the unit picker carries its own name. Left as a bare sibling label,
+                neither control had an accessible name at all. */}
+            <label htmlFor="coupon-amount" className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "ההנחה" : "Discount"}</label>
             <div className="flex gap-2">
               <select
                 value={discountType}
                 onChange={(e) => setDiscountType(e.target.value as "percent" | "fixed")}
                 className="w-32 shrink-0"
+                aria-label={he ? "סוג ההנחה" : "Discount type"}
               >
                 <option value="percent">{he ? "אחוזים" : "Percent"}</option>
                 <option value="fixed">{he ? "שקלים" : "Shekels"}</option>
               </select>
               <input
+                id="coupon-amount"
                 type="number"
                 min={1}
                 max={discountType === "percent" ? 100 : undefined}
@@ -195,10 +200,10 @@ export default function CouponsPage() {
             <input type="number" min={1} value={maxUses} onChange={(e) => setMaxUses(e.target.value)} placeholder={he ? "ללא הגבלה" : "Unlimited"} className="w-full" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1.5">
+            <label htmlFor="coupon-expires" className="block text-xs font-medium text-gray-600 mb-1.5">
               {he ? "בתוקף עד (ריק = ללא תאריך)" : "Valid until (blank = no end date)"}
             </label>
-            <input type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="w-full" dir="ltr" />
+            <input id="coupon-expires" type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} className="w-full" dir="ltr" />
           </div>
         </div>
 

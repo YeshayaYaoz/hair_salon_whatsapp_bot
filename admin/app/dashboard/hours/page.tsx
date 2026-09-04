@@ -86,15 +86,18 @@ function BlockedTimesSection() {
       <form onSubmit={add} className="bg-white border border-gray-200 rounded-xl p-5 mb-4 flex flex-col gap-3">
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "מתחילת" : "From"}</label>
-            <input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} required className="w-full" dir="ltr" />
+            {/* htmlFor/id, not a bare sibling label: without the association a screen reader
+                announces these two as unlabelled date fields, which is the same defect
+                SettingsControls was fixed for and these were missed by. */}
+            <label htmlFor="block-from" className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "מתחילת" : "From"}</label>
+            <input id="block-from" type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} required className="w-full" dir="ltr" />
             {describeLocalInput(start, localeFor(lang), true) && (
               <p className="text-[11px] font-medium text-[#145F78] mt-1">{describeLocalInput(start, localeFor(lang), true)}</p>
             )}
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "ועד" : "Until"}</label>
-            <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} required className="w-full" dir="ltr" />
+            <label htmlFor="block-until" className="block text-xs font-medium text-gray-600 mb-1.5">{he ? "ועד" : "Until"}</label>
+            <input id="block-until" type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} required className="w-full" dir="ltr" />
             {describeLocalInput(end, localeFor(lang), true) && (
               <p className="text-[11px] font-medium text-[#145F78] mt-1">{describeLocalInput(end, localeFor(lang), true)}</p>
             )}
@@ -213,7 +216,12 @@ export default function HoursPage() {
         ) : hours.map((h, i) => (
           <div
             key={h.dayOfWeek}
-            className={`flex items-center gap-4 px-5 py-3.5 ${i !== hours.length - 1 ? "border-b border-gray-200/50" : ""} ${!h.enabled ? "opacity-50" : ""}`}
+            /* opacity-85, not -50: a closed day is dimmed but its controls stay live — the
+               checkbox here is how you reopen the day. That makes it interactive text, not a
+               disabled control, so WCAG's exemption for disabled elements does not apply and
+               opacity-50 put the day name at 2.6:1 and the from/until labels at 2.3:1. At 85%
+               the cue survives and both clear 4.5. */
+            className={`flex items-center gap-4 px-5 py-3.5 ${i !== hours.length - 1 ? "border-b border-gray-200/50" : ""} ${!h.enabled ? "opacity-85" : ""}`}
           >
             {/* Label wrapper, so the day name is part of the tap target — the native box is 16px,
                 which is a small thing to hit with a thumb. */}
