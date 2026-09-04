@@ -12,7 +12,7 @@ on:
       action:
         description: "Which step to run"
         type: choice
-        options: [status, list, templates, library, discover-templates, wiring, submit-outreach-template, resubmit-templates, add, rename, remove, request-code, verify, verify-from-call, register]
+        options: [status, list, templates, library, discover-templates, wiring, submit-outreach-template, resubmit-templates, send-templates, add, rename, remove, request-code, verify, verify-from-call, register]
         default: status
       number:
         description: "Number in international format"
@@ -32,10 +32,13 @@ on:
         options: [SMS, VOICE]
         default: SMS
       business:
-        description: "Business id (resubmit-templates) — blank lists them"
+        description: "Business id (resubmit-templates / send-templates) — blank lists them"
+        default: ""
+      to:
+        description: "Recipient (send-templates) — blank uses the business's own notification phone"
         default: ""
       confirm:
-        description: "Actually submit (resubmit-templates). Unticked prints the bodies only."
+        description: "Actually submit or send. Unticked prints what would happen and stops."
         type: boolean
         default: false
 
@@ -68,6 +71,7 @@ jobs:
           CODE: ${{ inputs.code }}
           CODE_METHOD: ${{ inputs.code_method }}
           BUSINESS: ${{ inputs.business }}
+          TO: ${{ inputs.to }}
           CONFIRM: ${{ inputs.confirm && 'yes' || '' }}
         run: |
           # Single-use and short-lived, but a verification code in a build log is still a
@@ -82,7 +86,7 @@ jobs:
             status)       args=() ;;
             list)         args=(--list) ;;
             # Handled further down by a different script; nothing to build here.
-            templates|library|discover-templates|wiring|submit-outreach-template|resubmit-templates) args=() ;;
+            templates|library|discover-templates|wiring|submit-outreach-template|resubmit-templates|send-templates) args=() ;;
             add)          args=(--name "$NAME") ;;
             rename)       args=(--rename "$NAME") ;;
             # The script refuses on a CONNECTED or VERIFIED line regardless; --force is deliberately
@@ -133,6 +137,14 @@ jobs:
               npm i -g @railway/cli >/dev/null 2>&1
               railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
                 npx tsx scripts/resubmit-templates.ts ${BUSINESS:+--business "$BUSINESS"} ${CONFIRM:+--confirm}
+              exit $? ;;
+            # Sends real messages to a real handset from the business's own number, so --confirm is
+            # what separates "show me what would go out" from "put it on someone's phone".
+            send-templates)
+              [ -z "$BUSINESS" ] && { echo "::error::'send-templates' needs the business input."; exit 1; }
+              npm i -g @railway/cli >/dev/null 2>&1
+              railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+                npx tsx scripts/send-business-templates.ts --business "$BUSINESS" ${TO:+--to "$TO"} ${CONFIRM:+--confirm}
               exit $? ;;
             # Needs the database, which lives in Railway rather than in Actions secrets.
             wiring)
