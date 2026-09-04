@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "a11y": "node scripts/a11y-scan.mjs"
+    "a11y": "node scripts/a11y-scan.mjs",
+    "a11y:checks": "node scripts/a11y-checks.mjs"
   },
   "dependencies": {
     "@sentry/browser": "^10.63.0",
