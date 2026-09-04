@@ -546,8 +546,17 @@ payplusBillingRouter.put("/payplus/plan", requireAuth, async (req: AuthedRequest
     }
   }
 
-  const oldDaily = PLAN_PRICES_ILS[business.subscriptionPlan] / 30;
-  const newDaily = PLAN_PRICES_ILS[parsed.data.plan] / 30;
+  // Rate and remaining days must come from the SAME period, which they did not.
+  //
+  // The daily rate was the monthly list price over 30, while daysRemaining is however long is left
+  // of the actual cycle — up to 365 on an annual term. So an annual subscriber upgrading
+  // Premium → Ultra with a year to run was charged (749.90 − 374.90)/30 × 365 = ₪4,562.50, against
+  // a true difference of (7,499 − 3,749) = ₪3,750. An overcharge of ₪812.50, on the customers who
+  // had paid furthest in advance, taken instantly from a saved card.
+  const cycle = business.billingCycle === "annual" ? "annual" : "monthly";
+  const periodDays = BILLING_PERIOD_DAYS[cycle];
+  const oldDaily = planPriceForCycle(business.subscriptionPlan, cycle) / periodDays;
+  const newDaily = planPriceForCycle(parsed.data.plan, cycle) / periodDays;
   const daysRemaining = Math.max(0, Math.ceil((business.nextBillingDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
   const proratedDiff = Math.round((newDaily - oldDaily) * daysRemaining);
 

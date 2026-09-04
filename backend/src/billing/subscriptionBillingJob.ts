@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma.js";
-import { couponDiscountForCharge, couponStateAfterCharge } from "./coupons.js";
+import { couponStateAfterCharge } from "./coupons.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { notifyOwner } from "../lib/ownerNotify.js";
 import { sendAdminAlertEmail } from "../lib/email.js";
@@ -8,12 +8,9 @@ import { fmtIls } from "../lib/money.js";
 import {
   chargeSubscriptionToken,
   fetchCustomerUidForToken,
-  PLAN_PRICES_ILS,
   BILLING_PERIOD_DAYS,
   LOYALTY_DISCOUNT_AFTER_CYCLES,
   LOYALTY_DISCOUNT_ILS,
-  MANAGED_PAYMENT_SURCHARGE_ILS,
-  MANAGED_INVOICE_SURCHARGE_ILS,
 } from "./payplusSubscription.js";
 
 const FRONTEND_URL = process.env.FRONTEND_URL?.split(",")[0]?.trim() ?? "https://torionline.com";
@@ -109,15 +106,16 @@ export async function runSubscriptionBillingJob(): Promise<void> {
     }
 
     const periodDays = BILLING_PERIOD_DAYS[business.billingCycle] ?? 30;
-    const periodMultiplier = business.billingCycle === "annual" ? 10 : 1;
     // Shared with the pre-charge reminder, which used to compute its own version and quote a
-    // different number two days beforehand. See subscriptionAmount.ts.
+    // different number two days beforehand. See subscriptionAmount.ts — which also applies the
+    // coupon and the annual multiplier, so nothing here may recompute either. A second copy of
+    // that arithmetic sat right below this line, unused, for exactly as long as it took someone
+    // to notice; the next person to touch it would have wired it in and double-counted.
     const amountIls = subscriptionChargeIls(business);
     if (amountIls === null) {
       console.error(`[subscriptionBilling] Unknown plan "${business.subscriptionPlan}" for business ${business.id} — skipping`);
       continue;
     }
-    const couponOff = couponDiscountForCharge(business) * periodMultiplier;
 
     const token = business.subscriptionToken ? decryptSecret(business.subscriptionToken) : null;
 

@@ -293,3 +293,152 @@ describe("a due subscription with no saved card", () => {
     expect(lastData().billingFailedAttempts).toBe(0);
   });
 });
+
+/**
+ * What a successful charge writes.
+ *
+ * The failure ladder above is thoroughly covered; the success branch was not, and it is where the
+ * quieter money bugs live. Nothing here throws when it goes wrong — a coupon consumed on a failed
+ * attempt, a quota never reset, a loyalty discount awarded twice — it just bills the wrong amount
+ * next month, to someone who has no way of knowing.
+ */
+describe("what a successful charge writes", () => {
+  beforeEach(() => {
+    chargeSubscriptionToken.mockResolvedValue({ success: true });
+  });
+
+  it("resets the message quota, because the new cycle is the one being paid for", async () => {
+    mockPrisma.business.findMany.mockResolvedValue([dueBusiness({ messagesUsedThisCycle: 812 })]);
+    await runSubscriptionBillingJob();
+    expect(lastData().messagesUsedThisCycle).toBe(0);
+  });
+
+  it("does NOT reset the quota when the charge failed", async () => {
+    // Otherwise a declining card buys a fresh allowance every retry — three free quotas on the way
+    // to past_due, for the businesses least likely to be paying for them.
+    chargeSubscriptionToken.mockResolvedValue({ success: false, error: "declined" });
+    mockPrisma.business.findMany.mockResolvedValue([dueBusiness({ messagesUsedThisCycle: 812 })]);
+    await runSubscriptionBillingJob();
+    expect(lastData()).not.toHaveProperty("messagesUsedThisCycle");
+  });
+
+  it("advances the due date by the monthly period", async () => {
+    mockPrisma.business.findMany.mockResolvedValue([dueBusiness()]);
+    await runSubscriptionBillingJob();
+    const next = lastData().nextBillingDate as Date;
+    expect(Math.round((next.getTime() - Date.now()) / DAY_MS)).toBe(30);
+  });
+
+  it("advances an annual subscriber by a year, not a month", async () => {
+    mockPrisma.business.findMany.mockResolvedValue([dueBusiness({ billingCycle: "annual" })]);
+    await runSubscriptionBillingJob();
+    const next = lastData().nextBillingDate as Date;
+    // A month here would bill an annual customer twelve times for a year of service.
+    expect(Math.round((next.getTime() - Date.now()) / DAY_MS)).toBeGreaterThan(300);
+  });
+});
+
+/**
+ * The coupon must be spent by a charge that actually collected money.
+ *
+ * Counting a cycle down on a failed attempt silently raises the price of the retry — for a business
+ * whose card just declined, and in a way nobody could reconstruct afterwards.
+ */
+describe("coupon cycles", () => {
+  const withCoupon = () => dueBusiness({ couponDiscountIls: 50, couponCyclesRemaining: 3 });
+
+  it("counts down on a successful charge", async () => {
+    chargeSubscriptionToken.mockResolvedValue({ success: true });
+    mockPrisma.business.findMany.mockResolvedValue([withCoupon()]);
+    await runSubscriptionBillingJob();
+    expect(lastData().couponCyclesRemaining).toBe(2);
+  });
+
+  it("does not count down on a failed charge", async () => {
+    chargeSubscriptionToken.mockResolvedValue({ success: false, error: "declined" });
+    mockPrisma.business.findMany.mockResolvedValue([withCoupon()]);
+    await runSubscriptionBillingJob();
+    expect(lastData()).not.toHaveProperty("couponCyclesRemaining");
+  });
+
+  it("charges the discounted amount while cycles remain", async () => {
+    chargeSubscriptionToken.mockResolvedValue({ success: true });
+    mockPrisma.business.findMany.mockResolvedValue([withCoupon()]);
+    await runSubscriptionBillingJob();
+    // Premium 374.90 less the ₪50 coupon. Asserted through the charge call, not the stored row:
+    // the row records what happened, this is the number that reaches the card.
+    expect(chargeSubscriptionToken.mock.calls[0][1]).toBeCloseTo(324.9, 2);
+  });
+
+  it("charges full price once the coupon is spent", async () => {
+    chargeSubscriptionToken.mockResolvedValue({ success: true });
+    mockPrisma.business.findMany.mockResolvedValue([
+      dueBusiness({ couponDiscountIls: 50, couponCyclesRemaining: 0 }),
+    ]);
+    await runSubscriptionBillingJob();
+    expect(chargeSubscriptionToken.mock.calls[0][1]).toBeCloseTo(374.9, 2);
+  });
+});
+
+/**
+ * The loyalty discount is a permanent price cut, so awarding it twice is a permanent overpayment
+ * in the customer's favour that nobody would report, and awarding it early gives it to someone who
+ * has not earned it. Both are one-line mistakes in the same condition.
+ */
+describe("the loyalty discount", () => {
+  beforeEach(() => {
+    chargeSubscriptionToken.mockResolvedValue({ success: true });
+  });
+
+  it("is not awarded before the tenure threshold", async () => {
+    mockPrisma.business.findMany.mockResolvedValue([dueBusiness({ billingCyclesCompleted: 1 })]);
+    await runSubscriptionBillingJob();
+    expect(lastData()).not.toHaveProperty("loyaltyDiscountIls");
+    expect(notifyOwner).not.toHaveBeenCalled();
+  });
+
+  it("is awarded once tenure crosses it, and the owner is told", async () => {
+    mockPrisma.business.findMany.mockResolvedValue([dueBusiness({ billingCyclesCompleted: 11 })]);
+    await runSubscriptionBillingJob();
+    expect(lastData().loyaltyDiscountIls).toBeGreaterThan(0);
+    expect(notifyOwner).toHaveBeenCalled();
+  });
+
+  it("is not awarded a second time to someone who already has it", async () => {
+    mockPrisma.business.findMany.mockResolvedValue([
+      dueBusiness({ billingCyclesCompleted: 30, loyaltyDiscountIls: 30 }),
+    ]);
+    await runSubscriptionBillingJob();
+    expect(lastData()).not.toHaveProperty("loyaltyDiscountIls");
+  });
+
+  it("is not awarded on an annual term, which is already discounted", async () => {
+    mockPrisma.business.findMany.mockResolvedValue([
+      dueBusiness({ billingCycle: "annual", billingCyclesCompleted: 11 }),
+    ]);
+    await runSubscriptionBillingJob();
+    expect(lastData()).not.toHaveProperty("loyaltyDiscountIls");
+  });
+});
+
+/**
+ * A notification must never be able to cost a charge.
+ *
+ * The charge has already happened by the time the owner is told about it. If a throw from the
+ * notification escaped, the update recording that charge would be skipped — and the next nightly
+ * run would find the same business due and charge it again.
+ */
+describe("notification failures", () => {
+  it("does not stop the run when telling the owner throws", async () => {
+    chargeSubscriptionToken.mockResolvedValue({ success: true });
+    notifyOwner.mockRejectedValue(new Error("meta is down"));
+    mockPrisma.business.findMany.mockResolvedValue([
+      dueBusiness({ billingCyclesCompleted: 11 }),
+      dueBusiness({ id: "biz2", billingCyclesCompleted: 11 }),
+    ]);
+
+    await expect(runSubscriptionBillingJob()).resolves.toBeUndefined();
+    // Both businesses were still charged — the first one's failed notice did not abort the loop.
+    expect(chargeSubscriptionToken).toHaveBeenCalledTimes(2);
+  });
+});
