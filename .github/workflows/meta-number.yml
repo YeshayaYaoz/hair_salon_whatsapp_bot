@@ -12,7 +12,7 @@ on:
       action:
         description: "Which step to run"
         type: choice
-        options: [status, list, templates, library, discover-templates, wiring, submit-outreach-template, resubmit-templates, send-templates, add, rename, remove, request-code, verify, verify-from-call, register]
+        options: [status, list, templates, library, discover-templates, wiring, submit-outreach-template, resubmit-templates, send-templates, payment-method-notice, add, rename, remove, request-code, verify, verify-from-call, register]
         default: status
       number:
         description: "Number in international format"
@@ -86,7 +86,7 @@ jobs:
             status)       args=() ;;
             list)         args=(--list) ;;
             # Handled further down by a different script; nothing to build here.
-            templates|library|discover-templates|wiring|submit-outreach-template|resubmit-templates|send-templates) args=() ;;
+            templates|library|discover-templates|wiring|submit-outreach-template|resubmit-templates|send-templates|payment-method-notice) args=() ;;
             add)          args=(--name "$NAME") ;;
             rename)       args=(--rename "$NAME") ;;
             # The script refuses on a CONNECTED or VERIFIED line regardless; --force is deliberately
@@ -149,6 +149,14 @@ jobs:
               npm i -g @railway/cli >/dev/null 2>&1
               railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
                 npx tsx scripts/send-business-templates.ts "${who[@]}" ${TO:+--to "$TO"} ${CONFIRM:+--confirm}
+              exit $? ;;
+            # Sends one owner a real message about their own account, so it checks the account
+            # first: the script refuses outright if a card IS saved rather than claiming otherwise.
+            payment-method-notice)
+              [ -z "$BUSINESS" ] && { echo "::error::'payment-method-notice' needs the business input."; exit 1; }
+              npm i -g @railway/cli >/dev/null 2>&1
+              railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+                npx tsx scripts/send-payment-method-notice.ts --business "$BUSINESS" ${TO:+--to "$TO"} ${CONFIRM:+--confirm}
               exit $? ;;
             # Needs the database, which lives in Railway rather than in Actions secrets.
             wiring)
