@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SkeletonBlock } from "../../lib/Skeleton";
+import { useDialog } from "../../lib/useDialog";
 
 const STATUS_COLORS: Record<string, string> = {
   trial: "bg-amber-50 text-amber-700 border-amber-200",
@@ -206,6 +207,82 @@ function SavingsSummary({
   );
 }
 
+/**
+ * Confirms a plan change that will charge a card immediately.
+ *
+ * Says the direction, the new monthly price, and — for an upgrade — that a prorated amount is
+ * charged now. It deliberately does not name that amount: the server computes it from the days
+ * left in the period, and a number invented here to look helpful would be wrong often enough to
+ * be worse than the honest sentence.
+ */
+function PlanChangeDialog({
+  lang, from, to, onCancel, onConfirm, busy,
+}: {
+  lang: "he" | "en";
+  from: PlanKey;
+  to: PlanKey;
+  onCancel: () => void;
+  onConfirm: () => void;
+  busy: boolean;
+}) {
+  const he = lang === "he";
+  const isUpgrade = PLAN_PRICES[to] > PLAN_PRICES[from];
+  const panelRef = useDialog<HTMLDivElement>(onCancel);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onCancel}>
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="plan-change-title"
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-xl border border-gray-200 shadow-xl max-w-md w-full p-6"
+      >
+        <h2 id="plan-change-title" className="text-base font-bold text-gray-900">
+          {isUpgrade
+            ? he ? `לשדרג ל-${PLAN_LABEL[to]}?` : `Upgrade to ${PLAN_LABEL[to]}?`
+            : he ? `לעבור ל-${PLAN_LABEL[to]}?` : `Switch to ${PLAN_LABEL[to]}?`}
+        </h2>
+        <p className="text-sm text-gray-600 mt-2 leading-relaxed">
+          {he
+            ? `המסלול ישתנה מ-${PLAN_LABEL[from]} ל-${PLAN_LABEL[to]}, ומהחיוב הבא תשלמו ₪${fmtIls(PLAN_PRICES[to])} לחודש.`
+            : `Your plan changes from ${PLAN_LABEL[from]} to ${PLAN_LABEL[to]}, and from your next bill you pay ₪${fmtIls(PLAN_PRICES[to])} a month.`}
+        </p>
+        {isUpgrade && (
+          // The part worth stopping for: this one takes money now, from the card already on file.
+          <p className="text-sm text-gray-900 font-medium mt-2 leading-relaxed">
+            {he
+              ? "בנוסף יתבצע חיוב יחסי עכשיו, בכרטיס השמור, עבור יתרת התקופה הנוכחית."
+              : "A prorated amount for the rest of the current period is charged now, to your saved card."}
+          </p>
+        )}
+        <div className="flex gap-2 justify-end mt-5">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 text-sm font-semibold px-4 py-2 rounded-lg transition"
+          >
+            {he ? "ביטול" : "Cancel"}
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy}
+            className="bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition"
+          >
+            {busy
+              ? he ? "מחייב…" : "Charging…"
+              : isUpgrade
+                ? he ? "אישור ושדרוג" : "Confirm & upgrade"
+                : he ? "אישור ומעבר" : "Confirm & switch"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function BillingPage() {
   const { t, lang } = useLanguage();
   const he = lang === "he";
@@ -236,6 +313,8 @@ export default function BillingPage() {
   const [bookingStats, setBookingStats] = useState<{ confirmedThisMonth: number; revenueThisMonth: number } | null>(null);
   const [hasPaymentMethod, setHasPaymentMethod] = useState<boolean | null>(null);
   const [cardLoading, setCardLoading] = useState(false);
+  // The plan the owner clicked and has not confirmed yet. Null means no dialog is open.
+  const [pendingPlan, setPendingPlan] = useState<PlanKey | null>(null);
 
   async function load() {
     const me = await apiFetch<{
@@ -390,8 +469,26 @@ export default function BillingPage() {
     }
   }
 
+  /**
+   * Asks before a plan change that costs money on the spot.
+   *
+   * An active subscriber with a card on file has no payment page between the click and the charge:
+   * pressing "שדרג ל-Ultra" put a prorated amount on their card immediately, from a button sitting
+   * next to two others, with nothing in between and nothing to undo it. A confirmation is the
+   * whole of what was missing.
+   *
+   * Only for the upward direction with a card saved. Choosing a plan before subscribing charges
+   * nothing (it is a selection), and a business with no token is sent to a payment page that asks
+   * for its own confirmation.
+   */
+  function requestPlanChange(newPlan: PlanKey) {
+    if (status !== "active" || !currentPlan || !hasPaymentMethod) return changePlan(newPlan);
+    setPendingPlan(newPlan);
+  }
+
   async function changePlan(newPlan: PlanKey) {
     setError(null);
+    setPendingPlan(null);
     setPlan(newPlan);
     if (status !== "active" || !currentPlan) return; // just a pre-checkout selection, nothing to charge yet
     setCheckoutLoading(true);
@@ -554,7 +651,7 @@ export default function BillingPage() {
                 {PLANS.filter((p) => p !== activePlan).map((p) => (
                   <button
                     key={p}
-                    onClick={() => changePlan(p)}
+                    onClick={() => requestPlanChange(p)}
                     disabled={checkoutLoading}
                     className="inline-flex items-center justify-center gap-1.5 bg-gray-50 hover:bg-gray-100 disabled:opacity-50 text-gray-700 border border-gray-200 text-sm font-semibold px-4 py-2 rounded-lg transition"
                   >
@@ -701,7 +798,7 @@ export default function BillingPage() {
                       </button>
                     ) : (
                       <button
-                        onClick={() => changePlan(p)}
+                        onClick={() => requestPlanChange(p)}
                         disabled={checkoutLoading}
                         className="w-full inline-flex items-center justify-center gap-2 bg-[#1B7FA0] hover:bg-[#2A9BBF] disabled:opacity-50 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition"
                       >
@@ -754,13 +851,14 @@ export default function BillingPage() {
                       ? "לא נשמר כרטיס. בלי כרטיס שמור כל חיוב דורש מעבר לעמוד תשלום מחדש."
                       : "No card saved. Without one, every charge sends you back to a payment page."}
                 </p>
-                {/* The two questions anyone hesitates over before typing a card number: does this
-                    charge me, and who ends up holding the number. Both answered before the click. */}
+                {/* The two questions anyone hesitates over before typing a card number: what does
+                    this cost me, and who ends up holding the number. Both answered before the
+                    click — a ₪1 line nobody was warned about is how a chargeback starts. */}
                 {!hasPaymentMethod && (
                   <p className="text-[11px] text-gray-600 mt-1.5 leading-relaxed">
                     {he
-                      ? "שמירת הכרטיס לא מחייבת אתכם בכלום. פרטי הכרטיס נשמרים אצל חברת הסליקה ולא אצלנו."
-                      : "Saving a card charges you nothing. Card details are held by the payment processor, not by us."}
+                      ? "לשמירת הכרטיס מתבצע חיוב אימות של ₪1, שנטען במלואו לארנק ההודעות שלכם. פרטי הכרטיס נשמרים אצל חברת הסליקה ולא אצלנו."
+                      : "Saving a card runs a ₪1 verification charge, credited in full to your message wallet. Card details are held by the payment processor, not by us."}
                   </p>
                 )}
               </div>
@@ -860,6 +958,17 @@ export default function BillingPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {pendingPlan && (
+        <PlanChangeDialog
+          lang={lang}
+          from={activePlan}
+          to={pendingPlan}
+          busy={checkoutLoading}
+          onCancel={() => setPendingPlan(null)}
+          onConfirm={() => changePlan(pendingPlan)}
+        />
       )}
 
       {bookingStats && (

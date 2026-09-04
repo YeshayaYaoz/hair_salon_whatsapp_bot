@@ -200,25 +200,26 @@ export async function createWalletTopupLink(businessId: string, amountIls: numbe
 }
 
 /**
- * What a card-on-file page charges: nothing.
+ * What a card-on-file page charges.
  *
- * This started at ₪1, on the assumption that generateLink has no zero-amount mode — every other
- * page in this file is a payment, and `create_token` is a flag on top of one. The assumption was
- * never checked. scripts/payplus-card-probe.ts asked PayPlus directly and it generated a ₪0 page
- * without complaint, which makes the verification charge, the wallet credit compensating for it,
- * and the paragraph of copy explaining both, all unnecessary.
+ * This was briefly 0. PayPlus's generateLink accepted a ₪0 page and rendered it — and the rendered
+ * page had no card fields on it at all, just "₪0.00, נותר לתשלום ₪0.00" and a confirm button.
+ * Nothing to tokenize, so nothing to save. That is the whole lesson of the detour: an API
+ * accepting a request says the request is valid, not that the page it produces does the job, and
+ * only looking at the page showed the difference.
  *
- * Zero rather than an approval (charge_method 2 / J5), which PayPlus also accepted: an
- * authorization still puts a pending line on the owner's card and still has to be released. The
- * point was to take no money, and ₪0 takes no money in the simplest way available.
+ * So back to a shekel, which is the shape every other checkout in this file uses and the only one
+ * observed to actually return a token. The shekel is not kept — the callback credits it to the
+ * message wallet, where it is spent on the business's own sends. That is the difference between a
+ * verification charge and a fee, and it is why the page says so before the click rather than
+ * hoping nobody reads their statement.
  *
- * WHAT IS STILL UNPROVEN: that a ₪0 transaction returns a token. PayPlus generating the page only
- * says the request is valid. If it turns out not to tokenize, the webhook logs "card NOT saved"
- * and the billing page keeps saying no card is saved — the owner is not told something false —
- * but the flow does nothing useful and this constant should go back to MIN_CHARGE_ILS with the
- * wallet credit restored (both are still in place below and in the webhook).
+ * charge_method 2 (J5 authorization) is the untried third option: it should show card fields and
+ * verify without capturing. It is not used because it would be a second guess of the same kind —
+ * PayPlus accepted that request too, and acceptance has now been shown to prove nothing about the
+ * page. Worth trying, by looking at the page, before it is worth shipping.
  */
-export const CARD_ON_FILE_CHARGE_ILS = 0;
+export const CARD_ON_FILE_CHARGE_ILS = MIN_CHARGE_ILS;
 
 /**
  * A hosted page whose purpose is storing the card, not collecting money.
@@ -232,11 +233,8 @@ export async function createPaymentMethodLink(businessId: string, returnUrl: str
   return generateCheckoutPage({
     businessId,
     amountIls: CARD_ON_FILE_CHARGE_ILS,
-    itemName: "תורי — שמירת אמצעי תשלום (ללא חיוב)",
+    itemName: `תורי — שמירת אמצעי תשלום (₪${CARD_ON_FILE_CHARGE_ILS}, נטען לארנק ההודעות)`,
     returnUrl,
-    // checkoutAmountIls stays 0, which the webhook reads as "nothing to credit". The crediting
-    // branch is kept rather than deleted: if a ₪0 page turns out not to tokenize, this constant
-    // goes back to ₪1 and the compensation has to come back with it in the same commit.
     pending: { checkoutPurpose: "card", checkoutAmountIls: CARD_ON_FILE_CHARGE_ILS },
   });
 }
