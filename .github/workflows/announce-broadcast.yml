@@ -18,6 +18,10 @@ on:
         description: "Actually send (leave off to list recipients only)"
         type: boolean
         default: false
+      mark_sent:
+        description: "Record everyone as already having received it, WITHOUT sending — for an announcement that went out before the record existed"
+        type: boolean
+        default: false
       only:
         description: "Send to just this one recipient — a phone for whatsapp, an email address for email"
         type: string
@@ -39,6 +43,7 @@ jobs:
       SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
       PROJECT: ${{ inputs.project }}
       CONFIRM: ${{ inputs.confirm && '--confirm' || '' }}
+      MARK_SENT: ${{ inputs.mark_sent && '--mark-sent' || '' }}
       ONLY: ${{ inputs.only }}
     steps:
       - uses: actions/checkout@v4
@@ -60,7 +65,7 @@ jobs:
       - name: WhatsApp
         if: inputs.channel == 'both' || inputs.channel == 'whatsapp'
         run: |
-          args="$CONFIRM"
+          args="$CONFIRM $MARK_SENT"
           [ -n "$ONLY" ] && args="$args --only $ONLY"
           railway run --service "$SERVICE" --environment "$RAILWAY_ENVIRONMENT" -- \
             npx tsx scripts/announce-whatsapp.ts $args
@@ -68,7 +73,7 @@ jobs:
       - name: Email
         if: inputs.channel == 'both' || inputs.channel == 'email'
         run: |
-          args="$CONFIRM"
+          args="$CONFIRM $MARK_SENT"
           [ -n "$ONLY" ] && args="$args --only $ONLY"
           railway run --service "$SERVICE" --environment "$RAILWAY_ENVIRONMENT" -- \
             npx tsx scripts/announce-update.ts $args

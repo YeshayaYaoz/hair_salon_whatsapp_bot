@@ -29,9 +29,14 @@ import { prisma } from "../src/lib/prisma.js";
 import { sendWhatsAppTemplate } from "../src/webhook/whatsappClient.js";
 import { announceTemplate } from "../src/lib/whatsappTemplates.js";
 import { normalizeOwnerPhone } from "../src/lib/phone.js";
+import { loadAnnounceRecord, markAnnounceSent } from "../src/lib/announceRecord.js";
 
 const confirm = process.argv.includes("--confirm");
 const again = process.argv.includes("--again");
+// Records everyone as having received it, without sending anything. For an announcement that went
+// out before the record existed: without it the only way to protect those people from a duplicate
+// would be to remember, by hand, not to run this again.
+const markOnly = process.argv.includes("--mark-sent");
 const onlyIdx = process.argv.indexOf("--only");
 const only = onlyIdx >= 0 ? normalizeOwnerPhone(process.argv[onlyIdx + 1] ?? "") ?? undefined : undefined;
 
@@ -48,20 +53,8 @@ async function main() {
   }
 
   const { name: templateName, languageCode } = announceTemplate();
-  const sentKey = `announce:${templateName}:sent`;
-
-  // Phones this announcement has already reached. Stored as a JSON array of normalised numbers;
-  // a malformed or missing row reads as "nobody", which errs toward sending rather than toward
-  // silently skipping everyone — a run that reaches nobody and says "0 sent" is easy to misread
-  // as success.
-  const record = await prisma.systemSetting.findUnique({ where: { key: sentKey } });
-  let alreadySent: string[] = [];
-  try {
-    const parsed = record ? JSON.parse(record.value) : [];
-    if (Array.isArray(parsed)) alreadySent = parsed.filter((v): v is string => typeof v === "string");
-  } catch {
-    console.warn(`Could not read ${sentKey} — treating it as empty.`);
-  }
+  const record = await loadAnnounceRecord("whatsapp", templateName);
+  const alreadySent = record.sent;
 
   const businesses = await prisma.business.findMany({
     where: { subscriptionStatus: { in: ["active", "trial"] } },
@@ -105,6 +98,11 @@ async function main() {
   for (const r of recipientsToSend) console.log(`  ${r.name}  ${r.phone}`);
   console.log("");
 
+  if (markOnly) {
+    await markAnnounceSent(record, recipients.map((r) => r.phone));
+    console.log(`Marked ${recipients.length} recipient(s) as already having received this. Nothing was sent.`);
+    return;
+  }
   if (!confirm) {
     console.log("Nothing sent. Re-run with --confirm, or --only <phone> to test on one number first.");
     return;
@@ -131,12 +129,7 @@ async function main() {
       sent++;
       // Recorded per send, not once at the end: a run that dies halfway must not leave the people
       // it already reached unmarked, or the next run messages them a second time.
-      alreadySent.push(r.phone);
-      await prisma.systemSetting.upsert({
-        where: { key: sentKey },
-        create: { key: sentKey, value: JSON.stringify(alreadySent) },
-        update: { value: JSON.stringify(alreadySent) },
-      });
+      await markAnnounceSent(record, [r.phone]);
     } catch (err) {
       failed.push(`${r.name} (${r.phone}): ${err instanceof Error ? err.message : String(err)}`);
     }
