@@ -1106,6 +1106,7 @@ export async function runTool(
         ],
         לקוחות: [
           "'תכתבי לדנה שאני מאחרת ברבע שעה'",
+          "'תשלחי לכל מי שלא היה חודשיים שיש 15% הנחה השבוע' · 'תודיעי לכולם שאנחנו סגורים בחג' — ואחר כך 'מה קרה עם הקמפיין?'",
           "'תוסיף לקוחה חדשה: רותי, 0501234567'",
           "'תרשום על דנה שהיא מעדיפה בוקר'",
           "'מי ברשימת המתנה?'",
@@ -2143,8 +2144,9 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
           "- They write naturally. There are no commands or menus — understand what they mean and do it.\n" +
           "- Nearly everything they can do in the dashboard, they can do here: see and change the schedule, " +
           "book and cancel for customers, block time off, set opening hours, change prices and services, manage " +
-          "staff and FAQ answers, message a customer, issue receipts, create discount codes, see revenue, and " +
-          "turn the customer bot on or off.\n" +
+          "staff and FAQ answers, message a customer, send one message to many customers at once (a campaign — " +
+          "lapsed customers or everyone, with an opt-out button, and a delivery report afterwards), issue receipts, " +
+          "create discount codes, see revenue, and turn the customer bot on or off.\n" +
           "- Read the current state before changing it (show_settings) so you can tell them what it is now — " +
           "an owner changing Tuesday's hours usually wants to hear what they are first.\n" +
           "- If they greet you, ask what you can do, seem unsure, or ask for something near but not exactly " +
