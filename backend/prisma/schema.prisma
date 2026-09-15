@@ -333,6 +333,36 @@ model SystemJobRun {
   lastDurationMs Int?
 }
 
+/// One row per business per billing period, written BEFORE PayPlus is asked to charge it.
+///
+/// The billing job claims a business for the calendar day before charging, which stops a restart
+/// charging twice on the same day. It did not stop the day after. If the process died between
+/// PayPlus taking the money and nextBillingDate being advanced, the next day's run found a
+/// business whose due date was still in the past, claimed it afresh, and charged it again.
+///
+/// This row is the memory that survives that crash. Keyed by the due date the charge is for: a
+/// "charged" row for the period means the money already moved, and the job advances the date
+/// without calling PayPlus; a "pending" row older than a few minutes means a run died mid-charge
+/// and nobody knows whether the money moved — so the job refuses to charge and asks a person to
+/// check the PayPlus transaction, which is the only safe answer to "maybe".
+model SubscriptionCharge {
+  id            String   @id @default(cuid())
+  businessId    String
+  /// The due date this charge is for, YYYY-MM-DD. A dunning retry re-arms the due date, so a
+  /// retry after a genuine failure gets its own row; a crash does not move it, and collides.
+  periodKey     String
+  amountIls     Float
+  /// "pending" → "charged" | "failed"; "unknown" once a stale pending row has been reported.
+  status        String
+  transactionId String?
+  error         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([businessId, periodKey])
+  @@index([status, updatedAt])
+}
+
 /// Every inbound WhatsApp message, written BEFORE Meta is told 200.
 ///
 /// Two failures this closes, both from the webhook keeping state only in process memory. Meta

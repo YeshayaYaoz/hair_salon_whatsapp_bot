@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockPrisma = {
   business: { findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+  // The per-period ledger (chargeLedger.ts). create resolving = "nothing on record, go ahead".
+  subscriptionCharge: { create: vi.fn(), findUniqueOrThrow: vi.fn(), update: vi.fn() },
 };
 vi.mock("../lib/prisma.js", () => ({ prisma: mockPrisma }));
 vi.mock("../lib/crypto.js", () => ({ decryptSecret: (v: string) => v }));
@@ -58,6 +60,8 @@ const lastData = () => mockPrisma.business.update.mock.calls.at(-1)![0].data;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockPrisma.subscriptionCharge.create.mockResolvedValue({});
+  mockPrisma.subscriptionCharge.update.mockResolvedValue({});
   mockPrisma.business.updateMany.mockResolvedValue({ count: 1 }); // claim succeeds by default
   mockPrisma.business.update.mockResolvedValue({});
   sendAdminAlertEmail.mockResolvedValue(undefined);
@@ -291,5 +295,54 @@ describe("a due subscription with no saved card", () => {
 
     expect(chargeSubscriptionToken).toHaveBeenCalledOnce();
     expect(lastData().billingFailedAttempts).toBe(0);
+  });
+});
+
+/**
+ * The day-claim stops a restart charging twice today. It never stopped tomorrow: PayPlus takes
+ * the money, the process dies before nextBillingDate moves, and the next day's run finds a
+ * business still due. The ledger row written before the charge is what the next run consults.
+ */
+describe("a period the ledger already knows about", () => {
+  const dupe = () => Object.assign(new Error("unique"), { code: "P2002" });
+
+  it("advances the date without calling PayPlus when the period was already charged", async () => {
+    mockPrisma.business.findMany.mockResolvedValue([dueBusiness({ nextBillingDate: new Date("2026-09-15T00:00:00Z") })]);
+    mockPrisma.subscriptionCharge.create.mockRejectedValue(dupe());
+    mockPrisma.subscriptionCharge.findUniqueOrThrow.mockResolvedValue({ id: "c1", status: "charged", transactionId: "tx-old", updatedAt: new Date() });
+
+    await runSubscriptionBillingJob();
+
+    // The money already moved once. Not again.
+    expect(chargeSubscriptionToken).not.toHaveBeenCalled();
+    // But the business is treated as paid: date advanced, dunning reset.
+    expect(lastData().nextBillingDate).toBeInstanceOf(Date);
+    expect(lastData().billingFailedAttempts).toBe(0);
+  });
+
+  it("refuses to charge behind a stale pending row and tells the operator", async () => {
+    mockPrisma.business.findMany.mockResolvedValue([dueBusiness()]);
+    mockPrisma.subscriptionCharge.create.mockRejectedValue(dupe());
+    mockPrisma.subscriptionCharge.findUniqueOrThrow.mockResolvedValue({
+      id: "c1", status: "pending", transactionId: null, updatedAt: new Date(Date.now() - 30 * 60 * 1000),
+    });
+
+    await runSubscriptionBillingJob();
+
+    expect(chargeSubscriptionToken).not.toHaveBeenCalled();
+    expect(sendAdminAlertEmail).toHaveBeenCalledOnce();
+    expect(sendAdminAlertEmail.mock.calls[0][0]).toContain("לא ידוע");
+    // Nothing about the subscription itself changes — the only write was the claim.
+    expect(mockPrisma.business.update).not.toHaveBeenCalled();
+  });
+
+  it("settles the ledger row as charged, with the transaction id, on a successful charge", async () => {
+    mockPrisma.business.findMany.mockResolvedValue([dueBusiness()]);
+    chargeSubscriptionToken.mockResolvedValue({ success: true, transactionId: "tx-new" });
+
+    await runSubscriptionBillingJob();
+
+    const settle = mockPrisma.subscriptionCharge.update.mock.calls.at(-1)![0].data;
+    expect(settle).toEqual({ status: "charged", transactionId: "tx-new", error: null });
   });
 });
