@@ -341,6 +341,67 @@ model SystemJobRun {
   lastDurationMs Int?
 }
 
+/// One row per business per billing period, written BEFORE PayPlus is asked to charge it.
+///
+/// The billing job claims a business for the calendar day before charging, which stops a restart
+/// charging twice on the same day. It did not stop the day after. If the process died between
+/// PayPlus taking the money and nextBillingDate being advanced, the next day's run found a
+/// business whose due date was still in the past, claimed it afresh, and charged it again.
+///
+/// This row is the memory that survives that crash. Keyed by the due date the charge is for: a
+/// "charged" row for the period means the money already moved, and the job advances the date
+/// without calling PayPlus; a "pending" row older than a few minutes means a run died mid-charge
+/// and nobody knows whether the money moved — so the job refuses to charge and asks a person to
+/// check the PayPlus transaction, which is the only safe answer to "maybe".
+model SubscriptionCharge {
+  id            String   @id @default(cuid())
+  businessId    String
+  /// The due date this charge is for, YYYY-MM-DD. A dunning retry re-arms the due date, so a
+  /// retry after a genuine failure gets its own row; a crash does not move it, and collides.
+  periodKey     String
+  amountIls     Float
+  /// "pending" → "charged" | "failed"; "unknown" once a stale pending row has been reported.
+  status        String
+  transactionId String?
+  error         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([businessId, periodKey])
+  @@index([status, updatedAt])
+}
+
+/// Every inbound WhatsApp message, written BEFORE Meta is told 200.
+///
+/// Two failures this closes, both from the webhook keeping state only in process memory. Meta
+/// delivers at-least-once, and deduplication lived in a Map that a redeploy emptied — so a
+/// duplicate arriving during a deploy was answered twice, and two instances never shared it at
+/// all. And the handler acknowledged 200 first, then processed: a crash in between lost the
+/// message for good, since Meta had its receipt and would not retry, and nothing anywhere
+/// recorded that a customer had written.
+///
+/// The unique wamid makes the second insert fail, which is the deduplication — durable across
+/// restarts and instances, with no memory to keep. Rows still unprocessed after a grace period
+/// are picked up by the recovery sweep, which is what turns "the process died mid-reply" into
+/// "the reply came a minute late". The raw payload is kept so a bad reply can be replayed
+/// while debugging instead of reconstructed from logs.
+model WhatsAppInbound {
+  id            String    @id @default(cuid())
+  /// Meta's message id (wamid). Unique is the whole point.
+  wamid         String    @unique
+  phoneNumberId String
+  payload       Json
+  receivedAt    DateTime  @default(now())
+  /// Set when a worker (the live handler or the sweep) begins; the sweep only takes rows whose
+  /// start is stale, so it never races a handler that is merely slow.
+  startedAt     DateTime?
+  processedAt   DateTime?
+  attempts      Int       @default(0)
+  lastError     String?
+
+  @@index([processedAt, receivedAt])
+}
+
 /// A date range on which the business operates differently — different pricing, a minimum stay, a
 /// special menu, reduced hours. Unlike BlockedTime this does NOT close the calendar: the business
 /// is open, the terms are just different, and the bot's job is to say so before quoting anything.

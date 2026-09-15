@@ -5,6 +5,7 @@ import { notifyOwner } from "../lib/ownerNotify.js";
 import { sendAdminAlertEmail } from "../lib/email.js";
 import { subscriptionChargeIls } from "./subscriptionAmount.js";
 import { fmtIls } from "../lib/money.js";
+import { claimChargeForPeriod, recordChargeOutcome, periodKeyFor } from "./chargeLedger.js";
 import {
   chargeSubscriptionToken,
   fetchCustomerUidForToken,
@@ -94,6 +95,7 @@ export async function runSubscriptionBillingJob(): Promise<void> {
       billingCyclesCompleted: true, loyaltyDiscountIls: true, paymentProvider: true, invoiceProvider: true,
       couponDiscountIls: true, couponCyclesRemaining: true,
       billingFailedAttempts: true,
+      nextBillingDate: true,
       notificationPhone: true, whatsappPhoneNumberId: true, whatsappAccessToken: true,
     },
   });
@@ -125,10 +127,34 @@ export async function runSubscriptionBillingJob(): Promise<void> {
       continue;
     }
 
+    // The day-claim above stops a restart charging twice today. This stops tomorrow's run charging
+    // a period whose money PayPlus already took while the process died before nextBillingDate
+    // moved — the one sequence that used to bill a customer twice. See chargeLedger.ts.
+    const periodKey = periodKeyFor(business.nextBillingDate, now);
+    const claim = await claimChargeForPeriod(business.id, periodKey, amountIls);
+    if (claim.kind === "in-flight") continue;
+    if (claim.kind === "unknown") {
+      // A previous run died mid-charge and nobody knows whether the money moved. Charging again
+      // is the one thing that must not happen on "maybe"; a person has to look at PayPlus.
+      console.error(`[subscriptionBilling] ${business.id} (${business.name}): charge for ${periodKey} is in an unknown state — NOT charging, alerting`);
+      sendAdminAlertEmail(
+        `⚠️ חיוב במצב לא ידוע — ${business.name}`,
+        `<h2 style="color:#fff;margin-bottom:8px;">${business.name} — תקופה ${periodKey}</h2>` +
+          `<p style="color:#a1a1aa;">ריצת חיוב קודמת נפלה אחרי הפנייה ל-PayPlus ולפני הרישום. לא ידוע אם ₪${fmtIls(amountIls)} נגבו. ` +
+          `הג'וב לא יחייב שוב עד שמישהו יבדוק את העסקה ב-PayPlus ויעדכן את שורת SubscriptionCharge (charged או מחיקה).</p>`
+      ).catch((err) => console.error("[subscriptionBilling] Unknown-charge alert failed:", err));
+      continue;
+    }
+
     const token = business.subscriptionToken ? decryptSecret(business.subscriptionToken) : null;
 
-    let result: { success: boolean; error?: string };
-    if (!token) {
+    let result: { success: boolean; transactionId?: string; error?: string };
+    if (claim.kind === "charged") {
+      // Self-heal: the money for this period is already in. Run the success path — advance the
+      // date, reset dunning — without touching PayPlus.
+      result = { success: true, transactionId: claim.transactionId ?? undefined };
+      console.warn(`[subscriptionBilling] ${business.id} (${business.name}): ${periodKey} was already charged (${claim.transactionId ?? "no tx id"}) — advancing without charging`);
+    } else if (!token) {
       // Nothing to charge with. Reported as a failure rather than skipped, so it travels down the
       // dunning path below and the owner actually hears about it.
       result = { success: false, error: "no-saved-card" };
@@ -158,6 +184,10 @@ export async function runSubscriptionBillingJob(): Promise<void> {
         customerUid
       );
     }
+
+    // Written before the Business row moves: if the update below fails, the ledger already says
+    // "charged" and the next run advances the date instead of charging again.
+    if (claim.kind === "new") await recordChargeOutcome(business.id, periodKey, result);
 
     if (result.success) {
       // Loyalty discount: only tracked for monthly billing — award it once tenure crosses the

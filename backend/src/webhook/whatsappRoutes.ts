@@ -20,23 +20,9 @@ import { captureError } from "../lib/errorMonitoring.js";
 import { transcribeWhatsAppVoiceNote, TranscriptionNotConfiguredError } from "../lib/transcription.js";
 import { sendYieldCampaignOffers, type PendingYieldCampaign } from "../billing/yieldCampaignJob.js";
 import { logWhatsAppBillingEvent } from "../lib/usageLedger.js";
+import { inboundIdentity, recordInbound, markProcessed } from "./whatsappInbox.js";
 
 export const whatsappRouter = asyncRouter();
-
-// Deduplicate Meta webhook deliveries — Meta guarantees at-least-once, so the same
-// message can arrive twice within seconds. We keep message IDs for 5 minutes.
-const processedMessageIds = new Map<string, number>();
-const MESSAGE_TTL_MS = 5 * 60 * 1000;
-function isDuplicate(messageId: string): boolean {
-  const now = Date.now();
-  // Evict stale entries periodically (on every call, cheap enough)
-  for (const [id, ts] of processedMessageIds) {
-    if (now - ts > MESSAGE_TTL_MS) processedMessageIds.delete(id);
-  }
-  if (processedMessageIds.has(messageId)) return true;
-  processedMessageIds.set(messageId, now);
-  return false;
-}
 
 const webhookLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -249,9 +235,35 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
   // Parse body now that signature is verified (raw middleware gives us a Buffer).
   const payload = JSON.parse(rawBody.toString("utf8"));
 
-  // Acknowledge immediately; Meta retries aggressively if it doesn't get a fast 200.
+  // Order matters here and is the whole fix. Write the message down, THEN tell Meta 200, THEN
+  // do the work. Meta delivers at-least-once and stops the moment it sees a 200 — so anything
+  // acknowledged and not yet durable is lost if this process dies in between, and anything
+  // deduplicated only in memory is duplicated across a redeploy. The unique wamid handles the
+  // second; refusing to acknowledge what could not be written handles the first.
+  const inbound = inboundIdentity(payload);
+  if (inbound) {
+    const outcome = await recordInbound(inbound, payload);
+    if (outcome === "duplicate") {
+      console.log(`WhatsApp webhook: duplicate message ${inbound.wamid}, skipping`);
+      return res.sendStatus(200);
+    }
+    if (outcome === "unavailable") return res.sendStatus(503); // Meta will redeliver
+  }
+
+  // Acknowledge now; Meta retries aggressively if it doesn't get a fast 200.
   res.sendStatus(200);
 
+  await processWhatsAppPayload(payload);
+  if (inbound) await markProcessed(inbound.wamid);
+});
+
+/**
+ * Everything that happens to a delivery after Meta has been acknowledged. Exported so the inbox
+ * recovery sweep can run it against a stored payload, which is how a message whose handler died
+ * mid-flight still gets its reply. Never throws: every failure path inside ends with the customer
+ * being told something and the error recorded.
+ */
+export async function processWhatsAppPayload(payload: any): Promise<void> {
   let phoneNumberId: string | undefined;
   let accessToken: string | undefined;
   let customerPhone: string | undefined;
@@ -281,11 +293,6 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
 
     const message = change?.messages?.[0];
     if (!phoneNumberId || !message) return;
-
-    if (message.id && isDuplicate(message.id as string)) {
-      console.log(`WhatsApp webhook: duplicate message ${message.id as string}, skipping`);
-      return;
-    }
 
     const extracted = extractMessage(message);
     if (extracted.kind === "ignore") return;
@@ -621,4 +628,4 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
       }).catch((sendErr) => console.error("Failed to send error fallback message:", sendErr));
     }
   }
-});
+}

@@ -1,6 +1,8 @@
 import { prisma } from "./prisma.js";
 import { sendAdminAlertEmail } from "./email.js";
 import { getJobStatuses } from "./jobStatus.js";
+import { findStaleJobs } from "./jobSchedule.js";
+import { countAbandonedInbound } from "../webhook/whatsappInbox.js";
 import { checkWhatsAppLines, type LineHealth } from "./whatsappLineHealth.js";
 import { decryptSecret } from "./crypto.js";
 
@@ -30,7 +32,10 @@ export interface HealthSnapshot {
   botDisabled: string[];
   /** Active paid subscriptions with no saved card — these are silently never billed. */
   unbillable: string[];
-  staleJobs: string[]; // jobs that errored, or haven't run in over a day
+  /** Jobs late by twice their own interval, or whose last run failed — see jobSchedule.ts. */
+  staleJobs: string[];
+  /** Inbound WhatsApp messages the recovery sweep gave up on: customers who wrote and got no reply. */
+  abandonedInbound: number;
 }
 
 export async function collectHealthSnapshot(): Promise<HealthSnapshot> {
@@ -80,13 +85,15 @@ export async function collectHealthSnapshot(): Promise<HealthSnapshot> {
     // Never let the outward call take the digest with it.
   }
 
-  const staleJobs: string[] = [];
+  // Per-job thresholds, not a flat day: the old "no success in 24h" could not notice a 12-minute
+  // job that had been stuck since lunch. The hourly watchdog alerts on these as they happen;
+  // this is the morning summary of the same view.
+  let staleJobs: string[] = [];
+  let abandonedInbound = 0;
   try {
     const statuses = await getJobStatuses();
-    for (const job of statuses) {
-      const ranRecently = Date.now() - new Date(job.lastRunAt).getTime() < ONE_DAY_MS;
-      if (!ranRecently || job.lastStatus !== "ok") staleJobs.push(job.jobName);
-    }
+    staleJobs = findStaleJobs(statuses, new Date(), process.uptime() * 1000).map((j) => `${j.jobName} (${j.reason})`);
+    abandonedInbound = await countAbandonedInbound();
   } catch {
     // Job status is a nice-to-have here; never let it break the digest.
   }
@@ -107,6 +114,7 @@ export async function collectHealthSnapshot(): Promise<HealthSnapshot> {
       .filter((b) => b.subscriptionStatus === "active" && b.subscriptionPlan && !b.subscriptionToken && !b.blockedAt)
       .map((b) => b.name),
     staleJobs,
+    abandonedInbound,
   };
 }
 
@@ -142,7 +150,8 @@ function renderHtml(s: HealthSnapshot): string {
       <li>WhatsApp token broken: ${list(s.brokenWhatsapp)}</li>
       <li>No owner notification phone: ${list(s.missingNotificationPhone)}</li>
       <li>Bot switched off: ${list(s.botDisabled)}</li>
-      <li>Jobs with no success in 24h: ${list(s.staleJobs)}</li>
+      <li>Scheduled jobs late or failing: ${list(s.staleJobs)}</li>
+      <li>Inbound messages abandoned after retries: ${s.abandonedInbound === 0 ? "<span style='color:#16a34a'>none ✓</span>" : `<code>${s.abandonedInbound}</code>`}</li>
       <li>Active plan but <strong>no saved card — never billed</strong>: ${list(s.unbillable)}</li>
     </ul>
   `;
@@ -155,6 +164,7 @@ function countIssues(s: HealthSnapshot): number {
     s.missingNotificationPhone.length +
     s.botDisabled.length +
     s.staleJobs.length +
+    (s.abandonedInbound > 0 ? 1 : 0) +
     s.unbillable.length +
     s.lineProblems.length
   );

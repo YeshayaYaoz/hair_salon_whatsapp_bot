@@ -25,6 +25,9 @@ import { runAiCostAlertJob } from "./lib/aiCostAlerts.js";
 import { leadFinderRouter } from "./leadfinder/routes.js";
 import { voiceRouter } from "./api/voiceRoutes.js";
 import { cartesiaWebhookRouter } from "./webhook/cartesiaWebhookRoutes.js";
+import { processWhatsAppPayload } from "./webhook/whatsappRoutes.js";
+import { runInboundRecoveryJob } from "./webhook/whatsappInbox.js";
+import { runJobWatchdogJob } from "./lib/jobWatchdog.js";
 import { UPLOADS_ROUTE, UPLOADS_ROOT, UnsupportedImageError, MAX_UPLOAD_BYTES, checkUploadsDir } from "./lib/storage.js";
 import multer from "multer";
 
@@ -193,6 +196,10 @@ setInterval(() => {
   // safe because the job claims each business before charging and a claim lasts the calendar day
   // (see subscriptionBillingJob), so the extra runs find nothing to do.
   runTrackedJob("subscriptionBilling", runSubscriptionBillingJob);
+  // Last in the batch and deliberately absent from the startup run below: at startup every job
+  // is mid-first-run and its row still shows the previous process's timestamp, which would read
+  // as the whole table being stale.
+  runTrackedJob("jobWatchdog", runJobWatchdogJob);
 }, ONE_HOUR);
 // Also run immediately on startup to catch any missed windows
 runTrackedJob("reminders", runReminderJob);
@@ -225,6 +232,14 @@ runTrackedJob("yieldCampaign", runYieldCampaignJob);
 const TWELVE_MINUTES = 12 * 60 * 1000;
 setInterval(() => runTrackedJob("depositExpiry", runDepositExpiryJob), TWELVE_MINUTES);
 runTrackedJob("depositExpiry", runDepositExpiryJob);
+
+// Inbound messages whose handler never finished — see whatsappInbox.ts. The startup run is the one
+// that matters: the rows it finds were left by the process this one just replaced. Two minutes
+// thereafter is short enough that a customer notices a delay, not a silence.
+const TWO_MINUTES = 2 * 60 * 1000;
+const recoverInbound = () => runInboundRecoveryJob(processWhatsAppPayload);
+setInterval(() => runTrackedJob("inboundRecovery", recoverInbound), TWO_MINUTES);
+runTrackedJob("inboundRecovery", recoverInbound);
 
 const ONE_DAY = 24 * 60 * 60 * 1000;
 setInterval(() => runTrackedJob("metricSnapshot", runMetricSnapshotJob), ONE_DAY);

@@ -9,6 +9,11 @@ import express from "express";
  */
 
 const mockPrisma = {
+  // The webhook writes every inbound message to WhatsAppInbound BEFORE acknowledging Meta, and
+  // answers 503 if it cannot — so a route test that expects processing to happen must give it a
+  // writable inbox. Statuses carry no wamid and skip this, which is why only the button-tap cases
+  // needed it.
+  whatsAppInbound: { create: vi.fn(async () => ({})), update: vi.fn(async () => ({})) },
   business: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   customer: { upsert: vi.fn(), updateMany: vi.fn(), findUnique: vi.fn() },
   campaignSend: { findUnique: vi.fn(), update: vi.fn() },
