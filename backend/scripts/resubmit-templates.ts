@@ -24,7 +24,7 @@ import {
   OWNER_ALERT_TEXT,
   OWNER_ALERT_CTA_BODY,
   OWNER_ALERT_CTA_EXAMPLE,
-  OWNER_ALERT_CTA_BUTTON, CAMPAIGN_TEMPLATES } from "../src/lib/whatsappTemplates.js";
+  OWNER_ALERT_CTA_BUTTON, CAMPAIGN_TEMPLATES, CAMPAIGN_OPT_OUT_BUTTON, CAMPAIGN_FOOTER } from "../src/lib/whatsappTemplates.js";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -82,8 +82,15 @@ async function main() {
     t.example.forEach((v, i) => (filled = filled.replace(`{{${i + 1}}}`, v)));
     console.log(`  ${label}:`);
     console.log(`    ${filled}`);
+    // Each template's buttons under its own body. The dashboard button used to be printed once,
+    // after the whole loop — which put it under whichever template happened to be last, and read
+    // as if a campaign template carried a link it does not have.
+    if (label === "owner alert (button)") {
+      console.log(`    button: [${OWNER_ALERT_CTA_BUTTON.text}] → ${OWNER_ALERT_CTA_BUTTON.url}`);
+    } else if (label.startsWith("campaign:")) {
+      console.log(`    button: [${CAMPAIGN_OPT_OUT_BUTTON}]   footer: ${CAMPAIGN_FOOTER}`);
+    }
   }
-  console.log(`    button: [${OWNER_ALERT_CTA_BUTTON.text}] → ${OWNER_ALERT_CTA_BUTTON.url}`);
   console.log("");
 
   if (!has("confirm")) {
