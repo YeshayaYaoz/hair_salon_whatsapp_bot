@@ -333,6 +333,37 @@ model SystemJobRun {
   lastDurationMs Int?
 }
 
+/// Every inbound WhatsApp message, written BEFORE Meta is told 200.
+///
+/// Two failures this closes, both from the webhook keeping state only in process memory. Meta
+/// delivers at-least-once, and deduplication lived in a Map that a redeploy emptied — so a
+/// duplicate arriving during a deploy was answered twice, and two instances never shared it at
+/// all. And the handler acknowledged 200 first, then processed: a crash in between lost the
+/// message for good, since Meta had its receipt and would not retry, and nothing anywhere
+/// recorded that a customer had written.
+///
+/// The unique wamid makes the second insert fail, which is the deduplication — durable across
+/// restarts and instances, with no memory to keep. Rows still unprocessed after a grace period
+/// are picked up by the recovery sweep, which is what turns "the process died mid-reply" into
+/// "the reply came a minute late". The raw payload is kept so a bad reply can be replayed
+/// while debugging instead of reconstructed from logs.
+model WhatsAppInbound {
+  id            String    @id @default(cuid())
+  /// Meta's message id (wamid). Unique is the whole point.
+  wamid         String    @unique
+  phoneNumberId String
+  payload       Json
+  receivedAt    DateTime  @default(now())
+  /// Set when a worker (the live handler or the sweep) begins; the sweep only takes rows whose
+  /// start is stale, so it never races a handler that is merely slow.
+  startedAt     DateTime?
+  processedAt   DateTime?
+  attempts      Int       @default(0)
+  lastError     String?
+
+  @@index([processedAt, receivedAt])
+}
+
 /// A date range on which the business operates differently — different pricing, a minimum stay, a
 /// special menu, reduced hours. Unlike BlockedTime this does NOT close the calendar: the business
 /// is open, the terms are just different, and the bot's job is to say so before quoting anything.
