@@ -279,3 +279,52 @@ describe("capacity (group classes)", () => {
     expect(mockPrisma.appointment.findFirst).not.toHaveBeenCalled(); // used capacity count, not 1:1 overlap
   });
 });
+
+/**
+ * Israel moves its clock twice a year — forward on the last Friday of March, back on the last
+ * Sunday of October. A salon's 09:00 is 09:00 on both sides of each change; only the UTC instant
+ * behind it moves by an hour. A slot engine that adds hours to a UTC midnight would offer 08:00 or
+ * 10:00 for a week after every change. These pin the engine to wall time across both edges, which
+ * the timezone-helper tests cover in isolation but nothing had checked end to end.
+ */
+describe("findAvailableSlots across Israel's DST changes", () => {
+  const openNineToEleven = () => {
+    mockPrisma.business.findUniqueOrThrow.mockResolvedValue({ timezone: TZ });
+    mockPrisma.service.findUniqueOrThrow.mockResolvedValue({ durationMin: 60 });
+    mockPrisma.businessHours.findUnique.mockResolvedValue({ openMin: 9 * 60, closeMin: 11 * 60 });
+    mockPrisma.staffMember.findMany.mockResolvedValue([]);
+    mockPrisma.appointment.findMany.mockResolvedValue([]);
+    mockPrisma.blockedTime.findMany.mockResolvedValue([]);
+  };
+
+  it("spring forward: 09:00 local is 07:00Z the day before and 06:00Z on the day of the change", async () => {
+    vi.setSystemTime(new Date("2026-03-01T00:00:00.000Z")); // before both days, so nothing is "past"
+    openNineToEleven();
+
+    const before = await findAvailableSlots(BUSINESS_ID, SERVICE_ID, "2026-03-26"); // IST, UTC+2
+    const after = await findAvailableSlots(BUSINESS_ID, SERVICE_ID, "2026-03-27"); // IDT, UTC+3 from 02:00
+
+    // 09:00, 09:30, 10:00 local — the engine steps by 30 minutes whatever the service length.
+    expect(before.map((s) => s.startTime)).toEqual(["2026-03-26T07:00:00.000Z", "2026-03-26T07:30:00.000Z", "2026-03-26T08:00:00.000Z"]);
+    expect(after.map((s) => s.startTime)).toEqual(["2026-03-27T06:00:00.000Z", "2026-03-27T06:30:00.000Z", "2026-03-27T07:00:00.000Z"]);
+  });
+
+  it("fall back: 09:00 local is 06:00Z the day before and 07:00Z on the day of the change", async () => {
+    vi.setSystemTime(new Date("2026-10-01T00:00:00.000Z"));
+    openNineToEleven();
+
+    const before = await findAvailableSlots(BUSINESS_ID, SERVICE_ID, "2026-10-24"); // IDT
+    const after = await findAvailableSlots(BUSINESS_ID, SERVICE_ID, "2026-10-25"); // IST from 02:00
+
+    expect(before.map((s) => s.startTime)).toEqual(["2026-10-24T06:00:00.000Z", "2026-10-24T06:30:00.000Z", "2026-10-24T07:00:00.000Z"]);
+    expect(after.map((s) => s.startTime)).toEqual(["2026-10-25T07:00:00.000Z", "2026-10-25T07:30:00.000Z", "2026-10-25T08:00:00.000Z"]);
+  });
+
+  it("offers the same number of slots on a change day as on any other — no hour lost or doubled", async () => {
+    vi.setSystemTime(new Date("2026-03-01T00:00:00.000Z"));
+    openNineToEleven();
+    const changeDay = await findAvailableSlots(BUSINESS_ID, SERVICE_ID, "2026-03-27");
+    const ordinary = await findAvailableSlots(BUSINESS_ID, SERVICE_ID, "2026-03-30");
+    expect(changeDay).toHaveLength(ordinary.length);
+  });
+});
