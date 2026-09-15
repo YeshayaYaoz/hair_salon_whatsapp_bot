@@ -45,8 +45,25 @@ import { getAiProvider, ProviderCallError, type GenericTool, type GenericTurn } 
 const SIMPLE_MESSAGE_RE =
   /^(hi|hey|hello|thanks|thank you|ok|okay|k|yes|no|sure|great|cool|byy?e|goodbye|היי|הי|שלום|ביי|תודה|תודה רבה|מעולה|סבבה|בסדר|בסדר גמור|כן|לא|אוקיי|אוקי|יאללה|נהדר|יופי|וואו|תודה!)[!.,?׃…\s]*$/iu;
 
-function chooseTier(messageText: string, hadToolError: boolean): "cheap" | "smart" {
+/**
+ * Every tool that changes something. A failed call to one of these that the model then glosses
+ * over — "בוטל!", "הקבלה נשלחה", "חסמתי" — is the same lie as the booking one the guard below
+ * was written for, and used to be caught only for booking and rescheduling.
+ */
+const MUTATING_TOOLS = new Set([
+  "book_appointment", "reschedule_appointment", "cancel_appointment", "add_to_waitlist",
+  "request_human_followup", "save_customer_name", "get_payment_link",
+  "issue_receipt", "block_time", "cancel_booking", "set_hours", "upsert_service", "manage_staff",
+  "add_faq", "remove_block", "set_bot_enabled", "book_for_customer", "add_customer",
+  "set_customer_note", "message_customer", "create_discount_code",
+]);
+
+export function chooseTier(messageText: string, hadToolError: boolean, lastAssistantText?: string): "cheap" | "smart" {
   if (hadToolError) return "smart";
+  // "כן" is in the cheap whitelist because it is usually a pleasantry. It is not one when the
+  // bot's previous turn was a question — "לבטל את התור של יום שלישי?" — and the answer decides
+  // whether something is deleted. A reply to a question goes to the model that asked it.
+  if (lastAssistantText && /[?؟]\s*$/.test(lastAssistantText.trim())) return "smart";
   const trimmed = messageText.trim();
   if (trimmed.length > 0 && trimmed.length <= 20 && SIMPLE_MESSAGE_RE.test(trimmed)) return "cheap";
   return "smart";
@@ -2085,7 +2102,8 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
   // been followed by a success — guards against the model claiming "booked!" in its final
   // reply when the underlying tool call actually errored out (e.g. slot taken in the meantime).
   let unconfirmedBookingFailure: string | null = null;
-  let tier = chooseTier(messageText, false);
+  const lastAssistantText = [...history].reverse().find((t) => t.role === "assistant")?.content;
+  let tier = chooseTier(messageText, false, lastAssistantText);
 
   // "auto" is a meta-choice, not a real backend: it picks Claude or DeepSeek per-message from the
   // same tier the chosen provider then uses to pick its own cheap/smart model — so a business set
@@ -2179,8 +2197,8 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
         console.log(`[bot] tool error detected — escalating to ${provider.key}/${model}`);
       }
 
-      if (tc.name === "book_appointment" || tc.name === "reschedule_appointment") {
-        unconfirmedBookingFailure = result.includes('"error"') ? result : null;
+      if (MUTATING_TOOLS.has(tc.name)) {
+        unconfirmedBookingFailure = result.includes('"error"') ? `${tc.name}: ${result}` : null;
       }
 
       toolResults.push({ toolCallId: tc.id, content: result });
@@ -2209,7 +2227,7 @@ export async function handleIncomingMessage(businessId: string, customerPhone: s
     turns.push({ role: "assistant", text: response.text || undefined, toolCalls: response.toolCalls });
     turns.push({
       role: "user",
-      text: `(מערכתי: ניסיון הקביעה/שינוי האחרון נכשל בפועל (${unconfirmedBookingFailure}) — שום תור לא נשמר. אל תגיד ללקוח שהתור נקבע. הסבר לו בקצרה שהמועד לא זמין/קרתה תקלה, והצע לבדוק זמינות אחרת או לנסות שוב.)`,
+      text: `(מערכתי: הפעולה האחרונה נכשלה בפועל (${unconfirmedBookingFailure}) — שום שינוי לא נשמר. אל תגיד למשתמש שהפעולה בוצעה. הסבר בקצרה שהיא לא הצליחה/קרתה תקלה, והצע לנסות שוב או דרך אחרת.)`,
     });
     try {
       const corrected = await call(model);
