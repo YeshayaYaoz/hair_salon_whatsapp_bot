@@ -5,6 +5,7 @@ import { resolveBusinessByPhoneNumberId } from "../tenants/resolve.js";
 import { sendWhatsAppMessage, sendWhatsAppList, sendWhatsAppImage, sendWhatsAppCtaUrl, sendWhatsAppButtons, WhatsAppAuthError, type ListRow } from "./whatsappClient.js";
 import { sendWhatsAppTokenExpiredEmail } from "../lib/email.js";
 import { handleIncomingMessage } from "../bot/claudeBot.js";
+import { CAMPAIGN_OPT_OUT_BUTTON } from "../lib/whatsappTemplates.js";
 import { checkDailyCap } from "../lib/dailyMessageCap.js";
 import { notifyOwner } from "../lib/ownerNotify.js";
 import { clearHistory, appendTurn } from "../bot/conversationStore.js";
@@ -69,6 +70,7 @@ const rawBodyMiddleware = express.raw({ type: "application/json" });
 
 type ExtractedMessage =
   | { kind: "text"; text: string }
+  | { kind: "optOut" }
   | { kind: "voiceNote"; mediaId: string }
   | { kind: "reset" }
   | { kind: "unsupported" }
@@ -85,9 +87,13 @@ function extractMessage(message: any): ExtractedMessage {
     return { kind: "text", text: body };
   }
   // A quick-reply tap. The title is exactly what the customer would have typed, so it enters the
-  // conversation as an ordinary message and the bot needs no special case for it.
+  // conversation as an ordinary message and the bot needs no special case for it — with one
+  // exception: the opt-out button on a marketing template is an instruction to us, not a message
+  // for the bot, and must not reach the model, which would happily reply "בטח, איך אפשר לעזור?".
   if (message.type === "interactive" && message.interactive?.type === "button_reply") {
-    return { kind: "text", text: (message.interactive.button_reply?.title as string ?? "").trim() };
+    const title = (message.interactive.button_reply?.title as string ?? "").trim();
+    if (title === CAMPAIGN_OPT_OUT_BUTTON) return { kind: "optOut" };
+    return { kind: "text", text: title };
   }
   if (message.type === "interactive" && message.interactive?.type === "list_reply") {
     // The row id is the slot's ISO start time (see buildSlotRows); phrase it as a natural reply
@@ -136,9 +142,15 @@ async function handleYieldCampaignReply(
   const campaign = business.pendingYieldCampaign as PendingYieldCampaign;
 
   if (AFFIRMATIVE.test(trimmed)) {
-    const sent = await sendYieldCampaignOffers(business, campaign);
+    const outcome = await sendYieldCampaignOffers(business, campaign);
     await prisma.business.update({ where: { id: business.id }, data: { pendingYieldCampaign: Prisma.JsonNull } });
-    await sendWhatsAppMessage({ phoneNumberId, accessToken, to: business.notificationPhone, text: `נשלחה הצעה ל-${sent} לקוחות. בהצלחה! 🎉` });
+    // "Accepted", not "sent", and said so. Delivery is decided by Meta over the next minutes and
+    // lands on the status webhook; the owner can ask the bot for the campaign report then.
+    const skipped = outcome.skippedOptOut > 0 ? ` ${outcome.skippedOptOut} לא נשלחו כי ביקשו להסיר אותם מתפוצה.` : "";
+    await sendWhatsAppMessage({
+      phoneNumberId, accessToken, to: business.notificationPhone,
+      text: `ההצעה יצאה ל-${outcome.accepted} לקוחות.${skipped} וואטסאפ מאשר מסירה בדקות הקרובות — אפשר לשאול אותי אחר כך "מה קרה עם הקמפיין".`,
+    });
     return;
   }
 
@@ -157,7 +169,38 @@ async function handleYieldCampaignReply(
 /** Logs each status entry that carries a real Meta billing category/billable flag. Meta only
  * attaches `pricing` to status callbacks it actually bills for — most delivery/read receipts have
  * no pricing field at all and are skipped here, same as WhatsApp's own accounting would skip them. */
+/** Meta reports these out of order; a "read" must not be overwritten by a late "delivered". */
+const STATUS_RANK: Record<string, number> = { sent: 1, delivered: 2, read: 3, failed: 3 };
+
+/**
+ * Turns a campaign's "accepted" into what actually happened.
+ *
+ * The send loop wrote a CampaignSend row with Meta's message id and status "sent". This is the
+ * only place that ever moves it: delivered, read, or failed with Meta's own error code. For a
+ * marketing template to someone who has opted out of marketing at Meta's level, this is where the
+ * silent drop stops being silent — there is no status at all, and the row stays "sent" for good,
+ * which campaignReport counts as pending rather than as delivered.
+ */
+async function recordCampaignDelivery(statuses: any[]) {
+  for (const status of statuses) {
+    const messageId = status?.id as string | undefined;
+    const next = status?.status as string | undefined;
+    if (!messageId || !next || !(next in STATUS_RANK)) continue;
+    const failCode = next === "failed" ? Number(status.errors?.[0]?.code) || null : null;
+    try {
+      const row = await prisma.campaignSend.findUnique({ where: { messageId }, select: { status: true } });
+      if (!row) continue; // not a campaign message — the vast majority
+      if ((STATUS_RANK[row.status] ?? 0) >= STATUS_RANK[next] && row.status !== "sent") continue;
+      await prisma.campaignSend.update({ where: { messageId }, data: { status: next, failCode } });
+    } catch (err) {
+      console.error(`[whatsapp webhook] Could not record campaign delivery for ${messageId}:`, err);
+    }
+  }
+}
+
 async function recordWhatsAppBillingStatuses(phoneNumberId: string, statuses: any[]) {
+  await recordCampaignDelivery(statuses);
+
   // Delivery FAILURES arrive here too, and used to be filtered out with everything unpriced. That
   // made them perfectly invisible: the send API returns 200 with a message id (Meta "accepted" it),
   // and the real verdict — e.g. 131047, free-form message outside the 24h session window — lands
@@ -289,6 +332,24 @@ whatsappRouter.post("/", webhookLimiter, rawBodyMiddleware, async (req, res) => 
         update: {},
       })
       .catch((err) => console.error("[webhook] Failed to register customer:", err));
+
+    // The customer pressed "הסירו אותי" on a marketing message. Recorded, acknowledged in one line,
+    // and that is the whole interaction — it does not enter the conversation, and the bot never
+    // sees it. The tap itself opened a 24h window, so the acknowledgement can go free-form.
+    if (extracted.kind === "optOut") {
+      await prisma.customer.updateMany({
+        where: { businessId: business.id, phone: customerPhone },
+        data: { marketingOptOutAt: new Date() },
+      });
+      console.log(`[webhook] ${customerPhone} opted out of marketing from business ${business.id}`);
+      await sendWhatsAppMessage({
+        phoneNumberId,
+        accessToken,
+        to: customerPhone,
+        text: `הוסרת מרשימת התפוצה של ${business.name}. תזכורות ואישורים על תורים שקבעת ימשיכו להגיע.`,
+      }).catch((err) => console.error("[webhook] Opt-out acknowledgement failed (non-fatal):", err));
+      return;
+    }
 
     // The owner's own number replying to a pending yield-management campaign proposal
     // (see yieldCampaignJob.ts) is handled here, before any of this routes to the customer bot.

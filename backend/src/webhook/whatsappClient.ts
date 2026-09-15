@@ -42,8 +42,8 @@ export const RE_ENGAGEMENT_ERROR_CODE = 131047;
  */
 export async function sendWhatsAppTemplate(
   params: SendCommon & { templateName: string; languageCode: string; bodyParams: string[] }
-) {
-  await send(params, {
+): Promise<SendReceipt> {
+  return send(params, {
     type: "template",
     template: {
       name: params.templateName,
@@ -76,8 +76,14 @@ export function trimToLimit(text: string, max: number): string {
   return out.replace(/[\u200d\ufe0f]+$/u, "");
 }
 
-export async function sendWhatsAppMessage(params: SendCommon & { text: string }) {
-  await send(params, {
+/** What a successful send hands back: Meta's id for the message, which is what the status webhook
+ * later reports delivery against. Absent when Meta's response carried none. */
+export interface SendReceipt {
+  messageId?: string;
+}
+
+export async function sendWhatsAppMessage(params: SendCommon & { text: string }): Promise<SendReceipt> {
+  return send(params, {
     type: "text",
     text: { body: params.text },
   });
@@ -558,7 +564,7 @@ export async function setWhatsAppBusinessProfile(params: {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function send(params: SendCommon, payload: Record<string, unknown>) {
+async function send(params: SendCommon, payload: Record<string, unknown>): Promise<SendReceipt> {
   const url = `https://graph.facebook.com/${GRAPH_VERSION}/${params.phoneNumberId}/messages`;
   const MAX_ATTEMPTS = 3;
 
@@ -581,7 +587,17 @@ async function send(params: SendCommon, payload: Record<string, unknown>) {
       continue;
     }
 
-    if (res.ok) return;
+    if (res.ok) {
+      // The id is the only thing in the response worth keeping, and only campaigns keep it: it is
+      // how "accepted" becomes "delivered" or "failed" once the status webhook reports back.
+      // Everything else about a 200 is already known — it means accepted, and nothing more.
+      try {
+        const data = (await res.json()) as { messages?: { id?: string }[] };
+        return { messageId: data?.messages?.[0]?.id };
+      } catch {
+        return {};
+      }
+    }
 
     const body = await res.text();
 

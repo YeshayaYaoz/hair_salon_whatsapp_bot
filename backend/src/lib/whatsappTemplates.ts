@@ -440,3 +440,61 @@ export const PAYMENT_DETAILS_BODY =
 
 export const PAYMENT_DETAILS_EXAMPLE = ["מספרת רונית"];
 export const PAYMENT_DETAILS_BUTTON = { text: "הוספת אמצעי תשלום", url: `${DASHBOARD_URL}/billing` };
+
+/**
+ * The campaign library: marketing templates a business sends to its OWN customers.
+ *
+ * This is how an owner reaches customers outside the 24-hour window without ever touching Meta.
+ * Tori writes the structure once, files it on every business's WABA at connect (submitTemplates),
+ * and the owner supplies only the words that go into {{3}} — so review happens once per WABA, and
+ * a rejection is ours to understand rather than theirs.
+ *
+ * MARKETING, declared rather than hoped otherwise. An offer is marketing whatever the wording, and
+ * a UTILITY submission would be reclassified anyway (measured: tori_service_update_manage). What
+ * the category costs is the opt-out and Meta's silent drop for anyone who has opted out — and both
+ * are handled: the button below feeds Customer.marketingOptOutAt, and campaignSend reports from
+ * the status webhook rather than from the send loop.
+ *
+ * Same variable order on every template, on purpose — campaignSend passes the same three
+ * positional parameters to any of them:
+ *   {{1}} customer first name
+ *   {{2}} business name
+ *   {{3}} the owner's own text
+ *
+ * Every body has text on both sides of {{3}}. Meta rejects a body that starts or ends on a
+ * variable, and {{3}} is the natural last thing to say — so each ends on a short fixed line.
+ */
+export const CAMPAIGN_OPT_OUT_BUTTON = "הסירו אותי";
+export const CAMPAIGN_FOOTER = "לא רוצים הודעות כאלה מהעסק? לחצו על הכפתור.";
+
+export interface CampaignTemplateDef {
+  name: string;
+  body: string;
+  example: string[];
+}
+
+/** Lapsed customers: the yield campaign, and "everyone who hasn't been in a while". */
+export const CAMPAIGN_COME_BACK: CampaignTemplateDef = {
+  name: "tori_come_back",
+  body: "היי {{1}}, עבר זמן מאז הביקור האחרון שלך ב{{2}}. {{3}} נשמח לראותך שוב!",
+  example: ["דנה", "מספרת רונית", "מחר יש לנו מקום פנוי, ואם תגיעי נשמח להעניק 15% הנחה על הטיפול."],
+};
+
+/** A specific opening the owner wants filled. */
+export const CAMPAIGN_OPEN_SLOT: CampaignTemplateDef = {
+  name: "tori_open_slot",
+  body: "היי {{1}}, התפנה מקום ב{{2}}: {{3}} אם זה מתאים, השיבו כאן ונקבע.",
+  example: ["דנה", "מספרת רונית", "מחר בשעה 14:00, תספורת."],
+};
+
+/** Anything else the owner wants to tell customers: a new service, a holiday schedule, a promotion. */
+export const CAMPAIGN_ANNOUNCEMENT: CampaignTemplateDef = {
+  name: "tori_announcement",
+  body: "היי {{1}}, עדכון מ{{2}}: {{3}} לפרטים ולקביעת תור אפשר להשיב כאן.",
+  example: ["דנה", "מספרת רונית", "השבוע 20% הנחה על צבע לכל מי שקובעת עד יום חמישי."],
+};
+
+export const CAMPAIGN_TEMPLATES: CampaignTemplateDef[] = [CAMPAIGN_COME_BACK, CAMPAIGN_OPEN_SLOT, CAMPAIGN_ANNOUNCEMENT];
+
+/** Language every campaign template is filed in — the same as the rest of the library. */
+export const CAMPAIGN_TEMPLATE_LANG = DEFAULT_LANG;

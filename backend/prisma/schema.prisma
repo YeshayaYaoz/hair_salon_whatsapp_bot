@@ -292,6 +292,7 @@ model Business {
   specialPeriods          SpecialPeriod[]
   linkedLeads             Lead[] // Lead Finder prospects that turned into this real, paying account
   affiliateReferrals      AffiliateReferral[]
+  campaigns                      Campaign[]
 }
 
 // A salon we sent to a provider's signup page through our affiliate link, and whether it came back
@@ -450,11 +451,64 @@ model Customer {
   // instant, so the next message opens a new thread (greeting, buttons, no stale context) — while
   // ConversationMessage rows are left untouched, so the transcript stays complete in the dashboard.
   conversationResetAt DateTime?
+  // The customer pressed "הסירו אותי" on a marketing message from this business. Every marketing
+  // send filters on this; transactional messages about their own bookings (reminders,
+  // confirmations) are unaffected, since those are not marketing and the customer asked for them.
+  // Per business, not global: opting out of one salon's offers says nothing about another's.
+  marketingOptOutAt   DateTime?
   appointments        Appointment[]
   waitlistEntries     WaitlistEntry[]
+  campaignSends       CampaignSend[]
 
   @@unique([businessId, phone])
   @@index([businessId])
+}
+
+/// One outbound marketing broadcast from a business to some of its customers.
+///
+/// Exists so a campaign can be reported on honestly. "Sent 12" from the send loop means Meta
+/// accepted twelve requests; whether any arrived is decided later, asynchronously, on the status
+/// webhook — and for marketing to an opted-out number the answer is silently no. The per-recipient
+/// rows below are what the status callback updates, and the counts an owner is shown come from
+/// them, not from the loop.
+model Campaign {
+  id           String         @id @default(cuid())
+  businessId   String
+  business     Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  // "yield" for the automatic empty-day offer, "manager" for one the owner asked for on WhatsApp.
+  source       String
+  // Which library template carried it outside the 24h window — see whatsappTemplates.ts.
+  templateName String
+  // The owner's own words, as substituted into the template's free-text variable.
+  ownerText    String
+  audience     String // "lapsed" | "all"
+  createdAt    DateTime       @default(now())
+  sends        CampaignSend[]
+
+  @@index([businessId, createdAt])
+}
+
+/// One recipient of one campaign, and what became of the message.
+model CampaignSend {
+  id         String    @id @default(cuid())
+  campaignId String
+  campaign   Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  phone      String
+  // Meta's message id (wamid) from the send response. The status webhook keys on it; null means
+  // the send itself was refused and there is nothing to wait for.
+  messageId  String?   @unique
+  // "sent" (accepted by Meta) → "delivered" → "read", or "failed" with the code below. Written by
+  // the status webhook, never by the send loop, which only ever knows "accepted".
+  status     String    @default("sent")
+  failCode   Int?
+  // "session" when the customer's 24h window was open and a plain message went; "template" otherwise.
+  channel    String
+  sentAt     DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([campaignId])
 }
 
 model Appointment {

@@ -12,6 +12,10 @@ import {
   OWNER_ALERT_CTA_BODY,
   OWNER_ALERT_CTA_EXAMPLE,
   OWNER_ALERT_CTA_BUTTON,
+  CAMPAIGN_TEMPLATES,
+  CAMPAIGN_TEMPLATE_LANG,
+  CAMPAIGN_FOOTER,
+  CAMPAIGN_OPT_OUT_BUTTON,
 } from "./whatsappTemplates.js";
 
 /**
@@ -74,6 +78,21 @@ export async function submitWhatsAppTemplates(
         bodyExample: OWNER_ALERT_CTA_EXAMPLE,
         urlButton: OWNER_ALERT_CTA_BUTTON,
       }),
+      // The campaign library — see whatsappTemplates.ts. MARKETING by declaration, with the opt-out
+      // as a reply button and again in the footer: the button is what people tap, the footer is
+      // what survives a client that renders buttons badly, and Meta weighs a visible opt-out when
+      // reviewing marketing templates.
+      ...CAMPAIGN_TEMPLATES.map((t) =>
+        createMessageTemplate(wabaId!, accessToken, {
+          name: t.name,
+          languageCode: CAMPAIGN_TEMPLATE_LANG,
+          category: "MARKETING",
+          bodyText: t.body,
+          bodyExample: t.example,
+          footerText: CAMPAIGN_FOOTER,
+          quickReplies: [CAMPAIGN_OPT_OUT_BUTTON],
+        })
+      ),
     ]);
   } catch (err) {
     console.error(`[whatsapp] Automatic template submission failed for ${businessId} (non-fatal):`, err);

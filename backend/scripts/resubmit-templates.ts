@@ -24,8 +24,7 @@ import {
   OWNER_ALERT_TEXT,
   OWNER_ALERT_CTA_BODY,
   OWNER_ALERT_CTA_EXAMPLE,
-  OWNER_ALERT_CTA_BUTTON,
-} from "../src/lib/whatsappTemplates.js";
+  OWNER_ALERT_CTA_BUTTON, CAMPAIGN_TEMPLATES } from "../src/lib/whatsappTemplates.js";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -77,6 +76,7 @@ async function main() {
     ["confirmation", wording.confirmation],
     ["owner alert", OWNER_ALERT_TEXT],
     ["owner alert (button)", { body: OWNER_ALERT_CTA_BODY, example: OWNER_ALERT_CTA_EXAMPLE }],
+    ...CAMPAIGN_TEMPLATES.map((t) => [`campaign: ${t.name} (MARKETING)`, t] as const),
   ] as const) {
     let filled = t.body;
     t.example.forEach((v, i) => (filled = filled.replace(`{{${i + 1}}}`, v)));

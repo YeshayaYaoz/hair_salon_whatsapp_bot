@@ -1,4 +1,6 @@
 import { prisma } from "../lib/prisma.js";
+import { runCampaign, campaignReport, selectAudience, renderCampaignText, MAX_CAMPAIGN_RECIPIENTS } from "../lib/campaignSend.js";
+import { CAMPAIGN_COME_BACK, CAMPAIGN_ANNOUNCEMENT } from "../lib/whatsappTemplates.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { appendTurn, getHistory, type Turn } from "./conversationStore.js";
 import { findAvailableSlots, createAppointment, SlotUnavailableError, OutsideBusinessHoursError, SLOT_BLOCKING_STATUSES, type AvailableSlot } from "../booking/availability.js";
@@ -277,6 +279,26 @@ const managerTools: GenericTool[] = [
       },
       required: ["customerName", "note"],
     },
+  },
+  {
+    name: "send_campaign",
+    description:
+      "Send ONE marketing message from the business to many of its customers at once — 'תשלחי לכל מי שלא היה חודשיים שיש 15% הנחה השבוע', 'תודיעי לכולם שאנחנו סגורים בחג'. audience is 'lapsed' (no visit in 60 days) or 'all'. text is the owner's own words, one or two sentences; Tori wraps them in an approved template with a greeting and an opt-out button. Two-step: call WITHOUT confirmed to get the recipient count and the exact rendered message, read both to the owner, and only on a clear yes call again with confirmed:true. This reaches real people in the business's name and cannot be recalled.",
+    input_schema: {
+      type: "object",
+      properties: {
+        audience: { type: "string", enum: ["lapsed", "all"] },
+        text: { type: "string", description: "The owner's message, exactly as they want customers to read it" },
+        confirmed: { type: "boolean" },
+      },
+      required: ["audience", "text"],
+    },
+  },
+  {
+    name: "campaign_report",
+    description:
+      "What happened to the most recent campaign this business sent — how many were delivered, read, failed, or still pending. Use when the owner asks 'מה קרה עם הקמפיין', 'כמה קיבלו את ההודעה'. Delivery arrives over the minutes after a send, so a report taken immediately shows mostly pending; say so.",
+    input_schema: { type: "object", properties: {} },
   },
   {
     name: "message_customer",
@@ -918,6 +940,72 @@ export async function runTool(
     if (!target) return JSON.stringify({ error: `No customer matching "${input.customerName}".` });
     await prisma.customer.update({ where: { id: target.id }, data: { notes: String(input.note ?? "").trim() } });
     return JSON.stringify({ saved: true, customer: target.name ?? target.phone });
+  }
+
+  if (name === "send_campaign") {
+    const audience = input.audience === "lapsed" ? "lapsed" : input.audience === "all" ? "all" : null;
+    if (!audience) return JSON.stringify({ error: "audience must be 'lapsed' or 'all'." });
+    const text = String(input.text ?? "").trim();
+    if (!text) return JSON.stringify({ error: "Ask the owner what the message should say." });
+    if (text.length > 300) return JSON.stringify({ error: "Too long for one WhatsApp campaign message — ask the owner to keep it under about 300 characters." });
+
+    // "lapsed" reads as "come back", "all" as an announcement; the wrapper sentence differs.
+    const template = audience === "lapsed" ? CAMPAIGN_COME_BACK : CAMPAIGN_ANNOUNCEMENT;
+    const bizRow = await prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { name: true } });
+    const recipients = await selectAudience(businessId, audience);
+    const eligible = recipients.filter((r) => !r.marketingOptOutAt);
+    const willSend = Math.min(eligible.length, MAX_CAMPAIGN_RECIPIENTS);
+    if (willSend === 0) {
+      return JSON.stringify({
+        error: audience === "lapsed"
+          ? "Nobody matches — no customer has been away 60 days without an upcoming booking."
+          : "There are no customers to send to yet.",
+      });
+    }
+    const sampleName = eligible[0]?.name?.split(" ")[0] || "דנה";
+    const gate = confirmFirst(
+      input,
+      {
+        recipients: willSend,
+        optedOut: recipients.length - eligible.length,
+        ...(eligible.length > MAX_CAMPAIGN_RECIPIENTS ? { capped: `only the first ${MAX_CAMPAIGN_RECIPIENTS} of ${eligible.length} — the rest can go in a later campaign` } : {}),
+        exactMessage: renderCampaignText(template, [sampleName, bizRow.name, text]),
+        note: "Each message is metered against the plan quota. Customers outside the 24h window receive it as an approved template with an opt-out button.",
+      },
+      "willSend"
+    );
+    if (gate) return gate;
+
+    try {
+      const outcome = await runCampaign({ businessId, source: "manager", audience, template, ownerText: text, recipients });
+      return JSON.stringify({
+        accepted: outcome.accepted,
+        skippedOptOut: outcome.skippedOptOut,
+        refused: outcome.refused,
+        note: "Accepted by WhatsApp is not delivered. Delivery confirmations arrive over the next few minutes — offer to check with campaign_report later.",
+      });
+    } catch (err) {
+      return JSON.stringify({ error: `Could not send: ${err instanceof Error ? err.message : String(err)}` });
+    }
+  }
+
+  if (name === "campaign_report") {
+    const latest = await prisma.campaign.findFirst({
+      where: { businessId },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, createdAt: true, ownerText: true, audience: true },
+    });
+    if (!latest) return JSON.stringify({ error: "No campaign has been sent yet." });
+    const report = await campaignReport(latest.id);
+    return JSON.stringify({
+      sentAt: latest.createdAt.toISOString(),
+      audience: latest.audience,
+      message: latest.ownerText,
+      ...report,
+      note: report.pending > 0
+        ? "Pending means WhatsApp has not reported back yet. If it stays pending for hours, those recipients have most likely blocked marketing messages at WhatsApp's level — it is not a fault on our side."
+        : undefined,
+    });
   }
 
   if (name === "message_customer") {

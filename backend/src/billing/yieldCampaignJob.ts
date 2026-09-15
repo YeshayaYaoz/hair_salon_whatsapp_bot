@@ -1,7 +1,8 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { decryptSecret } from "../lib/crypto.js";
-import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
+import { runCampaign, type CampaignOutcome } from "../lib/campaignSend.js";
+import { CAMPAIGN_COME_BACK } from "../lib/whatsappTemplates.js";
 import { notifyOwner } from "../lib/ownerNotify.js";
 import { instantPartsInTz, zonedDateParts, zonedWallTimeToUtc } from "../lib/timezone.js";
 import { SLOT_BLOCKING_STATUSES } from "../booking/availability.js";
@@ -129,21 +130,23 @@ async function scanBusiness(
 export async function sendYieldCampaignOffers(
   business: { id: string; name: string; whatsappPhoneNumberId: string; whatsappAccessToken: string },
   campaign: PendingYieldCampaign
-): Promise<number> {
-  const accessToken = decryptSecret(business.whatsappAccessToken);
-  const customers = await prisma.customer.findMany({ where: { id: { in: campaign.candidateCustomerIds } } });
-
-  let sent = 0;
-  for (const customer of customers) {
-    const name = customer.name ? customer.name.split(" ")[0] : "היי";
-    const text = `${name}! 😊 מתגעגעים אליך ב${business.name}. יש לנו מקום פנוי מחר, ואם תגיע/י נשמח להעניק ${campaign.discountPercent}% הנחה על הטיפול. מעוניין/ת לקבוע?`;
-    try {
-      await sendWhatsAppMessage({ phoneNumberId: business.whatsappPhoneNumberId, accessToken, to: customer.phone, text });
-      sent++;
-    } catch (err) {
-      console.error(`[yieldCampaign] Failed to send offer to customer ${customer.id}:`, err);
-    }
-    await new Promise((r) => setTimeout(r, 400));
-  }
-  return sent;
+): Promise<CampaignOutcome> {
+  // Through the shared campaign path, not a free-form loop. This used to send plain text to
+  // customers who by definition had not written in sixty days — every one of them outside the 24h
+  // window — so Meta accepted each with a 200, dropped each, and the owner was told "נשלחה הצעה
+  // ל-12 לקוחות" about twelve messages nobody received. runCampaign uses the approved
+  // MARKETING template where the window is shut, skips anyone who opted out, and records each
+  // send so the delivery webhook can say what actually arrived.
+  const recipients = await prisma.customer.findMany({
+    where: { id: { in: campaign.candidateCustomerIds } },
+    select: { id: true, phone: true, name: true, marketingOptOutAt: true },
+  });
+  return runCampaign({
+    businessId: business.id,
+    source: "yield",
+    audience: "lapsed",
+    template: CAMPAIGN_COME_BACK,
+    ownerText: `מחר יש לנו מקום פנוי, ואם תגיע/י נשמח להעניק ${campaign.discountPercent}% הנחה על הטיפול.`,
+    recipients,
+  });
 }
