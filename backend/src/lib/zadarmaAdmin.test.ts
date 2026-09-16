@@ -91,3 +91,58 @@ describe("pointNumberAtCartesia", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * The renewal job runs on three things this client did not expose before: each number's stop date
+ * and autorenew flag, and the two calls that change a line's future. Zadarma sends its booleans
+ * as the strings "true"/"false" and its dates without a zone; both are pinned here.
+ */
+// Top-level, not inside the describe: a describe callback must be synchronous, and vitest
+// refuses a file whose describe awaits.
+const renewalMod = await import("./zadarmaAdmin.js");
+
+describe("number expiry and renewal", () => {
+  const mod = renewalMod;
+
+  it("reads stop date, fee and autorenew off the number list", async () => {
+    fetchMock.mockResolvedValueOnce(
+      ok({
+        status: "success",
+        info: [
+          { number: "972559000001", type: "common", status: "on", stop_date: "2026-10-06 12:00:00", monthly_fee: 3, currency: "USD", autorenew: "true", is_on_test: "false" },
+          { number: "972559000002", type: "common", status: "on", stop_date: "", monthly_fee: "2.5", currency: "USD", autorenew: "false", is_on_test: "false" },
+        ],
+      })
+    );
+    const [a, b] = await mod.listNumbers();
+    expect(a.stopDate?.toISOString()).toBe("2026-10-06T12:00:00.000Z");
+    expect(a.autorenew).toBe(true);
+    expect(a.monthlyFee).toBe(3);
+    expect(b.stopDate).toBeNull();
+    expect(b.autorenew).toBe(false);
+    expect(b.monthlyFee).toBe(2.5);
+  });
+
+  it("sets autorenew with the carrier's on/off vocabulary, digits only", async () => {
+    fetchMock.mockResolvedValueOnce(ok({ status: "success", number: "972559000001", autoprolongation: "off" }));
+    await mod.setAutoprolongation("+972 55-900-0001", false);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/v1/direct_numbers/autoprolongation/");
+    expect(init.method).toBe("PUT");
+    expect(String(init.body)).toBe("number=972559000001&value=off");
+  });
+
+  it("prepays and returns the new stop date and what was charged", async () => {
+    fetchMock.mockResolvedValueOnce(
+      ok({ status: "success", number: "972559000001", stop_date: "2026-11-06 12:00:00", total_paid: { amount: 3, currency: "USD" } })
+    );
+    const r = await mod.prolongNumber("972559000001", 1);
+    expect(r).toEqual({ stopDate: new Date("2026-11-06T12:00:00.000Z"), totalPaid: 3, currency: "USD" });
+    expect(String(fetchMock.mock.calls[0][1].body)).toBe("months=1&number=972559000001");
+  });
+
+  it("surfaces the carrier's own error text — it answers 200 with status:error", async () => {
+    fetchMock.mockResolvedValueOnce(ok({ status: "error", message: "Not enough money" }));
+    await expect(mod.prolongNumber("972559000001", 1)).rejects.toThrow("Not enough money");
+  });
+});

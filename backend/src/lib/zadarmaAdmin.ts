@@ -87,15 +87,88 @@ async function request(
   return body;
 }
 
-type ConnectedNumber = { number: string; type: string };
+export interface ZadarmaNumber {
+  number: string;
+  /** The `type` every per-number call requires. */
+  type: string;
+  /** "on" for a live line; anything else means it is not ringing. */
+  status: string;
+  /** When Zadarma will stop serving it unless renewed. Null when the carrier gave none. */
+  stopDate: Date | null;
+  monthlyFee: number;
+  currency: string;
+  /** Whether Zadarma will take the monthly fee from the balance on stopDate by itself. */
+  autorenew: boolean;
+  isOnTest: boolean;
+}
 
-/** The numbers on this Zadarma account, with the `type` that every per-number call requires. */
-export async function listNumbers(): Promise<ConnectedNumber[]> {
+/**
+ * Zadarma writes timestamps as "2026-02-11 18:14:40" with no zone. They are read as UTC: a few
+ * hours either way does not change whether a number expires this week, which is all anything
+ * here asks of the value.
+ */
+function parseZadarmaDate(v: unknown): Date | null {
+  if (typeof v !== "string" || !v.trim()) return null;
+  const d = new Date(v.trim().replace(" ", "T") + "Z");
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * The numbers on this Zadarma account.
+ *
+ * Used to return only number and type; stop_date and autorenew were discarded, which is why no
+ * part of the system could say whether a line was about to lapse. Both are what the renewal job
+ * runs on. Zadarma sends booleans as the strings "true"/"false".
+ */
+export async function listNumbers(): Promise<ZadarmaNumber[]> {
   const body = await request("GET", "/v1/direct_numbers/", {});
   const rows = (body.info as Array<Record<string, unknown>>) ?? [];
   return rows
-    .map((r) => ({ number: String(r.number ?? ""), type: String(r.type ?? "") }))
+    .map((r) => ({
+      number: String(r.number ?? ""),
+      type: String(r.type ?? ""),
+      status: String(r.status ?? ""),
+      stopDate: parseZadarmaDate(r.stop_date),
+      monthlyFee: Number(r.monthly_fee ?? 0) || 0,
+      currency: String(r.currency ?? ""),
+      autorenew: String(r.autorenew ?? "") === "true",
+      isOnTest: String(r.is_on_test ?? "") === "true",
+    }))
     .filter((r) => r.number);
+}
+
+/**
+ * Turns Zadarma's own monthly renewal on or off for one number. On means the fee comes off the
+ * balance on the stop date without anyone doing anything; off means the number lapses there. The
+ * renewal job sets on for paying businesses and off for cancelled ones — the second is how Tori
+ * stops paying for a line nobody is using.
+ */
+export async function setAutoprolongation(number: string, on: boolean): Promise<void> {
+  await request("PUT", "/v1/direct_numbers/autoprolongation/", {
+    number: number.replace(/\D/g, ""),
+    value: on ? "on" : "off",
+  });
+}
+
+/**
+ * Prepays the number for a whole number of months, from the balance, and returns the new stop
+ * date. Belt and braces for a line that is days from lapsing and whose autorenew could not be
+ * switched on — spending early is cheaper than a salon whose phone has stopped ringing.
+ */
+export async function prolongNumber(
+  number: string,
+  months: number
+): Promise<{ stopDate: Date | null; totalPaid: number; currency: string }> {
+  const body = await request("PUT", "/v1/direct_numbers/prolong/", {
+    number: number.replace(/\D/g, ""),
+    months: String(months),
+  });
+  const paid = (body.total_paid as { amount?: unknown; currency?: unknown } | undefined) ?? {};
+  return {
+    stopDate: parseZadarmaDate(body.stop_date),
+    totalPaid: Number(paid.amount ?? 0) || 0,
+    currency: String(paid.currency ?? ""),
+  };
 }
 
 /** Digits only, for comparing a number the owner typed against one Zadarma reports. */

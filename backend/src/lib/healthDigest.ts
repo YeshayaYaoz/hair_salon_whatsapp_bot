@@ -36,6 +36,8 @@ export interface HealthSnapshot {
   staleJobs: string[];
   /** Inbound WhatsApp messages the recovery sweep gave up on: customers who wrote and got no reply. */
   abandonedInbound: number;
+  /** Paying businesses whose carrier number lapses within a week — from the daily renewal sync. */
+  voiceNumbersAtRisk: string[];
 }
 
 export async function collectHealthSnapshot(): Promise<HealthSnapshot> {
@@ -54,6 +56,8 @@ export async function collectHealthSnapshot(): Promise<HealthSnapshot> {
         botEnabled: true,
         subscriptionPlan: true,
         subscriptionToken: true,
+        voicePhoneNumber: true,
+        voiceNumberStopDate: true,
       },
     }),
     prisma.appointment.count({ where: { createdAt: { gte: since } } }),
@@ -115,6 +119,15 @@ export async function collectHealthSnapshot(): Promise<HealthSnapshot> {
       .map((b) => b.name),
     staleJobs,
     abandonedInbound,
+    // Read from the columns the renewal job copied down, not from the carrier: the digest must
+    // never fail because Zadarma is slow at 08:00.
+    voiceNumbersAtRisk: businesses
+      .filter(
+        (b) =>
+          b.subscriptionStatus === "active" && !b.blockedAt && b.voicePhoneNumber && b.voiceNumberStopDate &&
+          b.voiceNumberStopDate.getTime() - Date.now() < 7 * ONE_DAY_MS
+      )
+      .map((b) => `${b.name} (${b.voicePhoneNumber}, ${b.voiceNumberStopDate!.toISOString().slice(0, 10)})`),
   };
 }
 
@@ -151,6 +164,7 @@ function renderHtml(s: HealthSnapshot): string {
       <li>No owner notification phone: ${list(s.missingNotificationPhone)}</li>
       <li>Bot switched off: ${list(s.botDisabled)}</li>
       <li>Scheduled jobs late or failing: ${list(s.staleJobs)}</li>
+      <li>Voice numbers lapsing within a week: ${list(s.voiceNumbersAtRisk)}</li>
       <li>Inbound messages abandoned after retries: ${s.abandonedInbound === 0 ? "<span style='color:#16a34a'>none ✓</span>" : `<code>${s.abandonedInbound}</code>`}</li>
       <li>Active plan but <strong>no saved card — never billed</strong>: ${list(s.unbillable)}</li>
     </ul>
@@ -165,6 +179,7 @@ function countIssues(s: HealthSnapshot): number {
     s.botDisabled.length +
     s.staleJobs.length +
     (s.abandonedInbound > 0 ? 1 : 0) +
+    s.voiceNumbersAtRisk.length +
     s.unbillable.length +
     s.lineProblems.length
   );

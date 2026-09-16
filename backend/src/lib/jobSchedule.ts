@@ -35,6 +35,7 @@ export const JOB_INTERVALS_MS: Record<string, number> = {
   whatsappHealth: 6 * HOUR_MS,
   metricSnapshot: DAY_MS,
   retention: DAY_MS,
+  voiceNumberRenewal: DAY_MS,
 };
 
 /** Nothing is judged stale under this, however short its interval: a 2-minute job that is 3
