@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, signImpersonationToken, DEFAULT_IMPERSONATION_HOURS, MAX_IMPERSONATION_HOURS, type AuthedRequest } from "../lib/auth.js";
 import { logAdminAction } from "../lib/adminAudit.js";
+import { updateBusinessContact } from "../lib/adminContact.js";
 import { sendAdminAlertEmail, sendBusinessNoticeEmail } from "../lib/email.js";
 import { assignNumberToAgent, listHebrewVoices, CartesiaNotConfiguredError } from "../lib/cartesiaAdmin.js";
 import { captureError } from "../lib/errorMonitoring.js";
@@ -497,6 +498,39 @@ businessRouter.post("/admin/businesses/:id/plan", requireSuperAdmin, async (req:
   }
 
   res.json({ ok: true, subscriptionPlan: business.subscriptionPlan, subscriptionStatus: business.subscriptionStatus });
+});
+
+/**
+ * Changes who the business is reached at — the owner's notification phone and the login email.
+ * The everyday reason: an owner who changed numbers and cannot reach the settings page to say so,
+ * because the manager tools now answer only the old number. Rules and consequences live in
+ * lib/adminContact; this is the wiring and the audit line.
+ */
+const contactSchema = z.object({
+  notificationPhone: z.string().max(40).optional(),
+  email: z.string().max(200).optional(),
+});
+businessRouter.post("/admin/businesses/:id/contact", requireSuperAdmin, async (req: AuthedRequest, res) => {
+  const parsed = contactSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const before = await prisma.business.findUnique({ where: { id: req.params.id }, select: { name: true, notificationPhone: true, email: true } });
+  if (!before) return res.status(404).json({ error: "Business not found" });
+
+  const result = await updateBusinessContact(req.params.id, parsed.data);
+  if (!result.ok) return res.status(result.status).json({ error: result.error });
+
+  if (result.changed.length > 0) {
+    await logAdminAction({
+      actorEmail: process.env.SUPER_ADMIN_EMAIL!,
+      action: "set_contact",
+      targetBusinessId: req.params.id,
+      targetBusinessName: before.name,
+      details: result.changed
+        .map((f) => (f === "email" ? `email ${before.email} → ${result.email}` : `phone ${before.notificationPhone ?? "none"} → ${result.notificationPhone ?? "none"}`))
+        .join("; "),
+    });
+  }
+  res.json({ ok: true, notificationPhone: result.notificationPhone, email: result.email, changed: result.changed });
 });
 
 // Permanently deletes a business and every row scoped to it. No cascade at the DB level (kept

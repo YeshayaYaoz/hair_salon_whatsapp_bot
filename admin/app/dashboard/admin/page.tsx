@@ -357,6 +357,10 @@ export default function AdminBusinessesPage() {
   const [bizAuditLog, setBizAuditLog] = useState<AuditLogEntry[] | null>(null);
   const [blockReason, setBlockReason] = useState("");
   const [planChoice, setPlanChoice] = useState<"standard" | "premium">("standard");
+  // Editable copies of the drilldown's contact details. Seeded when a business is opened, so the
+  // fields show what is saved and the operator edits rather than retypes.
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
   const [confirmDeleteName, setConfirmDeleteName] = useState("");
   const [messageText, setMessageText] = useState("");
   const [waPhoneId, setWaPhoneId] = useState("");
@@ -389,6 +393,8 @@ export default function AdminBusinessesPage() {
     setDrilldown(b);
     setBlockReason("");
     setPlanChoice((b.subscriptionPlan as "standard" | "premium") ?? "standard");
+    setContactPhone(b.notificationPhone ?? "");
+    setContactEmail(b.email ?? "");
     setConfirmDeleteName("");
     setMessageText("");
     setWaPhoneId("");
@@ -1085,6 +1091,42 @@ export default function AdminBusinessesPage() {
                   </button>
                 </div>
               )}
+
+              {/* Contact details: the owner's notification phone and the login email. The phone is
+                  the number the manager tools trust, so an owner who changed numbers is locked out
+                  of running the business from WhatsApp until someone sets the new one here. */}
+              <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+                <input
+                  type="tel"
+                  dir="ltr"
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                  placeholder={he ? "מספר מנהל" : "Manager phone"}
+                  className="flex-1 text-xs"
+                />
+                <input
+                  type="email"
+                  dir="ltr"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  placeholder={he ? "אימייל" : "Email"}
+                  className="flex-1 text-xs"
+                />
+                <button
+                  disabled={actionBusy || (contactPhone === (drilldown.notificationPhone ?? "") && contactEmail === (drilldown.email ?? ""))}
+                  onClick={() =>
+                    runAction(() =>
+                      apiFetch(`/api/business/admin/businesses/${drilldown.id}/contact`, {
+                        method: "POST",
+                        body: JSON.stringify({ notificationPhone: contactPhone, email: contactEmail }),
+                      })
+                    )
+                  }
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {he ? "עדכן פרטי קשר" : "Update contact"}
+                </button>
+              </div>
 
               {/* Plan upgrade/downgrade */}
               <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
