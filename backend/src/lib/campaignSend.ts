@@ -51,6 +51,8 @@ export interface RunCampaignParams {
   template: CampaignTemplateDef;
   /** The owner's own words — what goes into the template's {{3}}. */
   ownerText: string;
+  /** For a copyCode template: the code on the button. Ignored by templates without one. */
+  couponCode?: string;
   recipients: CampaignRecipient[];
 }
 
@@ -72,9 +74,15 @@ function firstName(name: string | null): string {
   return first || "היי";
 }
 
-/** The template body with its variables filled — the same words whichever channel carries them. */
-export function renderCampaignText(template: CampaignTemplateDef, params: [string, string, string]): string {
-  return params.reduce<string>((body, value, i) => body.split(`{{${i + 1}}}`).join(value), template.body);
+/**
+ * The template body with its variables filled — the same words whichever channel carries them.
+ *
+ * A plain session message has no button, so for a coupon template the code goes on its own line
+ * at the end; the customer still gets the code, just without the tap-to-copy.
+ */
+export function renderCampaignText(template: CampaignTemplateDef, params: [string, string, string], couponCode?: string): string {
+  const body = params.reduce<string>((acc, value, i) => acc.split(`{{${i + 1}}}`).join(value), template.body);
+  return template.copyCode && couponCode ? `${body}\n\nהקוד: ${couponCode}` : body;
 }
 
 /** Whether a customer wrote to this business on WhatsApp within the window. Only WhatsApp opens a
@@ -137,7 +145,7 @@ export async function runCampaign(params: RunCampaignParams): Promise<CampaignOu
             phoneNumberId: business.whatsappPhoneNumberId,
             accessToken,
             to: recipient.phone,
-            text: renderCampaignText(params.template, bodyParams),
+            text: renderCampaignText(params.template, bodyParams, params.couponCode),
           })
         : await sendWhatsAppTemplate({
             phoneNumberId: business.whatsappPhoneNumberId,
@@ -146,6 +154,7 @@ export async function runCampaign(params: RunCampaignParams): Promise<CampaignOu
             templateName: params.template.name,
             languageCode: CAMPAIGN_TEMPLATE_LANG,
             bodyParams,
+            ...(params.template.copyCode && params.couponCode ? { copyCode: params.couponCode } : {}),
           });
 
       await prisma.campaignSend.create({

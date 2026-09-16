@@ -471,6 +471,12 @@ export interface CampaignTemplateDef {
   name: string;
   body: string;
   example: string[];
+  /**
+   * Carries a tap-to-copy coupon button instead of the opt-out quick reply. One kind of button per
+   * template (see CreateTemplateParams), so the opt-out moves to the footer as "השיבו הסר" — and
+   * the webhook honours that word as an opt-out exactly as it honours the button.
+   */
+  copyCode?: boolean;
 }
 
 /** Lapsed customers: the yield campaign, and "everyone who hasn't been in a while". */
@@ -494,7 +500,26 @@ export const CAMPAIGN_ANNOUNCEMENT: CampaignTemplateDef = {
   example: ["דנה", "מספרת רונית", "השבוע 20% הנחה על צבע לכל מי שקובעת עד יום חמישי."],
 };
 
-export const CAMPAIGN_TEMPLATES: CampaignTemplateDef[] = [CAMPAIGN_COME_BACK, CAMPAIGN_OPEN_SLOT, CAMPAIGN_ANNOUNCEMENT];
+/**
+ * A discount code, delivered the way WhatsApp designed for it: the code sits on a COPY_CODE button
+ * the customer taps, not in the body where it has to be selected and copied by hand. The body's
+ * {{3}} says what the code is worth, in the owner's words; the code itself is a send-time button
+ * parameter, so one approved template serves every code the business ever creates.
+ */
+export const CAMPAIGN_COUPON: CampaignTemplateDef = {
+  name: "tori_coupon",
+  body: "היי {{1}}, {{2}} שמחים להעניק לך {{3}} לחצו על הכפתור להעתקת הקוד, ואפשר לממש אותו כשקובעים תור כאן.",
+  example: ["דנה", "מספרת רונית", "10% הנחה על הטיפול הבא."],
+  copyCode: true,
+};
+/** Meta requires a sample for the reviewer; any plausible code will do. */
+export const CAMPAIGN_COUPON_CODE_EXAMPLE = "WELCOME10";
+/** The opt-out, as text, for the one template whose button slot the coupon takes. */
+export const CAMPAIGN_COUPON_FOOTER = "לא רוצים הודעות כאלה מהעסק? השיבו הסר.";
+/** Plain-text opt-outs the webhook honours, for templates whose button slot is taken. */
+export const CAMPAIGN_OPT_OUT_WORDS = ["הסר", CAMPAIGN_OPT_OUT_BUTTON];
+
+export const CAMPAIGN_TEMPLATES: CampaignTemplateDef[] = [CAMPAIGN_COME_BACK, CAMPAIGN_OPEN_SLOT, CAMPAIGN_ANNOUNCEMENT, CAMPAIGN_COUPON];
 
 /** Language every campaign template is filed in — the same as the rest of the library. */
 export const CAMPAIGN_TEMPLATE_LANG = DEFAULT_LANG;

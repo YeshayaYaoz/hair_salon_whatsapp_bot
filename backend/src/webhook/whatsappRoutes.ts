@@ -5,7 +5,7 @@ import { resolveBusinessByPhoneNumberId } from "../tenants/resolve.js";
 import { sendWhatsAppMessage, sendWhatsAppList, sendWhatsAppImage, sendWhatsAppCtaUrl, sendWhatsAppButtons, WhatsAppAuthError, type ListRow } from "./whatsappClient.js";
 import { sendWhatsAppTokenExpiredEmail } from "../lib/email.js";
 import { handleIncomingMessage } from "../bot/claudeBot.js";
-import { CAMPAIGN_OPT_OUT_BUTTON } from "../lib/whatsappTemplates.js";
+import { CAMPAIGN_OPT_OUT_BUTTON, CAMPAIGN_OPT_OUT_WORDS } from "../lib/whatsappTemplates.js";
 import { checkDailyCap } from "../lib/dailyMessageCap.js";
 import { notifyOwner } from "../lib/ownerNotify.js";
 import { clearHistory, appendTurn } from "../bot/conversationStore.js";
@@ -70,6 +70,10 @@ function extractMessage(message: any): ExtractedMessage {
   if (message.type === "text") {
     const body = (message.text?.body as string ?? "").trim();
     if (RESET_KEYWORDS.some((k) => body.toLowerCase() === k.toLowerCase())) return { kind: "reset" };
+    // The coupon template's button slot holds the copy-code button, so its footer says "השיבו הסר"
+    // instead — and a customer who does exactly that must be honoured exactly like a button tap.
+    // Exact match on the whole message: "הסר" alone is an instruction, "תסירי את התור" is not.
+    if (CAMPAIGN_OPT_OUT_WORDS.includes(body)) return { kind: "optOut" };
     return { kind: "text", text: body };
   }
   // A quick-reply tap. The title is exactly what the customer would have typed, so it enters the

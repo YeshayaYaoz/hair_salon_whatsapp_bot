@@ -1,6 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { runCampaign, campaignReport, selectAudience, renderCampaignText, MAX_CAMPAIGN_RECIPIENTS } from "../lib/campaignSend.js";
-import { CAMPAIGN_COME_BACK, CAMPAIGN_ANNOUNCEMENT } from "../lib/whatsappTemplates.js";
+import { CAMPAIGN_COME_BACK, CAMPAIGN_ANNOUNCEMENT, CAMPAIGN_COUPON } from "../lib/whatsappTemplates.js";
 import { buildSystemPrompt } from "./prompt.js";
 import { appendTurn, getHistory, type Turn } from "./conversationStore.js";
 import { findAvailableSlots, createAppointment, SlotUnavailableError, OutsideBusinessHoursError, SLOT_BLOCKING_STATUSES, type AvailableSlot } from "../booking/availability.js";
@@ -300,12 +300,13 @@ const managerTools: GenericTool[] = [
   {
     name: "send_campaign",
     description:
-      "Send ONE marketing message from the business to many of its customers at once — 'תשלחי לכל מי שלא היה חודשיים שיש 15% הנחה השבוע', 'תודיעי לכולם שאנחנו סגורים בחג'. audience is 'lapsed' (no visit in 60 days) or 'all'. text is the owner's own words, one or two sentences; Tori wraps them in an approved template with a greeting and an opt-out button. Two-step: call WITHOUT confirmed to get the recipient count and the exact rendered message, read both to the owner, and only on a clear yes call again with confirmed:true. This reaches real people in the business's name and cannot be recalled.",
+      "Send ONE marketing message from the business to many of its customers at once — 'תשלחי לכל מי שלא היה חודשיים שיש 15% הנחה השבוע', 'תודיעי לכולם שאנחנו סגורים בחג', 'תשלחי לכולם את הקוד WELCOME10'. audience is 'lapsed' (no visit in 60 days) or 'all'. text is the owner's own words, one or two sentences; Tori wraps them in an approved template with a greeting and an opt-out. couponCode (optional) attaches an EXISTING discount code as a tap-to-copy button — the code must already exist (create_discount_code); then text should say what it is worth, e.g. '10% הנחה על הטיפול הבא.'. Two-step: call WITHOUT confirmed to get the recipient count and the exact rendered message, read both to the owner, and only on a clear yes call again with confirmed:true. This reaches real people in the business's name and cannot be recalled.",
     input_schema: {
       type: "object",
       properties: {
         audience: { type: "string", enum: ["lapsed", "all"] },
         text: { type: "string", description: "The owner's message, exactly as they want customers to read it" },
+        couponCode: { type: "string", description: "An existing discount code to attach as a copy button" },
         confirmed: { type: "boolean" },
       },
       required: ["audience", "text"],
@@ -966,8 +967,24 @@ export async function runTool(
     if (!text) return JSON.stringify({ error: "Ask the owner what the message should say." });
     if (text.length > 300) return JSON.stringify({ error: "Too long for one WhatsApp campaign message — ask the owner to keep it under about 300 characters." });
 
-    // "lapsed" reads as "come back", "all" as an announcement; the wrapper sentence differs.
-    const template = audience === "lapsed" ? CAMPAIGN_COME_BACK : CAMPAIGN_ANNOUNCEMENT;
+    // A code is checked before anything is promised on its strength: a campaign built around
+    // "WELCOME10" that does not exist sends fifty people a button that copies nothing usable.
+    let couponCode: string | undefined;
+    if (input.couponCode !== undefined && String(input.couponCode).trim()) {
+      const code = String(input.couponCode).trim().toUpperCase();
+      const coupon = await prisma.customerCoupon.findUnique({
+        where: { businessId_code: { businessId, code } },
+        select: { active: true, expiresAt: true },
+      });
+      if (!coupon) return JSON.stringify({ error: `No discount code "${code}" exists for this business. Create it first with create_discount_code, then send the campaign.` });
+      if (!coupon.active) return JSON.stringify({ error: `The code "${code}" is switched off. Ask the owner whether to reactivate it before sending it to customers.` });
+      if (coupon.expiresAt && coupon.expiresAt < new Date()) return JSON.stringify({ error: `The code "${code}" has already expired. Sending it would hand customers a code that is refused at booking.` });
+      couponCode = code;
+    }
+
+    // A coupon has its own template (the code rides on a copy button); otherwise "lapsed" reads
+    // as "come back" and "all" as an announcement — the wrapper sentence differs.
+    const template = couponCode ? CAMPAIGN_COUPON : audience === "lapsed" ? CAMPAIGN_COME_BACK : CAMPAIGN_ANNOUNCEMENT;
     const bizRow = await prisma.business.findUniqueOrThrow({ where: { id: businessId }, select: { name: true } });
     const recipients = await selectAudience(businessId, audience);
     const eligible = recipients.filter((r) => !r.marketingOptOutAt);
@@ -986,15 +1003,16 @@ export async function runTool(
         recipients: willSend,
         optedOut: recipients.length - eligible.length,
         ...(eligible.length > MAX_CAMPAIGN_RECIPIENTS ? { capped: `only the first ${MAX_CAMPAIGN_RECIPIENTS} of ${eligible.length} — the rest can go in a later campaign` } : {}),
-        exactMessage: renderCampaignText(template, [sampleName, bizRow.name, text]),
-        note: "Each message is metered against the plan quota. Customers outside the 24h window receive it as an approved template with an opt-out button.",
+        exactMessage: renderCampaignText(template, [sampleName, bizRow.name, text], couponCode),
+        ...(couponCode ? { couponCode, couponButton: "the code is delivered on a tap-to-copy button under the message" } : {}),
+        note: "Each message is metered against the plan quota. Customers outside the 24h window receive it as an approved template with an opt-out.",
       },
       "willSend"
     );
     if (gate) return gate;
 
     try {
-      const outcome = await runCampaign({ businessId, source: "manager", audience, template, ownerText: text, recipients });
+      const outcome = await runCampaign({ businessId, source: "manager", audience, template, ownerText: text, couponCode, recipients });
       return JSON.stringify({
         accepted: outcome.accepted,
         skippedOptOut: outcome.skippedOptOut,

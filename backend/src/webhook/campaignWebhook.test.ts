@@ -156,3 +156,29 @@ describe("delivery statuses", () => {
     expect(mockPrisma.campaignSend.update).not.toHaveBeenCalled();
   });
 });
+
+describe("opting out by text", () => {
+  const text = (body: string) => ({
+    metadata: { phone_number_id: "pn1" },
+    messages: [{ id: "wamid.t1", from: "972501111111", type: "text", text: { body } }],
+  });
+
+  it("honours the bare word the coupon footer asks for", async () => {
+    // The coupon template's button slot is the copy-code button, so its footer says "השיבו הסר".
+    await post(text("הסר"));
+    await settle();
+
+    expect(mockPrisma.customer.updateMany).toHaveBeenCalled();
+    expect(handleIncomingMessage).not.toHaveBeenCalled();
+  });
+
+  it("leaves a sentence that merely contains the word for the bot", async () => {
+    // "תסירי את התור שלי" is a cancellation, not an opt-out.
+    handleIncomingMessage.mockResolvedValue({ text: "ok", isFirstReply: false });
+    await post(text("תסירי את התור שלי מחר"));
+    await settle();
+
+    expect(mockPrisma.customer.updateMany).not.toHaveBeenCalled();
+    expect(handleIncomingMessage).toHaveBeenCalled();
+  });
+});

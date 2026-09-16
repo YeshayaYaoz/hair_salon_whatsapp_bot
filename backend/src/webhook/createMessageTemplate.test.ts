@@ -239,3 +239,70 @@ describe("createMessageTemplate", () => {
     expect(body.components[0]).not.toHaveProperty("example");
   });
 });
+
+/**
+ * The coupon button's wire shape, at both ends. Meta rejects a malformed button component with
+ * the same generic wording error as a content problem — which sends you rewriting perfectly good
+ * Hebrew — so the exact JSON is pinned here rather than discovered in review.
+ */
+describe("COPY_CODE button", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("is filed as a BUTTONS component with a sample code, and nothing else in the slot", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ id: "1", status: "PENDING" })));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createMessageTemplate("waba", "tok", {
+      name: "tori_coupon",
+      languageCode: "he",
+      category: "MARKETING",
+      bodyText: "היי {{1}}, קוד בשבילך.",
+      bodyExample: ["דנה"],
+      footerText: "השיבו הסר",
+      copyCodeButton: { example: "WELCOME10" },
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const buttons = body.components.find((c: { type: string }) => c.type === "BUTTONS");
+    expect(buttons.buttons).toEqual([{ type: "COPY_CODE", example: "WELCOME10" }]);
+  });
+
+  it("is filled at send time as a copy_code button parameter, not a body variable", async () => {
+    const { sendWhatsAppTemplate } = await import("./whatsappClient.js");
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ messages: [{ id: "wamid.1" }] })));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const receipt = await sendWhatsAppTemplate({
+      phoneNumberId: "pn", accessToken: "tok", to: "972501111111",
+      templateName: "tori_coupon", languageCode: "he",
+      bodyParams: ["דנה", "מספרת רונית", "10% הנחה."],
+      copyCode: "WELCOME10",
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.template.components).toContainEqual({
+      type: "button",
+      sub_type: "copy_code",
+      index: "0",
+      parameters: [{ type: "coupon_code", coupon_code: "WELCOME10" }],
+    });
+    // The body still carries only its three text parameters.
+    const bodyComp = body.template.components.find((c: { type: string }) => c.type === "body");
+    expect(bodyComp.parameters).toHaveLength(3);
+    expect(receipt.messageId).toBe("wamid.1");
+  });
+
+  it("adds no button component when no code is given", async () => {
+    const { sendWhatsAppTemplate } = await import("./whatsappClient.js");
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ messages: [{ id: "wamid.2" }] })));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await sendWhatsAppTemplate({
+      phoneNumberId: "pn", accessToken: "tok", to: "972501111111",
+      templateName: "tori_announcement", languageCode: "he", bodyParams: ["a", "b", "c"],
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.template.components.some((c: { type: string }) => c.type === "button")).toBe(false);
+  });
+});

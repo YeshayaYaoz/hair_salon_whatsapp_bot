@@ -41,17 +41,24 @@ export const RE_ENGAGEMENT_ERROR_CODE = 131047;
  * be approved in the sending WABA; see whatsappTemplates.ts for the naming contract.
  */
 export async function sendWhatsAppTemplate(
-  params: SendCommon & { templateName: string; languageCode: string; bodyParams: string[] }
+  params: SendCommon & { templateName: string; languageCode: string; bodyParams: string[]; copyCode?: string }
 ): Promise<SendReceipt> {
+  const components: Record<string, unknown>[] = params.bodyParams.length
+    ? [{ type: "body", parameters: params.bodyParams.map((text) => ({ type: "text", text })) }]
+    : [];
+  // The coupon code rides on the template's COPY_CODE button, filled at send time. Meta's shape
+  // for a dynamic button: sub_type + index + a coupon_code parameter — not a body variable.
+  if (params.copyCode) {
+    components.push({
+      type: "button",
+      sub_type: "copy_code",
+      index: "0",
+      parameters: [{ type: "coupon_code", coupon_code: params.copyCode }],
+    });
+  }
   return send(params, {
     type: "template",
-    template: {
-      name: params.templateName,
-      language: { code: params.languageCode },
-      components: params.bodyParams.length
-        ? [{ type: "body", parameters: params.bodyParams.map((text) => ({ type: "text", text })) }]
-        : [],
-    },
+    template: { name: params.templateName, language: { code: params.languageCode }, components },
   });
 }
 
@@ -328,6 +335,12 @@ export interface CreateTemplateParams {
    * you rewriting perfectly good Hebrew. One kind of button per template.
    */
   urlButton?: { text: string; url: string };
+  /**
+   * A tap-to-copy coupon button. The code itself is supplied per send (sendWhatsAppTemplate's
+   * copyCode), so one approved template serves every code a business ever creates; Meta only
+   * needs a sample here for the reviewer. Same one-kind-of-button rule as urlButton.
+   */
+  copyCodeButton?: { example: string };
 }
 
 /** How many distinct {{n}} placeholders a body uses. */
@@ -372,6 +385,11 @@ export async function createMessageTemplate(
     components.push({
       type: "BUTTONS",
       buttons: [{ type: "URL", text: params.urlButton.text, url: params.urlButton.url }],
+    });
+  } else if (params.copyCodeButton) {
+    components.push({
+      type: "BUTTONS",
+      buttons: [{ type: "COPY_CODE", example: params.copyCodeButton.example }],
     });
   }
 

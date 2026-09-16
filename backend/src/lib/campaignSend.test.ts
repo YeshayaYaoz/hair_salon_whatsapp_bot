@@ -21,7 +21,7 @@ const meterOutboundMessage = vi.fn();
 vi.mock("./wallet.js", () => ({ meterOutboundMessage: (...a: unknown[]) => meterOutboundMessage(...a) }));
 
 const { runCampaign, campaignReport, renderCampaignText, MAX_CAMPAIGN_RECIPIENTS } = await import("./campaignSend.js");
-const { CAMPAIGN_COME_BACK, CAMPAIGN_ANNOUNCEMENT } = await import("./whatsappTemplates.js");
+const { CAMPAIGN_COME_BACK, CAMPAIGN_ANNOUNCEMENT, CAMPAIGN_COUPON } = await import("./whatsappTemplates.js");
 
 /**
  * The single path every marketing send takes. The yield campaign used to do this by hand and got
@@ -191,5 +191,40 @@ describe("the report", () => {
     const r = await campaignReport("camp1");
 
     expect(r).toMatchObject({ total: 12, delivered: 7, read: 2, failed: 1, pending: 4 });
+  });
+});
+
+/**
+ * A coupon is the one template whose payload is not only words: the code has to reach the
+ * customer whichever channel carries the message, and on the template channel it has to reach
+ * them the way WhatsApp designed for it — on a button they can tap.
+ */
+describe("a coupon campaign", () => {
+  const coupon = () => ({ ...base(), template: CAMPAIGN_COUPON, ownerText: "10% הנחה על הטיפול הבא.", couponCode: "WELCOME10" });
+
+  it("puts the code on the copy button when the template goes out", async () => {
+    await runCampaign(coupon());
+
+    const call = sendWhatsAppTemplate.mock.calls[0][0];
+    expect(call.templateName).toBe("tori_coupon");
+    expect(call.copyCode).toBe("WELCOME10");
+    // And NOT in the body — the body says what it is worth, the button carries what it is.
+    expect(call.bodyParams.join(" ")).not.toContain("WELCOME10");
+  });
+
+  it("puts the code in the text when the window is open, since a plain message has no button", async () => {
+    mockPrisma.conversationMessage.findFirst.mockResolvedValue({ id: "m1" });
+
+    await runCampaign(coupon());
+
+    expect(sendWhatsAppMessage.mock.calls[0][0].text).toContain("הקוד: WELCOME10");
+  });
+
+  it("does not attach a code to a template that has no button for one", async () => {
+    // A stray couponCode on an announcement must not produce a button parameter Meta rejects.
+    await runCampaign({ ...base(), couponCode: "WELCOME10" });
+
+    expect(sendWhatsAppTemplate.mock.calls[0][0].copyCode).toBeUndefined();
+    expect(renderCampaignText(CAMPAIGN_ANNOUNCEMENT, ["דנה", "x", "y"], "WELCOME10")).not.toContain("WELCOME10");
   });
 });

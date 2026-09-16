@@ -12,11 +12,11 @@ const mockPrisma = {
   business: { findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), update: vi.fn() },
   customer: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), upsert: vi.fn() },
   campaign: { findFirst: vi.fn() },
+  customerCoupon: { findUnique: vi.fn(), create: vi.fn() },
   service: { findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
   staffMember: { findMany: vi.fn(), create: vi.fn(), deleteMany: vi.fn() },
   faqEntry: { findMany: vi.fn(), create: vi.fn() },
   blockedTime: { findMany: vi.fn(), deleteMany: vi.fn() },
-  customerCoupon: { findUnique: vi.fn(), create: vi.fn() },
   appointment: { findFirst: vi.fn(), findMany: vi.fn() },
 };
 vi.mock("../lib/prisma.js", () => ({ prisma: mockPrisma }));
@@ -190,5 +190,65 @@ describe("campaign_report", () => {
     mockPrisma.campaign.findFirst.mockResolvedValue(null);
     const out = JSON.parse(await runTool("b1", OWNER, "campaign_report", {}, noSlots, noPhotos));
     expect(out.error).toBeTruthy();
+  });
+});
+
+/**
+ * A campaign built around a code that does not work sends fifty people a button that copies
+ * nothing usable, in the business's name. So the code is checked before it is even previewed.
+ */
+describe("send_campaign with a coupon", () => {
+  const live = { active: true, expiresAt: null };
+
+  it("refuses a code that does not exist, and says how to create one", async () => {
+    mockPrisma.customerCoupon.findUnique.mockResolvedValue(null);
+    const out = await send(OWNER, { audience: "all", text: "10% הנחה", couponCode: "NOPE" });
+    expect(out.error).toMatch(/create_discount_code/);
+    expect(runCampaign).not.toHaveBeenCalled();
+  });
+
+  it("refuses a switched-off code", async () => {
+    mockPrisma.customerCoupon.findUnique.mockResolvedValue({ active: false, expiresAt: null });
+    const out = await send(OWNER, { audience: "all", text: "10% הנחה", couponCode: "OLD" });
+    expect(out.error).toBeTruthy();
+    expect(runCampaign).not.toHaveBeenCalled();
+  });
+
+  it("refuses an expired code", async () => {
+    mockPrisma.customerCoupon.findUnique.mockResolvedValue({ active: true, expiresAt: new Date(Date.now() - 1000) });
+    const out = await send(OWNER, { audience: "all", text: "10% הנחה", couponCode: "GONE" });
+    expect(out.error).toMatch(/expired/i);
+  });
+
+  it("normalises the code and looks it up per business", async () => {
+    mockPrisma.customerCoupon.findUnique.mockResolvedValue(live);
+    await send(OWNER, { audience: "all", text: "10% הנחה", couponCode: " welcome10 " });
+    expect(mockPrisma.customerCoupon.findUnique.mock.calls[0][0].where).toEqual({
+      businessId_code: { businessId: "b1", code: "WELCOME10" },
+    });
+  });
+
+  it("switches to the coupon template whatever the audience, and previews the code", async () => {
+    mockPrisma.customerCoupon.findUnique.mockResolvedValue(live);
+    const out = await send(OWNER, { audience: "lapsed", text: "10% הנחה על הטיפול הבא.", couponCode: "WELCOME10" });
+
+    expect(out.needsConfirmation).toBe(true);
+    expect(out.willSend.couponCode).toBe("WELCOME10");
+    expect(out.willSend.exactMessage).toContain("שמחים להעניק לך");
+  });
+
+  it("passes the code through on confirm", async () => {
+    mockPrisma.customerCoupon.findUnique.mockResolvedValue(live);
+    await send(OWNER, { audience: "all", text: "10% הנחה", couponCode: "WELCOME10", confirmed: true });
+
+    expect(runCampaign.mock.calls[0][0]).toMatchObject({ couponCode: "WELCOME10" });
+    expect(runCampaign.mock.calls[0][0].template.name).toBe("tori_coupon");
+  });
+
+  it("is unaffected by a customer supplying a code", async () => {
+    mockPrisma.customerCoupon.findUnique.mockResolvedValue(live);
+    const out = await send(CUSTOMER, { audience: "all", text: "x", couponCode: "WELCOME10", confirmed: true });
+    expect(out.error).toBeTruthy();
+    expect(runCampaign).not.toHaveBeenCalled();
   });
 });

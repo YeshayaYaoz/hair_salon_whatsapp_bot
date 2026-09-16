@@ -16,6 +16,8 @@ import {
   CAMPAIGN_TEMPLATE_LANG,
   CAMPAIGN_FOOTER,
   CAMPAIGN_OPT_OUT_BUTTON,
+  CAMPAIGN_COUPON_FOOTER,
+  CAMPAIGN_COUPON_CODE_EXAMPLE,
 } from "./whatsappTemplates.js";
 
 /**
@@ -89,8 +91,11 @@ export async function submitWhatsAppTemplates(
           category: "MARKETING",
           bodyText: t.body,
           bodyExample: t.example,
-          footerText: CAMPAIGN_FOOTER,
-          quickReplies: [CAMPAIGN_OPT_OUT_BUTTON],
+          // The coupon template's one button slot is the copy-code button, so its opt-out is the
+          // footer word "הסר" rather than a reply button. Everything else gets the button.
+          ...(t.copyCode
+            ? { footerText: CAMPAIGN_COUPON_FOOTER, copyCodeButton: { example: CAMPAIGN_COUPON_CODE_EXAMPLE } }
+            : { footerText: CAMPAIGN_FOOTER, quickReplies: [CAMPAIGN_OPT_OUT_BUTTON] }),
         })
       ),
     ]);

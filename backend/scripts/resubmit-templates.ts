@@ -24,7 +24,7 @@ import {
   OWNER_ALERT_TEXT,
   OWNER_ALERT_CTA_BODY,
   OWNER_ALERT_CTA_EXAMPLE,
-  OWNER_ALERT_CTA_BUTTON, CAMPAIGN_TEMPLATES, CAMPAIGN_OPT_OUT_BUTTON, CAMPAIGN_FOOTER } from "../src/lib/whatsappTemplates.js";
+  OWNER_ALERT_CTA_BUTTON, CAMPAIGN_TEMPLATES, CAMPAIGN_OPT_OUT_BUTTON, CAMPAIGN_FOOTER, CAMPAIGN_COUPON_FOOTER, CAMPAIGN_COUPON_CODE_EXAMPLE } from "../src/lib/whatsappTemplates.js";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -87,6 +87,8 @@ async function main() {
     // as if a campaign template carried a link it does not have.
     if (label === "owner alert (button)") {
       console.log(`    button: [${OWNER_ALERT_CTA_BUTTON.text}] → ${OWNER_ALERT_CTA_BUTTON.url}`);
+    } else if (label.startsWith("campaign:") && "copyCode" in t && t.copyCode) {
+      console.log(`    button: [copy code, e.g. ${CAMPAIGN_COUPON_CODE_EXAMPLE}]   footer: ${CAMPAIGN_COUPON_FOOTER}`);
     } else if (label.startsWith("campaign:")) {
       console.log(`    button: [${CAMPAIGN_OPT_OUT_BUTTON}]   footer: ${CAMPAIGN_FOOTER}`);
     }
