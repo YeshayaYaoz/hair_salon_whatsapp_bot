@@ -28,6 +28,7 @@ import { cartesiaWebhookRouter } from "./webhook/cartesiaWebhookRoutes.js";
 import { processWhatsAppPayload } from "./webhook/whatsappRoutes.js";
 import { runInboundRecoveryJob } from "./webhook/whatsappInbox.js";
 import { runJobWatchdogJob } from "./lib/jobWatchdog.js";
+import { runVoiceNumberRenewalJob } from "./lib/voiceNumberRenewal.js";
 import { UPLOADS_ROUTE, UPLOADS_ROOT, UnsupportedImageError, MAX_UPLOAD_BYTES, checkUploadsDir } from "./lib/storage.js";
 import multer from "multer";
 
@@ -243,6 +244,12 @@ runTrackedJob("inboundRecovery", recoverInbound);
 
 const ONE_DAY = 24 * 60 * 60 * 1000;
 setInterval(() => runTrackedJob("metricSnapshot", runMetricSnapshotJob), ONE_DAY);
+
+// Keeps paying businesses' phone numbers renewed at the carrier and stops paying for the rest —
+// see voiceNumberRenewal.ts. Daily, and once at startup: a deploy that lands the day a line was
+// due should not wait a day to notice.
+setInterval(() => runTrackedJob("voiceNumberRenewal", runVoiceNumberRenewalJob), ONE_DAY);
+runTrackedJob("voiceNumberRenewal", runVoiceNumberRenewalJob);
 runTrackedJob("metricSnapshot", runMetricSnapshotJob);
 
 const SIX_HOURS = 6 * 60 * 60 * 1000;

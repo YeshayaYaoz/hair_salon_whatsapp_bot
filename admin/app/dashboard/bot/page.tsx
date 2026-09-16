@@ -190,14 +190,18 @@ function VoicePhoneSection() {
   const { lang } = useLanguage();
   const he = lang === "he";
   const [current, setCurrent] = useState<string | null | undefined>(undefined); // undefined = loading
+  // What the carrier last said about when this number is paid through — copied down daily by the
+  // renewal job, so this is a read of our own row, not a live carrier call.
+  const [paidThrough, setPaidThrough] = useState<string | null>(null);
   const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    apiFetch<{ voicePhoneNumber?: string | null }>("/api/business/me").then((me) => {
+    apiFetch<{ voicePhoneNumber?: string | null; voiceNumberStopDate?: string | null }>("/api/business/me").then((me) => {
       setCurrent(me.voicePhoneNumber ?? null);
       setValue(me.voicePhoneNumber ?? "");
+      setPaidThrough(me.voiceNumberStopDate ?? null);
     }).catch((err) => {
       // The skeleton is a promise that content is coming. When the load failed it never is, and
       // the error line below the section is the honest replacement.
@@ -263,6 +267,16 @@ function VoicePhoneSection() {
           ? "מספר הטלפון שאליו שיחות נכנסות ייענו ע\"י הבוט הקולי. מתמלא אוטומטית עם מספר הוואטסאפ שלך בעת החיבור — ניתן לשנות ידנית אם יש לך מספר קולי נפרד."
           : "The phone number incoming calls to are answered by the voice bot. Auto-filled with your WhatsApp number once connected — change it manually if you use a separate voice line."}
       </p>
+      {current && paidThrough && (
+        // The one thing an owner would otherwise have no way to know: the line is a monthly rental,
+        // and this is the date it is paid through. Renewal is automatic while the subscription is
+        // active, so the sentence says so — the date is reassurance, not a to-do.
+        <p className="text-xs text-gray-600 -mt-2 mb-4">
+          {he
+            ? `המספר משולם עד ${new Date(paidThrough).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem", day: "numeric", month: "long", year: "numeric" })}. החידוש אוטומטי כל עוד המנוי פעיל.`
+            : `Paid through ${new Date(paidThrough).toLocaleDateString("en-GB", { timeZone: "Asia/Jerusalem", day: "numeric", month: "long", year: "numeric" })}. Renews automatically while your subscription is active.`}
+        </p>
+      )}
       {current === undefined ? (
         <SkeletonCard lines={1} />
       ) : (

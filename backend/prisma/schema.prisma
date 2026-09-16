@@ -107,6 +107,14 @@ model Business {
   // Claiming this column with a conditional update closes the window in the database rather than in
   // application logic, which is the only place two concurrent requests actually agree.
   voiceNumberOrderedAt           DateTime?
+  // What Zadarma last said about this number, copied down by the daily renewal job so the
+  // dashboard and the health digest can answer "is this line paid for" without a carrier call.
+  // Zadarma renews a number from the account balance on its stop date when autorenew is on; a
+  // number with autorenew off, or a balance that cannot cover it, lapses — and the salon's phone
+  // simply stops ringing. The job keeps autorenew on for paying businesses, off for cancelled
+  // ones, and reports anything it cannot secure. See voiceNumberRenewal.ts.
+  voiceNumberStopDate            DateTime?
+  voiceNumberAutorenew           Boolean?
   // Cartesia voice the agent speaks in for this salon, chosen by the owner. Null means the agent's
   // own default — which is what every salon got before this existed, so leaving it unset changes
   // nothing. The agent applies it per call, so one shared agent can still sound different per salon.
