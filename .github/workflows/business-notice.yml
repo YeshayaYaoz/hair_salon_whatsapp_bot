@@ -1,0 +1,54 @@
+name: Email one business
+
+# A one-off message from the operator to one specific business, by email. Dry run by default —
+# the run prints the recipient and the exact text, and sends nothing until `confirm` is ticked.
+#
+# Through `railway run` because the mail credentials live in Railway with the service that sends
+# every other email, and a second copy here would be another place to rotate.
+on:
+  workflow_dispatch:
+    inputs:
+      business:
+        description: "Business id"
+        required: true
+      message:
+        description: "The message text (newlines become line breaks)"
+        required: true
+        type: string
+      confirm:
+        description: "Actually send (leave off to preview)"
+        type: boolean
+        default: false
+
+jobs:
+  notice:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+
+      - name: ${{ inputs.confirm && 'Send' || 'Preview' }}
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+          RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+          BUSINESS: ${{ inputs.business }}
+          MESSAGE: ${{ inputs.message }}
+          CONFIRM: ${{ inputs.confirm && '--confirm' || '' }}
+        run: |
+          set -euo pipefail
+          # Via a file rather than an argument: the text has newlines and quotes, and a shell
+          # argument is where those go wrong silently.
+          printf '%s' "$MESSAGE" > /tmp/notice.txt
+          npm i -g @railway/cli >/dev/null 2>&1
+          railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" -- \
+            npx tsx scripts/send-business-notice.ts --business "$BUSINESS" --file /tmp/notice.txt $CONFIRM
