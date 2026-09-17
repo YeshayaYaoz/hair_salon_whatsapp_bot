@@ -60,7 +60,7 @@ export async function notifyWaitlist(businessId: string, serviceId: string, serv
       when,
     });
     try {
-      await sendWhatsAppMessage({ phoneNumberId: business.whatsappPhoneNumberId, accessToken, to: entry.customer.phone, text });
+      await sendWhatsAppMessage({ phoneNumberId: business.whatsappPhoneNumberId, accessToken, to: entry.customer.phone, kind: "waitlist", text });
       await prisma.waitlistEntry.update({ where: { id: entry.id }, data: { notified: true } });
     } catch (err) {
       console.error(`[waitlist] Failed to notify ${entry.customer.phone}:`, err);

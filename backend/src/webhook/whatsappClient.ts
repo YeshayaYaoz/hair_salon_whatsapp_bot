@@ -4,6 +4,39 @@ interface SendCommon {
   phoneNumberId: string;
   accessToken: string;
   to: string;
+  /** What this message is — "reminder", "booking-confirmation", "owner-notice", … — for the
+   * outbound ledger. Sites that pass none are recorded under the payload type instead. */
+  kind?: string;
+}
+
+/**
+ * What the ledger learns about every send, accepted or refused. The client does not import the
+ * ledger (or Prisma) itself: server.ts registers the observer at startup, so the client stays a
+ * pure HTTP module and its tests need no database mock.
+ */
+export interface SendEvent {
+  phoneNumberId: string;
+  to: string;
+  kind: string;
+  templateName?: string;
+  messageId?: string;
+  /** Present when the send API itself refused the message; there is no id to wait on. */
+  refused?: { status: number; code?: number; message: string };
+}
+export type SendObserver = (event: SendEvent) => void | Promise<void>;
+
+let observer: SendObserver | null = null;
+export function setSendObserver(fn: SendObserver | null): void {
+  observer = fn;
+}
+/** Fire and forget: bookkeeping never delays a send and never breaks one. */
+function observe(event: SendEvent): void {
+  if (!observer) return;
+  try {
+    void Promise.resolve(observer(event)).catch((err) => console.error("[whatsapp] send observer failed:", err));
+  } catch (err) {
+    console.error("[whatsapp] send observer failed:", err);
+  }
 }
 
 /** Thrown when WhatsApp rejects the access token (expired/invalid). Callers can alert the owner. */
@@ -582,7 +615,33 @@ export async function setWhatsAppBusinessProfile(params: {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Every send goes through here, which is what makes the ledger complete: the outcome — accepted
+ * with an id, or refused with Meta's code — is reported to the observer on every path, and no
+ * call site has to remember to do it.
+ */
 async function send(params: SendCommon, payload: Record<string, unknown>): Promise<SendReceipt> {
+  const kind = params.kind ?? String(payload.type ?? "unknown");
+  const templateName = (payload.template as { name?: string } | undefined)?.name;
+  const base = { phoneNumberId: params.phoneNumberId, to: params.to, kind, templateName };
+  try {
+    const receipt = await sendRaw(params, payload);
+    observe({ ...base, messageId: receipt.messageId });
+    return receipt;
+  } catch (err) {
+    observe({
+      ...base,
+      refused: {
+        status: err instanceof WhatsAppSendError ? err.status : err instanceof WhatsAppAuthError ? 401 : 0,
+        code: err instanceof WhatsAppSendError ? err.code : undefined,
+        message: err instanceof Error ? err.message : String(err),
+      },
+    });
+    throw err;
+  }
+}
+
+async function sendRaw(params: SendCommon, payload: Record<string, unknown>): Promise<SendReceipt> {
   const url = `https://graph.facebook.com/${GRAPH_VERSION}/${params.phoneNumberId}/messages`;
   const MAX_ATTEMPTS = 3;
 

@@ -18,7 +18,7 @@ import { fmtIlsGrouped } from "./money.js";
  */
 export async function sendWithTemplateFallback(
   businessId: string,
-  common: { phoneNumberId: string; accessToken: string; to: string },
+  common: { phoneNumberId: string; accessToken: string; to: string; kind?: string },
   text: string,
   template: TemplateConfig,
   templateParams: string[]
@@ -82,7 +82,7 @@ export async function runReminderJob() {
     try {
       const outcome = await sendWithTemplateFallback(
         appt.businessId,
-        { phoneNumberId: appt.business.whatsappPhoneNumberId, accessToken, to: appt.customer.phone },
+        { phoneNumberId: appt.business.whatsappPhoneNumberId, accessToken, to: appt.customer.phone, kind: "reminder" },
         text,
         reminderTemplate(),
         [name, appt.service.name, when, appt.business.name],
@@ -133,7 +133,7 @@ export async function runReviewJob() {
     try {
       const outcome = await sendWithTemplateFallback(
         appt.businessId,
-        { phoneNumberId: appt.business.whatsappPhoneNumberId, accessToken, to: appt.customer.phone },
+        { phoneNumberId: appt.business.whatsappPhoneNumberId, accessToken, to: appt.customer.phone, kind: "review" },
         text,
         reviewTemplate(),
         [name, appt.business.name, appt.service.name],

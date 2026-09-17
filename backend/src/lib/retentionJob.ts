@@ -96,7 +96,7 @@ async function processBusinessRetention(
     const message = buildReengagementMessage(customer.name, serviceName, business.name);
 
     try {
-      await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customer.phone, text: message });
+      await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customer.phone, kind: "retention", text: message });
       await prisma.customer.update({
         where: { id: customer.id },
         data: { lastRetentionSentAt: new Date() },

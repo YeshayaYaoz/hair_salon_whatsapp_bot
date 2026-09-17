@@ -145,12 +145,14 @@ export async function runCampaign(params: RunCampaignParams): Promise<CampaignOu
             phoneNumberId: business.whatsappPhoneNumberId,
             accessToken,
             to: recipient.phone,
+            kind: "campaign",
             text: renderCampaignText(params.template, bodyParams, params.couponCode),
           })
         : await sendWhatsAppTemplate({
             phoneNumberId: business.whatsappPhoneNumberId,
             accessToken,
             to: recipient.phone,
+            kind: "campaign",
             templateName: params.template.name,
             languageCode: CAMPAIGN_TEMPLATE_LANG,
             bodyParams,

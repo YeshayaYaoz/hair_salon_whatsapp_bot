@@ -59,6 +59,7 @@ async function confirmBookingToCustomer(params: {
       phoneNumberId: business.whatsappPhoneNumberId,
       accessToken: decryptSecret(business.whatsappAccessToken),
       to: params.customerPhone,
+      kind: "booking-confirmation",
       },
     text,
     confirmationTemplate(),

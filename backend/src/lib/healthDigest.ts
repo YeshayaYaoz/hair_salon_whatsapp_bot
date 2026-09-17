@@ -3,6 +3,7 @@ import { sendAdminAlertEmail } from "./email.js";
 import { getJobStatuses } from "./jobStatus.js";
 import { findStaleJobs } from "./jobSchedule.js";
 import { countAbandonedInbound } from "../webhook/whatsappInbox.js";
+import { countUndeliveredCustomerMessages, undeliveredBreakdown } from "./outboundLedger.js";
 import { checkWhatsAppLines, type LineHealth } from "./whatsappLineHealth.js";
 import { decryptSecret } from "./crypto.js";
 
@@ -38,6 +39,9 @@ export interface HealthSnapshot {
   abandonedInbound: number;
   /** Paying businesses whose carrier number lapses within a week — from the daily renewal sync. */
   voiceNumbersAtRisk: string[];
+  /** Customer messages Meta reported as failed in the last 24h, and why — from the outbound ledger. */
+  undeliveredCustomer24h: number;
+  undeliveredReasons: string[];
 }
 
 export async function collectHealthSnapshot(): Promise<HealthSnapshot> {
@@ -94,7 +98,11 @@ export async function collectHealthSnapshot(): Promise<HealthSnapshot> {
   // this is the morning summary of the same view.
   let staleJobs: string[] = [];
   let abandonedInbound = 0;
+  let undeliveredCustomer24h = 0;
+  let undeliveredReasons: string[] = [];
   try {
+    undeliveredCustomer24h = await countUndeliveredCustomerMessages(ONE_DAY_MS);
+    undeliveredReasons = (await undeliveredBreakdown(ONE_DAY_MS)).map((r) => `${r.count}× ${r.reason}`);
     const statuses = await getJobStatuses();
     staleJobs = findStaleJobs(statuses, new Date(), process.uptime() * 1000).map((j) => `${j.jobName} (${j.reason})`);
     abandonedInbound = await countAbandonedInbound();
@@ -119,6 +127,8 @@ export async function collectHealthSnapshot(): Promise<HealthSnapshot> {
       .map((b) => b.name),
     staleJobs,
     abandonedInbound,
+    undeliveredCustomer24h,
+    undeliveredReasons,
     // Read from the columns the renewal job copied down, not from the carrier: the digest must
     // never fail because Zadarma is slow at 08:00.
     voiceNumbersAtRisk: businesses
@@ -165,6 +175,7 @@ function renderHtml(s: HealthSnapshot): string {
       <li>Bot switched off: ${list(s.botDisabled)}</li>
       <li>Scheduled jobs late or failing: ${list(s.staleJobs)}</li>
       <li>Voice numbers lapsing within a week: ${list(s.voiceNumbersAtRisk)}</li>
+      <li>Customer messages not delivered (24h): ${s.undeliveredCustomer24h === 0 ? "<span style='color:#16a34a'>none ✓</span>" : `<code>${s.undeliveredCustomer24h}</code> — ${s.undeliveredReasons.join("; ")}`}</li>
       <li>Inbound messages abandoned after retries: ${s.abandonedInbound === 0 ? "<span style='color:#16a34a'>none ✓</span>" : `<code>${s.abandonedInbound}</code>`}</li>
       <li>Active plan but <strong>no saved card — never billed</strong>: ${list(s.unbillable)}</li>
     </ul>
@@ -179,6 +190,7 @@ function countIssues(s: HealthSnapshot): number {
     s.botDisabled.length +
     s.staleJobs.length +
     (s.abandonedInbound > 0 ? 1 : 0) +
+    (s.undeliveredCustomer24h > 0 ? 1 : 0) +
     s.voiceNumbersAtRisk.length +
     s.unbillable.length +
     s.lineProblems.length

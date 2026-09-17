@@ -72,6 +72,7 @@ export async function deliverReceipt(params: {
       phoneNumberId: business.whatsappPhoneNumberId,
       accessToken: decryptSecret(business.whatsappAccessToken),
       to: customerPhone,
+      kind: "receipt",
       text: `קבלה על ${description} — ₪${amountIls}\nמ${business.name}\n\n${documentUrl}`,
     });
     return "sent";

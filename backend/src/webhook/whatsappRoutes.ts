@@ -21,6 +21,7 @@ import { transcribeWhatsAppVoiceNote, TranscriptionNotConfiguredError } from "..
 import { sendYieldCampaignOffers, type PendingYieldCampaign } from "../billing/yieldCampaignJob.js";
 import { logWhatsAppBillingEvent } from "../lib/usageLedger.js";
 import { inboundIdentity, recordInbound, markProcessed } from "./whatsappInbox.js";
+import { recordOutboundStatuses } from "../lib/outboundLedger.js";
 
 export const whatsappRouter = asyncRouter();
 
@@ -190,6 +191,9 @@ async function recordCampaignDelivery(statuses: any[]) {
 
 async function recordWhatsAppBillingStatuses(phoneNumberId: string, statuses: any[]) {
   await recordCampaignDelivery(statuses);
+  // The general ledger — every send, not only campaigns. This is where "accepted" becomes
+  // "delivered" or "failed" for reminders, confirmations, receipts and replies alike.
+  await recordOutboundStatuses(statuses);
 
   // Delivery FAILURES arrive here too, and used to be filtered out with everything unpriced. That
   // made them perfectly invisible: the send API returns 200 with a message id (Meta "accepted" it),

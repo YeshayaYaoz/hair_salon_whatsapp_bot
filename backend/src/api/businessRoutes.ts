@@ -137,7 +137,7 @@ businessRouter.get("/admin/businesses", requireSuperAdmin, async (_req: AuthedRe
   // own billing-status callbacks. No estimation: businesses with zero events here simply show ₪0,
   // which reflects the ledger, not a fallback guess.
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const [claudeCosts, whatsappBillable, voiceCalls] = await Promise.all([
+  const [claudeCosts, whatsappBillable, voiceCalls, undelivered] = await Promise.all([
     prisma.apiUsageEvent.groupBy({
       by: ["businessId"],
       where: { kind: "claude", createdAt: { gte: since } },
@@ -158,7 +158,15 @@ businessRouter.get("/admin/businesses", requireSuperAdmin, async (_req: AuthedRe
       _sum: { costAgorot: true, durationSeconds: true },
       _count: { _all: true },
     }),
+    // Customer messages Meta reported as failed in the last day — owner notices excluded. A send
+    // returns 200 on acceptance; this is the only column that says whether it arrived.
+    prisma.whatsAppOutbound.groupBy({
+      by: ["businessId"],
+      where: { status: "failed", kind: { not: "owner-notice" }, sentAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+      _count: { _all: true },
+    }),
   ]);
+  const undeliveredByBusiness = new Map(undelivered.map((u) => [u.businessId, u._count._all]));
   const claudeByBusiness = new Map(claudeCosts.map((c) => [c.businessId, c]));
   const whatsappByBusiness = new Map(whatsappBillable.map((w) => [w.businessId, w._count._all]));
   const voiceByBusiness = new Map(voiceCalls.map((v) => [v.businessId, v]));
@@ -189,6 +197,7 @@ businessRouter.get("/admin/businesses", requireSuperAdmin, async (_req: AuthedRe
         // with light usage read as nearly free, and it is the cost that stays whether or not the
         // bot is used at all.
         carrierCostAgorotMonth: carrierCostAgorotMonth(Boolean(b.voicePhoneNumber)),
+        undelivered24h: undeliveredByBusiness.get(b.id) ?? 0,
         onboarding,
         onboardingDone,
         onboardingTotal: 4,

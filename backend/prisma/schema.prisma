@@ -379,6 +379,43 @@ model SubscriptionCharge {
   @@index([status, updatedAt])
 }
 
+/// Every outbound WhatsApp message Tori sends, and what became of it.
+///
+/// A send returns 200 the moment Meta accepts the message; whether it was ever delivered arrives
+/// later, on the status webhook, keyed by the message id. Campaigns kept that id and read the
+/// verdict back. Nothing else did — so a reminder to a customer whose 24-hour window had closed,
+/// a confirmation to a number that had blocked the business, a receipt to a dead line, all
+/// reported "sent" everywhere and were delivered nowhere. The reviewer's line for it was exact:
+/// "200, then a silent drop".
+///
+/// Written from one place — the client's send() through an observer, so no call site can forget —
+/// and settled by the status webhook, never by the sender, which only ever knows "accepted".
+model WhatsAppOutbound {
+  id            String    @id @default(cuid())
+  /// Meta's id (wamid). Null when the send was refused at the API, or the 200 carried none.
+  messageId     String?   @unique
+  /// Resolved from the sending number at write time; null if no business owns that number.
+  businessId    String?
+  phoneNumberId String
+  to            String
+  /// What the message was: a caller's label ("reminder", "review", "booking-confirmation",
+  /// "campaign", "owner-notice", …) or, for the sites that pass none, the payload type
+  /// ("text", "template", "interactive", "image"). Owner notices are excluded from customer
+  /// counts by this.
+  kind          String
+  templateName  String?
+  /// "sent" (accepted) → "delivered" → "read", or "failed" with the code beneath. Only ever moves
+  /// forward; the webhook can deliver statuses out of order.
+  status        String    @default("sent")
+  failCode      Int?
+  failTitle     String?
+  sentAt        DateTime  @default(now())
+  statusAt      DateTime?
+
+  @@index([businessId, status, sentAt])
+  @@index([status, sentAt])
+}
+
 /// Every inbound WhatsApp message, written BEFORE Meta is told 200.
 ///
 /// Two failures this closes, both from the webhook keeping state only in process memory. Meta

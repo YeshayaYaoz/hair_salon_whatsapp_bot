@@ -44,6 +44,9 @@ interface AdminBusiness {
   // not anything was used this month.
   voicePhoneNumber: string | null;
   carrierCostAgorotMonth: number;
+  // Customer messages Meta reported as failed in the last 24h. A send returns 200 when Meta
+  // accepts it; this is the only figure that says whether it arrived.
+  undelivered24h: number;
   onboarding: { whatsapp: boolean; services: boolean; hours: boolean; payment: boolean };
   onboardingDone: number;
   onboardingTotal: number;
@@ -489,7 +492,7 @@ export default function AdminBusinessesPage() {
     const header = [
       "name", "email", "emailVerified", "ownerPhone", "createdAt", "subscriptionStatus", "subscriptionPlan", "billingCycle",
       "blocked", "whatsappConnected", "paymentProvider", "invoiceProvider", "walletBalanceIls",
-      "claudeCost30dIls", "voiceMinutes30d", "voiceCost30dIls", "carrierCostMonthIls", "appointments", "customers",
+      "claudeCost30dIls", "voiceMinutes30d", "voiceCost30dIls", "carrierCostMonthIls", "undelivered24h", "appointments", "customers",
     ];
     const lines = rows.map((b) =>
       [
@@ -497,7 +500,7 @@ export default function AdminBusinessesPage() {
         b.blockedAt ? "yes" : "no", b.whatsappConnected ? "yes" : "no", b.paymentProvider ?? "", b.invoiceProvider ?? "",
         (b.walletBalanceAgorot / 100).toFixed(2), (b.realClaudeCostAgorot30d / 100).toFixed(2),
         Math.round(b.realVoiceSeconds30d / 60), (b.realVoiceCostAgorot30d / 100).toFixed(2),
-        (b.carrierCostAgorotMonth / 100).toFixed(2),
+        (b.carrierCostAgorotMonth / 100).toFixed(2), b.undelivered24h,
         b._count.appointments, b._count.customers,
       ]
         .map((v) => `"${String(v).replace(/"/g, '""')}"`)
@@ -531,6 +534,8 @@ export default function AdminBusinessesPage() {
   // computed per business, so the dollar rate lives in one place.
   const carrierCostIlsMonth = all.reduce((sum, b) => sum + b.carrierCostAgorotMonth, 0) / 100;
   const carrierNumbers = all.filter((b) => b.voicePhoneNumber).length;
+  const undelivered24h = all.reduce((sum, b) => sum + b.undelivered24h, 0);
+  const undeliveredBusinesses = all.filter((b) => b.undelivered24h > 0).length;
   const counts = {
     trial: all.filter((b) => b.subscriptionStatus === "trial").length,
     active: all.filter((b) => b.subscriptionStatus === "active").length,
@@ -650,6 +655,15 @@ export default function AdminBusinessesPage() {
               label={he ? "מספרי טלפון — Zadarma (לחודש)" : "Phone numbers — Zadarma (monthly)"}
               value={`₪${carrierCostIlsMonth.toLocaleString(he ? "he-IL" : "en-US", { maximumFractionDigits: 2 })}`}
               sub={he ? `${carrierNumbers} מספרים · $3 למספר · קבוע, לא לפי שימוש` : `${carrierNumbers} numbers · $3 each · fixed, not usage`}
+            />
+            <KpiCard
+              label={he ? "הודעות ללקוחות שלא נמסרו (24 שעות)" : "Customer messages not delivered (24h)"}
+              value={String(undelivered24h)}
+              sub={
+                undelivered24h === 0
+                  ? (he ? "כל מה שנשלח — הגיע" : "everything sent arrived")
+                  : (he ? `ב-${undeliveredBusinesses} עסקים · לפי הדיווח של Meta` : `across ${undeliveredBusinesses} businesses · per Meta's status`)
+              }
             />
             <KpiCard
               label={he ? "בניסיון" : "In trial"}

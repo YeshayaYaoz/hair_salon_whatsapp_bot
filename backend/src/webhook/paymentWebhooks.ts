@@ -216,6 +216,7 @@ paymentWebhookRouter.post("/:provider/:businessId/:webhookSecret", async (req, r
             phoneNumberId: business.whatsappPhoneNumberId,
             accessToken,
             to: pending.customer.phone,
+            kind: "payment-confirmation",
             text: `✅ המקדמה התקבלה! התור שלך ל${pending.service.name} ב-${when} אצל ${business.name} מאושר סופית. מחכים לך!`,
           }).catch((err) => console.error("[payments webhook] Deposit confirmation message failed:", err));
         }

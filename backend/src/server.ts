@@ -29,6 +29,12 @@ import { processWhatsAppPayload } from "./webhook/whatsappRoutes.js";
 import { runInboundRecoveryJob } from "./webhook/whatsappInbox.js";
 import { runJobWatchdogJob } from "./lib/jobWatchdog.js";
 import { runVoiceNumberRenewalJob } from "./lib/voiceNumberRenewal.js";
+import { setSendObserver } from "./webhook/whatsappClient.js";
+import { recordOutbound } from "./lib/outboundLedger.js";
+
+// Every WhatsApp send is written to the outbound ledger from here on. Registered once, at startup,
+// so the client itself stays free of the database — see whatsappClient.ts.
+setSendObserver(recordOutbound);
 import { UPLOADS_ROUTE, UPLOADS_ROOT, UnsupportedImageError, MAX_UPLOAD_BYTES, checkUploadsDir } from "./lib/storage.js";
 import multer from "multer";
 

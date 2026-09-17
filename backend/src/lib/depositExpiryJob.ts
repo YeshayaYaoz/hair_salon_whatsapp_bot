@@ -77,6 +77,7 @@ export async function runDepositExpiryJob() {
           phoneNumberId: appt.business.whatsappPhoneNumberId,
           accessToken,
           to: appt.customer.phone,
+          kind: "deposit-expired",
           text: `היי, המועד ל${appt.service.name} אצל ${appt.business.name} שוחרר כי המקדמה לא התקבלה בזמן. רוצה לנסות לקבוע מחדש? אני כאן 😊`,
         });
       } catch (err) {
