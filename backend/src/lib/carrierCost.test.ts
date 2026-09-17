@@ -1,4 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+// usageLedger (for USD_TO_ILS) imports the Prisma client at module load; without this the file
+// fails before the first test runs, on a database it has no reason to touch.
+vi.mock("./prisma.js", () => ({ prisma: {} }));
 import { carrierCostAgorotMonth, CARRIER_USD_PER_NUMBER_MONTH } from "./carrierCost.js";
 import { USD_TO_ILS } from "./usageLedger.js";
 
