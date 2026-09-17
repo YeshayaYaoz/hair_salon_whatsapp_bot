@@ -2,6 +2,7 @@ import { asyncRouter } from "../lib/asyncRouter.js";
 import crypto from "crypto";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
+import { carrierCostAgorotMonth } from "../lib/carrierCost.js";
 import { requireAuth, signImpersonationToken, DEFAULT_IMPERSONATION_HOURS, MAX_IMPERSONATION_HOURS, type AuthedRequest } from "../lib/auth.js";
 import { logAdminAction } from "../lib/adminAudit.js";
 import { updateBusinessContact } from "../lib/adminContact.js";
@@ -124,6 +125,8 @@ businessRouter.get("/admin/businesses", requireSuperAdmin, async (_req: AuthedRe
       greetingSeparateMessage: true,
       walletBalanceAgorot: true, messagesUsedThisCycle: true,
       blockedAt: true, blockedReason: true,
+      // Whether the business holds a carrier number — the one fixed cost per business.
+      voicePhoneNumber: true,
       _count: { select: { appointments: true, customers: true, services: true, hours: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -182,6 +185,10 @@ businessRouter.get("/admin/businesses", requireSuperAdmin, async (_req: AuthedRe
         realVoiceCallCount30d: voiceByBusiness.get(b.id)?._count._all ?? 0,
         realVoiceSeconds30d: voiceByBusiness.get(b.id)?._sum.durationSeconds ?? 0,
         realVoiceCostAgorot30d: voiceByBusiness.get(b.id)?._sum.costAgorot ?? 0,
+        // Fixed, not metered: the number's monthly rental at the carrier. Without it a business
+        // with light usage read as nearly free, and it is the cost that stays whether or not the
+        // bot is used at all.
+        carrierCostAgorotMonth: carrierCostAgorotMonth(Boolean(b.voicePhoneNumber)),
         onboarding,
         onboardingDone,
         onboardingTotal: 4,

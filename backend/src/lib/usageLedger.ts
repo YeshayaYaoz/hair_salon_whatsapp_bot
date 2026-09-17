@@ -42,7 +42,10 @@ const CLAUDE_PRICING_USD_PER_MTOK: Record<string, ModelRate> = {
 // USD→ILS is only needed to express cost in shekels next to ILS subscription revenue — update
 // this if/when it's worth wiring to a live rate; a static rate here is far less consequential
 // than fabricating a per-message cost, since it only scales an otherwise-exact token cost.
-const USD_TO_ILS = 3.7;
+/** The rate every cost figure in the admin panel is converted at. Exported so the carrier cost
+ * uses the same number as the token and voice costs — three lines on one screen must not disagree
+ * about what a dollar is. */
+export const USD_TO_ILS = 3.7;
 
 // Prompt-caching billing multipliers on top of the base input rate — official, published, and
 // fixed regardless of model (only the base input rate above varies by model). A cache write costs

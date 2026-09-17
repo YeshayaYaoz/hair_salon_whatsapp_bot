@@ -39,6 +39,11 @@ interface AdminBusiness {
   realVoiceCallCount30d: number;
   realVoiceSeconds30d: number;
   realVoiceCostAgorot30d: number;
+  // The number's monthly rental at the carrier (Zadarma) — flat, not metered. It is the line
+  // WhatsApp and the voice bot both run on, so it exists for every connected business whether or
+  // not anything was used this month.
+  voicePhoneNumber: string | null;
+  carrierCostAgorotMonth: number;
   onboarding: { whatsapp: boolean; services: boolean; hours: boolean; payment: boolean };
   onboardingDone: number;
   onboardingTotal: number;
@@ -484,7 +489,7 @@ export default function AdminBusinessesPage() {
     const header = [
       "name", "email", "emailVerified", "ownerPhone", "createdAt", "subscriptionStatus", "subscriptionPlan", "billingCycle",
       "blocked", "whatsappConnected", "paymentProvider", "invoiceProvider", "walletBalanceIls",
-      "claudeCost30dIls", "voiceMinutes30d", "voiceCost30dIls", "appointments", "customers",
+      "claudeCost30dIls", "voiceMinutes30d", "voiceCost30dIls", "carrierCostMonthIls", "appointments", "customers",
     ];
     const lines = rows.map((b) =>
       [
@@ -492,6 +497,7 @@ export default function AdminBusinessesPage() {
         b.blockedAt ? "yes" : "no", b.whatsappConnected ? "yes" : "no", b.paymentProvider ?? "", b.invoiceProvider ?? "",
         (b.walletBalanceAgorot / 100).toFixed(2), (b.realClaudeCostAgorot30d / 100).toFixed(2),
         Math.round(b.realVoiceSeconds30d / 60), (b.realVoiceCostAgorot30d / 100).toFixed(2),
+        (b.carrierCostAgorotMonth / 100).toFixed(2),
         b._count.appointments, b._count.customers,
       ]
         .map((v) => `"${String(v).replace(/"/g, '""')}"`)
@@ -521,6 +527,10 @@ export default function AdminBusinessesPage() {
   // come out low.
   const voiceMinutes30d = Math.round(all.reduce((sum, b) => sum + b.realVoiceSeconds30d, 0) / 60);
   const voiceCostIls30d = all.reduce((sum, b) => sum + b.realVoiceCostAgorot30d, 0) / 100;
+  // Monthly, not 30-day actuals: a rental has no usage to meter. Summed from what the server
+  // computed per business, so the dollar rate lives in one place.
+  const carrierCostIlsMonth = all.reduce((sum, b) => sum + b.carrierCostAgorotMonth, 0) / 100;
+  const carrierNumbers = all.filter((b) => b.voicePhoneNumber).length;
   const counts = {
     trial: all.filter((b) => b.subscriptionStatus === "trial").length,
     active: all.filter((b) => b.subscriptionStatus === "active").length,
@@ -635,6 +645,11 @@ export default function AdminBusinessesPage() {
                   ? `₪${voiceCostIls30d.toFixed(2)} · $0.06 לדקה`
                   : `₪${voiceCostIls30d.toFixed(2)} · $0.06 per minute`
               }
+            />
+            <KpiCard
+              label={he ? "מספרי טלפון — Zadarma (לחודש)" : "Phone numbers — Zadarma (monthly)"}
+              value={`₪${carrierCostIlsMonth.toLocaleString(he ? "he-IL" : "en-US", { maximumFractionDigits: 2 })}`}
+              sub={he ? `${carrierNumbers} מספרים · $3 למספר · קבוע, לא לפי שימוש` : `${carrierNumbers} numbers · $3 each · fixed, not usage`}
             />
             <KpiCard
               label={he ? "בניסיון" : "In trial"}
