@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, setToken, reloadAs, friendlyError } from "../lib/api";
+import { DIAL_CODES, DEFAULT_DIAL_CODE } from "../lib/dialCodes";
 import { useLanguage } from "../lib/LanguageContext";
 
 export default function LoginPage() {
@@ -14,6 +15,10 @@ export default function LoginPage() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [signupStep, setSignupStep] = useState<1 | 2>(1); // guided 2-step signup: credentials → business
   const [name, setName] = useState("");
+  // The manager number: required at signup, because a business without one has a bot but no
+  // owner behind it — no alerts, no running the business from WhatsApp.
+  const [phone, setPhone] = useState("");
+  const [dialCode, setDialCode] = useState(DEFAULT_DIAL_CODE);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -73,8 +78,15 @@ export default function LoginPage() {
     setError(null);
     setSwitchHint(null);
     try {
+      if (mode === "signup" && phone.replace(/\D/g, "").length < 7) {
+        setError(he ? "מספר הטלפון לא נראה תקין" : "That phone number doesn't look right");
+        setLoading(false);
+        return;
+      }
       const path = mode === "login" ? "/api/auth/login" : "/api/auth/signup";
-      const body = mode === "login" ? { email, password } : { name, email, password };
+      const body = mode === "login"
+        ? { email, password }
+        : { name, email, password, notificationPhone: phone, notificationPhoneDialCode: dialCode };
       const { token } = await apiFetch<{ token: string }>(path, { method: "POST", body: JSON.stringify(body) });
       setToken(token);
       // Full load rather than router.push: signing in changes who the app is for, and anything
@@ -865,6 +877,44 @@ export default function LoginPage() {
                     />
                   </div>
                   <p className="login-field-hint">{he ? "ככה הבוט יציג את עצמו ללקוחות שלכם" : "This is how the bot will introduce itself to your customers"}</p>
+                </div>
+
+                {/* The manager number. dir="ltr" on the row so the dial code sits physically LEFT
+                    of the digits even on the RTL page — a number is read left-to-right. */}
+                <div className="login-field">
+                  <label htmlFor="login-phone">{he ? "הטלפון שלכם (וואטסאפ)" : "Your phone (WhatsApp)"}</label>
+                  <div style={{ display: "flex", gap: 8 }} dir="ltr">
+                    <select
+                      value={dialCode}
+                      onChange={(e) => setDialCode(e.target.value)}
+                      aria-label={he ? "קידומת מדינה" : "Country code"}
+                      dir="ltr"
+                      style={{ width: 128, flexShrink: 0, borderRadius: 12, border: "1px solid rgba(15,23,42,0.14)", background: "#fff", padding: "0 10px", fontSize: 14 }}
+                    >
+                      {DIAL_CODES.map((c) => (
+                        <option key={c.code} value={c.code}>+{c.code} {he ? c.he : c.label}</option>
+                      ))}
+                    </select>
+                    <div className="login-input-wrap" style={{ flex: 1 }}>
+                      <input
+                        id="login-phone"
+                        type="tel"
+                        inputMode="tel"
+                        autoComplete="tel"
+                        placeholder="0501234567"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        required
+                        dir="ltr"
+                        style={{ direction: "ltr", paddingLeft: 16, paddingRight: 16 }}
+                      />
+                    </div>
+                  </div>
+                  <p className="login-field-hint">
+                    {he
+                      ? "מהמספר הזה תנהלו את העסק בוואטסאפ ותקבלו התראות על תורים חדשים"
+                      : "You'll run the business from WhatsApp with this number and get alerts on new bookings"}
+                  </p>
                 </div>
 
                 {error && (

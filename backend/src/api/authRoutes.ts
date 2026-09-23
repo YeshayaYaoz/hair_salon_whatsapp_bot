@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { signBusinessToken } from "../lib/auth.js";
 import { rateLimit } from "../lib/rateLimit.js";
+import { normalizeOwnerPhone } from "../lib/phone.js";
 import { APP_URL, sendPasswordResetEmail, sendWelcomeEmail, sendAdminAlertEmail, sendEmailVerificationEmail } from "../lib/email.js";
 import {
   getAuthUrl,
@@ -27,6 +28,13 @@ const signupSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(8),
+  // Required. The manager number is the whole of running the business from WhatsApp and the
+  // number every owner alert goes to; a business without one has a bot but no owner behind it.
+  // Optional here meant most accounts were created without one and never came back to add it —
+  // the announcement had to be emailed to six of ten businesses because they could not be
+  // reached any other way, and none of the six set it afterwards.
+  notificationPhone: z.string().min(1).max(40),
+  notificationPhoneDialCode: z.string().max(6).optional(),
 });
 
 authRouter.post("/signup", authLimiter, async (req, res) => {
@@ -34,11 +42,18 @@ authRouter.post("/signup", authLimiter, async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const { name, email, password } = parsed.data;
+  // Same normalisation and same refusal as the settings page, so the number stored at signup is
+  // the same shape as one saved later — fully qualified, ready for Meta — and a bad one is caught
+  // here rather than discovered by the first alert that never arrives.
+  const notificationPhone = normalizeOwnerPhone(parsed.data.notificationPhone, parsed.data.notificationPhoneDialCode);
+  if (!notificationPhone) {
+    return res.status(400).json({ error: "מספר הטלפון לא נראה תקין. הזינו מספר מלא, למשל 0501234567." });
+  }
   const existing = await prisma.business.findUnique({ where: { email } });
   if (existing) return res.status(409).json({ error: "Email already registered" });
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const business = await prisma.business.create({ data: { name, email, passwordHash } });
+  const business = await prisma.business.create({ data: { name, email, passwordHash, notificationPhone } });
 
   // Send welcome email (non-fatal)
   sendWelcomeEmail(email, name).catch((err) => console.error("Welcome email failed:", err));

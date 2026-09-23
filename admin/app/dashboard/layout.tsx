@@ -385,9 +385,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         setIsSuperAdmin(Boolean(me.isSuperAdmin));
         setManagerPhoneSet(Boolean(me.notificationPhone?.trim()));
         setTrial({ status: me.subscriptionStatus, createdAt: me.createdAt });
-        // First-login category picker: if the owner hasn't chosen a vertical yet, send them to the
-        // onboarding cards once (skip if they're already there, to avoid a redirect loop).
-        if (!me.businessTypeChosenAt && pathname !== "/dashboard/onboarding") {
+        // First-login gate: no vertical chosen, or no manager number, and the owner goes to
+        // onboarding (skipping when already there, to avoid a redirect loop). The phone half is
+        // what catches an account created through Google, which had no signup form to ask on —
+        // and the older accounts created before the number was required. The operator's own
+        // account is exempt: it is not a business with an owner to alert.
+        const needsPhone = !me.isSuperAdmin && !me.notificationPhone?.trim();
+        if ((!me.businessTypeChosenAt || needsPhone) && pathname !== "/dashboard/onboarding") {
           router.replace("/dashboard/onboarding");
         }
       })
