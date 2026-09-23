@@ -98,6 +98,12 @@ async function main() {
     const mark = !points ? "✖" : points.includes(CARTESIA_HOST) ? "✔" : "!";
     const inactive = String(n.is_activated ?? "") === "false" || n.status === "reserved";
     console.log(`  ${mark} ${number}  type=${String(n.type ?? "?")}${inactive ? "  [RESERVED, NOT ACTIVE]" : ""}`);
+    // What the account is actually billed, from the account — the public tariff page and the
+    // console's period picker do not agree with each other, and neither is the number the
+    // renewal job budgets on. stop_date is the day the line lapses unless renewed.
+    const fee = n.monthly_fee != null ? `${n.monthly_fee} ${String(n.currency ?? "")}/month` : "fee unknown";
+    const renew = String(n.autorenew ?? "") === "true" ? "autorenew on" : "autorenew OFF";
+    console.log(`      ${fee}  ·  paid until ${String(n.stop_date ?? "?")}  ·  ${renew}`);
     if (!points) {
       console.log(`      no SIP destination — calls to this number reach nobody`);
     } else if (points.includes(CARTESIA_HOST)) {
