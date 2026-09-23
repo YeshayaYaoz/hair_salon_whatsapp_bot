@@ -1,23 +1,28 @@
 name: Probe SMS cost and senders
 
-# What one SMS to an Israeli mobile costs, and which senders this Zadarma account may use. The
+# Which senders Zadarma allows towards an Israeli mobile, and what one SMS there is billed. The
 # Zadarma keys live in Railway, not in Actions secrets, so this runs through `railway run` — the
 # same way every other carrier probe here does, and the reason nothing has to be installed on a
 # laptop.
 #
-# Two modes, both manual:
-#   send_to empty  → free. Balance + the allowed sender list. Sends nothing.
-#   send_to set    → sends ONE real Hebrew SMS to that number and prints what it cost, per
-#                    segment and in shekels. This is the only way to learn the Israel rate:
-#                    Zadarma publishes prices in a script-rendered table and offers no lookup
-#                    endpoint for SMS. The script refuses any number that is not Israeli.
+# Manual only. Two inputs:
+#   phone  → an Israeli number (972…). Free: balance + the senders allowed towards it. The sender
+#            list is per destination (Zadarma's `phones` parameter), so this is needed even for
+#            the free question. Empty → balance only.
+#   send   → tick to send ONE real Hebrew SMS to that number and print what it was billed, per
+#            SMS and in shekels. List price for Israel is $0.22 per SMS; this shows what a
+#            two-part Hebrew reminder actually costs and which sender it arrives from.
 on:
   workflow_dispatch:
     inputs:
-      send_to:
-        description: "Send ONE real SMS to this Israeli number (972…) and report its cost. Leave empty to only list senders."
+      phone:
+        description: "Israeli number (972…) to ask about. Free: lists the senders allowed towards it."
         type: string
         default: ""
+      send:
+        description: "Also send ONE real SMS to that number and report its cost."
+        type: boolean
+        default: false
 
 jobs:
   probe:
@@ -34,12 +39,13 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
 
-      - name: SMS senders, balance, and (if asked) one priced send
+      - name: Balance, allowed senders, and (if ticked) one priced send
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
           RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
-          SEND_TO: ${{ inputs.send_to }}
+          PHONE: ${{ inputs.phone }}
+          SEND: ${{ inputs.send }}
         run: |
           if [ -z "$RAILWAY_TOKEN" ]; then
             echo "::error::RAILWAY_TOKEN is not set — this probe reads the Zadarma keys out of the Railway environment."
@@ -47,6 +53,6 @@ jobs:
           fi
           npm i -g @railway/cli
           # The number is a personal phone; keep it out of a log anyone with repo read access can open.
-          [ -n "$SEND_TO" ] && echo "::add-mask::$SEND_TO"
+          [ -n "$PHONE" ] && echo "::add-mask::$PHONE"
           railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
-            npx tsx scripts/zadarma-sms-probe.ts ${SEND_TO:+--send "$SEND_TO"}
+            npx tsx scripts/zadarma-sms-probe.ts ${PHONE:+--phone "$PHONE"} $([ "$SEND" = "true" ] && echo --send)
