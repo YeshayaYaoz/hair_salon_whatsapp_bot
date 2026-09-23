@@ -1,0 +1,52 @@
+name: Probe SMS cost and senders
+
+# What one SMS to an Israeli mobile costs, and which senders this Zadarma account may use. The
+# Zadarma keys live in Railway, not in Actions secrets, so this runs through `railway run` — the
+# same way every other carrier probe here does, and the reason nothing has to be installed on a
+# laptop.
+#
+# Two modes, both manual:
+#   send_to empty  → free. Balance + the allowed sender list. Sends nothing.
+#   send_to set    → sends ONE real Hebrew SMS to that number and prints what it cost, per
+#                    segment and in shekels. This is the only way to learn the Israel rate:
+#                    Zadarma publishes prices in a script-rendered table and offers no lookup
+#                    endpoint for SMS. The script refuses any number that is not Israeli.
+on:
+  workflow_dispatch:
+    inputs:
+      send_to:
+        description: "Send ONE real SMS to this Israeli number (972…) and report its cost. Leave empty to only list senders."
+        type: string
+        default: ""
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+
+      - name: SMS senders, balance, and (if asked) one priced send
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+          RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+          SEND_TO: ${{ inputs.send_to }}
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::error::RAILWAY_TOKEN is not set — this probe reads the Zadarma keys out of the Railway environment."
+            exit 1
+          fi
+          npm i -g @railway/cli
+          # The number is a personal phone; keep it out of a log anyone with repo read access can open.
+          [ -n "$SEND_TO" ] && echo "::add-mask::$SEND_TO"
+          railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+            npx tsx scripts/zadarma-sms-probe.ts ${SEND_TO:+--send "$SEND_TO"}
