@@ -24,7 +24,11 @@ import {
   OWNER_ALERT_TEXT,
   OWNER_ALERT_CTA_BODY,
   OWNER_ALERT_CTA_EXAMPLE,
-  OWNER_ALERT_CTA_BUTTON, CAMPAIGN_TEMPLATES, CAMPAIGN_OPT_OUT_BUTTON, CAMPAIGN_FOOTER, CAMPAIGN_COUPON_FOOTER, CAMPAIGN_COUPON_CODE_EXAMPLE } from "../src/lib/whatsappTemplates.js";
+  OWNER_ALERT_CTA_BUTTON, CAMPAIGN_TEMPLATES, CAMPAIGN_OPT_OUT_BUTTON, CAMPAIGN_FOOTER, CAMPAIGN_COUPON_FOOTER, CAMPAIGN_COUPON_CODE_EXAMPLE   RECEIPT_BODY,
+  RECEIPT_EXAMPLE,
+  RECEIPT_BUTTON_TEXT,
+  receiptLinkBase,
+} from "../src/lib/whatsappTemplates.js";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -76,6 +80,7 @@ async function main() {
     ["confirmation", wording.confirmation],
     ["owner alert", OWNER_ALERT_TEXT],
     ["owner alert (button)", { body: OWNER_ALERT_CTA_BODY, example: OWNER_ALERT_CTA_EXAMPLE }],
+    ["receipt (button)", { body: RECEIPT_BODY, example: RECEIPT_EXAMPLE }],
     ...CAMPAIGN_TEMPLATES.map((t) => [`campaign: ${t.name} (MARKETING)`, t] as const),
   ] as const) {
     let filled = t.body;
@@ -87,6 +92,8 @@ async function main() {
     // as if a campaign template carried a link it does not have.
     if (label === "owner alert (button)") {
       console.log(`    button: [${OWNER_ALERT_CTA_BUTTON.text}] → ${OWNER_ALERT_CTA_BUTTON.url}`);
+    } else if (label === "receipt (button)") {
+      console.log(`    button: [${RECEIPT_BUTTON_TEXT}] → ${receiptLinkBase()}/r/{{1}}`);
     } else if (label.startsWith("campaign:") && "copyCode" in t && t.copyCode) {
       console.log(`    button: [copy code, e.g. ${CAMPAIGN_COUPON_CODE_EXAMPLE}]   footer: ${CAMPAIGN_COUPON_FOOTER}`);
     } else if (label.startsWith("campaign:")) {
