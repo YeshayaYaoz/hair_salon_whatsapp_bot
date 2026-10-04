@@ -1,16 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ZadarmaNumber } from "./zadarmaAdmin.js";
 
-const mockPrisma = {
-  business: { findMany: vi.fn(), update: vi.fn() },
-  systemSetting: { findUnique: vi.fn(), upsert: vi.fn() },
-};
+const mockPrisma = { business: { findMany: vi.fn(), update: vi.fn() } };
 vi.mock("./prisma.js", () => ({ prisma: mockPrisma }));
 const sendAdminAlertEmail = vi.fn();
 vi.mock("./email.js", () => ({ sendAdminAlertEmail: (...a: unknown[]) => sendAdminAlertEmail(...a) }));
 const notifyOwner = vi.fn();
 vi.mock("./ownerNotify.js", () => ({ notifyOwner: (...a: unknown[]) => notifyOwner(...a) }));
-const carrier = { listNumbers: vi.fn(), getBalance: vi.fn(), setAutoprolongation: vi.fn(), prolongNumber: vi.fn() };
+const carrier = { listNumbers: vi.fn(), getBalance: vi.fn(), setAutoprolongation: vi.fn(), prolongNumber: vi.fn(), setSmsReception: vi.fn() };
 vi.mock("./zadarmaAdmin.js", async () => {
   const actual = await vi.importActual<typeof import("./zadarmaAdmin.js")>("./zadarmaAdmin.js");
   return {
@@ -19,6 +16,7 @@ vi.mock("./zadarmaAdmin.js", async () => {
     getBalance: (...a: unknown[]) => carrier.getBalance(...a),
     setAutoprolongation: (...a: unknown[]) => carrier.setAutoprolongation(...a),
     prolongNumber: (...a: unknown[]) => carrier.prolongNumber(...a),
+    setSmsReception: (...a: unknown[]) => carrier.setSmsReception(...a),
   };
 });
 
@@ -138,49 +136,44 @@ describe("planVoiceNumberRenewal", () => {
   });
 
   /**
-   * Buying three months at once. The price is only learnable by buying, so the first purchase is
-   * the test; and no purchase may leave the balance unable to renew another salon's line.
+   * Buying three months at once — Zadarma's package, priced below three renewals and the thing
+   * that unlocks SMS. Every paying line moves onto it as it comes up, and no purchase may leave
+   * the balance unable to renew another salon's line.
    */
   describe("buying several months at once", () => {
-    const untested = { months: 3, state: "untested" as const };
-    const discounted = { months: 3, state: "discounted" as const };
     const prepayActions = (actions: { kind: string }[]) => actions.filter((a) => a.kind === "prepay");
 
     it("buys a paying line that is inside the renewal window, not one weeks away", () => {
-      const soon = planVoiceNumberRenewal([num({ stopDate: inDays(5) })], [biz()], balance(50), NOW, discounted);
+      const soon = planVoiceNumberRenewal([num({ stopDate: inDays(5) })], [biz()], balance(50), NOW, 3);
       expect(prepayActions(soon.actions)).toEqual([{ kind: "prepay", number: "972559000001", businessId: "b1", businessName: "מספרת רונית", months: 3, monthlyFee: 3 }]);
-      const later = planVoiceNumberRenewal([num({ stopDate: inDays(20) })], [biz()], balance(50), NOW, discounted);
+      const later = planVoiceNumberRenewal([num({ stopDate: inDays(20) })], [biz()], balance(50), NOW, 3);
       expect(prepayActions(later.actions)).toEqual([]);
     });
 
     it("buys nothing ahead for a business that stopped paying, and nothing at all when turned off", () => {
-      const held = planVoiceNumberRenewal([num({ stopDate: inDays(5) })], [lapsed(3)], balance(50), NOW, discounted);
+      const held = planVoiceNumberRenewal([num({ stopDate: inDays(5) })], [lapsed(3)], balance(50), NOW, 3);
       expect(prepayActions(held.actions)).toEqual([]);
-      const off = planVoiceNumberRenewal([num({ stopDate: inDays(5) })], [biz()], balance(50), NOW, { months: 1, state: "untested" });
+      const off = planVoiceNumberRenewal([num({ stopDate: inDays(5) })], [biz()], balance(50), NOW, 1);
       expect(prepayActions(off.actions)).toEqual([]);
-      const fullPrice = planVoiceNumberRenewal([num({ stopDate: inDays(5) })], [biz()], balance(50), NOW, { months: 3, state: "full-price" });
-      expect(prepayActions(fullPrice.actions)).toEqual([]);
     });
 
     it("never buys ahead what would leave another line unable to renew — and says what the balance must keep", () => {
       const numbers = [num({ number: "972559000001", stopDate: inDays(3) }), num({ number: "972559000002", stopDate: inDays(10) })];
       const businesses = [biz({ id: "b1", voicePhoneNumber: "972559000001" }), biz({ id: "b2", name: "צימר", voicePhoneNumber: "972559000002" })];
       // 9 on the balance: three months of line 1 is up to 9, and line 2 still needs 3 this month.
-      const tight = planVoiceNumberRenewal(numbers, businesses, balance(9), NOW, discounted);
+      const tight = planVoiceNumberRenewal(numbers, businesses, balance(9), NOW, 3);
       expect(prepayActions(tight.actions)).toEqual([]);
       expect(tight.report.prepaySkipped[0]).toContain("must keep 3");
       expect(tight.report.shortfall).toBeNull(); // monthly renewals are still covered
       // 12 is enough: 12 − 9 = 3 left for line 2.
-      const enough = planVoiceNumberRenewal(numbers, businesses, balance(12), NOW, discounted);
+      const enough = planVoiceNumberRenewal(numbers, businesses, balance(12), NOW, 3);
       expect(prepayActions(enough.actions)).toHaveLength(1);
     });
 
-    it("buys one line per run until the price is known, then every eligible line, earliest expiry first", () => {
+    it("buys every eligible line, earliest expiry first", () => {
       const numbers = [num({ number: "972559000002", stopDate: inDays(6) }), num({ number: "972559000001", stopDate: inDays(2) })];
       const businesses = [biz({ id: "b1", voicePhoneNumber: "972559000001" }), biz({ id: "b2", name: "צימר", voicePhoneNumber: "972559000002" })];
-      const first = planVoiceNumberRenewal(numbers, businesses, balance(100), NOW, untested);
-      expect(prepayActions(first.actions)).toEqual([expect.objectContaining({ number: "972559000001" })]);
-      const all = planVoiceNumberRenewal(numbers, businesses, balance(100), NOW, discounted);
+      const all = planVoiceNumberRenewal(numbers, businesses, balance(100), NOW, 3);
       expect(prepayActions(all.actions).map((a) => (a as { number: string }).number)).toEqual(["972559000001", "972559000002"]);
     });
 
@@ -188,7 +181,7 @@ describe("planVoiceNumberRenewal", () => {
       const numbers = [num({ number: "972559000001", stopDate: inDays(2) }), num({ number: "972559000002", stopDate: inDays(3) })];
       const businesses = [biz({ id: "b1", voicePhoneNumber: "972559000001" }), biz({ id: "b2", name: "צימר", voicePhoneNumber: "972559000002" })];
       // 15: line 1 takes up to 9, leaving 6 — line 2's 9 would leave −3, so it waits for monthly autorenew.
-      const { actions, report } = planVoiceNumberRenewal(numbers, businesses, balance(15), NOW, discounted);
+      const { actions, report } = planVoiceNumberRenewal(numbers, businesses, balance(15), NOW, 3);
       expect(prepayActions(actions)).toHaveLength(1);
       expect(report.prepaySkipped).toHaveLength(1);
     });
@@ -247,17 +240,15 @@ describe("runVoiceNumberRenewalJob", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrisma.business.update.mockResolvedValue({});
-    mockPrisma.systemSetting.findUnique.mockResolvedValue(null);
-    mockPrisma.systemSetting.upsert.mockResolvedValue({});
     carrier.getBalance.mockResolvedValue(balance(50));
     carrier.setAutoprolongation.mockResolvedValue(undefined);
+    carrier.setSmsReception.mockResolvedValue(undefined);
     sendAdminAlertEmail.mockResolvedValue(undefined);
   });
 
   const fromNow = (d: number) => new Date(Date.now() + d * DAY);
-  const verdict = () => JSON.parse(mockPrisma.systemSetting.upsert.mock.calls.at(-1)![0].create.value) as { state: string; months: number; perMonth: number };
 
-  it("learns the price from the first multi-month purchase and remembers a discount", async () => {
+  it("buys three months for a line in its renewal window, switches SMS on behind it, and reports the real price", async () => {
     carrier.listNumbers.mockResolvedValue([num({ stopDate: fromNow(3) })]);
     mockPrisma.business.findMany.mockResolvedValue([biz()]);
     const until = fromNow(93);
@@ -266,37 +257,23 @@ describe("runVoiceNumberRenewalJob", () => {
     await runVoiceNumberRenewalJob();
 
     expect(carrier.prolongNumber).toHaveBeenCalledWith("972559000001", 3);
-    expect(verdict()).toMatchObject({ state: "discounted", months: 3, perMonth: 2 });
+    expect(carrier.setSmsReception).toHaveBeenCalledWith("972559000001", true);
     expect(sendAdminAlertEmail.mock.calls[0][1]).toContain("paid 6 USD for 3 months (2.00/month vs 3 monthly)");
     // The new stop date lands on the row the same day, not tomorrow.
     expect(mockPrisma.business.update).toHaveBeenCalledWith({ where: { id: "b1" }, data: { voiceNumberStopDate: until } });
   });
 
-  it("remembers full price and stops buying ahead — the line bought is kept, nothing else is", async () => {
-    carrier.listNumbers.mockResolvedValue([num({ stopDate: fromNow(3) })]);
-    mockPrisma.business.findMany.mockResolvedValue([biz()]);
-    carrier.prolongNumber.mockResolvedValue({ stopDate: fromNow(93), totalPaid: 9, currency: "USD" });
-
-    await runVoiceNumberRenewalJob();
-    expect(verdict()).toMatchObject({ state: "full-price", months: 3 });
-    expect(sendAdminAlertEmail.mock.calls[0][1]).toContain("No discount for buying 3 months");
-
-    vi.clearAllMocks();
-    mockPrisma.systemSetting.findUnique.mockResolvedValue({ key: "voice_number_prepay", value: JSON.stringify({ state: "full-price", months: 3 }) });
-    carrier.listNumbers.mockResolvedValue([num({ number: "972559000002", stopDate: fromNow(3) })]);
-    mockPrisma.business.findMany.mockResolvedValue([biz({ id: "b2", voicePhoneNumber: "972559000002" })]);
-    await runVoiceNumberRenewalJob();
-    expect(carrier.prolongNumber).not.toHaveBeenCalled();
-  });
-
-  it("a verdict for a different number of months does not count", async () => {
-    mockPrisma.systemSetting.findUnique.mockResolvedValue({ key: "voice_number_prepay", value: JSON.stringify({ state: "full-price", months: 12 }) });
+  it("an SMS refusal is a note for the operator, not a problem with the line", async () => {
     carrier.listNumbers.mockResolvedValue([num({ stopDate: fromNow(3) })]);
     mockPrisma.business.findMany.mockResolvedValue([biz()]);
     carrier.prolongNumber.mockResolvedValue({ stopDate: fromNow(93), totalPaid: 6, currency: "USD" });
+    carrier.setSmsReception.mockRejectedValue(new Error("documents required"));
 
     await runVoiceNumberRenewalJob();
-    expect(carrier.prolongNumber).toHaveBeenCalledWith("972559000001", 3);
+
+    expect(sendAdminAlertEmail.mock.calls[0][0]).not.toContain("problem");
+    expect(sendAdminAlertEmail.mock.calls[0][1]).toContain("SMS reception refused");
+    expect(sendAdminAlertEmail.mock.calls[0][1]).toContain("documents required");
   });
 
   it("a refused multi-month purchase is reported and leaves monthly autorenew standing", async () => {
@@ -305,7 +282,7 @@ describe("runVoiceNumberRenewalJob", () => {
     carrier.prolongNumber.mockRejectedValue(new Error("not enough funds"));
 
     await runVoiceNumberRenewalJob();
-    expect(mockPrisma.systemSetting.upsert).not.toHaveBeenCalled();
+    expect(carrier.setSmsReception).not.toHaveBeenCalled();
     expect(sendAdminAlertEmail).not.toHaveBeenCalled(); // nothing is at risk: the line still renews monthly
   });
 

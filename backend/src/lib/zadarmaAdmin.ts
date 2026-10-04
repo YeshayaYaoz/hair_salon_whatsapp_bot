@@ -177,6 +177,15 @@ function digits(s: string): string {
 }
 
 /**
+ * Switches SMS reception on (or off) for a number already on the account. Zadarma grants it only
+ * to a line prepaid for three months and an account with its documents in, so this is called
+ * right after such a purchase and may legitimately be refused — the caller reports, not fails.
+ */
+export async function setSmsReception(number: string, on: boolean): Promise<void> {
+  await request("PUT", "/v1/direct_numbers/receive_sms/", { number: digits(number), value: on ? "on" : "off" });
+}
+
+/**
  * Sends the number's incoming calls to Cartesia — the External Server (SIP URI) field, set over the
  * API instead of by hand.
  *
@@ -245,6 +254,13 @@ export class NumberOrderError extends Error {
   }
 }
 
+export interface OrderOptions {
+  /** 3 buys Zadarma's three-month package, the one that also carries SMS. Default: one month. */
+  months?: 1 | 3;
+  /** Ask for SMS reception on the line (needs the three-month package and the account's documents). */
+  receiveSms?: boolean;
+}
+
 /**
  * Orders one specific number and returns the one Zadarma actually allocated.
  *
@@ -252,11 +268,13 @@ export class NumberOrderError extends Error {
  * everything downstream against the returned value, never against the requested one. Silently
  * getting a different number is how the wrong number ends up in three places.
  */
-export async function orderNumber(directionId: string, wanted: string): Promise<string> {
+export async function orderNumber(directionId: string, wanted: string, opts: OrderOptions = {}): Promise<string> {
   const digits = wanted.replace(/\D/g, "");
   const body = await request("POST", "/v1/direct_numbers/order/", {
     direction_id: directionId,
     number: digits,
+    ...(opts.months === 3 ? { period: "3month" } : {}),
+    ...(opts.receiveSms ? { receive_sms: "1" } : {}),
   });
   const allocated = String((body as { number?: unknown }).number ?? "").replace(/\D/g, "");
   if (!allocated) throw new NumberOrderError("Zadarma accepted the order but returned no number");

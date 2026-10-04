@@ -6,6 +6,7 @@ import {
   getBalance,
   setAutoprolongation,
   prolongNumber,
+  setSmsReception,
   ZadarmaNotConfiguredError,
   type ZadarmaNumber,
 } from "./zadarmaAdmin.js";
@@ -59,22 +60,13 @@ export const RENEW_AHEAD_DAYS = 7;
 /** The balance is judged against everything due within this window. */
 export const RUNWAY_DAYS = 30;
 /**
- * How many months a paying line is bought at a time. Zadarma's console prices three months below
- * three monthly renewals, and three months prepaid is also what unlocks SMS on a number. The job
- * buys one line first and reads what it was actually charged: a discount confirmed means every
- * line is bought this way as it comes up for renewal; full price means the first is kept (it is
- * paid, not lost) and nothing else is prepaid — monthly autorenew is the same money then, with
- * less of it tied up. 1 turns this off.
+ * How many months a paying line is bought at a time. Zadarma's three-month package is priced
+ * below three monthly renewals and is what unlocks SMS on a number, so every paying line is moved
+ * onto it as it comes up for renewal, and SMS reception is switched on behind the purchase. The
+ * report shows what the carrier actually charged per month next to the monthly fee. 1 turns this
+ * off and leaves the lines on monthly autorenew.
  */
 export const PREPAY_MONTHS = Math.max(1, Math.floor(Number(process.env.VOICE_NUMBER_PREPAY_MONTHS ?? 3)) || 3);
-const PREPAY_MARKER_KEY = "voice_number_prepay";
-
-export type PrepayState = "untested" | "discounted" | "full-price";
-export interface PrepayPolicy {
-  months: number;
-  state: PrepayState;
-}
-const NO_PREPAY: PrepayPolicy = { months: 1, state: "untested" };
 
 const digits = (s: string) => s.replace(/\D/g, "");
 
@@ -120,8 +112,8 @@ export interface RenewalReport {
   prepaid: string[];
   /** Lines due for a multi-month purchase that the balance could not fund without starving another. */
   prepaySkipped: string[];
-  /** Set once, the day the carrier charged full price for a multi-month purchase. */
-  prepayFullPrice: string | null;
+  /** SMS reception the carrier would not switch on after a package purchase — documents, usually. */
+  smsRefused: string[];
   /** Paying, expiring soon, and nothing above could secure it. */
   atRisk: string[];
   /** On the carrier account, owned by no business — Tori pays for these. */
@@ -154,7 +146,7 @@ export function planVoiceNumberRenewal(
   businesses: NumberBusiness[],
   balance: { balance: number; currency: string } | null,
   now: Date,
-  prepay: PrepayPolicy = NO_PREPAY
+  prepayMonths = 1
 ): RenewalPlan {
   const byNumber = new Map<string, NumberBusiness>();
   for (const b of businesses) if (b.voicePhoneNumber) byNumber.set(digits(b.voicePhoneNumber), b);
@@ -162,7 +154,7 @@ export function planVoiceNumberRenewal(
   const actions: RenewalAction[] = [];
   const report: RenewalReport = {
     repaired: [], held: [], released: [], restored: [], detached: [], prolonged: [],
-    prepaid: [], prepaySkipped: [], prepayFullPrice: null, atRisk: [], orphans: [], dead: [], shortfall: null,
+    prepaid: [], prepaySkipped: [], smsRefused: [], atRisk: [], orphans: [], dead: [], shortfall: null,
   };
   const seen = new Set<string>();
   let due = 0;
@@ -250,24 +242,22 @@ export function planVoiceNumberRenewal(
 
   // Multi-month purchases, decided only once everything due this month is known: a line is bought
   // ahead only if what is left afterwards still covers every other line's renewal, so prepaying
-  // one salon can never be what takes another salon's phone down. Earliest expiry first. Until the
-  // carrier's price is known, one line per run — the purchase is also the price check.
-  if (prepay.months > 1 && prepay.state !== "full-price") {
+  // one salon can never be what takes another salon's phone down. Earliest expiry first.
+  if (prepayMonths > 1) {
     let left = balance?.balance ?? null;
     prepayCandidates.sort((a, b) => (a.n.stopDate?.getTime() ?? 0) - (b.n.stopDate?.getTime() ?? 0));
     for (const { n, biz } of prepayCandidates) {
-      const cost = prepay.months * n.monthlyFee; // the most it can be; the carrier may charge less
+      const cost = prepayMonths * n.monthlyFee; // the most it can be; the package is priced below this
       const othersDue = due - n.monthlyFee;
       if (left !== null && left - cost < othersDue) {
         report.prepaySkipped.push(
-          `${biz.name} ${n.number} — ${prepay.months} months is up to ${cost} ${n.currency}; balance ${left} must keep ${othersDue} for the other lines`
+          `${biz.name} ${n.number} — ${prepayMonths} months is up to ${cost} ${n.currency}; balance ${left} must keep ${othersDue} for the other lines`
         );
         continue;
       }
-      actions.push({ kind: "prepay", number: n.number, businessId: biz.id, businessName: biz.name, months: prepay.months, monthlyFee: n.monthlyFee });
+      actions.push({ kind: "prepay", number: n.number, businessId: biz.id, businessName: biz.name, months: prepayMonths, monthlyFee: n.monthlyFee });
       if (left !== null) left -= cost;
       due -= n.monthlyFee; // bought ahead, so no longer due this month
-      if (prepay.state === "untested") break;
     }
     if (balance && left !== null) balance = { ...balance, balance: left };
   }
@@ -283,7 +273,7 @@ function hasSomethingToSay(r: RenewalReport): boolean {
   return (
     Boolean(r.shortfall) || r.atRisk.length > 0 || r.dead.length > 0 || r.orphans.length > 0 ||
     r.released.length > 0 || r.restored.length > 0 || r.detached.length > 0 || r.prolonged.length > 0 ||
-    r.prepaid.length > 0 || Boolean(r.prepayFullPrice)
+    r.prepaid.length > 0 || r.smsRefused.length > 0
   );
 }
 
@@ -304,14 +294,8 @@ function renderReport(r: RenewalReport): string {
   if (r.released.length) parts.push(`<h3 style="color:#fff;">Autorenew switched off (${NUMBER_GRACE_DAYS}-day hold over)</h3><ul style="color:#a1a1aa;">${li(r.released)}</ul>`);
   if (r.detached.length) parts.push(`<h3 style="color:#fff;">Numbers gone from the carrier, taken off their businesses</h3><ul style="color:#a1a1aa;">${li(r.detached)}</ul>`);
   if (r.prolonged.length) parts.push(`<h3 style="color:#fff;">Prepaid a month</h3><ul style="color:#a1a1aa;">${li(r.prolonged)}</ul>`);
-  if (r.prepayFullPrice) {
-    parts.push(
-      `<h3 style="color:#fff;">No discount for buying ${PREPAY_MONTHS} months at once</h3>` +
-        `<p style="color:#a1a1aa;"><code>${r.prepayFullPrice}</code><br>Nothing else will be bought ahead; monthly autorenew costs the same with less tied up. ` +
-        `Set VOICE_NUMBER_PREPAY_MONTHS=1 to silence this, or delete the <code>${PREPAY_MARKER_KEY}</code> setting to try again.</p>`
-    );
-  }
   if (r.prepaid.length) parts.push(`<h3 style="color:#fff;">Bought ${PREPAY_MONTHS} months at once</h3><ul style="color:#a1a1aa;">${li(r.prepaid)}</ul>`);
+  if (r.smsRefused.length) parts.push(`<h3 style="color:#fff;">SMS reception refused by the carrier</h3><ul style="color:#a1a1aa;">${li(r.smsRefused)}</ul><p style="color:#a1a1aa;">Usually the account's documents. The line is bought and rings; only SMS is missing.</p>`);
   if (r.prepaySkipped.length) parts.push(`<h3 style="color:#fff;">Not bought ahead — balance would not cover the other lines</h3><ul style="color:#a1a1aa;">${li(r.prepaySkipped)}</ul>`);
   if (r.held.length) parts.push(`<p style="color:#a1a1aa;">Held for businesses that stopped paying (Tori pays): ${r.held.join("; ")}</p>`);
   if (r.repaired.length) parts.push(`<p style="color:#a1a1aa;">Autorenew switched on for: ${r.repaired.join(", ")}</p>`);
@@ -320,30 +304,6 @@ function renderReport(r: RenewalReport): string {
 
 const fmtHe = (d: Date | null) =>
   d ? d.toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem", day: "numeric", month: "long", year: "numeric" }) : "";
-
-/** What earlier runs learned about multi-month pricing, kept across restarts. */
-async function readPrepayPolicy(): Promise<PrepayPolicy> {
-  if (PREPAY_MONTHS <= 1) return NO_PREPAY;
-  const row = await prisma.systemSetting.findUnique({ where: { key: PREPAY_MARKER_KEY } }).catch(() => null);
-  let state: PrepayState = "untested";
-  if (row) {
-    try {
-      const parsed = JSON.parse(row.value) as { state?: PrepayState; months?: number };
-      // A verdict for a different length (the env var changed) is not a verdict for this one.
-      if (parsed.months === PREPAY_MONTHS && (parsed.state === "discounted" || parsed.state === "full-price")) state = parsed.state;
-    } catch {
-      /* unreadable marker — test again */
-    }
-  }
-  return { months: PREPAY_MONTHS, state };
-}
-
-async function writePrepayPolicy(state: PrepayState, perMonth: number, currency: string): Promise<void> {
-  const value = JSON.stringify({ state, months: PREPAY_MONTHS, perMonth, currency, at: new Date().toISOString() });
-  await prisma.systemSetting
-    .upsert({ where: { key: PREPAY_MARKER_KEY }, create: { key: PREPAY_MARKER_KEY, value }, update: { value } })
-    .catch((err) => console.error("[voiceNumberRenewal] Could not store the prepay verdict:", err));
-}
 
 export async function runVoiceNumberRenewalJob(): Promise<void> {
   let numbers: ZadarmaNumber[];
@@ -365,8 +325,7 @@ export async function runVoiceNumberRenewalJob(): Promise<void> {
     },
   });
 
-  const prepay = await readPrepayPolicy();
-  const { actions, report } = planVoiceNumberRenewal(numbers, businesses, balance, new Date(), prepay);
+  const { actions, report } = planVoiceNumberRenewal(numbers, businesses, balance, new Date(), PREPAY_MONTHS);
 
   for (const a of actions) {
     switch (a.kind) {
@@ -384,22 +343,20 @@ export async function runVoiceNumberRenewalJob(): Promise<void> {
           report.prepaySkipped.push(`${a.businessName} ${a.number} — carrier refused the ${a.months}-month purchase (${why}); monthly autorenew stands`);
           continue;
         }
-        const perMonth = r.totalPaid / a.months;
-        const line = `${a.businessName} ${a.number} — paid ${r.totalPaid} ${r.currency} for ${a.months} months (${perMonth.toFixed(2)}/month vs ${a.monthlyFee} monthly), now until ${fmtDate(r.stopDate)}`;
-        // The verdict, from the only source that has it: the charge itself. Zero means the carrier
-        // reported nothing usable, which is not a verdict either way.
-        if (r.totalPaid > 0 && perMonth < a.monthlyFee) {
-          report.prepaid.push(line);
-          if (prepay.state !== "discounted") await writePrepayPolicy("discounted", perMonth, r.currency);
-        } else if (r.totalPaid > 0) {
-          report.prepayFullPrice = line;
-          await writePrepayPolicy("full-price", perMonth, r.currency);
-        } else {
-          report.prepaid.push(`${line} — charge not reported, price still unknown`);
-        }
+        const perMonth = a.months > 0 ? r.totalPaid / a.months : 0;
+        report.prepaid.push(
+          `${a.businessName} ${a.number} — paid ${r.totalPaid} ${r.currency} for ${a.months} months (${perMonth.toFixed(2)}/month vs ${a.monthlyFee} monthly), now until ${fmtDate(r.stopDate)}`
+        );
         await prisma.business
           .update({ where: { id: a.businessId }, data: { voiceNumberStopDate: r.stopDate } })
           .catch((err) => console.error("[voiceNumberRenewal] Could not persist the new stop date:", err));
+        // The package is what makes SMS possible on the line; asking is free and idempotent, and a
+        // refusal (documents) is a note for the operator, not a problem with the line.
+        if (a.months >= 3) {
+          await setSmsReception(a.number, true).catch((err) => {
+            report.smsRefused.push(`${a.businessName} ${a.number} — ${err instanceof Error ? err.message : String(err)}`);
+          });
+        }
         continue;
       }
       case "stamp":

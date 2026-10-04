@@ -1,8 +1,9 @@
 import { prisma } from "./prisma.js";
 import { sendAdminAlertEmail } from "./email.js";
 import { assignNumberToAgent } from "./cartesiaAdmin.js";
-import { listAvailableNumbers, orderNumber, pointNumberAtCartesia, getBalance } from "./zadarmaAdmin.js";
+import { listAvailableNumbers, orderNumber, pointNumberAtCartesia, getBalance, NumberOrderError } from "./zadarmaAdmin.js";
 import { captureError } from "./errorMonitoring.js";
+import { CARRIER_USD_PER_NUMBER_MONTH } from "./carrierCost.js";
 
 /**
  * Getting a business its own phone number, without a person in the middle when there needn't be one.
@@ -163,7 +164,7 @@ async function orderAndWire(businessId: string, businessName: string, preferredN
 
   // Zadarma can allocate a different number from the one requested, so everything downstream uses
   // what came back.
-  const allocated = await orderNumber(DEFAULT_DIRECTION_ID, chosen);
+  const allocated = await orderBundleOrMonth(chosen, balance);
   const e164 = allocated.startsWith("+") ? allocated : `+${allocated}`;
 
   await prisma.business.update({ where: { id: businessId }, data: { voicePhoneNumber: allocated } });
@@ -175,6 +176,35 @@ async function orderAndWire(businessId: string, businessName: string, preferredN
   await pointNumberAtCartesia(e164);
 
   return allocated;
+}
+
+/**
+ * A new number is bought as Zadarma's three-month package whenever the balance can carry it: the
+ * package is priced below three monthly renewals and is what unlocks SMS on the line, and a new
+ * business is exactly who should start on it. The request also asks for SMS reception; if the
+ * carrier rejects that (documents not accepted for it yet), the same package is ordered without,
+ * because SMS is the smaller half of what the salon is waiting for. A balance that cannot carry
+ * three months buys one — a business is not kept waiting over a top-up, and the renewal job moves
+ * the line to the package at its first renewal with money on the account.
+ *
+ * Only an outright rejection is retried. A NumberOrderError means a number was reserved and
+ * something about it is wrong; ordering again would reserve a second one.
+ */
+const BUNDLE_MONTHS = 3;
+export const BUNDLE_USD = BUNDLE_MONTHS * CARRIER_USD_PER_NUMBER_MONTH;
+
+async function orderBundleOrMonth(chosen: string, balance: number): Promise<string> {
+  if (balance < BUNDLE_USD) {
+    console.warn(`[provisioning] Balance ${balance} USD cannot carry the ${BUNDLE_MONTHS}-month package (${BUNDLE_USD}); ordering a month`);
+    return orderNumber(DEFAULT_DIRECTION_ID, chosen);
+  }
+  try {
+    return await orderNumber(DEFAULT_DIRECTION_ID, chosen, { months: 3, receiveSms: true });
+  } catch (err) {
+    if (err instanceof NumberOrderError) throw err;
+    console.warn(`[provisioning] ${BUNDLE_MONTHS}-month order with SMS refused (${(err as Error).message}); ordering the package without SMS`);
+    return orderNumber(DEFAULT_DIRECTION_ID, chosen, { months: 3 });
+  }
 }
 
 /**
