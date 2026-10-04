@@ -29,6 +29,8 @@ import { processWhatsAppPayload } from "./webhook/whatsappRoutes.js";
 import { runInboundRecoveryJob } from "./webhook/whatsappInbox.js";
 import { runJobWatchdogJob } from "./lib/jobWatchdog.js";
 import { runVoiceNumberRenewalJob } from "./lib/voiceNumberRenewal.js";
+import { runRecurringChargesJob } from "./lib/recurringCharges.js";
+import { receiptRedirectRouter } from "./lib/receiptRedirect.js";
 import { setSendObserver } from "./webhook/whatsappClient.js";
 import { recordOutbound } from "./lib/outboundLedger.js";
 
@@ -101,6 +103,8 @@ app.use(
 
 app.use("/api/auth", authRouter);
 app.use("/api/public", publicRouter);
+// Receipt buttons on WhatsApp open /r/<id>, which redirects to the provider's document.
+app.use("/r", receiptRedirectRouter);
 app.use("/api/business", businessRouter);
 app.use("/api/billing", payplusBillingRouter);
 app.use("/api/leadfinder", leadFinderRouter);
@@ -203,6 +207,8 @@ setInterval(() => {
   // safe because the job claims each business before charging and a claim lasts the calendar day
   // (see subscriptionBillingJob), so the extra runs find nothing to do.
   runTrackedJob("subscriptionBilling", runSubscriptionBillingJob);
+  // Creates each day's recurring-charge dues and nudges the owner. Idempotent per day, like billing.
+  runTrackedJob("recurringCharges", runRecurringChargesJob);
   // Last in the batch and deliberately absent from the startup run below: at startup every job
   // is mid-first-run and its row still shows the previous process's timestamp, which would read
   // as the whole table being stale.
@@ -217,6 +223,7 @@ runTrackedJob("billingReminder", runBillingReminderJob);
 runTrackedJob("healthDigest", runHealthDigestJob);
 runTrackedJob("aiCostAlert", runAiCostAlertJob);
 runTrackedJob("subscriptionBilling", runSubscriptionBillingJob);
+runTrackedJob("recurringCharges", runRecurringChargesJob);
 
 // Yield-management (empty-slot) campaign scan — runs once daily at 18:00 local business time;
 // like the digest job, the underlying function itself gates on each business's local clock, so

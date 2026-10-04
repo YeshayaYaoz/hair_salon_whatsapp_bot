@@ -13,10 +13,10 @@ const STATUS_COLORS: Record<string, string> = {
   canceled: "bg-gray-100 text-gray-600 border-gray-200",
 };
 
-type PlanKey = "standard" | "premium" | "ultra";
-const PLANS: PlanKey[] = ["standard", "premium", "ultra"];
-const PLAN_LABEL: Record<PlanKey, string> = { standard: "Standard", premium: "Premium", ultra: "Ultra" };
-const PLAN_PRICES: Record<PlanKey, number> = { standard: 174.9, premium: 374.9, ultra: 749.9 };
+type PlanKey = "receipts" | "standard" | "premium" | "ultra";
+const PLANS: PlanKey[] = ["receipts", "standard", "premium", "ultra"];
+const PLAN_LABEL: Record<PlanKey, string> = { receipts: "קבלות", standard: "Standard", premium: "Premium", ultra: "Ultra" };
+const PLAN_PRICES: Record<PlanKey, number> = { receipts: 75, standard: 174.9, premium: 374.9, ultra: 749.9 };
 // ₪174.9 must render as "174.90" — a price, not a float.
 const fmtIls = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
 // Must match ANNUAL_MONTHS_CHARGED in backend/src/billing/payplusSubscription.ts — the annual term
@@ -24,7 +24,7 @@ const fmtIls = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
 const ANNUAL_MONTHS_CHARGED = 10;
 
 // Must match MESSAGE_QUOTA_BY_PLAN in backend/src/lib/wallet.ts — display-only, not authoritative.
-const MESSAGE_QUOTA_BY_PLAN: Record<PlanKey, number> = { standard: 300, premium: 1000, ultra: 3000 };
+const MESSAGE_QUOTA_BY_PLAN: Record<PlanKey, number> = { receipts: 100, standard: 300, premium: 1000, ultra: 3000 };
 
 // Features shared by both plans — everything below is what actually differs, so the comparison
 // is honest about what a Premium upgrade buys today rather than padding the list.
@@ -40,11 +40,34 @@ const MESSAGE_QUOTA_BY_PLAN: Record<PlanKey, number> = { standard: 300, premium:
  * asking ₪260 more for a quota bump and a promise.
  */
 const PLAN_TAGLINE: Record<PlanKey, { he: string; en: string }> = {
+  receipts: { he: "רק קבלות ללקוחות, כל חודש, אוטומטית", en: "Just receipts to your customers, every month" },
   standard: { he: "כל מה שצריך כדי שהוואטסאפ יעבוד בשבילכם", en: "Everything you need for WhatsApp to work for you" },
   premium: { he: "גם הטלפון עונה מעצמו", en: "The phone answers itself too" },
   ultra: { he: "נפח גבוה, ליווי צמוד, התאמה אישית", en: "High volume, close guidance, custom fit" },
 };
 const PLAN_FEATURES: Record<PlanKey, { he: string[]; en: string[] }> = {
+  // The plan without a bot: for the studio or class that only wants its members' monthly receipts
+  // handled. Says plainly what it does not include, so nobody buys it expecting the bot.
+  receipts: {
+    he: [
+      "חיובים קבועים לכל לקוח — סכום ויום בחודש",
+      "בכל חודש: תזכורת בוואטסאפ מי צריך לשלם",
+      "אישרתם שהכסף נכנס? הקבלה מופקת ונשלחת ללקוח מיד",
+      "ייבוא רשימת לקוחות מאקסל",
+      "עובד עם חשבונית ירוקה, iCount, YPay או PayPlus",
+      "עד 100 הודעות בחודש",
+      "ללא בוט ללקוחות — רק קבלות",
+    ],
+    en: [
+      "A fixed charge per customer — amount and day of month",
+      "Every month: a WhatsApp reminder of who is due",
+      "Confirm the money came in and the receipt is issued and sent at once",
+      "Import your customer list from Excel",
+      "Works with Green Invoice, iCount, YPay or PayPlus",
+      "Up to 100 messages a month",
+      "No customer bot — receipts only",
+    ],
+  },
   standard: {
     he: [
       "בוט WhatsApp בעברית שסוגר תורים לבד, 24/7",
@@ -106,6 +129,7 @@ const PLAN_FEATURES: Record<PlanKey, { he: string[]; en: string[] }> = {
 };
 /** The friendly beat under the price — small, true, and human. */
 const PLAN_ICEBREAKER: Record<PlanKey, { he: string; en: string }> = {
+  receipts: { he: "🧾 שום קבלה לא נשכחת", en: "🧾 No receipt ever forgotten" },
   standard: { he: "☕ פחות ממחיר קפה ביום", en: "☕ Less than a coffee a day" },
   premium: { he: "📞 הטלפון עונה גם כשהידיים שלכם עסוקות", en: "📞 Answers even when your hands are full" },
   ultra: { he: "🤝 עסק גדול? יש לכם צוות מאחוריכם", en: "🤝 Growing fast? You've got a team behind you" },
@@ -775,7 +799,7 @@ export default function BillingPage() {
               </>
             )}
           </div>
-          <div className="grid sm:grid-cols-3 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {PLANS.map((p) => {
               const isCurrent = currentPlan === p && status === "active";
               const isSelected = plan === p;

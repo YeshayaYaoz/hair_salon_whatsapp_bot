@@ -74,7 +74,7 @@ export const RE_ENGAGEMENT_ERROR_CODE = 131047;
  * be approved in the sending WABA; see whatsappTemplates.ts for the naming contract.
  */
 export async function sendWhatsAppTemplate(
-  params: SendCommon & { templateName: string; languageCode: string; bodyParams: string[]; copyCode?: string }
+  params: SendCommon & { templateName: string; languageCode: string; bodyParams: string[]; copyCode?: string; urlSuffix?: string }
 ): Promise<SendReceipt> {
   const components: Record<string, unknown>[] = params.bodyParams.length
     ? [{ type: "body", parameters: params.bodyParams.map((text) => ({ type: "text", text })) }]
@@ -87,6 +87,17 @@ export async function sendWhatsAppTemplate(
       sub_type: "copy_code",
       index: "0",
       parameters: [{ type: "coupon_code", coupon_code: params.copyCode }],
+    });
+  }
+  // A URL button whose link ends in {{1}}: the suffix is filled per send, the domain is fixed in
+  // the approved template. How a receipt link rides on a button without the provider's domain
+  // having to be in the template.
+  if (params.urlSuffix !== undefined) {
+    components.push({
+      type: "button",
+      sub_type: "url",
+      index: "0",
+      parameters: [{ type: "text", text: params.urlSuffix }],
     });
   }
   return send(params, {
@@ -367,7 +378,13 @@ export interface CreateTemplateParams {
    * composition comes back with the same generic wording error as a content problem — which sends
    * you rewriting perfectly good Hebrew. One kind of button per template.
    */
-  urlButton?: { text: string; url: string };
+  urlButton?: {
+    text: string;
+    /** May end in {{1}} for a per-send suffix (sendWhatsAppTemplate's urlSuffix); then `example`
+     * must hold one full sample URL for Meta's reviewer. The domain itself stays fixed. */
+    url: string;
+    example?: string;
+  };
   /**
    * A tap-to-copy coupon button. The code itself is supplied per send (sendWhatsAppTemplate's
    * copyCode), so one approved template serves every code a business ever creates; Meta only
@@ -417,7 +434,12 @@ export async function createMessageTemplate(
   } else if (params.urlButton) {
     components.push({
       type: "BUTTONS",
-      buttons: [{ type: "URL", text: params.urlButton.text, url: params.urlButton.url }],
+      buttons: [{
+        type: "URL",
+        text: params.urlButton.text,
+        url: params.urlButton.url,
+        ...(params.urlButton.example ? { example: [params.urlButton.example] } : {}),
+      }],
     });
   } else if (params.copyCodeButton) {
     components.push({

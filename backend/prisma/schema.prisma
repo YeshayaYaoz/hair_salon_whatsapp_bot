@@ -307,6 +307,9 @@ model Business {
   linkedLeads             Lead[] // Lead Finder prospects that turned into this real, paying account
   affiliateReferrals      AffiliateReferral[]
   campaigns                      Campaign[]
+  recurringCharges   RecurringCharge[]
+  chargesDue         ChargeDue[]
+  receipts           Receipt[]
 }
 
 // A salon we sent to a provider's signup page through our affiliate link, and whether it came back
@@ -571,9 +574,85 @@ model Customer {
   appointments        Appointment[]
   waitlistEntries     WaitlistEntry[]
   campaignSends       CampaignSend[]
+  recurringCharges    RecurringCharge[]
+  chargesDue          ChargeDue[]
+  receipts            Receipt[]
 
   @@unique([businessId, phone])
   @@index([businessId])
+}
+
+/// A fixed amount a customer pays a business every month — a studio membership, a class, a
+/// retainer — that the business wants a receipt sent for each time.
+///
+/// Tori does not collect the money. The business collects it however it already does (Bit, cash,
+/// a standing order at the bank) and tells Tori it arrived; only then is a receipt issued. A
+/// receipt documents money received, so issuing one on a schedule, before the money, would be
+/// issuing false documents in the business's name.
+model RecurringCharge {
+  id          String      @id @default(cuid())
+  businessId  String
+  business    Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customerId  String
+  customer    Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  amountIls   Float
+  description String
+  /// 1–31. A day the month lacks (31 in April) falls on the month's last day.
+  dayOfMonth  Int
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  dues        ChargeDue[]
+
+  @@index([businessId, active])
+}
+
+/// One month's instance of a recurring charge: created on its day, waits for the owner to say the
+/// money came in, and then carries the receipt that was issued for it.
+model ChargeDue {
+  id                String           @id @default(cuid())
+  businessId        String
+  business          Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  recurringChargeId String?
+  recurringCharge   RecurringCharge? @relation(fields: [recurringChargeId], references: [id], onDelete: SetNull)
+  customerId        String
+  customer          Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  amountIls         Float
+  description       String
+  /// The calendar day it fell due, at local midnight of the business. One row per charge per month.
+  dueDate           DateTime
+  /// "pending" | "received" (receipt issued) | "skipped" (owner said no money this month)
+  status            String           @default("pending")
+  createdAt         DateTime         @default(now())
+  resolvedAt        DateTime?
+  receipt           Receipt?
+
+  @@unique([recurringChargeId, dueDate])
+  @@index([businessId, status])
+}
+
+/// A receipt Tori issued through the business's invoicing provider, whatever triggered it.
+///
+/// Exists so a receipt can be sent as a template with a button: Meta's URL buttons take a fixed
+/// domain with a variable suffix, and the provider's document URL is on the provider's domain. The
+/// button points at /r/<id> here, which redirects to the document — and the row doubles as the
+/// receipt history the dashboard shows.
+model Receipt {
+  id          String     @id @default(cuid())
+  businessId  String
+  business    Business   @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customerId  String?
+  customer    Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  chargeDueId String?    @unique
+  chargeDue   ChargeDue? @relation(fields: [chargeDueId], references: [id], onDelete: SetNull)
+  amountIls   Float
+  description String
+  documentUrl String
+  /// How it reached the customer: "sent" | "template" | "window_closed" | "no_whatsapp" | "failed"
+  delivery    String
+  createdAt   DateTime   @default(now())
+
+  @@index([businessId, createdAt])
 }
 
 /// One outbound marketing broadcast from a business to some of its customers.

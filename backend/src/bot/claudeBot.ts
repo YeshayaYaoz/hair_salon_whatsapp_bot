@@ -15,6 +15,8 @@ import {
   minutesToHhmm, hhmmToMinutes, dayNameToIndex,
 } from "./managerActions.js";
 import { issueAndSendReceipt, NoInvoiceProviderError, DELIVERY_MESSAGE_HE } from "../lib/receipts.js";
+import { listPendingDues, confirmChargeDue, skipChargeDue } from "../lib/recurringCharges.js";
+import { normalizePhone } from "../lib/phone.js";
 import { quoteCustomerCoupon, redeemCustomerCoupon, releaseCustomerCoupon, CustomerCouponError, CUSTOMER_COUPON_FAILURE_HE } from "../booking/customerCoupons.js";
 import { isDepositRequired, depositHoldFields, createDepositLink, releaseHold } from "../booking/deposits.js";
 import { parseBookingTime, parseDateString, dayOfWeekForDate, instantPartsInTz, zonedDateParts } from "../lib/timezone.js";
@@ -58,6 +60,7 @@ const MUTATING_TOOLS = new Set([
   "issue_receipt", "block_time", "cancel_booking", "set_hours", "upsert_service", "manage_staff",
   "add_faq", "remove_block", "set_bot_enabled", "book_for_customer", "add_customer",
   "set_customer_note", "message_customer", "create_discount_code",
+  "confirm_recurring_charges", "add_recurring_charge",
 ]);
 
 export function chooseTier(messageText: string, hadToolError: boolean, lastAssistantText?: string): "cheap" | "smart" {
@@ -317,6 +320,44 @@ const managerTools: GenericTool[] = [
     description:
       "What happened to the most recent campaign this business sent — how many were delivered, read, failed, or still pending. Use when the owner asks 'מה קרה עם הקמפיין', 'כמה קיבלו את ההודעה'. Delivery arrives over the minutes after a send, so a report taken immediately shows mostly pending; say so.",
     input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "recurring_charges_due",
+    description:
+      "The monthly charges (memberships, classes, retainers) that fell due and are waiting for the owner to say the money came in — 'מי עוד לא שילם?', 'מה ממתין לאישור?', 'אילו קבלות צריך להוציא?'. Tori does not collect the money; the owner confirms it arrived and only then a receipt is issued and sent.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "confirm_recurring_charges",
+    description:
+      "The owner says a recurring payment arrived — 'התקבל מדנה', 'דנה שילמה', 'אשרי את כל החיובים', 'כולם שילמו חוץ מיוסי' — so issue the receipt and send it to the customer. Pass customerNames (names or phones) for specific people, all:true for everyone pending, and except for the ones to leave out. skip:true instead marks the named ones as not paid this month (no receipt). Two-step: call without confirmed to get the list and amounts, read it back, and only on a clear yes call again with confirmed:true. A receipt is a legal document stating money was received: never confirm on the owner's behalf.",
+    input_schema: {
+      type: "object",
+      properties: {
+        customerNames: { type: "array", items: { type: "string" } },
+        all: { type: "boolean" },
+        except: { type: "array", items: { type: "string" }, description: "With all: customers NOT to confirm" },
+        skip: { type: "boolean", description: "Mark as not paid this month instead of confirming" },
+        confirmed: { type: "boolean" },
+      },
+    },
+  },
+  {
+    name: "add_recurring_charge",
+    description:
+      "Set up a fixed monthly charge for a customer that Tori will remind the owner about each month and issue a receipt for once the owner confirms payment — 'תוסיפי לדנה מנוי חודשי 350 שקל כל 1 לחודש'. For a new customer give phone. dayOfMonth 1–31. Two-step confirmation.",
+    input_schema: {
+      type: "object",
+      properties: {
+        customerName: { type: "string" },
+        phone: { type: "string", description: "For a customer not yet known" },
+        amountIls: { type: "number" },
+        description: { type: "string", description: "What it is for, as it should appear on the receipt, e.g. 'מנוי חודשי'" },
+        dayOfMonth: { type: "number" },
+        confirmed: { type: "boolean" },
+      },
+      required: ["customerName", "amountIls", "description", "dayOfMonth"],
+    },
   },
   {
     name: "message_customer",
@@ -1043,6 +1084,84 @@ export async function runTool(
     });
   }
 
+  if (name === "recurring_charges_due") {
+    const dues = await listPendingDues(businessId);
+    if (dues.length === 0) return JSON.stringify({ pending: [], note: "Nothing is waiting. Dues appear on each charge's day of the month." });
+    return JSON.stringify({
+      pending: dues.map((d) => ({ customer: d.customerName ?? d.customerPhone, amountIls: d.amountIls, for: d.description, dueDate: d.dueDate.toISOString().slice(0, 10) })),
+      totalIls: dues.reduce((sum, d) => sum + d.amountIls, 0),
+      note: "Ask the owner which of these were paid. Confirm only what they say — a receipt documents money received.",
+    });
+  }
+
+  if (name === "confirm_recurring_charges") {
+    const dues = await listPendingDues(businessId);
+    if (dues.length === 0) return JSON.stringify({ error: "Nothing is waiting for confirmation." });
+    const matches = (d: (typeof dues)[number], q: string) => {
+      const needle = q.trim().toLowerCase();
+      if (!needle) return false;
+      if (/\d{7,}/.test(needle)) return d.customerPhone === normalizePhone(needle);
+      return (d.customerName ?? "").toLowerCase().includes(needle);
+    };
+    const names = Array.isArray(input.customerNames) ? input.customerNames.map(String) : [];
+    const except = Array.isArray(input.except) ? input.except.map(String) : [];
+    let chosen = input.all === true ? dues.filter((d) => !except.some((q) => matches(d, q))) : dues.filter((d) => names.some((q) => matches(d, q)));
+    chosen = chosen.filter((d, i, arr) => arr.findIndex((x) => x.id === d.id) === i);
+    if (chosen.length === 0) {
+      const unmatched = names.filter((q) => !dues.some((d) => matches(d, q)));
+      return JSON.stringify({ error: `No pending charge matches ${unmatched.length ? unmatched.join(", ") : "that"}.`, pending: dues.map((d) => d.customerName ?? d.customerPhone) });
+    }
+    const skip = input.skip === true;
+    const gate = confirmFirst(
+      input,
+      {
+        action: skip ? "mark as NOT paid this month (no receipt)" : "issue and send a receipt to each",
+        charges: chosen.map((d) => ({ customer: d.customerName ?? d.customerPhone, amountIls: d.amountIls, for: d.description })),
+        totalIls: chosen.reduce((sum, d) => sum + d.amountIls, 0),
+      },
+      "will"
+    );
+    if (gate) return gate;
+
+    const results: Record<string, unknown>[] = [];
+    for (const d of chosen) {
+      const who = d.customerName ?? d.customerPhone;
+      if (skip) {
+        results.push({ customer: who, skipped: await skipChargeDue(businessId, d.id) });
+        continue;
+      }
+      const out = await confirmChargeDue(businessId, d.id);
+      results.push(out.ok ? { customer: who, receipt: out.receipt.documentUrl, delivery: out.message } : { customer: who, error: out.error });
+    }
+    return JSON.stringify({ results, note: "Tell the owner per customer what happened, including any receipt that was not delivered and needs forwarding." });
+  }
+
+  if (name === "add_recurring_charge") {
+    const amountIls = Number(input.amountIls);
+    const dayOfMonth = Number(input.dayOfMonth);
+    const description = String(input.description ?? "").trim();
+    if (!Number.isFinite(amountIls) || amountIls <= 0) return JSON.stringify({ error: "Ask for the amount." });
+    if (!Number.isInteger(dayOfMonth) || dayOfMonth < 1 || dayOfMonth > 31) return JSON.stringify({ error: "dayOfMonth must be 1–31." });
+    if (!description) return JSON.stringify({ error: "Ask what the charge is for — it goes on the receipt." });
+    let target = await findCustomerByNameOrPhone(businessId, String(input.customerName ?? ""));
+    const phone = input.phone ? normalizePhone(String(input.phone)) : null;
+    if (!target && !phone) return JSON.stringify({ error: `No customer matching "${input.customerName}". Ask for their phone number to add them.` });
+
+    const gate = confirmFirst(input, { customer: target?.name ?? String(input.customerName), phone: target?.phone ?? phone, amountIls, for: description, everyMonthOn: dayOfMonth }, "willCreate");
+    if (gate) return gate;
+
+    if (!target) {
+      target = await prisma.customer.upsert({
+        where: { businessId_phone: { businessId, phone: phone! } },
+        create: { businessId, phone: phone!, name: String(input.customerName).trim() },
+        update: {},
+        select: { id: true, name: true, phone: true },
+      });
+    }
+    const charge = await prisma.recurringCharge.create({ data: { businessId, customerId: target.id, amountIls, description, dayOfMonth } });
+    return JSON.stringify({ created: true, chargeId: charge.id, note: `On the ${dayOfMonth} of each month Tori will ask the owner whether it was paid, and send a receipt when they confirm.` });
+  }
+
   if (name === "message_customer") {
     const target = await findCustomerByNameOrPhone(businessId, String(input.customerName ?? ""));
     if (!target) return JSON.stringify({ error: `No customer matching "${input.customerName}".` });
@@ -1148,6 +1267,7 @@ export async function runTool(
         ],
         כסף: [
           "'תוציא קבלה לדנה על 200 שקל, תספורת'",
+          "'תוסיפי לדנה מנוי חודשי 350 שקל כל 1 לחודש' — ובכל חודש אשאל אם שולם: 'התקבל מדנה' · 'אשרי את כל החיובים' · 'מי עוד לא שילם?'",
           "'כמה הכנסתי החודש?'",
           "'תפתח קוד הנחה WELCOME10 של 10 אחוז'",
         ],

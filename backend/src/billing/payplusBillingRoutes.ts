@@ -260,7 +260,7 @@ payplusBillingRouter.post("/payplus/coupons", requireAuth, requireSuperAdmin, as
       durationCycles: z.number().int().positive().nullable().optional(),
       maxRedemptions: z.number().int().positive().nullable().optional(),
       expiresAt: z.string().datetime().nullable().optional(),
-      allowedPlans: z.array(z.enum(["standard", "premium", "ultra"])).optional(),
+      allowedPlans: z.array(z.enum(["receipts", "standard", "premium", "ultra"])).optional(),
       note: z.string().trim().max(300).optional(),
     })
     .refine((v) => v.discountType !== "percent" || v.discountValue <= 100, {
@@ -316,7 +316,7 @@ payplusBillingRouter.post("/payplus/coupons/:id/activate", requireAuth, requireS
  */
 payplusBillingRouter.post("/payplus/coupon/preview", requireAuth, async (req: AuthedRequest, res) => {
   const parsed = z
-    .object({ code: z.string().trim().min(1).max(40), plan: z.enum(["standard", "premium", "ultra"]) })
+    .object({ code: z.string().trim().min(1).max(40), plan: z.enum(["receipts", "standard", "premium", "ultra"]) })
     .safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
@@ -333,7 +333,7 @@ payplusBillingRouter.post("/payplus/coupon/preview", requireAuth, async (req: Au
 payplusBillingRouter.post("/payplus/checkout", requireAuth, async (req: AuthedRequest, res) => {
   const parsed = z
     .object({
-      plan: z.enum(["standard", "premium", "ultra"]),
+      plan: z.enum(["receipts", "standard", "premium", "ultra"]),
       returnUrl: z.string().url(),
       cycle: z.enum(["monthly", "annual"]).optional(),
       couponCode: z.string().trim().max(40).optional(),
@@ -516,7 +516,7 @@ payplusBillingRouter.post("/payplus/payment-method", requireAuth, async (req: Au
 /** Upgrades/downgrades the plan and charges a prorated top-up immediately for the remainder of
  * the current billing period — the next scheduled charge picks up the new plan price automatically. */
 payplusBillingRouter.put("/payplus/plan", requireAuth, async (req: AuthedRequest, res) => {
-  const parsed = z.object({ plan: z.enum(["standard", "premium", "ultra"]) }).safeParse(req.body);
+  const parsed = z.object({ plan: z.enum(["receipts", "standard", "premium", "ultra"]) }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! } });

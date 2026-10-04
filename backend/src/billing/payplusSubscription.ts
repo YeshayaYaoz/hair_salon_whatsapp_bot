@@ -23,7 +23,9 @@ const BASE_URL =
 
 // standard is deliberately a .90 price point; every consumer of this table must format prices
 // with two decimals (or agorot), never assume whole shekels.
-export const PLAN_PRICES_ILS: Record<string, number> = { standard: 174.9, premium: 374.9, ultra: 749.9 };
+// "receipts" is the plan without a bot: monthly receipts to the business's customers and nothing
+// else (see lib/planFeatures.ts). Priced for a business that would otherwise not be a customer.
+export const PLAN_PRICES_ILS: Record<string, number> = { receipts: 75, standard: 174.9, premium: 374.9, ultra: 749.9 };
 // Annual plan: 10 months' worth charged upfront (2 months free) — a common SaaS annual incentive.
 export const ANNUAL_MONTHS_CHARGED = 10;
 export const BILLING_PERIOD_DAYS: Record<string, number> = { monthly: 30, annual: 365 };
@@ -157,7 +159,7 @@ export async function createSubscriptionCheckoutLink(
   // Never below zero: PayPlus rejects a non-positive amount with an error that says nothing about
   // coupons, and a 100%-off code is a legitimate thing to hand someone.
   const amountIls = Math.max(1, beforeCoupon - couponOff);
-  const planLabel = plan === "ultra" ? "Ultra" : plan === "premium" ? "Premium" : "Standard";
+  const planLabel = plan === "ultra" ? "Ultra" : plan === "premium" ? "Premium" : plan === "receipts" ? "קבלות" : "Standard";
   const cycleLabel = cycle === "annual" ? "שנתי" : "חודשי";
   // Named on the payment page so the owner can see why it is not the list price.
   const credited = beforeCoupon < fullPrice ? ` — בקיזוז ₪${fmtIls(fullPrice - beforeCoupon)} ששולמו כבר` : "";

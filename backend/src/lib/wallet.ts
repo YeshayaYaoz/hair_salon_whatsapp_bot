@@ -11,6 +11,7 @@ import { prisma } from "./prisma.js";
  * code change.
  */
 export const MESSAGE_QUOTA_BY_PLAN: Record<string, number> = {
+  receipts: 100,
   standard: 300,
   premium: 1000,
   ultra: 3000,

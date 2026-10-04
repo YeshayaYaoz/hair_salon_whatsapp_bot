@@ -523,3 +523,29 @@ export const CAMPAIGN_TEMPLATES: CampaignTemplateDef[] = [CAMPAIGN_COME_BACK, CA
 
 /** Language every campaign template is filed in — the same as the rest of the library. */
 export const CAMPAIGN_TEMPLATE_LANG = DEFAULT_LANG;
+
+/**
+ * A receipt, delivered as a UTILITY template with a button to the document.
+ *
+ * Receipts used to go out as a plain text message with the link in it — which only reaches a
+ * customer who wrote to the business in the last 24 hours. A deposit paid through the bot is inside
+ * that window; a monthly membership paid by standing order never is, so for the business that only
+ * wants receipts sent, nearly every one was silently dropped. A template has no window.
+ *
+ * The button's domain is fixed at approval time and must be ours: Meta allows a variable only as a
+ * suffix. So the button opens /r/<receipt id> on this backend, which redirects to wherever the
+ * provider keeps the document (see receiptRedirect.ts).
+ */
+export const RECEIPT_TEMPLATE_NAME = "tori_receipt";
+export const RECEIPT_BODY = "היי {{1}}, קבלה מ{{2}} על {{3}} בסך ₪{{4}} מוכנה. לחצו על הכפתור כדי לפתוח אותה.";
+export const RECEIPT_EXAMPLE = ["דנה", "סטודיו רונית", "מנוי חודשי", "350"];
+export const RECEIPT_BUTTON_TEXT = "לקבלה";
+
+/** Where receipt buttons point. Public URL of this backend, which PayPlus callbacks already need. */
+export function receiptLinkBase(): string {
+  return (process.env.PUBLIC_BACKEND_URL ?? process.env.APP_URL ?? "").trim().replace(/\/+$/, "");
+}
+
+export function receiptTemplate(): TemplateConfig {
+  return { name: process.env.WHATSAPP_RECEIPT_TEMPLATE || RECEIPT_TEMPLATE_NAME, languageCode: DEFAULT_LANG };
+}

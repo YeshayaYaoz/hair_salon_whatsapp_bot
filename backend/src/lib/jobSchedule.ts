@@ -26,6 +26,7 @@ export const JOB_INTERVALS_MS: Record<string, number> = {
   healthDigest: HOUR_MS,
   aiCostAlert: HOUR_MS,
   subscriptionBilling: HOUR_MS,
+  recurringCharges: HOUR_MS,
   yieldCampaign: HOUR_MS,
   voiceUsage: HOUR_MS,
   voiceBudget: HOUR_MS,

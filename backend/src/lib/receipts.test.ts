@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const mockPrisma = { business: { findUniqueOrThrow: vi.fn() } };
+const mockPrisma = {
+  business: { findUniqueOrThrow: vi.fn() },
+  // Every issued receipt is recorded (the button link needs its id).
+  receipt: { create: vi.fn(async () => ({ id: "r1" })), update: vi.fn(async () => ({})) },
+};
 vi.mock("./prisma.js", () => ({ prisma: mockPrisma }));
 vi.mock("./crypto.js", () => ({ decryptSecret: (s: string) => `dec(${s})` }));
 vi.mock("./errorMonitoring.js", () => ({ captureError: vi.fn() }));
@@ -65,7 +69,7 @@ describe("issueAndSendReceipt", () => {
   it("issues the document and sends it to the customer", async () => {
     const result = await issueAndSendReceipt(args);
 
-    expect(result).toEqual({ documentUrl: "https://inv.example/doc/1", delivery: "sent" });
+    expect(result).toEqual({ receiptId: "r1", documentUrl: "https://inv.example/doc/1", delivery: "sent" });
     const sent = sendWhatsAppMessage.mock.calls[0][0];
     expect(sent).toMatchObject({ phoneNumberId: "pn1", accessToken: "dec(tok)", to: "972501234567" });
     // The link is the point of the message — a receipt notification without it is worthless.

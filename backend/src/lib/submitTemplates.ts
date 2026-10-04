@@ -18,6 +18,11 @@ import {
   CAMPAIGN_OPT_OUT_BUTTON,
   CAMPAIGN_COUPON_FOOTER,
   CAMPAIGN_COUPON_CODE_EXAMPLE,
+  receiptTemplate,
+  RECEIPT_BODY,
+  RECEIPT_EXAMPLE,
+  RECEIPT_BUTTON_TEXT,
+  receiptLinkBase,
 } from "./whatsappTemplates.js";
 
 /**
@@ -50,6 +55,7 @@ export async function submitWhatsAppTemplates(
     const confirmation = confirmationTemplate();
     const ownerAlert = ownerAlertTemplate();
     const ownerAlertCta = ownerAlertCtaTemplate();
+    const receipt = receiptTemplate();
 
     // A zimmer has no "תור" and sells no "תספורת". Same template names and same variable order —
     // the sending code passes positional parameters and knows nothing about wording — but a guest
@@ -79,6 +85,15 @@ export async function submitWhatsAppTemplates(
         bodyText: OWNER_ALERT_CTA_BODY,
         bodyExample: OWNER_ALERT_CTA_EXAMPLE,
         urlButton: OWNER_ALERT_CTA_BUTTON,
+      }),
+      // The receipt, with a button to the document. UTILITY: it documents a payment the customer
+      // made, which is the textbook transactional message. See RECEIPT_BODY for why a template.
+      createMessageTemplate(wabaId, accessToken, {
+        name: receipt.name,
+        languageCode: receipt.languageCode,
+        bodyText: RECEIPT_BODY,
+        bodyExample: RECEIPT_EXAMPLE,
+        urlButton: { text: RECEIPT_BUTTON_TEXT, url: `${receiptLinkBase()}/r/{{1}}`, example: `${receiptLinkBase()}/r/clx0example000` },
       }),
       // The campaign library — see whatsappTemplates.ts. MARKETING by declaration, with the opt-out
       // as a reply button and again in the footer: the button is what people tap, the footer is

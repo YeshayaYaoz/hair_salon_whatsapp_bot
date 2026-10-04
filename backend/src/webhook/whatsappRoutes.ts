@@ -13,6 +13,8 @@ import { decryptSecret } from "../lib/crypto.js";
 import { hasActiveSubscription } from "../lib/subscriptionGate.js";
 import { rateLimit } from "../lib/rateLimit.js";
 import { prisma } from "../lib/prisma.js";
+import { checkManager } from "../bot/managerAuth.js";
+import { planHasBot } from "../lib/planFeatures.js";
 import { handleTemplateStatusUpdate } from "./templateStatus.js";
 import { handleOutreachReply, isOutreachNumber } from "../leadfinder/inboundReplies.js";
 import { Prisma } from "@prisma/client";
@@ -384,14 +386,17 @@ export async function processWhatsAppPayload(payload: any): Promise<void> {
     // Business-wide kill switch: the owner turned the bot off entirely (holiday, emergency, or
     // they want to answer manually today). Still persist the message so nothing is lost from the
     // transcript when they switch it back on.
-    if (!business.botEnabled) {
+    // The Receipts plan has no customer-facing bot at all; only the owner's manager line stays.
+    // Gated here rather than by botEnabled so switching plans does not silently flip that switch.
+    const planGated = !planHasBot(business.subscriptionPlan) && !(await checkManager(business.id, customerPhone)).isManager;
+    if (!business.botEnabled || planGated) {
       const preview =
         extracted.kind === "text" ? extracted.text
         : extracted.kind === "voiceNote" ? "[הודעה קולית]"
         : extracted.kind === "reset" ? "[בקשת איפוס שיחה]"
         : "[הודעה]";
       await appendTurn(business.id, customerPhone, { role: "user", content: preview });
-      console.log(`[bot] business ${business.id} has the bot disabled — staying silent`);
+      console.log(`[bot] business ${business.id} has the bot ${planGated ? "off on its plan" : "disabled"} — staying silent`);
       return;
     }
 

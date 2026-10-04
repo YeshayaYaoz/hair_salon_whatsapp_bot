@@ -26,6 +26,7 @@ import {
 } from "../lib/googleBusinessProfile.js";
 import { sendWhatsAppMessage, getWabaId, subscribeAppToWaba, registerPhoneNumber, getPhoneNumberStatus, getSubscribedApps, createMessageTemplate, setWhatsAppProfilePicture, type CreateTemplateResult } from "../webhook/whatsappClient.js";
 import { submitWhatsAppTemplates } from "../lib/submitTemplates.js";
+import { receiptsRouter } from "./receiptsRoutes.js";
 import { notifyWaitlist, waitlistOfferText } from "../lib/waitlist.js";
 import { AFFILIATE_PROVIDERS, AFFILIATE_KINDS, recordAffiliateClick, markAffiliateConversion } from "../lib/affiliates.js";
 import { normalizeOwnerPhone } from "../lib/phone.js";
@@ -57,6 +58,9 @@ businessRouter.use((req, res, next) => {
   if (req.path === "/me" || req.path === "/me/whatsapp" || req.path.startsWith("/admin/")) return next();
   requireActiveSubscription(req, res, next);
 });
+
+// Recurring charges, dues and receipts — see receiptsRoutes.ts. Behind the same auth as above.
+businessRouter.use(receiptsRouter);
 
 // --- Business profile + WhatsApp credentials ---
 
@@ -490,7 +494,7 @@ businessRouter.post("/admin/businesses/:id/whatsapp-token/extend", requireSuperA
 // create a PayPlus recurring token — it just marks the account as paid, same as a successful
 // charge would; the business's OWN recurring billing (if any) is untouched.
 const planSchema = z.object({
-  plan: z.enum(["standard", "premium", "ultra"]),
+  plan: z.enum(["receipts", "standard", "premium", "ultra"]),
   billingCycle: z.enum(["monthly", "annual"]).optional(),
   subscriptionStatus: z.enum(["trial", "active", "past_due", "canceled"]).optional(),
 });
@@ -1577,13 +1581,14 @@ businessRouter.post("/customers/:id/receipt", async (req: AuthedRequest, res) =>
 
   const customer = await prisma.customer.findFirst({
     where: { id: req.params.id, businessId: req.businessId! },
-    select: { name: true, phone: true },
+    select: { id: true, name: true, phone: true },
   });
   if (!customer) return res.status(404).json({ error: "Not found" });
 
   try {
     const receipt = await issueAndSendReceipt({
       businessId: req.businessId!,
+      customerId: customer.id,
       amountIls: parsed.data.amountIls,
       description: parsed.data.description,
       // Providers require a name on the document. A customer who has never given one still needs a
