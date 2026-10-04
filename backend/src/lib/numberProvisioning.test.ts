@@ -16,12 +16,16 @@ const getBalance = vi.fn();
 const listAvailableNumbers = vi.fn();
 const orderNumber = vi.fn();
 const pointNumberAtCartesia = vi.fn();
+class NumberOrderError extends Error {}
 vi.mock("./zadarmaAdmin.js", () => ({
   getBalance: (...a: unknown[]) => getBalance(...a),
   listAvailableNumbers: (...a: unknown[]) => listAvailableNumbers(...a),
   orderNumber: (...a: unknown[]) => orderNumber(...a),
   pointNumberAtCartesia: (...a: unknown[]) => pointNumberAtCartesia(...a),
+  NumberOrderError,
 }));
+// carrierCost pulls in the usage ledger, which opens Prisma at import time without this.
+vi.mock("./usageLedger.js", () => ({ USD_TO_ILS: 3.7 }));
 
 const { provisionVoiceNumber, mayOrderNumber, AlreadyHasNumberError } = await import("./numberProvisioning.js");
 
@@ -158,7 +162,51 @@ describe("provisionVoiceNumber", () => {
 
     await provisionVoiceNumber("b1", "972559661422");
 
-    expect(orderNumber).toHaveBeenCalledWith(expect.any(String), "972559661422");
+    expect(orderNumber).toHaveBeenCalledWith(expect.any(String), "972559661422", expect.anything());
+  });
+
+  /**
+   * Zadarma's three-month package: cheaper than three renewals and the thing that makes SMS
+   * possible on the line, so a new business starts on it whenever the balance can carry it.
+   */
+  describe("the three-month package", () => {
+    it("is what a new number is bought as, with SMS, when the balance can carry it", async () => {
+      mockPrisma.business.findUniqueOrThrow.mockResolvedValue(business());
+      getBalance.mockResolvedValue({ balance: 9, currency: "USD" });
+
+      await provisionVoiceNumber("b1");
+
+      expect(orderNumber).toHaveBeenCalledTimes(1);
+      expect(orderNumber).toHaveBeenCalledWith(expect.any(String), "972559661420", { months: 3, receiveSms: true });
+    });
+
+    it("gives way to a single month when the balance cannot carry it — a business is not kept waiting over a top-up", async () => {
+      mockPrisma.business.findUniqueOrThrow.mockResolvedValue(business());
+      getBalance.mockResolvedValue({ balance: 5, currency: "USD" });
+
+      await provisionVoiceNumber("b1");
+
+      expect(orderNumber).toHaveBeenCalledWith(expect.any(String), "972559661420");
+      expect(orderNumber.mock.calls[0]).toHaveLength(2);
+    });
+
+    it("is ordered again without SMS when the carrier rejects the SMS request", async () => {
+      mockPrisma.business.findUniqueOrThrow.mockResolvedValue(business());
+      orderNumber.mockRejectedValueOnce(new Error("Zadarma /v1/direct_numbers/order/ failed: documents required for receive_sms")).mockResolvedValueOnce("972559661420");
+
+      const result = await provisionVoiceNumber("b1");
+
+      expect(result.number).toBe("972559661420");
+      expect(orderNumber.mock.calls[1][2]).toEqual({ months: 3 });
+    });
+
+    it("is NOT retried when a number was already reserved — that would reserve a second one", async () => {
+      mockPrisma.business.findUniqueOrThrow.mockResolvedValue(business());
+      orderNumber.mockRejectedValueOnce(new NumberOrderError("reserved but not activated"));
+
+      await expect(provisionVoiceNumber("b1")).rejects.toThrow("reserved but not activated");
+      expect(orderNumber).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("falls back to an available number when the pick is already gone", async () => {
@@ -170,7 +218,7 @@ describe("provisionVoiceNumber", () => {
 
     await provisionVoiceNumber("b1", "972500000999");
 
-    expect(orderNumber).toHaveBeenCalledWith(expect.any(String), "972559661420");
+    expect(orderNumber).toHaveBeenCalledWith(expect.any(String), "972559661420", expect.anything());
   });
 
   it("tells the operator which number a trial asked for", async () => {
