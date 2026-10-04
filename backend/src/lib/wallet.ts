@@ -11,7 +11,8 @@ import { prisma } from "./prisma.js";
  * code change.
  */
 export const MESSAGE_QUOTA_BY_PLAN: Record<string, number> = {
-  receipts: 100,
+  // Small on purpose: ₪75 a month, and the plan sends from Tori's shared line.
+  receipts: 50,
   standard: 300,
   premium: 1000,
   ultra: 3000,

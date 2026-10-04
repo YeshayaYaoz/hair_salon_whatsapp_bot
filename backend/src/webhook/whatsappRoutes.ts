@@ -1,7 +1,8 @@
 import { asyncRouter } from "../lib/asyncRouter.js";
 import express from "express";
 import crypto from "crypto";
-import { resolveBusinessByPhoneNumberId } from "../tenants/resolve.js";
+import { resolveBusinessByPhoneNumberId, resolveBusinessBySender, resolveSharedCustomerBusiness } from "../tenants/resolve.js";
+import { isSharedNumber, sendingIdentity, sharedIdentity } from "../lib/sendingIdentity.js";
 import { sendWhatsAppMessage, sendWhatsAppList, sendWhatsAppImage, sendWhatsAppCtaUrl, sendWhatsAppButtons, WhatsAppAuthError, type ListRow } from "./whatsappClient.js";
 import { sendWhatsAppTokenExpiredEmail } from "../lib/email.js";
 import { handleIncomingMessage } from "../bot/claudeBot.js";
@@ -307,20 +308,51 @@ export async function processWhatsAppPayload(payload: any): Promise<void> {
     const extracted = extractMessage(message);
     if (extracted.kind === "ignore") return;
 
-    // Replies to Tori's own cold-outreach number, which no Business row owns — without this they
-    // fall through to the "no business configured" warning below and are lost.
-    if (isOutreachNumber(phoneNumberId)) {
-      // Raw body rather than `extracted`, which classifies bot keywords a prospect never meant:
-      // a lead whose reply happens to be a reset keyword would otherwise arrive as "(לא טקסט)".
-      const replyText =
-        (message.text?.body as string | undefined)?.trim() ||
-        (extracted.kind === "text" ? extracted.text : "(הודעה שאינה טקסט)");
-      await handleOutreachReply(message.from as string, replyText);
-      return;
+    // Tori's own line. Three kinds of sender share it, told apart by who is writing, since the
+    // receiving number is the same for all of them:
+    //   1. The owner of a business with no number of its own (Receipts plan, or a trial that has
+    //      not connected) — runs their business from here exactly as from their own line.
+    //   2. A customer of such a business, replying to a receipt — gets one line saying who sent
+    //      it, and their opt-out is honoured. There is no bot for them on this line, by design:
+    //      one business's spam reports would cost every business the line.
+    //   3. A prospect answering cold outreach — handled by the lead finder, as before.
+    let sharedOwner: Awaited<ReturnType<typeof resolveBusinessBySender>> | null = null;
+    if (isOutreachNumber(phoneNumberId) || isSharedNumber(phoneNumberId)) {
+      sharedOwner = await resolveBusinessBySender(message.from as string);
+      if (!sharedOwner) {
+        const viaBusiness = await resolveSharedCustomerBusiness(message.from as string);
+        const shared = sharedIdentity();
+        if (viaBusiness && shared) {
+          if (extracted.kind === "optOut") {
+            await prisma.customer.updateMany({
+              where: { businessId: viaBusiness.id, phone: message.from as string },
+              data: { marketingOptOutAt: new Date() },
+            });
+          }
+          await sendWhatsAppMessage({
+            phoneNumberId: shared.phoneNumberId,
+            accessToken: shared.accessToken,
+            to: message.from as string,
+            text:
+              extracted.kind === "optOut"
+                ? `הוסרת מרשימת התפוצה של ${viaBusiness.name}. קבלות על תשלומים שלך ימשיכו להגיע.`
+                : `ההודעה שקיבלת נשלחה בשם ${viaBusiness.name} דרך תורי. המספר הזה לא מקבל הודעות — לפניות, פנו ישירות ל${viaBusiness.name}.`,
+          }).catch((err) => console.error("[webhook] Shared-line customer reply failed (non-fatal):", err));
+          return;
+        }
+        // Raw body rather than `extracted`, which classifies bot keywords a prospect never meant:
+        // a lead whose reply happens to be a reset keyword would otherwise arrive as "(לא טקסט)".
+        const replyText =
+          (message.text?.body as string | undefined)?.trim() ||
+          (extracted.kind === "text" ? extracted.text : "(הודעה שאינה טקסט)");
+        await handleOutreachReply(message.from as string, replyText);
+        return;
+      }
     }
 
-    const business = await resolveBusinessByPhoneNumberId(phoneNumberId);
-    if (!business?.whatsappAccessToken) {
+    const business = sharedOwner ?? (await resolveBusinessByPhoneNumberId(phoneNumberId));
+    const identity = business ? sendingIdentity(business) : null;
+    if (!business || !identity) {
       console.warn(`No business configured for phone_number_id ${phoneNumberId}`);
       return;
     }
@@ -330,7 +362,7 @@ export async function processWhatsAppPayload(payload: any): Promise<void> {
     }
 
     customerPhone = message.from as string;
-    accessToken = decryptSecret(business.whatsappAccessToken);
+    accessToken = identity.accessToken;
     businessRef = { id: business.id, name: business.name, email: business.email };
 
     // Register anyone who writes in as a customer, before doing anything else with the message.
@@ -372,7 +404,7 @@ export async function processWhatsAppPayload(payload: any): Promise<void> {
     // (see yieldCampaignJob.ts) is handled here, before any of this routes to the customer bot.
     if (business.pendingYieldCampaign && business.notificationPhone && customerPhone === business.notificationPhone && extracted.kind === "text") {
       await handleYieldCampaignReply(
-        { ...business, notificationPhone: business.notificationPhone, whatsappPhoneNumberId: phoneNumberId, whatsappAccessToken: business.whatsappAccessToken },
+        { ...business, notificationPhone: business.notificationPhone, whatsappPhoneNumberId: phoneNumberId, whatsappAccessToken: business.whatsappAccessToken ?? accessToken },
         phoneNumberId,
         accessToken,
         extracted.text

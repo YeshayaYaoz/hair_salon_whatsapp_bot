@@ -1,5 +1,5 @@
 import { prisma } from "./prisma.js";
-import { decryptSecret } from "./crypto.js";
+import { sendingIdentity } from "./sendingIdentity.js";
 import { getInvoiceProvider, resolveInvoiceCredentials } from "./invoices/index.js";
 import { sendWhatsAppMessage, sendWhatsAppTemplate, RE_ENGAGEMENT_ERROR_CODE, WhatsAppSendError } from "../webhook/whatsappClient.js";
 import { captureError } from "./errorMonitoring.js";
@@ -72,11 +72,12 @@ export async function deliverReceipt(params: {
   description: string;
 }): Promise<DeliveryOutcome> {
   const { business, customerPhone, documentUrl, amountIls, description } = params;
-  if (!customerPhone || !business.whatsappPhoneNumberId || !business.whatsappAccessToken) {
+  // The business's own line, or Tori's for a business without one (see sendingIdentity).
+  const identity = sendingIdentity(business);
+  if (!customerPhone || !identity) {
     return "no_whatsapp";
   }
-  const accessToken = decryptSecret(business.whatsappAccessToken);
-  const common = { phoneNumberId: business.whatsappPhoneNumberId, accessToken, to: customerPhone, kind: "receipt" as const };
+  const common = { phoneNumberId: identity.phoneNumberId, accessToken: identity.accessToken, to: customerPhone, kind: "receipt" as const };
 
   try {
     await sendWhatsAppMessage({ ...common, text: `קבלה על ${description} — ₪${fmtIls(amountIls)}\nמ${business.name}\n\n${documentUrl}` });

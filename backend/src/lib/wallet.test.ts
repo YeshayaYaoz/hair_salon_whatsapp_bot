@@ -141,7 +141,7 @@ describe("a wallet that cannot cover the send", () => {
  */
 describe("the published quotas", () => {
   it("are the ones the pricing page promises", () => {
-    expect(MESSAGE_QUOTA_BY_PLAN).toEqual({ receipts: 100, standard: 300, premium: 1000, ultra: 3000 });
+    expect(MESSAGE_QUOTA_BY_PLAN).toEqual({ receipts: 50, standard: 300, premium: 1000, ultra: 3000 });
   });
 
   it("charge ₪0.30 per message beyond them", () => {

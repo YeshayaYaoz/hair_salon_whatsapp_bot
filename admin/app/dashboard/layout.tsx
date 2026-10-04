@@ -22,6 +22,9 @@ type NavItem = {
   key: keyof ReturnType<typeof useLanguage>["t"]["nav"];
   icon: string;
   hideFor?: string[];
+  // Plans where this destination is meaningless. The Receipts plan never connects a number and
+  // has no customer bot, so "WhatsApp" and "Bot settings" would be two pages that do nothing.
+  hideForPlan?: string[];
 };
 
 const ICONS = {
@@ -75,10 +78,10 @@ const NAV_GROUPS: { titleKey: keyof ReturnType<typeof useLanguage>["t"]["navGrou
     { href: "/dashboard/faq", key: "faq", icon: ICONS.faq },
     { href: "/dashboard/coupons", key: "coupons", icon: ICONS.coupons },
     { href: "/dashboard/receipts", key: "receipts", icon: ICONS.receipts },
-    { href: "/dashboard/bot", key: "bot", icon: ICONS.bot },
+    { href: "/dashboard/bot", key: "bot", icon: ICONS.bot, hideForPlan: ["receipts"] },
   ] },
   { titleKey: "account", items: [
-    { href: "/dashboard/whatsapp", key: "whatsapp", icon: ICONS.whatsapp },
+    { href: "/dashboard/whatsapp", key: "whatsapp", icon: ICONS.whatsapp, hideForPlan: ["receipts"] },
     { href: "/dashboard/payments", key: "payments", icon: ICONS.payments },
     { href: "/dashboard/settings", key: "settings", icon: ICONS.settings },
     { href: "/dashboard/billing", key: "billing", icon: ICONS.billing },
@@ -90,7 +93,9 @@ const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 // Not exported: Next.js allows a layout module to export only its own known names (default,
 // metadata, revalidate, …), and any extra export fails `tsc` against the generated .next/types —
 // which broke `npm run typecheck` and `next build`. Nothing outside this file uses it.
+let currentPlan: string | null = null;
 function isVisibleFor(item: NavItem, businessType: string | null): boolean {
+  if (item.hideForPlan && currentPlan && item.hideForPlan.includes(currentPlan)) return false;
   return !item.hideFor || !businessType || !item.hideFor.includes(businessType);
 }
 
@@ -382,8 +387,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   // Single source of truth for the /me lookup — TrialBanner, the sidebar, and the mobile "More"
   // sheet all need bits of it, so fetch once here and pass down instead of three separate calls.
   useEffect(() => {
-    apiFetch<{ isSuperAdmin?: boolean; subscriptionStatus: string; createdAt: string; businessTypeChosenAt?: string | null; notificationPhone?: string | null }>("/api/business/me")
+    apiFetch<{ isSuperAdmin?: boolean; subscriptionStatus: string; subscriptionPlan?: string | null; createdAt: string; businessTypeChosenAt?: string | null; notificationPhone?: string | null }>("/api/business/me")
       .then((me) => {
+        currentPlan = me.subscriptionPlan ?? null;
         setIsSuperAdmin(Boolean(me.isSuperAdmin));
         setManagerPhoneSet(Boolean(me.notificationPhone?.trim()));
         setTrial({ status: me.subscriptionStatus, createdAt: me.createdAt });

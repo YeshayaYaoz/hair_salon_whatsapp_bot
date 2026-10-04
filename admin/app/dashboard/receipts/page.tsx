@@ -102,6 +102,11 @@ export default function ReceiptsPage() {
             ? "חיובים חודשיים קבועים ללקוחות. בכל חודש תורי מזכירה מי צריך לשלם; כשהכסף נכנס מאשרים כאן או בוואטסאפ, והקבלה מופקת ונשלחת ללקוח."
             : "Fixed monthly charges. Each month Tori reminds you who is due; when the money comes in you confirm here or on WhatsApp, and the receipt is issued and sent."}
         </p>
+        <p className="text-gray-500 text-xs mt-2">
+          {he
+            ? "לא חיברתם מספר וואטסאפ משלכם? הקבלות נשלחות מהמספר של תורי, עם שם העסק שלכם בהודעה. את העסק מנהלים מהמספר שהגדרתם בהגדרות, בשיחה עם תורי."
+            : "No WhatsApp number of your own? Receipts go out from Tori's number with your business name in the message. You run the business from the phone set in Settings, by chatting with Tori."}
+        </p>
       </div>
 
       <div className="flex gap-1 mb-5 border-b border-gray-200" role="tablist">

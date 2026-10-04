@@ -24,7 +24,7 @@ const fmtIls = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
 const ANNUAL_MONTHS_CHARGED = 10;
 
 // Must match MESSAGE_QUOTA_BY_PLAN in backend/src/lib/wallet.ts — display-only, not authoritative.
-const MESSAGE_QUOTA_BY_PLAN: Record<PlanKey, number> = { receipts: 100, standard: 300, premium: 1000, ultra: 3000 };
+const MESSAGE_QUOTA_BY_PLAN: Record<PlanKey, number> = { receipts: 50, standard: 300, premium: 1000, ultra: 3000 };
 
 // Features shared by both plans — everything below is what actually differs, so the comparison
 // is honest about what a Premium upgrade buys today rather than padding the list.
@@ -55,7 +55,8 @@ const PLAN_FEATURES: Record<PlanKey, { he: string[]; en: string[] }> = {
       "אישרתם שהכסף נכנס? הקבלה מופקת ונשלחת ללקוח מיד",
       "ייבוא רשימת לקוחות מאקסל",
       "עובד עם חשבונית ירוקה, iCount, YPay או PayPlus",
-      "עד 100 הודעות בחודש",
+      "ההודעות נשלחות מהמספר של תורי, בשם העסק שלכם — בלי לחבר וואטסאפ",
+      "עד 50 הודעות בחודש",
       "ללא בוט ללקוחות — רק קבלות",
     ],
     en: [
@@ -64,7 +65,8 @@ const PLAN_FEATURES: Record<PlanKey, { he: string[]; en: string[] }> = {
       "Confirm the money came in and the receipt is issued and sent at once",
       "Import your customer list from Excel",
       "Works with Green Invoice, iCount, YPay or PayPlus",
-      "Up to 100 messages a month",
+      "Sent from Tori's number in your business's name — no WhatsApp to connect",
+      "Up to 50 messages a month",
       "No customer bot — receipts only",
     ],
   },

@@ -65,7 +65,7 @@ beforeEach(async () => {
   app.use("/webhook/whatsapp", whatsappRouter);
   resolveBusinessByPhoneNumberId.mockResolvedValue({
     id: "b1", name: "מספרת רונית", email: "o@x.com",
-    whatsappAccessToken: "tok", notificationPhone: "972509999999", pendingYieldCampaign: null, botEnabled: true,
+    whatsappPhoneNumberId: "pn1", whatsappAccessToken: "tok", notificationPhone: "972509999999", pendingYieldCampaign: null, botEnabled: true,
   });
   mockPrisma.customer.upsert.mockResolvedValue({});
   mockPrisma.customer.updateMany.mockResolvedValue({ count: 1 });

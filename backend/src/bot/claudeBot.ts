@@ -8,6 +8,7 @@ import { cancelAppointmentById } from "../booking/actions.js";
 import { normalizeOwnerPhone } from "../lib/phone.js";
 import { sendWhatsAppMessage } from "../webhook/whatsappClient.js";
 import { decryptSecret } from "../lib/crypto.js";
+import { sendingIdentity } from "../lib/sendingIdentity.js";
 import { checkManager } from "./managerAuth.js";
 import {
   daySchedule, businessSummary, blockTime, notifyCustomerOfCancellation, dayBounds, todayIn, BlockOverlapError,
@@ -1173,17 +1174,20 @@ export async function runTool(
 
     const biz = await prisma.business.findUniqueOrThrow({
       where: { id: businessId },
-      select: { whatsappPhoneNumberId: true, whatsappAccessToken: true },
+      select: { name: true, whatsappPhoneNumberId: true, whatsappAccessToken: true },
     });
-    if (!biz.whatsappPhoneNumberId || !biz.whatsappAccessToken) {
+    const identity = sendingIdentity(biz);
+    if (!identity) {
       return JSON.stringify({ error: "WhatsApp is not connected, so nothing can be sent." });
     }
     try {
       await sendWhatsAppMessage({
-        phoneNumberId: biz.whatsappPhoneNumberId,
-        accessToken: decryptSecret(biz.whatsappAccessToken),
+        phoneNumberId: identity.phoneNumberId,
+        accessToken: identity.accessToken,
         to: target.phone,
-        text,
+        // From Tori's line the customer sees "תורי-אונליין" as the sender, so the business has to
+        // be named in the text — otherwise "I'm running fifteen minutes late" arrives from nobody.
+        text: identity.shared ? `הודעה מ${biz.name}:\n${text}` : text,
       });
       return JSON.stringify({ sent: true, to: target.name ?? target.phone });
     } catch (err) {

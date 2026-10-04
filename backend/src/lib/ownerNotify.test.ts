@@ -130,3 +130,23 @@ describe("notifyOwner", () => {
     expect(await notifyOwner("biz1", "הודעה")).toBe(false);
   });
 });
+
+describe("a business without a number of its own", () => {
+  it("is alerted from Tori's line rather than skipped", async () => {
+    process.env.TORI_OUTREACH_PHONE_NUMBER_ID = "tori-line";
+    process.env.TORI_OUTREACH_ACCESS_TOKEN = "tori-token";
+    mockPrisma.business.findUnique.mockResolvedValue({
+      name: "סטודיו רונית", email: "r@x.com", notificationPhone: "972501111111", notificationPhoneVerifiedAt: null,
+      whatsappPhoneNumberId: null, whatsappAccessToken: null,
+    });
+    mockPrisma.conversationMessage.findFirst.mockResolvedValue({ id: "m1" }); // window open
+    mockPrisma.business.update.mockResolvedValue({});
+
+    const ok = await notifyOwner("b1", "היום 3 חיובים");
+
+    expect(ok).toBe(true);
+    expect(sendWhatsAppMessage.mock.calls[0][0]).toMatchObject({ phoneNumberId: "tori-line", accessToken: "tori-token", to: "972501111111" });
+    delete process.env.TORI_OUTREACH_PHONE_NUMBER_ID;
+    delete process.env.TORI_OUTREACH_ACCESS_TOKEN;
+  });
+});

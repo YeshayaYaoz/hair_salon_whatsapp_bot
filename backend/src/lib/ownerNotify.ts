@@ -1,5 +1,5 @@
 import { prisma } from "./prisma.js";
-import { decryptSecret } from "./crypto.js";
+import { sendingIdentity } from "./sendingIdentity.js";
 import { normalizePhone } from "./phone.js";
 import { sendWhatsAppMessage, sendWhatsAppTemplate } from "../webhook/whatsappClient.js";
 import { sendBusinessNoticeEmail } from "./email.js";
@@ -48,11 +48,15 @@ export async function notifyOwner(businessId: string, message: string): Promise<
         whatsappAccessToken: true,
       },
     });
-    if (!business?.notificationPhone || !business.whatsappPhoneNumberId || !business.whatsappAccessToken) {
-      console.warn(`[notifyOwner] business ${businessId} has no notificationPhone configured — skipping`);
+    const identity = business ? sendingIdentity(business) : null;
+    if (!business?.notificationPhone || !identity) {
+      console.warn(`[notifyOwner] business ${businessId} has no notificationPhone or no line to send from — skipping`);
       return false;
     }
-    const accessToken = decryptSecret(business.whatsappAccessToken);
+    // From the business's own number, or from Tori's line for a business that has none — the
+    // Receipts plan, or a trial that has not connected. Tori's line holds every template, so the
+    // ladder below works the same from either.
+    const { phoneNumberId, accessToken } = identity;
 
     const lastInbound = await prisma.conversationMessage.findFirst({
       where: {
@@ -75,7 +79,7 @@ export async function notifyOwner(businessId: string, message: string): Promise<
       // mail never left — and the logs said nothing at all about which.
       console.log(`[notifyOwner] ${businessId}: free-form WhatsApp to ${business.notificationPhone} (window open)`);
       await sendWhatsAppMessage({
-        phoneNumberId: business.whatsappPhoneNumberId, accessToken,
+        phoneNumberId, accessToken,
         to: business.notificationPhone, text: message,
       });
     } else {
@@ -90,7 +94,7 @@ export async function notifyOwner(businessId: string, message: string): Promise<
       try {
         console.log(`[notifyOwner] ${businessId}: template '${template.name}' to ${business.notificationPhone} (window closed)`);
         await sendWhatsAppTemplate({
-          phoneNumberId: business.whatsappPhoneNumberId, accessToken,
+          phoneNumberId, accessToken,
           to: business.notificationPhone,
           templateName: template.name,
           languageCode: template.languageCode,
@@ -102,7 +106,7 @@ export async function notifyOwner(businessId: string, message: string): Promise<
             `[notifyOwner] ${businessId}: '${template.name}' failed (${ctaErr instanceof Error ? ctaErr.message : ctaErr}) — trying '${fallbackTemplate.name}'`
           );
           await sendWhatsAppTemplate({
-            phoneNumberId: business.whatsappPhoneNumberId, accessToken,
+            phoneNumberId, accessToken,
             to: business.notificationPhone,
             templateName: fallbackTemplate.name,
             languageCode: fallbackTemplate.languageCode,

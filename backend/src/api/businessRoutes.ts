@@ -26,6 +26,8 @@ import {
 } from "../lib/googleBusinessProfile.js";
 import { sendWhatsAppMessage, getWabaId, subscribeAppToWaba, registerPhoneNumber, getPhoneNumberStatus, getSubscribedApps, createMessageTemplate, setWhatsAppProfilePicture, type CreateTemplateResult } from "../webhook/whatsappClient.js";
 import { submitWhatsAppTemplates } from "../lib/submitTemplates.js";
+import { sendingIdentity } from "../lib/sendingIdentity.js";
+import { planHasBot } from "../lib/planFeatures.js";
 import { receiptsRouter } from "./receiptsRoutes.js";
 import { notifyWaitlist, waitlistOfferText } from "../lib/waitlist.js";
 import { AFFILIATE_PROVIDERS, AFFILIATE_KINDS, recordAffiliateClick, markAffiliateConversion } from "../lib/affiliates.js";
@@ -977,7 +979,10 @@ businessRouter.get("/me/setup-status", async (req: AuthedRequest, res) => {
 
   const steps = [
     { key: "category", done: Boolean(business.businessTypeChosenAt), critical: false },
-    { key: "whatsapp", done: Boolean(business.whatsappAccessToken) && business.whatsappTokenValid, critical: true },
+    // Not asked of the Receipts plan: it sends from Tori's line and never connects a number.
+    ...(planHasBot(business.subscriptionPlan)
+      ? [{ key: "whatsapp", done: Boolean(business.whatsappAccessToken) && business.whatsappTokenValid, critical: true }]
+      : []),
     // Proven, not merely present. A number that was typed but never reached is the exact failure
     // this step exists to prevent, and "non-empty" cannot tell the two apart. Businesses whose
     // number already works are marked verified by their next ordinary alert (see notifyOwner), so
@@ -1022,7 +1027,10 @@ businessRouter.post("/me/whatsapp/test-message", async (req: AuthedRequest, res)
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! } });
-  if (!business.whatsappPhoneNumberId || !business.whatsappAccessToken) {
+  // A business without a number of its own sends from Tori's line — and this test is then how its
+  // owner proves their manager number, which is what lets them run the business from WhatsApp.
+  const identity = sendingIdentity(business);
+  if (!identity) {
     return res.status(400).json({ error: "Connect a WhatsApp number first" });
   }
   const to = parsed.data.to?.trim() || business.notificationPhone?.trim();
@@ -1030,10 +1038,12 @@ businessRouter.post("/me/whatsapp/test-message", async (req: AuthedRequest, res)
 
   try {
     await sendWhatsAppMessage({
-      phoneNumberId: business.whatsappPhoneNumberId,
-      accessToken: decryptSecret(business.whatsappAccessToken),
+      phoneNumberId: identity.phoneNumberId,
+      accessToken: identity.accessToken,
       to,
-      text: `✅ בדיקה מתורי — החיבור לוואטסאפ של "${business.name}" עובד. אם קיבלת את ההודעה הזו, שליחת ההודעות מוגדרת כמו שצריך.`,
+      text: identity.shared
+        ? `✅ המספר שלך מחובר לתורי עבור "${business.name}". מכאן אפשר לנהל את העסק: כתבו לי למשל "מה אני יכול לעשות?"`
+        : `✅ בדיקה מתורי — החיבור לוואטסאפ של "${business.name}" עובד. אם קיבלת את ההודעה הזו, שליחת ההודעות מוגדרת כמו שצריך.`,
     });
 
     // If the test went to the notification phone, it just proved the thing the setup checklist is
