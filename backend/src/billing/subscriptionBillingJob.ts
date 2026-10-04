@@ -5,6 +5,7 @@ import { notifyOwner } from "../lib/ownerNotify.js";
 import { sendAdminAlertEmail } from "../lib/email.js";
 import { subscriptionChargeIls } from "./subscriptionAmount.js";
 import { fmtIls } from "../lib/money.js";
+import { NUMBER_GRACE_DAYS } from "../lib/numberGrace.js";
 import { claimChargeForPeriod, recordChargeOutcome, periodKeyFor } from "./chargeLedger.js";
 import {
   chargeSubscriptionToken,
@@ -96,6 +97,7 @@ export async function runSubscriptionBillingJob(): Promise<void> {
       couponDiscountIls: true, couponCyclesRemaining: true,
       billingFailedAttempts: true,
       nextBillingDate: true,
+      voiceNumberOrderedAt: true,
       notificationPhone: true, whatsappPhoneNumberId: true, whatsappAccessToken: true,
     },
   });
@@ -206,6 +208,7 @@ export async function runSubscriptionBillingJob(): Promise<void> {
           lastBillingAttemptAt: now,
           billingCyclesCompleted: cyclesCompleted,
           billingFailedAttempts: 0, // paid — any dunning run in progress is over
+          subscriptionLapsedAt: null, // paying again, if they ever stopped
           messagesUsedThisCycle: 0, // new cycle paid for — reset the plan's message quota
           // Applied only alongside a charge that actually collected. On a decline the business
           // keeps the plan it has and the instruction stays armed for the retry — dropping them a
@@ -250,7 +253,8 @@ export async function runSubscriptionBillingJob(): Promise<void> {
           billingFailedAttempts: attempts,
           lastBillingAttemptAt: now,
           ...(givingUp
-            ? { subscriptionStatus: "past_due" }
+            ? // The phone number's grace month counts from here — see voiceNumberRenewal.ts.
+              { subscriptionStatus: "past_due", subscriptionLapsedAt: now }
             : // Re-armed for the retry day. Left as-is on the final failure: past_due is terminal
               // until the owner acts, and a due date in the past would keep re-charging them.
               { nextBillingDate: new Date(now.getTime() + retryInDays * DAY_MS) }),
@@ -265,15 +269,22 @@ export async function runSubscriptionBillingJob(): Promise<void> {
       // the owner would go looking at their bank for a decline that never happened. Say what is
       // actually missing, and ask for the one thing that fixes it.
       const noCard = !token;
+      // A business with a number Tori bought for it is about to learn the bot stopped; the next
+      // question is whether the number is gone too. It is not, for a month (voiceNumberRenewal.ts),
+      // and saying so here is what makes coming back feel safe rather than like starting over.
+      const holdNote = givingUp && business.voiceNumberOrderedAt
+        ? ` המספר והוואטסאפ שלכם נשמרים ${NUMBER_GRACE_DAYS} יום — חידוש עד אז מחזיר הכול כמו שהיה.`
+        : "";
       await notifyOwnerOfBilling(
         business.id,
-        noCard
+        (noCard
           ? givingUp
             ? `⚠️ אין אמצעי תשלום שמור לתורי, והחיוב של ₪${fmtIls(amountIls)} לא נגבה — הבוט נעצר. להוספת כרטיס והפעלה מחדש: ${FRONTEND_URL}/dashboard/billing`
             : `⚠️ אין אמצעי תשלום שמור לתורי, כך שהחיוב של ₪${fmtIls(amountIls)} לא נגבה. הבוט ממשיך לעבוד כרגיל — נבדוק שוב בעוד ${retryInDays} ימים. להוספת כרטיס: ${FRONTEND_URL}/dashboard/billing`
           : givingUp
             ? `⚠️ החיוב עבור תורי (₪${fmtIls(amountIls)}) נכשל שוב והבוט נעצר. כדי להפעיל מחדש, עדכנו אמצעי תשלום: ${FRONTEND_URL}/dashboard/billing`
-            : `⚠️ החיוב עבור תורי (₪${fmtIls(amountIls)}) לא עבר. הבוט ממשיך לעבוד כרגיל — ננסה שוב בעוד ${retryInDays} ימים. אם תרצו, אפשר לעדכן אמצעי תשלום כבר עכשיו: ${FRONTEND_URL}/dashboard/billing`
+            : `⚠️ החיוב עבור תורי (₪${fmtIls(amountIls)}) לא עבר. הבוט ממשיך לעבוד כרגיל — ננסה שוב בעוד ${retryInDays} ימים. אם תרצו, אפשר לעדכן אמצעי תשלום כבר עכשיו: ${FRONTEND_URL}/dashboard/billing`) +
+          holdNote
       );
       // Only worth waking the operator when the account has actually stopped. The intermediate
       // retries are routine and would just train us to ignore the alert.

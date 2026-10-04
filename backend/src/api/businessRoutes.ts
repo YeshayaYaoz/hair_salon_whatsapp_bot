@@ -11,7 +11,8 @@ import { assignNumberToAgent, listHebrewVoices, CartesiaNotConfiguredError } fro
 import { captureError } from "../lib/errorMonitoring.js";
 import { syncWhatsAppProfileInBackground } from "../lib/whatsappProfile.js";
 import { pointNumberAtCartesia, ZadarmaNotConfiguredError } from "../lib/zadarmaAdmin.js";
-import { provisionVoiceNumber, listNumberChoices, AlreadyHasNumberError } from "../lib/numberProvisioning.js";
+import { provisionVoiceNumber, listNumberChoices, AlreadyHasNumberError, mayOrderNumber } from "../lib/numberProvisioning.js";
+import { numberHeldUntil } from "../lib/numberGrace.js";
 import { startWhatsAppAutoSetup } from "../lib/whatsappAutoSetup.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import { requireActiveSubscription } from "../lib/subscriptionGate.js";
@@ -86,6 +87,13 @@ businessRouter.get("/me", async (req: AuthedRequest, res) => {
           ? true
           : Boolean(invoiceApiKey),
     isSuperAdmin: isSuperAdminEmail(business.email),
+    // For a business that stopped paying: the day its number is released unless it renews. One
+    // computed date rather than a status and a constant for the client to add up — the rule lives
+    // in lib/numberGrace and the dashboard only shows it.
+    voiceNumberHeldUntil:
+      business.voicePhoneNumber && business.subscriptionLapsedAt && !mayOrderNumber(business)
+        ? numberHeldUntil(business.subscriptionLapsedAt)
+        : null,
   });
   // (whatsappTokenValid is included in ...safe)
 });
@@ -489,13 +497,18 @@ const planSchema = z.object({
 businessRouter.post("/admin/businesses/:id/plan", requireSuperAdmin, async (req: AuthedRequest, res) => {
   const parsed = planSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const before = await prisma.business.findUnique({ where: { id: req.params.id }, select: { subscriptionPlan: true, subscriptionStatus: true } });
+  const before = await prisma.business.findUnique({ where: { id: req.params.id }, select: { subscriptionPlan: true, subscriptionStatus: true, subscriptionLapsedAt: true } });
+  const status = parsed.data.subscriptionStatus ?? "active";
+  const lapsing = status === "past_due" || status === "canceled";
   const business = await prisma.business.update({
     where: { id: req.params.id },
     data: {
       subscriptionPlan: parsed.data.plan,
       ...(parsed.data.billingCycle ? { billingCycle: parsed.data.billingCycle } : {}),
-      subscriptionStatus: parsed.data.subscriptionStatus ?? "active",
+      subscriptionStatus: status,
+      // The phone number's grace month runs from the first time the business stopped paying, so a
+      // lapse date already on the row stands; a return to active clears it (voiceNumberRenewal.ts).
+      subscriptionLapsedAt: lapsing ? (before?.subscriptionLapsedAt ?? new Date()) : null,
     },
   });
   await logAdminAction({

@@ -193,15 +193,18 @@ function VoicePhoneSection() {
   // What the carrier last said about when this number is paid through — copied down daily by the
   // renewal job, so this is a read of our own row, not a live carrier call.
   const [paidThrough, setPaidThrough] = useState<string | null>(null);
+  // Set only for a business that stopped paying: the day the number is released unless it renews.
+  const [heldUntil, setHeldUntil] = useState<string | null>(null);
   const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    apiFetch<{ voicePhoneNumber?: string | null; voiceNumberStopDate?: string | null }>("/api/business/me").then((me) => {
+    apiFetch<{ voicePhoneNumber?: string | null; voiceNumberStopDate?: string | null; voiceNumberHeldUntil?: string | null }>("/api/business/me").then((me) => {
       setCurrent(me.voicePhoneNumber ?? null);
       setValue(me.voicePhoneNumber ?? "");
       setPaidThrough(me.voiceNumberStopDate ?? null);
+      setHeldUntil(me.voiceNumberHeldUntil ?? null);
     }).catch((err) => {
       // The skeleton is a promise that content is coming. When the load failed it never is, and
       // the error line below the section is the honest replacement.
@@ -267,7 +270,16 @@ function VoicePhoneSection() {
           ? "מספר הטלפון שאליו שיחות נכנסות ייענו ע\"י הבוט הקולי. מתמלא אוטומטית עם מספר הוואטסאפ שלך בעת החיבור — ניתן לשנות ידנית אם יש לך מספר קולי נפרד."
           : "The phone number incoming calls to are answered by the voice bot. Auto-filled with your WhatsApp number once connected — change it manually if you use a separate voice line."}
       </p>
-      {current && paidThrough && (
+      {current && heldUntil ? (
+        // The subscription has lapsed. What the owner needs is not the carrier's paid-through date
+        // but the one that is theirs to act on: the day the number goes, and the fact that renewing
+        // before it keeps everything — number, WhatsApp, bot — exactly as it is.
+        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 -mt-2 mb-4">
+          {he
+            ? `המנוי לא פעיל, אבל המספר שמור לכם עד ${new Date(heldUntil).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem", day: "numeric", month: "long", year: "numeric" })}. חידוש המנוי עד אז משאיר את המספר, הוואטסאפ והבוט בדיוק כפי שהם. אחרי התאריך הזה המספר משתחרר ולא ניתן לקבל אותו בחזרה.`
+            : `Your subscription is inactive, but the number is held for you until ${new Date(heldUntil).toLocaleDateString("en-GB", { timeZone: "Asia/Jerusalem", day: "numeric", month: "long", year: "numeric" })}. Renew by then and the number, WhatsApp and bot stay exactly as they are. After that date the number is released and cannot be recovered.`}
+        </p>
+      ) : current && paidThrough && (
         // The one thing an owner would otherwise have no way to know: the line is a monthly rental,
         // and this is the date it is paid through. Renewal is automatic while the subscription is
         // active, so the sentence says so — the date is reassurance, not a to-do.

@@ -5,6 +5,8 @@ const mockPrisma = { business: { findMany: vi.fn(), update: vi.fn() } };
 vi.mock("./prisma.js", () => ({ prisma: mockPrisma }));
 const sendAdminAlertEmail = vi.fn();
 vi.mock("./email.js", () => ({ sendAdminAlertEmail: (...a: unknown[]) => sendAdminAlertEmail(...a) }));
+const notifyOwner = vi.fn();
+vi.mock("./ownerNotify.js", () => ({ notifyOwner: (...a: unknown[]) => notifyOwner(...a) }));
 const carrier = { listNumbers: vi.fn(), getBalance: vi.fn(), setAutoprolongation: vi.fn(), prolongNumber: vi.fn() };
 vi.mock("./zadarmaAdmin.js", async () => {
   const actual = await vi.importActual<typeof import("./zadarmaAdmin.js")>("./zadarmaAdmin.js");
@@ -18,6 +20,7 @@ vi.mock("./zadarmaAdmin.js", async () => {
 });
 
 const { planVoiceNumberRenewal, runVoiceNumberRenewalJob, RENEW_AHEAD_DAYS } = await import("./voiceNumberRenewal.js");
+const { NUMBER_GRACE_DAYS } = await import("./numberGrace.js");
 
 const NOW = new Date("2026-09-16T09:00:00Z");
 const DAY = 86_400_000;
@@ -28,10 +31,14 @@ const num = (over: Partial<ZadarmaNumber> = {}): ZadarmaNumber => ({
   monthlyFee: 3, currency: "USD", autorenew: true, isOnTest: false, ...over,
 });
 const biz = (over: Record<string, unknown> = {}) => ({
-  id: "b1", name: "מספרת רונית", voicePhoneNumber: "+972559000001",
-  subscriptionStatus: "active", blockedAt: null, ...over,
+  id: "b1", name: "מספרת רונית", voicePhoneNumber: "+972559000001", voiceNumberOrderedAt: inDays(-200),
+  subscriptionStatus: "active", subscriptionLapsedAt: null, blockedAt: null, ...over,
 });
+/** Stopped paying `daysAgo` days ago — past_due is what the dunning ladder ends in. */
+const lapsed = (daysAgo: number, over: Record<string, unknown> = {}) =>
+  biz({ subscriptionStatus: "past_due", subscriptionLapsedAt: inDays(-daysAgo), ...over });
 const balance = (b: number) => ({ balance: b, currency: "USD" });
+const autorenewActions = (actions: { kind: string }[]) => actions.filter((a) => a.kind === "autorenew");
 
 /**
  * A Zadarma number is a monthly rental that renews itself from the balance only while autorenew
@@ -51,20 +58,80 @@ describe("planVoiceNumberRenewal", () => {
     expect(report.repaired).toEqual(["מספרת רונית 972559000001"]);
   });
 
-  it("switches autorenew off for a cancelled business, so Tori stops paying at the stop date", () => {
-    const { actions, report } = planVoiceNumberRenewal([num()], [biz({ subscriptionStatus: "canceled" })], balance(50), NOW);
-    expect(actions).toContainEqual(expect.objectContaining({ kind: "autorenew", on: false }));
-    expect(report.released[0]).toContain("lapses 2026-10-06");
+  /**
+   * The month in the middle. The number is the business's whole line, and a salon sorting out a
+   * declined card must find it where it was. So a lapsed line is paid for like a live one for
+   * NUMBER_GRACE_DAYS, and released on the day after.
+   */
+  describe("a business that stopped paying", () => {
+    it("keeps the line for a month — autorenew on, counted against the balance, nothing released", () => {
+      const { actions, report } = planVoiceNumberRenewal([num({ autorenew: false, stopDate: inDays(5) })], [lapsed(10)], balance(0), NOW);
+      expect(actions).toContainEqual(expect.objectContaining({ kind: "autorenew", on: true }));
+      expect(report.released).toEqual([]);
+      expect(report.held[0]).toContain(`held until ${inDays(NUMBER_GRACE_DAYS - 10).toISOString().slice(0, 10)}`);
+      expect(report.shortfall).toMatchObject({ due: 3 }); // Tori pays for a held line, so it is budgeted
+    });
+
+    it("releases the line once the month is up, and tells the owner once — on the flip", () => {
+      const { actions, report } = planVoiceNumberRenewal([num()], [lapsed(NUMBER_GRACE_DAYS + 1)], balance(50), NOW);
+      expect(actions).toContainEqual(expect.objectContaining({ kind: "autorenew", on: false }));
+      expect(actions).toContainEqual({ kind: "release-notice", businessId: "b1", number: "972559000001", stopDate: inDays(20) });
+      expect(report.released[0]).toContain("lapses 2026-10-06");
+      expect(report.held).toEqual([]);
+    });
+
+    it("does not notify again on later days — autorenew is already off", () => {
+      const { actions } = planVoiceNumberRenewal([num({ autorenew: false })], [lapsed(NUMBER_GRACE_DAYS + 5)], balance(50), NOW);
+      expect(actions.filter((a) => a.kind !== "persist")).toEqual([]);
+    });
+
+    it("holds right up to the last day of the month and releases the day after", () => {
+      const lastDay = planVoiceNumberRenewal([num()], [lapsed(NUMBER_GRACE_DAYS - 0.5)], balance(50), NOW);
+      expect(lastDay.report.held).toHaveLength(1);
+      const dayAfter = planVoiceNumberRenewal([num()], [lapsed(NUMBER_GRACE_DAYS)], balance(50), NOW);
+      expect(dayAfter.report.released).toHaveLength(1);
+    });
+
+    it("treats canceled and blocked the same as past_due", () => {
+      const canceled = planVoiceNumberRenewal([num()], [biz({ subscriptionStatus: "canceled", subscriptionLapsedAt: inDays(-40) })], balance(50), NOW);
+      expect(canceled.report.released).toHaveLength(1);
+      const blocked = planVoiceNumberRenewal([num()], [biz({ blockedAt: inDays(-40) })], balance(50), NOW);
+      expect(blocked.report.released).toHaveLength(1);
+      const blockedRecently = planVoiceNumberRenewal([num()], [biz({ blockedAt: inDays(-3) })], balance(50), NOW);
+      expect(blockedRecently.report.held).toHaveLength(1);
+    });
+
+    it("counts from the earlier of the lapse and the block", () => {
+      const { report } = planVoiceNumberRenewal([num()], [lapsed(3, { blockedAt: inDays(-45) })], balance(50), NOW);
+      expect(report.released).toHaveLength(1);
+    });
+
+    it("starts the clock today for a lapsed business nothing stamped, so the month always begins somewhere", () => {
+      const { actions, report } = planVoiceNumberRenewal([num()], [biz({ subscriptionStatus: "canceled" })], balance(50), NOW);
+      expect(actions).toContainEqual({ kind: "stamp", businessId: "b1", lapsedAt: NOW });
+      expect(report.held).toHaveLength(1);
+      expect(report.released).toEqual([]);
+    });
+
+    it("takes a released number off the business once the carrier no longer lists it — but only one Tori bought", () => {
+      const ours = planVoiceNumberRenewal([], [lapsed(60)], balance(50), NOW);
+      expect(ours.actions).toContainEqual({ kind: "detach", businessId: "b1", businessName: "מספרת רונית", number: "+972559000001" });
+      expect(ours.report.dead).toEqual([]);
+      const theirs = planVoiceNumberRenewal([], [lapsed(60, { voiceNumberOrderedAt: null })], balance(50), NOW);
+      expect(theirs.actions).toEqual([]);
+    });
   });
 
-  it("also releases a blocked business's line", () => {
-    const { actions } = planVoiceNumberRenewal([num()], [biz({ blockedAt: new Date() })], balance(50), NOW);
-    expect(actions).toContainEqual(expect.objectContaining({ kind: "autorenew", on: false }));
+  it("buys back a parked line for a business that is paying again", () => {
+    const { actions, report } = planVoiceNumberRenewal([num({ status: "parking", autorenew: false })], [biz()], balance(50), NOW);
+    expect(actions).toContainEqual({ kind: "restore", number: "972559000001", businessId: "b1", businessName: "מספרת רונית" });
+    expect(actions).toContainEqual(expect.objectContaining({ kind: "autorenew", on: true }));
+    expect(report.restored).toEqual(["מספרת רונית 972559000001"]);
   });
 
-  it("does not touch a past_due business — late is not gone", () => {
-    const { actions } = planVoiceNumberRenewal([num({ autorenew: false })], [biz({ subscriptionStatus: "past_due" })], balance(50), NOW);
-    expect(actions.filter((a) => a.kind === "autorenew")).toEqual([]);
+  it("leaves a trial alone — a trial with a number is the operator's decision", () => {
+    const { actions } = planVoiceNumberRenewal([num({ autorenew: false })], [biz({ subscriptionStatus: "trial" })], balance(50), NOW);
+    expect(autorenewActions(actions)).toEqual([]);
   });
 
   it("flags a paying line expiring within a week that the balance cannot cover", () => {
@@ -93,8 +160,8 @@ describe("planVoiceNumberRenewal", () => {
     expect(report.shortfall).toEqual({ balance: 5, due: 6, currency: "USD", firstExpiry: inDays(10) });
   });
 
-  it("does not count a cancelled business's line against the balance", () => {
-    const { report } = planVoiceNumberRenewal([num({ stopDate: inDays(5) })], [biz({ subscriptionStatus: "canceled" })], balance(0), NOW);
+  it("does not count a released business's line against the balance", () => {
+    const { report } = planVoiceNumberRenewal([num({ stopDate: inDays(5) })], [lapsed(60)], balance(0), NOW);
     expect(report.shortfall).toBeNull();
   });
 
@@ -143,11 +210,15 @@ describe("runVoiceNumberRenewalJob", () => {
     expect(sendAdminAlertEmail).not.toHaveBeenCalled();
   });
 
+  // The job's own "days left" is measured from the real clock, so these two use it too — a fixed
+  // date drifted into the prepay window as the calendar moved and the test flipped on its own.
+  const fromNow = (d: number) => new Date(Date.now() + d * DAY);
+
   it("prepays a month when autorenew cannot be enabled and the line is days from lapsing", async () => {
-    carrier.listNumbers.mockResolvedValue([num({ autorenew: false, stopDate: inDays(2) })]);
+    carrier.listNumbers.mockResolvedValue([num({ autorenew: false, stopDate: fromNow(2) })]);
     mockPrisma.business.findMany.mockResolvedValue([biz()]);
     carrier.setAutoprolongation.mockRejectedValue(new Error("Zadarma /v1/direct_numbers/autoprolongation/ failed: not allowed"));
-    carrier.prolongNumber.mockResolvedValue({ stopDate: inDays(32), totalPaid: 3, currency: "USD" });
+    carrier.prolongNumber.mockResolvedValue({ stopDate: fromNow(32), totalPaid: 3, currency: "USD" });
 
     await runVoiceNumberRenewalJob();
 
@@ -157,7 +228,7 @@ describe("runVoiceNumberRenewalJob", () => {
   });
 
   it("does not prepay when the line is weeks away — reports and lets tomorrow retry", async () => {
-    carrier.listNumbers.mockResolvedValue([num({ autorenew: false, stopDate: inDays(20) })]);
+    carrier.listNumbers.mockResolvedValue([num({ autorenew: false, stopDate: fromNow(20) })]);
     mockPrisma.business.findMany.mockResolvedValue([biz()]);
     carrier.setAutoprolongation.mockRejectedValue(new Error("boom"));
 
@@ -176,5 +247,64 @@ describe("runVoiceNumberRenewalJob", () => {
 
     expect(sendAdminAlertEmail.mock.calls[0][0]).toContain("voice line problem");
     expect(sendAdminAlertEmail.mock.calls[0][1]).toContain("Balance cannot cover this month");
+  });
+
+  it("on release: switches autorenew off and tells the owner the date the line stops, in Hebrew", async () => {
+    carrier.listNumbers.mockResolvedValue([num()]);
+    mockPrisma.business.findMany.mockResolvedValue([lapsed(45)]);
+    notifyOwner.mockResolvedValue(true);
+
+    await runVoiceNumberRenewalJob();
+
+    expect(carrier.setAutoprolongation).toHaveBeenCalledWith("972559000001", false);
+    expect(notifyOwner).toHaveBeenCalledOnce();
+    const [businessId, text] = notifyOwner.mock.calls[0] as [string, string];
+    expect(businessId).toBe("b1");
+    expect(text).toContain("972559000001");
+    expect(text).toContain("משתחרר");
+    expect(text).toContain("חידוש לפני כן");
+    expect(sendAdminAlertEmail.mock.calls[0][1]).toContain("hold over");
+  });
+
+  it("detaches a number the carrier dropped, clearing the order marker so a return can buy a fresh one", async () => {
+    carrier.listNumbers.mockResolvedValue([]);
+    mockPrisma.business.findMany.mockResolvedValue([lapsed(60)]);
+
+    await runVoiceNumberRenewalJob();
+
+    expect(mockPrisma.business.update).toHaveBeenCalledWith({
+      where: { id: "b1" },
+      data: { voicePhoneNumber: null, voiceNumberOrderedAt: null, voiceNumberStopDate: null, voiceNumberAutorenew: null },
+    });
+    expect(sendAdminAlertEmail.mock.calls[0][1]).toContain("taken off their businesses");
+  });
+
+  it("buys back a parked line when the business is paying again, and reports it if the carrier refuses", async () => {
+    carrier.listNumbers.mockResolvedValue([num({ status: "parking" })]);
+    mockPrisma.business.findMany.mockResolvedValue([biz()]);
+    carrier.prolongNumber.mockResolvedValue({ stopDate: inDays(30), totalPaid: 3, currency: "USD" });
+
+    await runVoiceNumberRenewalJob();
+    expect(carrier.prolongNumber).toHaveBeenCalledWith("972559000001", 1);
+    expect(sendAdminAlertEmail.mock.calls[0][1]).toContain("bought back");
+
+    vi.clearAllMocks();
+    carrier.listNumbers.mockResolvedValue([num({ status: "parking" })]);
+    mockPrisma.business.findMany.mockResolvedValue([biz()]);
+    carrier.prolongNumber.mockRejectedValue(new Error("not enough funds"));
+    await runVoiceNumberRenewalJob();
+    expect(sendAdminAlertEmail.mock.calls[0][0]).toContain("voice line problem");
+    expect(sendAdminAlertEmail.mock.calls[0][1]).toContain("could not be bought back");
+  });
+
+  it("stamps today's date on a lapsed business that had none", async () => {
+    carrier.listNumbers.mockResolvedValue([num()]);
+    mockPrisma.business.findMany.mockResolvedValue([biz({ subscriptionStatus: "canceled" })]);
+
+    await runVoiceNumberRenewalJob();
+
+    const stamp = mockPrisma.business.update.mock.calls.find((c) => c[0].data.subscriptionLapsedAt);
+    expect(stamp?.[0].data.subscriptionLapsedAt).toBeInstanceOf(Date);
+    expect(carrier.setAutoprolongation).not.toHaveBeenCalled(); // held, and autorenew was already on
   });
 });

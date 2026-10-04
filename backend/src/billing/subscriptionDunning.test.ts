@@ -186,8 +186,25 @@ describe("dunning", () => {
 
     const data = lastData();
     expect(data.subscriptionStatus).toBe("past_due");
+    // The phone number's grace month counts from this moment (voiceNumberRenewal.ts).
+    expect(data.subscriptionLapsedAt).toBeInstanceOf(Date);
     // A due date in the past would keep re-charging a business that has already been cut off.
     expect(data.nextBillingDate).toBeUndefined();
+  });
+
+  it("promises the number is kept for a month — only to a business Tori bought one for", async () => {
+    mockPrisma.business.findMany.mockResolvedValue([dueBusiness({ billingFailedAttempts: 2, voiceNumberOrderedAt: new Date() })]);
+    chargeSubscriptionToken.mockResolvedValue({ success: false, error: "declined" });
+    await runSubscriptionBillingJob();
+    expect(notifyOwner.mock.calls.at(-1)![1]).toContain("נשמרים 30 יום");
+
+    vi.clearAllMocks();
+    mockPrisma.business.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.business.update.mockResolvedValue({});
+    mockPrisma.business.findMany.mockResolvedValue([dueBusiness({ billingFailedAttempts: 2 })]);
+    chargeSubscriptionToken.mockResolvedValue({ success: false, error: "declined" });
+    await runSubscriptionBillingJob();
+    expect(notifyOwner.mock.calls.at(-1)![1]).not.toContain("נשמרים");
   });
 
   it("only emails the operator once the account has actually stopped", async () => {

@@ -916,6 +916,7 @@ payplusBillingWebhookRouter.post("/:secret", async (req, res) => {
       where: { id: business.id },
       data: {
         subscriptionStatus: "active",
+        subscriptionLapsedAt: null, // back, whether from past_due, canceled or a first signup
         subscriptionPlan: plan,
         // Only ever set, never cleared — the same rule the wallet branch above follows, and for a
         // sharper reason. Nothing else in the codebase ever nulls subscriptionToken, so a lapsed
