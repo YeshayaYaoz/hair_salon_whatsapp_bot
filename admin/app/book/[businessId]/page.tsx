@@ -500,7 +500,17 @@ export default function BookPage() {
             {c.accessibility}
           </a>
           <span className="mx-2 text-gray-400" aria-hidden="true">·</span>
-          {c.poweredBy} <span className="font-semibold text-gray-500">תורי</span>
+          {/* Every customer who books here sees this line; the salon's own customers are very often
+              salon owners' peers. A link with attribution turns that into a measurable channel. */}
+          {c.poweredBy}{" "}
+          <a
+            href={`https://torionline.com/?utm_source=booking_page&utm_medium=powered_by&utm_campaign=${encodeURIComponent(businessId)}`}
+            target="_blank"
+            rel="noopener"
+            className="font-semibold text-gray-500 hover:underline"
+          >
+            תורי
+          </a>
         </p>
       </div>
     </main>

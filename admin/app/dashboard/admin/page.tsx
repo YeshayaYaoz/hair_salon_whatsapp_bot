@@ -14,6 +14,7 @@ interface AdminBusiness {
   email: string;
   createdAt: string;
   notificationPhone: string | null;
+  signupSource: string | null;
   emailVerifiedAt: string | null;
   subscriptionStatus: string;
   subscriptionPlan: string | null;
@@ -206,6 +207,11 @@ function BusinessCard({ b, he, onOpen, fmtDate }: {
           </span>
         )}
         <span className="text-xs text-gray-500">· {fmtDate(b.createdAt)}</span>
+        {b.signupSource && (
+          <span className="text-xs text-gray-500 truncate max-w-[220px]" title={b.signupSource}>
+            · {he ? "מקור" : "via"}: {b.signupSource}
+          </span>
+        )}
       </div>
 
       {/* The numbers an operator scans for: activity, spend, and whether the wallet has gone red. */}

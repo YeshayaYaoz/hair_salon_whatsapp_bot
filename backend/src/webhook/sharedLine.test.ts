@@ -27,14 +27,25 @@ vi.mock("../lib/email.js", () => ({ sendWhatsAppTokenExpiredEmail: vi.fn(), send
 vi.mock("../lib/transcription.js", () => ({ transcribeWhatsAppVoiceNote: vi.fn(), TranscriptionNotConfiguredError: class extends Error {} }));
 vi.mock("./templateStatus.js", () => ({ handleTemplateStatusUpdate: vi.fn() }));
 vi.mock("../billing/yieldCampaignJob.js", () => ({ sendYieldCampaignOffers: vi.fn() }));
-vi.mock("../bot/conversationStore.js", () => ({ clearHistory: vi.fn(), appendTurn: vi.fn() }));
+const getHistory = vi.fn(async () => [] as unknown[]);
+vi.mock("../bot/conversationStore.js", () => ({ clearHistory: vi.fn(), appendTurn: vi.fn(), getHistory: (...a: unknown[]) => getHistory(...a) }));
+const noteDemoStarted = vi.fn(async () => {});
+vi.mock("../lib/demoLine.js", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../lib/demoLine.js")>();
+  return { ...real, noteDemoStarted: (...a: unknown[]) => noteDemoStarted(...a) };
+});
 vi.mock("../bot/managerAuth.js", () => ({ checkManager: vi.fn(async () => ({ isManager: true })) }));
 
 const handleOutreachReply = vi.fn();
-vi.mock("../leadfinder/inboundReplies.js", () => ({
-  handleOutreachReply: (...a: unknown[]) => handleOutreachReply(...a),
-  isOutreachNumber: (id: string) => id === "tori-line",
-}));
+vi.mock("../leadfinder/inboundReplies.js", async (importOriginal) => {
+  // classifyReply/phoneKey stay real: the demo router uses them to keep an opt-out out of the demo.
+  const real = await importOriginal<typeof import("../leadfinder/inboundReplies.js")>();
+  return {
+    ...real,
+    handleOutreachReply: (...a: unknown[]) => handleOutreachReply(...a),
+    isOutreachNumber: (id: string) => id === "tori-line",
+  };
+});
 const handleIncomingMessage = vi.fn();
 vi.mock("../bot/claudeBot.js", () => ({ handleIncomingMessage: (...a: unknown[]) => handleIncomingMessage(...a) }));
 const sendWhatsAppMessage = vi.fn();
@@ -57,6 +68,8 @@ beforeEach(async () => {
   vi.clearAllMocks();
   vi.resetModules();
   delete process.env.WHATSAPP_APP_SECRET;
+  delete process.env.TORI_DEMO_BUSINESS_ID;
+  getHistory.mockResolvedValue([]);
   process.env.TORI_OUTREACH_PHONE_NUMBER_ID = "tori-line";
   process.env.TORI_OUTREACH_ACCESS_TOKEN = "tori-token";
   const { whatsappRouter } = await import("./whatsappRoutes.js");
@@ -118,5 +131,65 @@ describe("a stranger on the shared line", () => {
 
     expect(handleOutreachReply).toHaveBeenCalledWith("972508888888", "מעניין אותי");
     expect(handleIncomingMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe("the public demo on the shared line", () => {
+  const demoBusiness = {
+    ...receiptsBusiness, id: "demo", name: "סלון דנה (דמו)", notificationPhone: "972500000000",
+    subscriptionPlan: "standard", botEnabled: true,
+  };
+  const STRANGER = "972508888888";
+
+  beforeEach(() => {
+    process.env.TORI_DEMO_BUSINESS_ID = "demo";
+    mockPrisma.business.findUnique.mockImplementation(async ({ where }: { where: { id?: string } }) =>
+      where.id === "demo" ? demoBusiness : null
+    );
+    handleIncomingMessage.mockResolvedValue({ text: "היי! מחר פנוי ב-10:00 וב-12:30", isFirstReply: true });
+  });
+
+  it("'דמו' from a stranger opens the real bot as the demo business, from Tori's line, with the footer once", async () => {
+    await post(STRANGER, "דמו");
+    await settle();
+
+    expect(handleIncomingMessage).toHaveBeenCalledWith("demo", STRANGER, "דמו");
+    expect(handleOutreachReply).not.toHaveBeenCalled();
+    expect(noteDemoStarted).toHaveBeenCalledWith(STRANGER, "דמו");
+    const reply = sendWhatsAppMessage.mock.calls[0][0];
+    expect(reply).toMatchObject({ phoneNumberId: "tori-line", accessToken: "tori-token", to: STRANGER });
+    expect(reply.text).toContain("מחר פנוי");
+    expect(reply.text).toContain("הדגמה של תורי");
+  });
+
+  it("keeps the thread with the demo on the next message, without re-introducing itself", async () => {
+    getHistory.mockResolvedValue([{ role: "user", content: "דמו", at: new Date() }]);
+    handleIncomingMessage.mockResolvedValue({ text: "קבעתי לך ל-10:00 ✅", isFirstReply: false });
+
+    await post(STRANGER, "10:00");
+    await settle();
+
+    expect(handleIncomingMessage).toHaveBeenCalledWith("demo", STRANGER, "10:00");
+    expect(noteDemoStarted).not.toHaveBeenCalled();
+    expect(sendWhatsAppMessage.mock.calls[0][0].text).not.toContain("הדגמה של תורי");
+  });
+
+  it("still hands an opt-out and a plain outreach reply to the lead finder", async () => {
+    await post(STRANGER, "הסר");
+    await post(STRANGER, "כן, מעניין");
+    await settle();
+
+    expect(handleOutreachReply).toHaveBeenCalledTimes(2);
+    expect(handleIncomingMessage).not.toHaveBeenCalled();
+  });
+
+  it("never overrides a verified owner or a receipt customer", async () => {
+    mockPrisma.receipt.findFirst.mockResolvedValue({ business: { id: "b1", name: "סטודיו רונית" } });
+
+    await post("972509999999", "דמו");
+    await settle();
+
+    expect(handleIncomingMessage).not.toHaveBeenCalled();
+    expect(sendWhatsAppMessage.mock.calls[0][0].text).toContain("סטודיו רונית");
   });
 });

@@ -132,6 +132,8 @@ businessRouter.get("/admin/businesses", requireSuperAdmin, async (_req: AuthedRe
       // starting point for proactively calling a business that's stuck mid-setup, and an
       // unverified email means email outreach silently won't reach them at all.
       notificationPhone: true, emailVerifiedAt: true,
+      // Which channel brought them — the only way to learn what marketing is worth repeating.
+      signupSource: true,
       subscriptionStatus: true, subscriptionPlan: true, billingCycle: true,
       whatsappPhoneNumberId: true, whatsappTokenValid: true,
       paymentProvider: true, invoiceProvider: true, depositEnabled: true,

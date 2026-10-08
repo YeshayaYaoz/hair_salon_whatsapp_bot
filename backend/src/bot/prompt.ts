@@ -1,4 +1,5 @@
 import type { BusinessHours, Service, StaffMember, FaqEntry } from "@prisma/client";
+import { isDemoBusiness, siteUrl } from "../lib/demoLine.js";
 import { prisma } from "../lib/prisma.js";
 import { instantPartsInTz, zonedDateParts, dayOfWeekForDate } from "../lib/timezone.js";
 import { TEMPLATES, isBusinessType } from "../lib/businessTemplates.js";
@@ -112,6 +113,12 @@ export async function buildSystemPrompt(
     : "";
 
   const personalityNote = business.botPersonality ? `\nסגנון תקשורת: ${business.botPersonality}\n` : "";
+  // The public demo (see lib/demoLine.ts): the person on the other end is a business owner trying
+  // Tori, not a customer. The bot still books like a real salon — that is the demo — but it must
+  // not pretend the salon is real when asked, and it knows where to send someone who wants this.
+  const demoNote = isDemoBusiness(business.id)
+    ? `\nזהו חשבון הדגמה של תורי: מי שכותב לך הוא כנראה בעל עסק שבודק את המערכת, ו"${business.name}" הוא עסק לדוגמה. התנהג בדיוק כמו עוזר של עסק אמיתי — הצע שירותים, בדוק זמינות וקבע תור — כי זה מה שהוא בא לראות. אם שואלים אותך מה זה, מי בנה אותך, או איך מקבלים את זה לעסק: ענה בקצרה שאתה תורי, עוזר AI לקביעת תורים בוואטסאפ ובטלפון, ושמצטרפים ב-${siteUrl()}. אל תמציא מחירים של תורי עצמו — הם באתר.\n`
+    : "";
   // Owners write greetings with fill-in-the-blank placeholders — "[פירוט של כל הצימרים]",
   // "[כתובת האתר]" — expecting them to be substituted. They can't be substituted deterministically
   // (each owner invents their own wording), so PLACEHOLDER_RULE explains what they mean and, more
@@ -247,7 +254,7 @@ ${CALENDAR_RULES}
 ${CONVERSATION_AGE_RULE}
 ${PHOTOS_RULE}
 ${isOvernight ? `${UNIT_FIT_RULE}\n` : ""}
-${cancellationNote}${pricingNote}${specialPeriodsText}${vocabNote}${personalityNote}${greeting}${crmNote}
+${cancellationNote}${pricingNote}${specialPeriodsText}${vocabNote}${personalityNote}${demoNote}${greeting}${crmNote}
 שירותים ומחירים:
 ${servicesText}
 

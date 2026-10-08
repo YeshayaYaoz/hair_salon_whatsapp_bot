@@ -29,6 +29,20 @@ export interface OutreachLeadContext {
   notes: string | null;
 }
 
+export type OutreachChannel = "email" | "manual_call" | "whatsapp";
+
+/**
+ * The demo is the pitch. When a public demo line exists (TORI_DEMO_WA_LINK, a wa.me link that
+ * pre-fills "דמו"), a WhatsApp draft invites the prospect to try it before anything else is asked
+ * of them — a thirty-second booking says more than the four sentences around it.
+ */
+function demoInvite(): string {
+  const link = process.env.TORI_DEMO_WA_LINK?.trim();
+  return link
+    ? `כלול בהודעה הזמנה לנסות את הבוט בעצמם, עם הקישור הזה בדיוק כפי שהוא: ${link} — למשל "תכתבו לו 'רוצה תספורת מחר' ותראו". `
+    : "";
+}
+
 export interface OutreachDraft {
   subject: string | null; // null for manual_call (no subject line)
   body: string;
@@ -77,14 +91,16 @@ function buildLeadSummary(lead: OutreachLeadContext, scoreBreakdown: Record<stri
 export async function generateOutreachDraft(
   lead: OutreachLeadContext,
   scoreBreakdown: Record<string, number> | null,
-  channel: "email" | "manual_call",
+  channel: OutreachChannel,
   angle: string
 ): Promise<OutreachDraft> {
   const leadSummary = buildLeadSummary(lead, scoreBreakdown);
   const task =
     channel === "email"
       ? `כתוב טיוטת מייל יזום (subject + body) לבעל/ת העסק. השב בפורמט JSON בלבד: {"subject": "...", "body": "..."}.`
-      : `כתוב תסריט קצר לשיחת טלפון יזומה (בולטים, לא נאום רציף). השב בפורמט JSON בלבד: {"body": "..."}.`;
+      : channel === "whatsapp"
+        ? `כתוב הודעת וואטסאפ אישית קצרה לבעל/ת העסק, שנשלחת מהטלפון של ישעיה אחרי שיחת טלפון קצרה או ביקור בעסק (כלומר: הם כבר יודעים מי אנחנו, זו לא הודעה קרה). 2 עד 4 משפטים, בלי נושא, בלי כותרת, בלי ברכת פתיחה רשמית, אפשר אימוג'י אחד לכל היותר. ${demoInvite()}השב בפורמט JSON בלבד: {"body": "..."}.`
+        : `כתוב תסריט קצר לשיחת טלפון יזומה (בולטים, לא נאום רציף). השב בפורמט JSON בלבד: {"body": "..."}.`;
 
   const angleNote =
     angle === "follow_up_1"

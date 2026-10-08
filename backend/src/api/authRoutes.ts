@@ -35,6 +35,9 @@ const signupSchema = z.object({
   // reached any other way, and none of the six set it afterwards.
   notificationPhone: z.string().min(1).max(40),
   notificationPhoneDialCode: z.string().max(6).optional(),
+  // See Business.signupSource. Optional and bounded: an attribution string is nice to have and
+  // never a reason to refuse an account.
+  source: z.string().max(300).optional(),
 });
 
 authRouter.post("/signup", authLimiter, async (req, res) => {
@@ -53,7 +56,8 @@ authRouter.post("/signup", authLimiter, async (req, res) => {
   if (existing) return res.status(409).json({ error: "Email already registered" });
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const business = await prisma.business.create({ data: { name, email, passwordHash, notificationPhone } });
+  const signupSource = parsed.data.source?.trim() || null;
+  const business = await prisma.business.create({ data: { name, email, passwordHash, notificationPhone, signupSource } });
 
   // Send welcome email (non-fatal)
   sendWelcomeEmail(email, name).catch((err) => console.error("Welcome email failed:", err));
@@ -64,7 +68,8 @@ authRouter.post("/signup", authLimiter, async (req, res) => {
   issueVerificationEmail(business.id, email).catch((err) => console.error("Verification email failed:", err));
   sendAdminAlertEmail(
     `🎉 עסק חדש נרשם — ${name}`,
-    `<h2 style="color:#fff;margin-bottom:8px;">${name} נרשם/ה לתורי</h2><p style="color:#a1a1aa;">${email}</p>`
+    `<h2 style="color:#fff;margin-bottom:8px;">${name} נרשם/ה לתורי</h2><p style="color:#a1a1aa;">${email}</p>` +
+      `<p style="color:#a1a1aa;">מקור: ${signupSource ?? "לא ידוע"}</p>`
   ).catch((err) => console.error("New-signup admin alert failed:", err));
 
   res.status(201).json({ token: signBusinessToken(business.id) });

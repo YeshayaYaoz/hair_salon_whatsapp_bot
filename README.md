@@ -139,6 +139,35 @@ button instead of typing back a time. Customers can also say "cancel my appointm
 "reschedule" — the bot has `cancel_appointment` and `list_my_appointments` tools in addition to
 `check_availability` / `book_appointment`.
 
+## Growth: the public demo, outreach and attribution
+
+The product is its own best pitch, so the shared line doubles as a public demo
+(`backend/src/lib/demoLine.ts`):
+
+1. In the dashboard, create a business to be the demo salon — services, hours, a greeting, a
+   Standard plan (set it from the super-admin panel), and leave WhatsApp unconnected so it sits on
+   Tori's shared line.
+2. Set `TORI_DEMO_BUSINESS_ID` to its id on the backend. From then on a stranger who writes
+   "דמו" (or "demo") to `TORI_OUTREACH_PHONE_NUMBER_ID` is treated as that salon's customer:
+   the real bot, the real slot picker, a real booking. The first reply carries a one-line
+   "this is a demo of Tori" footer; later messages are a normal conversation. The operator gets
+   an email on every new demo thread, and a matching Lead Finder lead moves to "replied".
+3. Set `TORI_DEMO_WA_LINK` (backend) to `https://wa.me/<number>?text=דמו` so WhatsApp outreach
+   drafts invite the prospect to try it, and `NEXT_PUBLIC_DEMO_WHATSAPP` (admin) to the bare number
+   so the landing page's "talk to the bot" section opens that chat instead of the scripted mock.
+
+Opt-outs and plain replies to cold outreach still reach the lead finder, never the demo.
+
+The Lead Finder's per-lead drafts have a third channel, **personal WhatsApp**: a short message to
+send from your own phone after a call or a visit (never cold, never from Tori's line — that is
+what the templated broadcast is for). "פתח בוואטסאפ" opens the thread with the text filled in.
+
+Signups record where they came from (`Business.signupSource`: UTM parameters or the referring
+site, captured on the landing page and sent with the form) and the super-admin list shows it.
+Google Analytics 4 and the Meta pixel load on the public pages only when
+`NEXT_PUBLIC_GA_MEASUREMENT_ID` / `NEXT_PUBLIC_META_PIXEL_ID` are set; signup fires one
+conversion event. The salon booking page's "Powered by תורי" is a link with UTM attribution.
+
 ## Not yet built (flagged for later, out of v1 scope)
 
 - Multiple subscription tiers / usage-based billing (current model is a single flat plan gate).

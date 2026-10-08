@@ -27,6 +27,12 @@ model Business {
   // stamps itself so the clock always starts somewhere.
   subscriptionLapsedAt DateTime?
 
+  // Where this signup came from, as the browser saw it: the UTM parameters of the visit that
+  // ended in the form, or the referring site, or what the owner typed when asked. Free text,
+  // never parsed by anything — it exists so that "which channel brought the paying ones" has an
+  // answer other than guessing. Null for every account older than this column.
+  signupSource String?
+
   // Super-admin block: independent of subscriptionStatus — a blocked business is locked out of
   // login and the bot stops replying, regardless of whether their subscription is otherwise fine
   // (e.g. abuse, fraud, a support dispute), without touching their billing state.
@@ -1018,7 +1024,7 @@ model OutreachMessage {
   id             String    @id @default(cuid())
   lead           Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
   leadId         String
-  channel        String // "email" | "manual_call"
+  channel        String // "email" | "manual_call" | "whatsapp" (whatsapp: sent by hand from the operator's phone)
   angle          String? // "initial" | "follow_up_1" | ...
   subject        String?
   body           String    @db.Text

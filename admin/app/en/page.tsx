@@ -6,6 +6,11 @@ import {
   AudioLines, type LucideIcon,
 } from "lucide-react";
 import { jsonLd } from "../lib/jsonLd";
+import { rememberArrival } from "../lib/attribution";
+
+// Tori's own WhatsApp number, digits only with country code. When set, the demo section opens the
+// real bot on WhatsApp; the scripted chat below is the fallback. See the Hebrew page for details.
+const DEMO_WHATSAPP = (process.env.NEXT_PUBLIC_DEMO_WHATSAPP ?? "").replace(/\D/g, "");
 
 /* Lucide (MIT) — same professionally drawn stroke-icon set as the Hebrew page. Emoji stay only
    inside the chat mockups, where they are what WhatsApp actually looks like. */
@@ -98,6 +103,11 @@ export default function LandingPageEN() {
     const el = demoScrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [demoMsgs]);
+
+  // First-touch attribution for the signup form — see lib/attribution.ts.
+  useEffect(() => {
+    rememberArrival();
+  }, []);
 
   // 3D scroll tilt. Coalesced to one read/write pass per animation frame — see the matching
   // comment on the Hebrew landing page for why the original synchronous handler was an INP
@@ -1357,6 +1367,23 @@ export default function LandingPageEN() {
             <p className="reveal" style={{ textAlign: "center", color: "#666", fontSize: 16, marginBottom: 40 }}>
               Type a message like a real customer would — and see how Tori replies. No install, right here.
             </p>
+            {DEMO_WHATSAPP ? (
+              <div className="reveal" style={{ textAlign: "center", marginBottom: 36 }}>
+                <a
+                  className="btn-green"
+                  href={`https://wa.me/${DEMO_WHATSAPP}?text=${encodeURIComponent("demo")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 10 }}
+                >
+                  <Icon name="chat" size={20} />
+                  Chat with Tori on WhatsApp now
+                </a>
+                <div style={{ color: "#666", fontSize: 14, marginTop: 12 }}>
+                  Opens in your own WhatsApp. Try &quot;I want a haircut tomorrow&quot; and watch it book a real slot.
+                </div>
+              </div>
+            ) : null}
             <div className="lp-demo-chat reveal">
               <div className="lp-demo-header">
                 <div className="lp-demo-avatar"><img src="/tori_logo_transparent.png" alt="Tori" /></div>
