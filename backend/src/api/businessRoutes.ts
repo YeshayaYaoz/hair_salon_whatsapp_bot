@@ -1,4 +1,5 @@
 import { asyncRouter } from "../lib/asyncRouter.js";
+import { ensureSharedLineCode, sharedLineLink } from "../lib/sharedLineRouting.js";
 import crypto from "crypto";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
@@ -65,6 +66,23 @@ businessRouter.use((req, res, next) => {
 businessRouter.use(receiptsRouter);
 
 // --- Business profile + WhatsApp credentials ---
+
+/**
+ * The link a business hands out while it runs from Tori's shared line — before Meta has verified
+ * a number of its own, or instead of ever having one. Null `link` means the deployment has no
+ * shared number to put in it (TORI_SHARED_WHATSAPP_NUMBER), and the dashboard shows nothing.
+ */
+businessRouter.get("/me/shared-line", async (req: AuthedRequest, res) => {
+  const business = await prisma.business.findUniqueOrThrow({
+    where: { id: req.businessId! },
+    select: { name: true, whatsappPhoneNumberId: true, subscriptionPlan: true },
+  });
+  if (business.whatsappPhoneNumberId || !planHasBot(business.subscriptionPlan)) {
+    return res.json({ active: false, code: null, link: null });
+  }
+  const code = await ensureSharedLineCode(req.businessId!);
+  res.json({ active: true, code, link: sharedLineLink(code, business.name) });
+});
 
 businessRouter.get("/me", async (req: AuthedRequest, res) => {
   const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! } });

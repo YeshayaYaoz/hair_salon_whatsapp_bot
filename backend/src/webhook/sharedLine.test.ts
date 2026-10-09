@@ -12,7 +12,7 @@ const mockPrisma = {
   business: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   customer: { upsert: vi.fn(async () => ({})), updateMany: vi.fn(async () => ({ count: 1 })), findUnique: vi.fn(async () => null) },
   receipt: { findFirst: vi.fn() },
-  conversationMessage: { findFirst: vi.fn(), create: vi.fn() },
+  conversationMessage: { findFirst: vi.fn(), findMany: vi.fn(async () => [] as { businessId: string }[]), create: vi.fn() },
   systemSetting: { findMany: vi.fn(async () => []), findUnique: vi.fn(async () => null), upsert: vi.fn(async () => ({})) },
 };
 vi.mock("../lib/prisma.js", () => ({ prisma: mockPrisma }));
@@ -70,6 +70,8 @@ beforeEach(async () => {
   delete process.env.WHATSAPP_APP_SECRET;
   delete process.env.TORI_DEMO_BUSINESS_ID;
   getHistory.mockResolvedValue([]);
+  mockPrisma.conversationMessage.findMany.mockResolvedValue([]);
+  mockPrisma.business.findUnique.mockResolvedValue(null);
   process.env.TORI_OUTREACH_PHONE_NUMBER_ID = "tori-line";
   process.env.TORI_OUTREACH_ACCESS_TOKEN = "tori-token";
   const { whatsappRouter } = await import("./whatsappRoutes.js");
@@ -163,6 +165,7 @@ describe("the public demo on the shared line", () => {
   });
 
   it("keeps the thread with the demo on the next message, without re-introducing itself", async () => {
+    mockPrisma.conversationMessage.findMany.mockResolvedValue([{ businessId: "demo" }]);
     getHistory.mockResolvedValue([{ role: "user", content: "דמו", at: new Date() }]);
     handleIncomingMessage.mockResolvedValue({ text: "קבעתי לך ל-10:00 ✅", isFirstReply: false });
 
@@ -183,13 +186,60 @@ describe("the public demo on the shared line", () => {
     expect(handleIncomingMessage).not.toHaveBeenCalled();
   });
 
-  it("never overrides a verified owner or a receipt customer", async () => {
-    mockPrisma.receipt.findFirst.mockResolvedValue({ business: { id: "b1", name: "סטודיו רונית" } });
+  it("never overrides a verified owner", async () => {
+    mockPrisma.business.findMany.mockResolvedValue([receiptsBusiness]);
 
-    await post("972509999999", "דמו");
+    await post(OWNER, "דמו");
+    await settle();
+
+    expect(handleIncomingMessage).toHaveBeenCalledWith("b1", OWNER, "דמו");
+  });
+});
+
+describe("a business running its bot from the shared line", () => {
+  const salon = {
+    ...receiptsBusiness, id: "salon", name: "סלון דנה", notificationPhone: "972500000001",
+    subscriptionPlan: "standard", botEnabled: true, sharedLineCode: "ab3k7m",
+  };
+  const CUSTOMER = "972507777777";
+
+  beforeEach(() => {
+    mockPrisma.business.findUnique.mockImplementation(async ({ where }: { where: { id?: string; sharedLineCode?: string } }) =>
+      where.id === "salon" || where.sharedLineCode === "ab3k7m" ? salon : null
+    );
+    handleIncomingMessage.mockResolvedValue({ text: "היי! מחר פנוי ב-10:00", isFirstReply: true });
+  });
+
+  it("the link's first message reaches that business's bot, answered from Tori's line, with no demo footer", async () => {
+    await post(CUSTOMER, "היי, רוצה לקבוע תור אצל סלון דנה #ab3k7m");
+    await settle();
+
+    expect(handleIncomingMessage).toHaveBeenCalledWith("salon", CUSTOMER, "היי, רוצה לקבוע תור אצל סלון דנה #ab3k7m");
+    expect(handleOutreachReply).not.toHaveBeenCalled();
+    expect(noteDemoStarted).not.toHaveBeenCalled();
+    const reply = sendWhatsAppMessage.mock.calls[0][0];
+    expect(reply).toMatchObject({ phoneNumberId: "tori-line", accessToken: "tori-token", to: CUSTOMER });
+    expect(reply.text).not.toContain("הדגמה של תורי");
+    // Registered as that business's customer, like on its own line.
+    expect(mockPrisma.customer.upsert.mock.calls[0][0].where).toEqual({ businessId_phone: { businessId: "salon", phone: CUSTOMER } });
+  });
+
+  it("a returning customer needs no code", async () => {
+    mockPrisma.conversationMessage.findMany.mockResolvedValue([{ businessId: "salon" }]);
+
+    await post(CUSTOMER, "אפשר שוב תור לשבוע הבא?");
+    await settle();
+
+    expect(handleIncomingMessage).toHaveBeenCalledWith("salon", CUSTOMER, "אפשר שוב תור לשבוע הבא?");
+  });
+
+  it("an opt-out from such a customer is never answered by the bot", async () => {
+    mockPrisma.conversationMessage.findMany.mockResolvedValue([{ businessId: "salon" }]);
+
+    await post(CUSTOMER, "הסר");
     await settle();
 
     expect(handleIncomingMessage).not.toHaveBeenCalled();
-    expect(sendWhatsAppMessage.mock.calls[0][0].text).toContain("סטודיו רונית");
+    expect(handleOutreachReply).toHaveBeenCalledWith(CUSTOMER, "הסר");
   });
 });

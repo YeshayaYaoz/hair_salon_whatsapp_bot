@@ -9,7 +9,7 @@ import { handleIncomingMessage } from "../bot/claudeBot.js";
 import { CAMPAIGN_OPT_OUT_BUTTON, CAMPAIGN_OPT_OUT_WORDS } from "../lib/whatsappTemplates.js";
 import { checkDailyCap } from "../lib/dailyMessageCap.js";
 import { notifyOwner } from "../lib/ownerNotify.js";
-import { clearHistory, appendTurn, getHistory } from "../bot/conversationStore.js";
+import { clearHistory, appendTurn } from "../bot/conversationStore.js";
 import { decryptSecret } from "../lib/crypto.js";
 import { hasActiveSubscription } from "../lib/subscriptionGate.js";
 import { rateLimit } from "../lib/rateLimit.js";
@@ -18,7 +18,9 @@ import { checkManager } from "../bot/managerAuth.js";
 import { planHasBot } from "../lib/planFeatures.js";
 import { handleTemplateStatusUpdate } from "./templateStatus.js";
 import { handleOutreachReply, isOutreachNumber } from "../leadfinder/inboundReplies.js";
-import { demoBusinessId, demoFooter, isDemoBusiness, noteDemoStarted, routeSharedStranger } from "../lib/demoLine.js";
+import { demoFooter, isDemoBusiness, noteDemoStarted } from "../lib/demoLine.js";
+import { resolveSharedStranger } from "../lib/sharedLineRouting.js";
+import { classifyReply } from "../leadfinder/inboundReplies.js";
 import { Prisma } from "@prisma/client";
 import { captureError } from "../lib/errorMonitoring.js";
 import { transcribeWhatsAppVoiceNote, TranscriptionNotConfiguredError } from "../lib/transcription.js";
@@ -313,16 +315,33 @@ export async function processWhatsAppPayload(payload: any): Promise<void> {
     // receiving number is the same for all of them:
     //   1. The owner of a business with no number of its own (Receipts plan, or a trial that has
     //      not connected) — runs their business from here exactly as from their own line.
-    //   2. A customer of such a business, replying to a receipt — gets one line saying who sent
-    //      it, and their opt-out is honoured. There is no bot for them on this line, by design:
-    //      one business's spam reports would cost every business the line.
-    //   3. A prospect trying the public demo — "דמו", or a follow-up in a live demo thread — is
-    //      handed to the demo business (TORI_DEMO_BUSINESS_ID) and gets the real bot from here on.
+    //   2. A customer of a business that runs its bot from here — identified by the business's
+    //      code in the message, by "דמו" for the public demo, or by having talked to that business
+    //      recently (sharedLineRouting.ts) — gets that business's bot, exactly as on its own line.
+    //   3. A customer of a Receipts-plan business, replying to a receipt — gets one line saying who
+    //      sent it, and their opt-out is honoured. There is no bot for them, by design.
     //   4. A prospect answering cold outreach — handled by the lead finder, as before.
+    // An opt-out skips (2): a bot is never what answers "הסר". It goes to (3) or (4) as it always did.
     let sharedOwner: Awaited<ReturnType<typeof resolveBusinessBySender>> | null = null;
     let demoStarting = false;
     if (isOutreachNumber(phoneNumberId) || isSharedNumber(phoneNumberId)) {
       sharedOwner = await resolveBusinessBySender(message.from as string);
+      if (!sharedOwner) {
+        // Raw body rather than `extracted`, which classifies bot keywords a prospect never meant:
+        // a lead whose reply happens to be a reset keyword would otherwise arrive as "(לא טקסט)".
+        const replyText =
+          (message.text?.body as string | undefined)?.trim() ||
+          (extracted.kind === "text" ? extracted.text : "(הודעה שאינה טקסט)");
+        const optingOut = extracted.kind === "optOut" || classifyReply(replyText) === "opt_out";
+        const routed = optingOut ? null : await resolveSharedStranger(message.from as string, replyText);
+        if (routed) {
+          sharedOwner = routed.business;
+          // The first message of a demo thread is a lead waking up: told to the operator, and
+          // footed with what this is (below). Later messages are an ordinary conversation.
+          demoStarting = routed.opening && isDemoBusiness(routed.business.id);
+          if (demoStarting) void noteDemoStarted(message.from as string, replyText);
+        }
+      }
       if (!sharedOwner) {
         const viaBusiness = await resolveSharedCustomerBusiness(message.from as string);
         const shared = sharedIdentity();
@@ -344,29 +363,11 @@ export async function processWhatsAppPayload(payload: any): Promise<void> {
           }).catch((err) => console.error("[webhook] Shared-line customer reply failed (non-fatal):", err));
           return;
         }
-        // Raw body rather than `extracted`, which classifies bot keywords a prospect never meant:
-        // a lead whose reply happens to be a reset keyword would otherwise arrive as "(לא טקסט)".
         const replyText =
           (message.text?.body as string | undefined)?.trim() ||
           (extracted.kind === "text" ? extracted.text : "(הודעה שאינה טקסט)");
-        const demoId = demoBusinessId();
-        const route = demoId && !viaBusiness ? await routeSharedStranger(message.from as string, replyText) : "outreach";
-        if (route === "demo" && demoId) {
-          const demo = await prisma.business.findUnique({ where: { id: demoId } });
-          if (demo && !demo.whatsappPhoneNumberId) {
-            // The first message of a demo thread is a lead waking up: told to the operator, and
-            // footed with what this is (below). Later messages are an ordinary conversation.
-            demoStarting = (await getHistory(demo.id, message.from as string)).length === 0;
-            if (demoStarting) void noteDemoStarted(message.from as string, replyText);
-            sharedOwner = demo;
-          } else {
-            console.warn(`[demo] TORI_DEMO_BUSINESS_ID ${demoId} is missing or has its own number — demo off`);
-          }
-        }
-        if (!sharedOwner) {
-          await handleOutreachReply(message.from as string, replyText);
-          return;
-        }
+        await handleOutreachReply(message.from as string, replyText);
+        return;
       }
     }
 

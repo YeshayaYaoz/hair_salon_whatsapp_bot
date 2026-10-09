@@ -139,6 +139,30 @@ button instead of typing back a time. Customers can also say "cancel my appointm
 "reschedule" — the bot has `cancel_appointment` and `list_my_appointments` tools in addition to
 `check_availability` / `book_appointment`.
 
+## Running a business from Tori's shared line
+
+A business that has not connected a number of its own — a trial that signed up last night and is
+waiting on Meta, or one that never wants its own number — runs its bot from Tori's line
+(`backend/src/lib/sharedLineRouting.ts`). Set `TORI_SHARED_WHATSAPP_NUMBER` to the dialable form
+of the outreach number and:
+
+- The WhatsApp page in the dashboard shows "your bot already works" with a link to hand out. The
+  link opens WhatsApp on Tori's number with the business named and its short code (`#ab3k7m`,
+  `Business.sharedLineCode`, minted on first use) in the first message. The public booking page
+  offers the same link.
+- On the shared line the sender decides the tenant: the code wins, then "דמו" for the public demo,
+  then memory — a phone that talked to a shared-line business in the last 90 days is still its
+  customer, so a returning customer needs no link. The demo is remembered only while its thread
+  is live, so a prospect answering cold outreach days later reaches a person.
+- Replies, booking confirmations, reminders and review requests all go out from Tori's line with
+  the business's name in the text (the templates are approved on Tori's WABA). Owner alerts
+  already did.
+- An opt-out never reaches a bot: it goes to the receipt sender's opt-out or the lead finder's
+  consent log, as before. A Receipts-plan business is never reachable this way (no bot on it).
+- Once the business connects a number of its own, the code stops resolving and everything moves
+  to that number. Customers who wrote to Tori's number need the new one — the link should be
+  swapped wherever it was posted.
+
 ## Growth: the public demo, outreach and attribution
 
 The product is its own best pitch, so the shared line doubles as a public demo

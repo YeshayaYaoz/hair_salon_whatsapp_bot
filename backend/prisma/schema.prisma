@@ -33,6 +33,12 @@ model Business {
   // answer other than guessing. Null for every account older than this column.
   signupSource String?
 
+  // The short code that identifies this business on Tori's shared line (sharedLineRouting.ts):
+  // its booking link pre-fills "#<code>" into a customer's first message, and that is how the
+  // line knows whose customer is writing. Minted on first use; unique so a code resolves to one
+  // business. Meaningless once the business connects a number of its own.
+  sharedLineCode String? @unique
+
   // Super-admin block: independent of subscriptionStatus — a blocked business is locked out of
   // login and the bot stops replying, regardless of whether their subscription is otherwise fine
   // (e.g. abuse, fraud, a support dispute), without touching their billing state.

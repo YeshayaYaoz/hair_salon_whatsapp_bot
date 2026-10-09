@@ -12,15 +12,13 @@
  * is then treated as that business's customer for the rest of the conversation: the real bot,
  * the real slot picker, the real booking. Nothing is special-cased in the bot itself.
  *
- * Who is a stranger is decided by the webhook before this is asked (not a verified owner, not a
- * customer who was sent a receipt). Among strangers, the outreach reply handler keeps the ones it
- * exists for: an opt-out is never swallowed by a demo, and a message that neither asks for the
- * demo nor continues one still reaches the operator as a reply to cold outreach, exactly as before.
+ * The routing lives in sharedLineRouting.ts, where the demo is one shared-line business among
+ * the others; what is here is only what makes the demo different from them — the trigger word,
+ * the operator alert, and the footer that says what the reader is looking at.
  */
 import { prisma } from "./prisma.js";
 import { Prisma } from "@prisma/client";
-import { getHistory } from "../bot/conversationStore.js";
-import { classifyReply, phoneKey } from "../leadfinder/inboundReplies.js";
+import { phoneKey } from "../leadfinder/inboundReplies.js";
 import { sendAdminAlertEmail } from "./email.js";
 import { esc } from "./emailLayout.js";
 
@@ -45,22 +43,6 @@ export function isDemoBusiness(businessId: string): boolean {
  * this, and a person who typed it by hand meant the same thing. */
 export function isDemoTrigger(text: string): boolean {
   return /דמו|demo/i.test(text);
-}
-
-/**
- * Where a stranger's message on the shared line goes. "demo" when it opens or continues a demo
- * conversation, "outreach" otherwise — and always "outreach" for an opt-out, which must reach the
- * consent log whatever else the sender was doing.
- */
-export async function routeSharedStranger(fromPhone: string, text: string): Promise<"demo" | "outreach"> {
-  const demoId = demoBusinessId();
-  if (!demoId) return "outreach";
-  if (classifyReply(text) === "opt_out") return "outreach";
-  if (isDemoTrigger(text)) return "demo";
-  // Mid-conversation: the thread with the demo business is live (getHistory already drops one
-  // that has gone idle), so "מחר ב-10" after "דמו" lands with the bot and not in the inbox.
-  const history = await getHistory(demoId, fromPhone);
-  return history.length > 0 ? "demo" : "outreach";
 }
 
 /**

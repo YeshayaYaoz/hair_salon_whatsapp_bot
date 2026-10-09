@@ -1,54 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 /**
- * Who among the strangers on Tori's line gets the demo. The rules are few and each one guards a
- * real failure: an opt-out swallowed by a demo is a spam-law breach, a "מחר ב-10" mid-demo that
- * lands in the operator's inbox is a broken demo, and a plain reply to cold outreach that opens a
- * demo is a prospect being answered by a bot when they expected a person.
+ * What makes the demo different from any other business on the shared line: the trigger word,
+ * the operator alert, and the footer. The routing itself is sharedLineRouting.test.ts.
  */
-const getHistory = vi.fn();
-vi.mock("../bot/conversationStore.js", () => ({ getHistory: (...a: unknown[]) => getHistory(...a) }));
 const mockPrisma = { $queryRaw: vi.fn(), $transaction: vi.fn(), lead: { update: vi.fn() }, leadStatusEvent: { create: vi.fn() } };
 vi.mock("./prisma.js", () => ({ prisma: mockPrisma }));
 const sendAdminAlertEmail = vi.fn();
 vi.mock("./email.js", () => ({ sendAdminAlertEmail: (...a: unknown[]) => sendAdminAlertEmail(...a), APP_URL: "https://app.test" }));
 
-const { routeSharedStranger, isDemoTrigger, noteDemoStarted, demoFooter, siteUrl } = await import("./demoLine.js");
+const { isDemoTrigger, noteDemoStarted, demoFooter, siteUrl } = await import("./demoLine.js");
 
 beforeEach(() => {
   vi.clearAllMocks();
-  process.env.TORI_DEMO_BUSINESS_ID = "demo-biz";
-  getHistory.mockResolvedValue([]);
 });
 
-describe("routeSharedStranger", () => {
-  it("sends 'דמו' to the demo, in either language and inside a sentence", async () => {
-    expect(await routeSharedStranger("972501", "דמו")).toBe("demo");
-    expect(await routeSharedStranger("972501", "Demo please")).toBe("demo");
-    expect(await routeSharedStranger("972501", "היי, רוצה לראות את הדמו")).toBe("demo");
+describe("isDemoTrigger", () => {
+  it("matches 'דמו' in either language and inside a sentence", () => {
+    expect(isDemoTrigger("דמו")).toBe(true);
+    expect(isDemoTrigger("Demo please")).toBe(true);
+    expect(isDemoTrigger("היי, רוצה לראות את הדמו")).toBe(true);
     expect(isDemoTrigger("שלום")).toBe(false);
-  });
-
-  it("keeps a live demo thread with the demo, whatever the next message says", async () => {
-    getHistory.mockResolvedValue([{ role: "user", content: "דמו", at: new Date() }]);
-    expect(await routeSharedStranger("972501", "מחר ב-10 מתאים")).toBe("demo");
-    expect(getHistory).toHaveBeenCalledWith("demo-biz", "972501");
-  });
-
-  it("never lets a demo swallow an opt-out", async () => {
-    getHistory.mockResolvedValue([{ role: "user", content: "דמו", at: new Date() }]);
-    expect(await routeSharedStranger("972501", "הסר")).toBe("outreach");
-    expect(await routeSharedStranger("972501", "לא מעוניין")).toBe("outreach");
-  });
-
-  it("leaves a plain reply to cold outreach with the lead finder", async () => {
-    expect(await routeSharedStranger("972501", "כן, מעניין אותי")).toBe("outreach");
-  });
-
-  it("is off entirely without TORI_DEMO_BUSINESS_ID", async () => {
-    delete process.env.TORI_DEMO_BUSINESS_ID;
-    expect(await routeSharedStranger("972501", "דמו")).toBe("outreach");
-    expect(getHistory).not.toHaveBeenCalled();
   });
 });
 

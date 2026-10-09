@@ -1,5 +1,5 @@
 import { prisma } from "./prisma.js";
-import { decryptSecret } from "./crypto.js";
+import { sendingIdentity } from "./sendingIdentity.js";
 import { sendWhatsAppMessage, sendWhatsAppTemplate, WhatsAppSendError, RE_ENGAGEMENT_ERROR_CODE } from "../webhook/whatsappClient.js";
 import { reminderTemplate, reviewTemplate, type TemplateConfig } from "./whatsappTemplates.js";
 import { meterOutboundMessage } from "./wallet.js";
@@ -67,8 +67,10 @@ export async function runReminderJob() {
 
   for (const appt of appointments) {
     if (!appt.business.remindersEnabled) continue;
-    if (!appt.business.whatsappPhoneNumberId || !appt.business.whatsappAccessToken) continue;
-    const accessToken = decryptSecret(appt.business.whatsappAccessToken);
+    // Its own line, or Tori's for a business running from the shared line — the templates are
+    // approved on Tori's WABA, so a reminder from there is as deliverable as from any salon's.
+    const identity = sendingIdentity(appt.business);
+    if (!identity) continue;
     // timeZone is not optional: startTime is an absolute UTC instant and the server runs on UTC, so
     // without it the reminder told the customer an hour two or three hours before the real one.
     const when = appt.startTime.toLocaleString("he-IL", {
@@ -82,7 +84,7 @@ export async function runReminderJob() {
     try {
       const outcome = await sendWithTemplateFallback(
         appt.businessId,
-        { phoneNumberId: appt.business.whatsappPhoneNumberId, accessToken, to: appt.customer.phone, kind: "reminder" },
+        { phoneNumberId: identity.phoneNumberId, accessToken: identity.accessToken, to: appt.customer.phone, kind: "reminder" },
         text,
         reminderTemplate(),
         [name, appt.service.name, when, appt.business.name],
@@ -120,8 +122,8 @@ export async function runReviewJob() {
 
   for (const appt of appointments) {
     if (!appt.business.reviewsEnabled) continue;
-    if (!appt.business.whatsappPhoneNumberId || !appt.business.whatsappAccessToken) continue;
-    const accessToken = decryptSecret(appt.business.whatsappAccessToken);
+    const identity = sendingIdentity(appt.business);
+    if (!identity) continue;
     const name = appt.customer.name ? appt.customer.name.split(" ")[0] : "היי";
     const reviewLine = appt.business.googleMapsUrl
       ? `\n\nנשמח לביקורת קצרה ⭐\n${appt.business.googleMapsUrl}`
@@ -133,7 +135,7 @@ export async function runReviewJob() {
     try {
       const outcome = await sendWithTemplateFallback(
         appt.businessId,
-        { phoneNumberId: appt.business.whatsappPhoneNumberId, accessToken, to: appt.customer.phone, kind: "review" },
+        { phoneNumberId: identity.phoneNumberId, accessToken: identity.accessToken, to: appt.customer.phone, kind: "review" },
         text,
         reviewTemplate(),
         [name, appt.business.name, appt.service.name],

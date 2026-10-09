@@ -9,7 +9,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 interface Service { id: string; name: string; description?: string; priceCents: number; durationMin: number }
 interface BusinessHours { dayOfWeek: number; openMin: number; closeMin: number }
-interface BusinessInfo { id: string; name: string; address?: string; timezone?: string; services: Service[]; hours?: BusinessHours[] }
+interface BusinessInfo { id: string; name: string; address?: string; timezone?: string; services: Service[]; hours?: BusinessHours[]; whatsappLink?: string | null }
 interface Slot { startTime: string; endTime: string }
 
 type Step = "service" | "date" | "slot" | "details" | "done";
@@ -44,6 +44,7 @@ const COPY = {
     payNow: "לתשלום המקדמה",
     holdWarning: "בלי התשלום המועד ישוחרר אוטומטית וייפתח לאחרים.",
     poweredBy: "מופעל על ידי",
+    bookOnWhatsApp: "או קבעו תור בוואטסאפ",
     minutesShort: "דק׳",
     today: "היום",
     accessibility: "הצהרת נגישות",
@@ -74,6 +75,7 @@ const COPY = {
     payNow: "Pay the deposit",
     holdWarning: "Without payment the slot is released automatically and opens up to others.",
     poweredBy: "Powered by",
+    bookOnWhatsApp: "Or book over WhatsApp",
     minutesShort: "min",
     today: "Today",
     accessibility: "Accessibility statement",
@@ -285,6 +287,21 @@ export default function BookPage() {
           </div>
           <h1 className="text-2xl font-bold text-gray-900">{info.name}</h1>
           {info.address && <p className="text-gray-500 text-xs mt-1">{info.address}</p>}
+          {/* A business running from Tori's shared line has no number of its own to print, so
+              this is the one place its customers learn they can book by chat. */}
+          {info.whatsappLink && step !== "done" && (
+            <a
+              href={info.whatsappLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 mt-4 text-sm font-semibold text-[#128C7E] bg-[#E7F8F2] border border-[#BFEBDB] rounded-full px-4 py-2 hover:bg-[#d8f3e9] transition"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                <path d="M12 2a10 10 0 00-8.6 15.1L2 22l5-1.3A10 10 0 1012 2zm0 18.2a8.2 8.2 0 01-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1112 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.6.8-.8 1-.3.2-.5.1a6.7 6.7 0 01-3.3-2.9c-.3-.4.3-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 00-.7.3 3 3 0 00-.9 2.2 5.2 5.2 0 001.1 2.8 12 12 0 004.6 4c.6.3 1.1.4 1.5.5a3.6 3.6 0 001.6.1 2.7 2.7 0 001.8-1.3 2.2 2.2 0 00.2-1.3c-.1-.1-.3-.2-.5-.3z" />
+              </svg>
+              {c.bookOnWhatsApp}
+            </a>
+          )}
         </div>
 
         {step !== "done" && <StepIndicator current={STEP_INDEX[step]} labels={c.steps} />}

@@ -3,12 +3,12 @@
 // behave identically regardless of which channel the customer used — one has a slot cancelled,
 // the freed time offered to the waitlist, and the calendar cleaned up the same way either way.
 import { prisma } from "../lib/prisma.js";
+import { sendingIdentity } from "../lib/sendingIdentity.js";
 import type { Appointment } from "@prisma/client";
 import { createAppointment, SlotUnavailableError, OutsideBusinessHoursError } from "./availability.js";
 import { syncAppointmentToCalendar, deleteCalendarEvent } from "../lib/googleCalendar.js";
 import { notifyWaitlist } from "../lib/waitlist.js";
 import { notifyOwner } from "../lib/ownerNotify.js";
-import { decryptSecret } from "../lib/crypto.js";
 import { sendWithTemplateFallback } from "../lib/scheduledMessages.js";
 import { confirmationTemplate } from "../lib/whatsappTemplates.js";
 import { releaseCustomerCoupon } from "./customerCoupons.js";
@@ -38,7 +38,9 @@ async function confirmBookingToCustomer(params: {
     where: { id: params.businessId },
     select: { name: true, address: true, timezone: true, whatsappPhoneNumberId: true, whatsappAccessToken: true },
   });
-  if (!business?.whatsappPhoneNumberId || !business.whatsappAccessToken) return;
+  // Its own line, or Tori's for a business that runs from the shared line (sendingIdentity).
+  const identity = business ? sendingIdentity(business) : null;
+  if (!business || !identity) return;
 
   // The same localized string the reminder uses, so a customer sees one format across both messages
   // rather than two renderings of the same appointment.
@@ -56,8 +58,8 @@ async function confirmBookingToCustomer(params: {
   const outcome = await sendWithTemplateFallback(
     params.businessId,
     {
-      phoneNumberId: business.whatsappPhoneNumberId,
-      accessToken: decryptSecret(business.whatsappAccessToken),
+      phoneNumberId: identity.phoneNumberId,
+      accessToken: identity.accessToken,
       to: params.customerPhone,
       kind: "booking-confirmation",
       },
