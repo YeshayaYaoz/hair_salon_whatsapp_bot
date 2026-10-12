@@ -20,6 +20,8 @@ import { handleTemplateStatusUpdate } from "./templateStatus.js";
 import { handleOutreachReply, isOutreachNumber } from "../leadfinder/inboundReplies.js";
 import { demoFooter, isDemoBusiness, noteDemoStarted } from "../lib/demoLine.js";
 import { resolveSharedStranger } from "../lib/sharedLineRouting.js";
+import { checkSharedLineCap, capNoticeSentRecently, SHARED_LINE_CAP_NOTICE } from "../lib/sharedLineCap.js";
+import { sendAdminAlertEmail } from "../lib/email.js";
 import { classifyReply } from "../leadfinder/inboundReplies.js";
 import { Prisma } from "@prisma/client";
 import { captureError } from "../lib/errorMonitoring.js";
@@ -498,6 +500,37 @@ export async function processWhatsAppPayload(payload: any): Promise<void> {
         ).catch(() => {});
       }
       return;
+    }
+
+    /**
+     * A trial business on Tori's shared line has a ceiling on bot replies (sharedLineCap.ts).
+     * Past it the bot is quiet for its customers: the message is kept for the transcript, the
+     * customer is told once a day, and the owner is told once — with the two ways out.
+     */
+    if (identity.shared && customerPhone !== business.notificationPhone) {
+      const shared = await checkSharedLineCap(business);
+      if (shared.exceeded) {
+        const preview = extracted.kind === "text" ? extracted.text : "[הודעה]";
+        await appendTurn(business.id, customerPhone, { role: "user", content: preview });
+        console.warn(`[sharedLine] trial cap reached for business ${business.id} (${shared.used}/${shared.cap}) — staying silent`);
+        if (shared.justCrossed) {
+          await notifyOwner(
+            business.id,
+            `⚠️ הבוט הגיע למגבלת ${shared.cap} ההודעות של תקופת הניסיון על הקו של תורי, ומפסיק לענות ללקוחות. כדי להמשיך: חברו מספר וואטסאפ משלכם (דשבורד → וואטסאפ), או הפעילו מנוי.`
+          ).catch(() => {});
+          sendAdminAlertEmail(
+            `🔥 עסק בניסיון מיצה את מכסת הקו המשותף: ${business.name}`,
+            `<strong>${business.name}</strong> (${business.email}) שלח ${shared.used} תשובות בוט ב-30 יום על הקו של תורי. הבוט שלו הושתק. זה הזמן להתקשר ולסגור.`
+          ).catch(() => {});
+        }
+        if (!(await capNoticeSentRecently(business.id, customerPhone))) {
+          await appendTurn(business.id, customerPhone, { role: "assistant", content: SHARED_LINE_CAP_NOTICE });
+          await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: SHARED_LINE_CAP_NOTICE }).catch((err) => {
+            console.error("[sharedLine] cap notice failed (non-fatal):", err);
+          });
+        }
+        return;
+      }
     }
 
     if (extracted.kind === "reset") {

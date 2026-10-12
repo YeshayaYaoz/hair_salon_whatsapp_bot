@@ -1,4 +1,5 @@
 import { asyncRouter } from "../lib/asyncRouter.js";
+import { checkSharedLineCap } from "../lib/sharedLineCap.js";
 import { ensureSharedLineCode, sharedLineLink } from "../lib/sharedLineRouting.js";
 import crypto from "crypto";
 import { z } from "zod";
@@ -75,13 +76,21 @@ businessRouter.use(receiptsRouter);
 businessRouter.get("/me/shared-line", async (req: AuthedRequest, res) => {
   const business = await prisma.business.findUniqueOrThrow({
     where: { id: req.businessId! },
-    select: { name: true, whatsappPhoneNumberId: true, subscriptionPlan: true },
+    select: { name: true, whatsappPhoneNumberId: true, subscriptionPlan: true, subscriptionStatus: true },
   });
   if (business.whatsappPhoneNumberId || !planHasBot(business.subscriptionPlan)) {
-    return res.json({ active: false, code: null, link: null });
+    return res.json({ active: false, code: null, link: null, cap: null });
   }
   const code = await ensureSharedLineCode(req.businessId!);
-  res.json({ active: true, code, link: sharedLineLink(code, business.name) });
+  // The trial ceiling on replies from the shared line, so the owner sees it coming rather than
+  // learning about it from a silent bot. Null when it does not apply (a paying business).
+  const status = await checkSharedLineCap({ id: req.businessId!, ...business });
+  res.json({
+    active: true,
+    code,
+    link: sharedLineLink(code, business.name),
+    cap: status.applies ? { used: status.used, limit: status.cap } : null,
+  });
 });
 
 businessRouter.get("/me", async (req: AuthedRequest, res) => {

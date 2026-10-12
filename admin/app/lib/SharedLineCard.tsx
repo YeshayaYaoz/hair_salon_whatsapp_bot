@@ -17,11 +17,15 @@ export function SharedLineCard() {
   const { lang } = useLanguage();
   const he = lang === "he";
   const [link, setLink] = useState<string | null>(null);
+  const [cap, setCap] = useState<{ used: number; limit: number } | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    apiFetch<{ active: boolean; link: string | null }>("/api/business/me/shared-line")
-      .then((r) => setLink(r.active ? r.link : null))
+    apiFetch<{ active: boolean; link: string | null; cap: { used: number; limit: number } | null }>("/api/business/me/shared-line")
+      .then((r) => {
+        setLink(r.active ? r.link : null);
+        setCap(r.active ? r.cap : null);
+      })
       .catch(() => setLink(null));
   }, []);
 
@@ -88,6 +92,34 @@ export function SharedLineCard() {
               ? "שימו אותו בביו באינסטגרם, בפרופיל בגוגל ובסטטוס. לקוח שכתב פעם אחת לא צריך את הקישור שוב — הבוט זוכר אותו 90 יום."
               : "Put it in your Instagram bio, your Google profile and your status. A customer who wrote once needs no link again — the bot remembers them for 90 days."}
           </p>
+          {/* The trial ceiling, shown before it is hit: a bot that goes quiet with no warning
+              looks broken, and the two ways past it are both one click from here. */}
+          {cap && (() => {
+            const pct = Math.min(100, Math.round((cap.used / cap.limit) * 100));
+            const exhausted = cap.used >= cap.limit;
+            return (
+              <div className={`mt-3 rounded-lg px-3 py-2.5 text-xs ${exhausted ? "bg-red-50 border border-red-200 text-red-800" : "bg-white border border-[#BFEBDB] text-gray-700"}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-semibold">
+                    {he ? "תשובות בוט בניסיון, 30 יום אחרונים" : "Trial bot replies, last 30 days"}
+                  </span>
+                  <span className="tabular-nums" dir="ltr">{cap.used} / {cap.limit}</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-gray-200 mt-2 overflow-hidden" aria-hidden>
+                  <div className={`h-full rounded-full ${exhausted ? "bg-red-500" : pct >= 80 ? "bg-amber-500" : "bg-[#128C7E]"}`} style={{ width: `${pct}%` }} />
+                </div>
+                <p className="mt-2">
+                  {exhausted
+                    ? he
+                      ? "המכסה נוצלה והבוט מפסיק לענות ללקוחות. חיבור מספר משלכם או הפעלת מנוי מסירים את המגבלה מיד."
+                      : "The cap is used up and the bot has stopped answering customers. Connecting your own number or starting a subscription lifts it at once."
+                    : he
+                      ? "המגבלה חלה רק בתקופת הניסיון על הקו המשותף. עם מספר משלכם או מנוי אין מגבלה כזו."
+                      : "Applies only during the trial on the shared line. With your own number or a subscription there is no such cap."}
+                </p>
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>

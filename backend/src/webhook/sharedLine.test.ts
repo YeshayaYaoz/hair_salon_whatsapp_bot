@@ -12,7 +12,7 @@ const mockPrisma = {
   business: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
   customer: { upsert: vi.fn(async () => ({})), updateMany: vi.fn(async () => ({ count: 1 })), findUnique: vi.fn(async () => null) },
   receipt: { findFirst: vi.fn() },
-  conversationMessage: { findFirst: vi.fn(), findMany: vi.fn(async () => [] as { businessId: string }[]), create: vi.fn() },
+  conversationMessage: { findFirst: vi.fn(), findMany: vi.fn(async () => [] as { businessId: string }[]), count: vi.fn(async () => 0), create: vi.fn() },
   systemSetting: { findMany: vi.fn(async () => []), findUnique: vi.fn(async () => null), upsert: vi.fn(async () => ({})) },
 };
 vi.mock("../lib/prisma.js", () => ({ prisma: mockPrisma }));
@@ -22,13 +22,16 @@ vi.mock("../lib/rateLimit.js", () => ({ rateLimit: () => (_r: unknown, _s: unkno
 vi.mock("../lib/subscriptionGate.js", () => ({ hasActiveSubscription: vi.fn(async () => true) }));
 vi.mock("../lib/usageLedger.js", () => ({ logWhatsAppBillingEvent: vi.fn() }));
 vi.mock("../lib/dailyMessageCap.js", () => ({ checkDailyCap: vi.fn(async () => ({ exceeded: false, justCrossed: false, count: 0 })) }));
-vi.mock("../lib/ownerNotify.js", () => ({ notifyOwner: vi.fn() }));
-vi.mock("../lib/email.js", () => ({ sendWhatsAppTokenExpiredEmail: vi.fn(), sendAdminAlertEmail: vi.fn() }));
+const notifyOwner = vi.fn(async () => true);
+vi.mock("../lib/ownerNotify.js", () => ({ notifyOwner: (...a: unknown[]) => notifyOwner(...a) }));
+const sendAdminAlertEmail = vi.fn(async () => {});
+vi.mock("../lib/email.js", () => ({ sendWhatsAppTokenExpiredEmail: vi.fn(), sendAdminAlertEmail: (...a: unknown[]) => sendAdminAlertEmail(...a) }));
 vi.mock("../lib/transcription.js", () => ({ transcribeWhatsAppVoiceNote: vi.fn(), TranscriptionNotConfiguredError: class extends Error {} }));
 vi.mock("./templateStatus.js", () => ({ handleTemplateStatusUpdate: vi.fn() }));
 vi.mock("../billing/yieldCampaignJob.js", () => ({ sendYieldCampaignOffers: vi.fn() }));
 const getHistory = vi.fn(async () => [] as unknown[]);
-vi.mock("../bot/conversationStore.js", () => ({ clearHistory: vi.fn(), appendTurn: vi.fn(), getHistory: (...a: unknown[]) => getHistory(...a) }));
+const appendTurn = vi.fn(async () => {});
+vi.mock("../bot/conversationStore.js", () => ({ clearHistory: vi.fn(), appendTurn: (...a: unknown[]) => appendTurn(...a), getHistory: (...a: unknown[]) => getHistory(...a) }));
 const noteDemoStarted = vi.fn(async () => {});
 vi.mock("../lib/demoLine.js", async (importOriginal) => {
   const real = await importOriginal<typeof import("../lib/demoLine.js")>();
@@ -71,6 +74,8 @@ beforeEach(async () => {
   delete process.env.TORI_DEMO_BUSINESS_ID;
   getHistory.mockResolvedValue([]);
   mockPrisma.conversationMessage.findMany.mockResolvedValue([]);
+  mockPrisma.conversationMessage.count.mockResolvedValue(0);
+  mockPrisma.conversationMessage.findFirst.mockResolvedValue(null);
   mockPrisma.business.findUnique.mockResolvedValue(null);
   process.env.TORI_OUTREACH_PHONE_NUMBER_ID = "tori-line";
   process.env.TORI_OUTREACH_ACCESS_TOKEN = "tori-token";
@@ -241,5 +246,71 @@ describe("a business running its bot from the shared line", () => {
 
     expect(handleIncomingMessage).not.toHaveBeenCalled();
     expect(handleOutreachReply).toHaveBeenCalledWith(CUSTOMER, "הסר");
+  });
+});
+
+describe("the trial cap on the shared line", () => {
+  const trialSalon = {
+    ...receiptsBusiness, id: "trial", name: "סטודיו ניסיון", email: "trial@x.com", notificationPhone: "972500000002",
+    subscriptionPlan: "standard", subscriptionStatus: "trial", botEnabled: true, sharedLineCode: "zz9q2p",
+  };
+  const CUSTOMER = "972506666666";
+
+  beforeEach(() => {
+    mockPrisma.business.findUnique.mockImplementation(async ({ where }: { where: { id?: string; sharedLineCode?: string } }) =>
+      where.id === "trial" || where.sharedLineCode === "zz9q2p" ? trialSalon : null
+    );
+    handleIncomingMessage.mockResolvedValue({ text: "היי! מחר פנוי ב-10:00", isFirstReply: true });
+  });
+
+  it("under the cap, the bot answers as usual", async () => {
+    mockPrisma.conversationMessage.count.mockResolvedValue(149);
+    await post(CUSTOMER, "#zz9q2p");
+    await settle();
+    expect(handleIncomingMessage).toHaveBeenCalledWith("trial", CUSTOMER, "#zz9q2p");
+  });
+
+  it("at the cap, the bot is silent, the customer is told once, and the owner and operator once", async () => {
+    mockPrisma.conversationMessage.count.mockResolvedValue(150);
+    await post(CUSTOMER, "#zz9q2p");
+    await settle();
+
+    expect(handleIncomingMessage).not.toHaveBeenCalled();
+    // The customer's message is kept for the transcript; the notice is sent and recorded.
+    expect(appendTurn).toHaveBeenCalledWith("trial", CUSTOMER, { role: "user", content: "#zz9q2p" });
+    expect(appendTurn).toHaveBeenCalledWith("trial", CUSTOMER, { role: "assistant", content: expect.stringContaining("לא זמין כרגע") });
+    expect(sendWhatsAppMessage.mock.calls[0][0]).toMatchObject({ phoneNumberId: "tori-line", to: CUSTOMER, text: expect.stringContaining("לא זמין כרגע") });
+    expect(notifyOwner).toHaveBeenCalledWith("trial", expect.stringContaining("150"));
+    expect(sendAdminAlertEmail.mock.calls[0][0]).toContain("סטודיו ניסיון");
+
+    // The next message past the cap: no second alert, and no second notice within the day.
+    vi.clearAllMocks();
+    mockPrisma.conversationMessage.count.mockResolvedValue(151);
+    mockPrisma.conversationMessage.findFirst.mockResolvedValue({ createdAt: new Date() });
+    mockPrisma.business.findUnique.mockImplementation(async ({ where }: { where: { id?: string; sharedLineCode?: string } }) =>
+      where.id === "trial" || where.sharedLineCode === "zz9q2p" ? trialSalon : null
+    );
+    await post(CUSTOMER, "#zz9q2p");
+    await settle();
+    expect(handleIncomingMessage).not.toHaveBeenCalled();
+    expect(notifyOwner).not.toHaveBeenCalled();
+    expect(sendWhatsAppMessage).not.toHaveBeenCalled();
+  });
+
+  it("does not bind a paying business on the shared line, nor the owner's own line to Tori", async () => {
+    mockPrisma.conversationMessage.count.mockResolvedValue(999);
+    const paying = { ...trialSalon, subscriptionStatus: "active" };
+    mockPrisma.business.findUnique.mockImplementation(async () => paying);
+    await post(CUSTOMER, "#zz9q2p");
+    await settle();
+    expect(handleIncomingMessage).toHaveBeenCalledWith("trial", CUSTOMER, "#zz9q2p");
+
+    vi.clearAllMocks();
+    mockPrisma.conversationMessage.count.mockResolvedValue(999);
+    mockPrisma.business.findMany.mockResolvedValue([trialSalon]);
+    handleIncomingMessage.mockResolvedValue({ text: "יש 3 תורים מחר", isFirstReply: false });
+    await post(trialSalon.notificationPhone, "מה יש מחר?");
+    await settle();
+    expect(handleIncomingMessage).toHaveBeenCalledWith("trial", trialSalon.notificationPhone, "מה יש מחר?");
   });
 });

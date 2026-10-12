@@ -159,6 +159,11 @@ of the outreach number and:
   already did.
 - An opt-out never reaches a bot: it goes to the receipt sender's opt-out or the lead finder's
   consent log, as before. A Receipts-plan business is never reachable this way (no bot on it).
+- A **trial** business on the shared line may send `SHARED_LINE_TRIAL_MESSAGE_CAP` bot replies
+  (default 150) per rolling 30 days (`backend/src/lib/sharedLineCap.ts`). Past that its bot goes
+  quiet: the customer is told once a day, the owner and the operator are told once, and the
+  dashboard card shows the meter. Connecting a number or paying lifts it. Owner-side traffic,
+  reminders and the demo are not counted. One trial can no longer cost the line its standing.
 - Once the business connects a number of its own, the code stops resolving and everything moves
   to that number. Customers who wrote to Tori's number need the new one — the link should be
   swapped wherever it was posted.
