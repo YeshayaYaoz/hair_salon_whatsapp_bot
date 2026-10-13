@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: "list — show every code and who redeemed it; create — make a new one"
+        description: "list — every code and who redeemed it; create — a new code; find — businesses matching text; grant — a direct discount to one business (needs business + price)"
         type: choice
-        options: [list, create]
+        options: [list, create, find, grant]
         default: list
       code:
         description: "The code businesses will type, e.g. LAUNCH50"
@@ -34,6 +34,19 @@ on:
       note:
         description: "For your own reference — which campaign this was for"
         default: ""
+      find:
+        description: "find — text to match against business name or email"
+        default: ""
+      business:
+        description: "grant — business id"
+        default: ""
+      price:
+        description: "grant — the monthly price the owner was promised, e.g. 87.90 (cycles = how many charges; blank = forever)"
+        default: ""
+      confirm:
+        description: "grant — actually write it. Unticked prints before/after and stops."
+        type: boolean
+        default: false
 
 jobs:
   coupon:
@@ -63,6 +76,10 @@ jobs:
           MAXR: ${{ inputs.max }}
           EXPIRES: ${{ inputs.expires }}
           NOTE: ${{ inputs.note }}
+          FIND: ${{ inputs.find }}
+          BUSINESS: ${{ inputs.business }}
+          PRICE: ${{ inputs.price }}
+          CONFIRM: ${{ inputs.confirm == true && '1' || '' }}
         run: |
           set -euo pipefail
           npm i -g @railway/cli >/dev/null 2>&1
@@ -79,6 +96,20 @@ jobs:
             [ -n "$MAXR" ]    && args+=(--max "$MAXR")
             [ -n "$EXPIRES" ] && args+=(--expires "$EXPIRES")
             [ -n "$NOTE" ]    && args+=(--note "$NOTE")
+          elif [ "$ACTION" = "find" ]; then
+            [ -z "$FIND" ] && { echo "::error::'find' needs the find input."; exit 1; }
+            railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+              npx tsx scripts/grant-coupon.ts --find "$FIND"
+            exit $?
+          elif [ "$ACTION" = "grant" ]; then
+            [ -z "$BUSINESS" ] || [ -z "$PRICE" ] && { echo "::error::'grant' needs business and price."; exit 1; }
+            args+=(--business "$BUSINESS" --price "$PRICE")
+            [ -n "$CYCLES" ] && args+=(--cycles "$CYCLES")
+            [ -n "$CODE" ]   && args+=(--code "$CODE")
+            [ -n "$CONFIRM" ] && args+=(--confirm)
+            railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+              npx tsx scripts/grant-coupon.ts "${args[@]}"
+            exit $?
           else
             args+=(--list)
           fi
