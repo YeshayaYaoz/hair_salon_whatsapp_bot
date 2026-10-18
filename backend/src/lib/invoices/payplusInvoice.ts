@@ -87,8 +87,13 @@ export const payplusInvoiceProvider: InvoiceProvider = {
 
     const text = await res.text();
     if (!res.ok) throw new Error(`PayPlus Invoice+ generation failed (${res.status}): ${text}`);
-    let body: {
-      originalDocAddress?: string; copyDocAddress?: string; docUID?: string; number?: string | number; validDocumentGenerated?: boolean;
+    interface DocFields { originalDocAddress?: string; copyDocAddress?: string; docUID?: string; number?: string | number; validDocumentGenerated?: boolean }
+    let body: DocFields & {
+      status?: string;
+      /** What the live API actually answers with: the document fields nested here. The reference's
+       * example shows them at the top level, and the first real receipt (number 2001) was issued
+       * and then reported as a failure because only the top level was read. */
+      details?: DocFields;
       data?: { number?: string; uuid?: string; original_doc_url?: string; copy_doc_url?: string };
       results?: { status?: string; description?: string };
       message?: string;
@@ -98,15 +103,16 @@ export const payplusInvoiceProvider: InvoiceProvider = {
     } catch {
       throw new Error(`PayPlus Invoice+ returned a non-JSON response: ${text.slice(0, 200)}`);
     }
-    if (body.results?.status && body.results.status !== "success") {
-      throw new Error(`PayPlus Invoice+ rejected the request: ${body.results.description ?? body.message ?? "unknown error"}`);
+    const failed = (body.results?.status && body.results.status !== "success") || (body.status && body.status !== "success");
+    if (failed) {
+      throw new Error(`PayPlus Invoice+ rejected the request: ${body.results?.description ?? body.message ?? text.slice(0, 300)}`);
     }
-    if (body.validDocumentGenerated === false) {
+    const doc: DocFields = { ...body, ...(body.details ?? {}) };
+    if (doc.validDocumentGenerated === false) {
       throw new Error(`PayPlus Invoice+ did not generate the document: ${body.message ?? body.results?.description ?? "unknown error"}`);
     }
-    // Documented shape first; the older data-wrapped one kept in case an account still answers so.
-    const url = body.originalDocAddress ?? body.copyDocAddress ?? body.data?.original_doc_url ?? body.data?.copy_doc_url;
-    const id = body.docUID ?? body.data?.uuid ?? body.number ?? body.data?.number;
+    const url = doc.originalDocAddress ?? doc.copyDocAddress ?? body.data?.original_doc_url ?? body.data?.copy_doc_url;
+    const id = doc.docUID ?? body.data?.uuid ?? doc.number ?? body.data?.number;
     if (!url || id === undefined) throw new Error(`PayPlus Invoice+ response missing the document url: ${text.slice(0, 300)}`);
     return { documentUrl: url, providerDocumentId: String(id) };
   },

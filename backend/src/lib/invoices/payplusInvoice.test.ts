@@ -59,6 +59,21 @@ describe("payplusInvoiceProvider.createReceipt", () => {
     expect(out).toEqual({ documentUrl: "https://payplus/doc/1", providerDocumentId: "d-1" });
   });
 
+  it("reads the live API's shape, with the document under details", async () => {
+    // Verbatim from the first real receipt, 18 Oct 2026 — issued, and then misreported as failed.
+    fetchMock.mockResolvedValue(ok({
+      status: "success",
+      details: { doc_type: "inv_receipt", docUID: "0ba9d23b-c93b-4f72-b055-5452863a160e", number: "2001", originalDocAddress: "https://restapi.payplus.co.il/getdoc/s/o/0ba9d23b.pdf", copyDocAddress: "https://restapi.payplus.co.il/getdoc/s/c/0ba9d23b.pdf" },
+    }));
+    const out = await payplusInvoiceProvider.createReceipt(creds, { amountIls: 300, description: "בדיקה", customerName: "אורי" });
+    expect(out).toEqual({ documentUrl: "https://restapi.payplus.co.il/getdoc/s/o/0ba9d23b.pdf", providerDocumentId: "0ba9d23b-c93b-4f72-b055-5452863a160e" });
+  });
+
+  it("treats a top-level non-success status as a refusal", async () => {
+    fetchMock.mockResolvedValue(ok({ status: "error", message: "brand not configured" }));
+    await expect(payplusInvoiceProvider.createReceipt(creds, { amountIls: 1, description: "x", customerName: "a" })).rejects.toThrow(/brand not configured/);
+  });
+
   it("still reads the older data-wrapped response", async () => {
     fetchMock.mockResolvedValue(ok({ data: { uuid: "u-9", original_doc_url: "https://payplus/doc/9" }, results: { status: "success" } }));
     const out = await payplusInvoiceProvider.createReceipt(creds, { amountIls: 1, description: "x", customerName: "a" });
