@@ -63,6 +63,16 @@ describe("createPaymentRequest", () => {
     expect(sendWhatsAppMessage.mock.calls[0][0].text).toContain("₪300");
   });
 
+  it("promises the automatic receipt only when an invoicing provider is connected", async () => {
+    resolveInvoiceCredentials.mockReturnValue(null);
+    await createPaymentRequest({ businessId: "b1", customer, amountIls: 300, description: "בדיקה" });
+    expect(sendWhatsAppMessage.mock.calls[0][0].text).not.toContain("הקבלה");
+
+    resolveInvoiceCredentials.mockReturnValue({ provider: "greeninvoice", credentials: {} });
+    await createPaymentRequest({ businessId: "b1", customer, amountIls: 300, description: "בדיקה" });
+    expect(sendWhatsAppMessage.mock.calls[1][0].text).toContain("הקבלה תגיע אליך");
+  });
+
   it("falls back to the template with the request id on the button when the window is closed", async () => {
     sendWhatsAppMessage.mockRejectedValue(new WhatsAppSendError(400, 131047));
     sendWhatsAppTemplate.mockResolvedValue({});
@@ -70,7 +80,7 @@ describe("createPaymentRequest", () => {
     const out = await createPaymentRequest({ businessId: "b1", customer, amountIls: 300, description: "בדיקה" });
 
     expect(out.delivery).toBe("template");
-    expect(sendWhatsAppTemplate.mock.calls[0][0]).toMatchObject({ templateName: "tori_payment_link", urlSuffix: "pr1", bodyParams: ["אורי", "Kestech", "בדיקה", "300"] });
+    expect(sendWhatsAppTemplate.mock.calls[0][0]).toMatchObject({ templateName: "tori_payment_request", urlSuffix: "pr1", bodyParams: ["אורי", "Kestech", "בדיקה", "300"] });
   });
 
   it("refuses without a payment provider, and leaves no row behind when the provider refuses", async () => {

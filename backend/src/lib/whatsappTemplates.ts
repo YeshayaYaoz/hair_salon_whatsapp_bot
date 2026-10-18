@@ -557,8 +557,12 @@ export function receiptTemplate(): TemplateConfig {
  * message with the link is dropped. Same arrangement as the receipt: fixed domain on the button,
  * /p/<request id> here redirects to the provider's hosted page.
  */
-export const PAYMENT_LINK_TEMPLATE_NAME = "tori_payment_link";
-export const PAYMENT_LINK_BODY = "היי {{1}}, {{2}} שלחו לך בקשת תשלום על {{3}} בסך ₪{{4}}. לתשלום מאובטח לחצו על הכפתור.";
+// "_request" rather than "_link": the first wording was approved and an approved body cannot be
+// edited, only replaced under a new name. This one thanks the customer and says the receipt
+// follows by itself, which is what the owner wanted a customer to read.
+export const PAYMENT_LINK_TEMPLATE_NAME = "tori_payment_request";
+export const PAYMENT_LINK_BODY =
+  "היי {{1}} 👋 תודה שבחרת ב{{2}}! הכנו לך קישור לתשלום על {{3}}, בסך ₪{{4}}. התשלום מאובטח ולוקח פחות מדקה, והקבלה תגיע אליך לכאן אוטומטית מיד אחרי. לחצו על הכפתור לתשלום.";
 export const PAYMENT_LINK_EXAMPLE = ["אורי", "סטודיו רונית", "טיפול", "300"];
 export const PAYMENT_LINK_BUTTON_TEXT = "לתשלום";
 

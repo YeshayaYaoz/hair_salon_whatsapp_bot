@@ -30,6 +30,7 @@ export class NoPaymentProviderError extends Error {
 const BUSINESS_SELECT = {
   id: true, name: true, paymentProvider: true, paymentApiKey: true, paymentApiSecret: true, paymentPageUid: true, paymentWebhookSecret: true,
   whatsappPhoneNumberId: true, whatsappAccessToken: true,
+  invoiceProvider: true, invoiceApiKey: true, invoiceApiSecret: true,
 } as const;
 
 export interface CreatedPaymentRequest {
@@ -74,7 +75,11 @@ export async function createPaymentRequest(params: {
   }
   await prisma.paymentRequest.update({ where: { id: row.id }, data: { paymentUrl: link.paymentUrl, providerRef: link.providerTransactionId } });
 
-  const delivery = await deliverPaymentLink({ business, customer: params.customer, requestId: row.id, paymentUrl: link.paymentUrl, amountIls: params.amountIls, description: params.description });
+  const delivery = await deliverPaymentLink({
+    business, customer: params.customer, requestId: row.id, paymentUrl: link.paymentUrl, amountIls: params.amountIls, description: params.description,
+    // Promised only when it is true: a business with no invoicing connected issues nothing.
+    receiptPromised: Boolean(resolveInvoiceCredentials(business)),
+  });
   await prisma.paymentRequest.update({ where: { id: row.id }, data: { delivery } }).catch(() => {});
   return { requestId: row.id, paymentUrl: link.paymentUrl, delivery };
 }
@@ -87,6 +92,7 @@ export async function deliverPaymentLink(params: {
   paymentUrl: string;
   amountIls: number;
   description: string;
+  receiptPromised?: boolean;
 }): Promise<DeliveryOutcome> {
   const identity = sendingIdentity(params.business);
   if (!identity) return "no_whatsapp";
@@ -95,7 +101,12 @@ export async function deliverPaymentLink(params: {
   try {
     await sendWhatsAppMessage({
       ...common,
-      text: `היי ${first}, ${params.business.name} שלחו לך בקשת תשלום על ${params.description} בסך ₪${fmtIls(params.amountIls)}.\nלתשלום מאובטח: ${params.paymentUrl}`,
+      text:
+        `היי ${first} 👋\n` +
+        `תודה שבחרת ב${params.business.name}! הכנו לך קישור לתשלום על ${params.description}, בסך ₪${fmtIls(params.amountIls)}.\n` +
+        `התשלום מאובטח ולוקח פחות מדקה` +
+        (params.receiptPromised ? `, והקבלה תגיע אליך לכאן בוואטסאפ אוטומטית מיד אחרי.` : `.`) +
+        `\n\n👉 ${params.paymentUrl}`,
     });
     return "sent";
   } catch (err) {
