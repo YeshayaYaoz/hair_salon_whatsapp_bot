@@ -138,7 +138,11 @@ describe("number expiry and renewal", () => {
     );
     const r = await mod.prolongNumber("972559000001", 1);
     expect(r).toEqual({ stopDate: new Date("2026-11-06T12:00:00.000Z"), totalPaid: 3, currency: "USD" });
-    expect(String(fetchMock.mock.calls[0][1].body)).toBe("months=1&number=972559000001");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/v1/direct_numbers/prolong/");
+    // POST per Zadarma's documentation. As PUT the carrier refused every purchase with "Wrong parameters".
+    expect(init.method).toBe("POST");
+    expect(String(init.body)).toBe("months=1&number=972559000001");
   });
 
   it("surfaces the carrier's own error text — it answers 200 with status:error", async () => {
