@@ -29,19 +29,22 @@ const SELECT = {
   id: true, name: true, email: true, subscriptionPlan: true, subscriptionStatus: true, billingCycle: true,
   nextBillingDate: true, loyaltyDiscountIls: true, couponCode: true, couponDiscountIls: true, couponCyclesRemaining: true,
   paymentProvider: true, invoiceProvider: true, subscriptionToken: true,
+  notificationPhone: true, notificationPhoneVerifiedAt: true, whatsappPhoneNumberId: true,
 } as const;
 
 function describe(b: {
   name: string; email: string; subscriptionPlan: string | null; subscriptionStatus: string; billingCycle: string;
   nextBillingDate: Date | null; loyaltyDiscountIls: number; couponCode: string | null; couponDiscountIls: number;
   couponCyclesRemaining: number | null; paymentProvider: string | null; invoiceProvider: string | null; subscriptionToken: string | null;
+  notificationPhone?: string | null; notificationPhoneVerifiedAt?: Date | null; whatsappPhoneNumberId?: string | null;
 }): string {
   const coupon = b.couponDiscountIls > 0
     ? `coupon ${b.couponCode ?? "(no code)"} −₪${b.couponDiscountIls} × ${b.couponCyclesRemaining ?? "∞"}`
     : "no coupon";
   const charge = b.subscriptionPlan ? `next charge ₪${fmtIls(subscriptionChargeIls(b))}` : "no plan";
   return `${b.name} <${b.email}>\n      ${b.subscriptionPlan ?? "—"} / ${b.subscriptionStatus} / ${b.billingCycle} · card ${b.subscriptionToken ? "saved" : "missing"}` +
-    `\n      ${coupon} · ${charge} · next ${b.nextBillingDate?.toISOString().slice(0, 10) ?? "—"}`;
+    `\n      ${coupon} · ${charge} · next ${b.nextBillingDate?.toISOString().slice(0, 10) ?? "—"}` +
+    `\n      payments ${b.paymentProvider ?? "—"} · invoices ${b.invoiceProvider ?? "—"} · manager ${b.notificationPhone ?? "—"}${b.notificationPhoneVerifiedAt ? " (verified)" : " (unverified)"} · own number ${b.whatsappPhoneNumberId ? "yes" : "no"}`;
 }
 
 async function main() {
