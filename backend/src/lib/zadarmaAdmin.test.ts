@@ -139,6 +139,28 @@ describe("number expiry and renewal", () => {
     const r = await mod.prolongNumber("972559000001", 1);
     expect(r).toEqual({ stopDate: new Date("2026-11-06T12:00:00.000Z"), totalPaid: 3, currency: "USD" });
     expect(String(fetchMock.mock.calls[0][1].body)).toBe("months=1&number=972559000001");
+    // POST, unlike its PUT neighbours. Sent as PUT, Zadarma answers "Wrong parameters" — and one
+    // night's purchases for every line were refused on exactly that.
+    expect(fetchMock.mock.calls[0][1].method).toBe("POST");
+  });
+
+  it("switches SMS reception on with the carrier's on/off vocabulary", async () => {
+    fetchMock.mockResolvedValueOnce(ok({ status: "success", number: "972559000001", receive_sms: "on" }));
+    await mod.setSmsReception("+972 55-900-0001", true);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/v1/direct_numbers/receive_sms/");
+    expect(init.method).toBe("PUT");
+    expect(String(init.body)).toBe("number=972559000001&value=on");
+  });
+
+  it("orders the three-month package with SMS when asked, and a plain month otherwise", async () => {
+    fetchMock.mockResolvedValueOnce(ok({ status: "success", number: "972559000001", is_activated: "true" }));
+    await mod.orderNumber("3061", "972559000001", { months: 3, receiveSms: true });
+    expect(String(fetchMock.mock.calls[0][1].body)).toBe("direction_id=3061&number=972559000001&period=3month&receive_sms=1");
+
+    fetchMock.mockResolvedValueOnce(ok({ status: "success", number: "972559000001", is_activated: "true" }));
+    await mod.orderNumber("3061", "972559000001");
+    expect(String(fetchMock.mock.calls[1][1].body)).toBe("direction_id=3061&number=972559000001");
   });
 
   it("surfaces the carrier's own error text — it answers 200 with status:error", async () => {
