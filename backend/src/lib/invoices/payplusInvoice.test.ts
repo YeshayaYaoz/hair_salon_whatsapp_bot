@@ -17,15 +17,17 @@ beforeEach(() => {
 });
 
 describe("payplusInvoiceProvider.createReceipt", () => {
-  it("sends the documented shape: receipt doc type, split auth headers, items with vat_type_code, a payment line", async () => {
+  it("sends the documented shape: receipt doc type, split auth headers, items, a payment line — and no VAT type", async () => {
     await payplusInvoiceProvider.createReceipt(creds, { amountIls: 300, description: "בדיקה", customerName: "אורי", customerPhone: "972501111111", paymentMethod: "cash" });
 
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("https://restapi.payplus.co.il/api/v1.0/books/docs/new/inv_receipt");
     expect(init.headers).toMatchObject({ "api-key": "k", "secret-key": "s" });
     const body = JSON.parse(init.body);
-    expect(body.vatType).toBe("vat-type-included");
-    expect(body.items[0]).toMatchObject({ name: "בדיקה", quantity: 1, price: 300, vat_type_code: "vat-type-included" });
+    // The account's own VAT regime decides; an exempt dealer's receipt must not carry VAT.
+    expect(body).not.toHaveProperty("vatType");
+    expect(body.items[0]).toMatchObject({ name: "בדיקה", quantity: 1, price: 300 });
+    expect(body.items[0]).not.toHaveProperty("vat_type_code");
     expect(body.payments[0]).toMatchObject({ payment_type: "cash", amount: 300 });
     expect(body.payments[0].payment_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(body.totalAmount).toBe(300);

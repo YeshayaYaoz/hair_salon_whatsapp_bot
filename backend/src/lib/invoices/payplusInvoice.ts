@@ -66,8 +66,11 @@ export const payplusInvoiceProvider: InvoiceProvider = {
         doc_date: todayIl(),
         language: "he",
         currency_code: "ILS",
-        // The amount handed in is what the customer paid, VAT and all.
-        vatType: "vat-type-included",
+        // No vatType, deliberately: PayPlus then applies the account's own default — "פטור מע"מ"
+        // for an exempt dealer, "כולל מע"מ" for a registered one — which is the one fact about the
+        // business we do not hold. Sending "included" to an exempt account printed VAT on a receipt
+        // that must not carry any. The amount handed in is what the customer paid, whatever the
+        // account's regime.
         customer: {
           // The reference lists both names; sending both costs nothing and satisfies either.
           customer_name: params.customerName,
@@ -75,7 +78,7 @@ export const payplusInvoiceProvider: InvoiceProvider = {
           email,
           ...(params.customerPhone ? { phone: params.customerPhone } : {}),
         },
-        items: [{ name: params.description, quantity: 1, price: amount, vat_type_code: "vat-type-included", currency_code: "ILS" }],
+        items: [{ name: params.description, quantity: 1, price: amount, currency_code: "ILS" }],
         // A receipt documents money received, so it carries the payment line — type, date, sum.
         payments: [{ payment_type: PAYMENT_TYPE[params.paymentMethod ?? "other"], payment_date: todayIl(), amount, currency_code: "ILS" }],
         totalAmount: amount,
