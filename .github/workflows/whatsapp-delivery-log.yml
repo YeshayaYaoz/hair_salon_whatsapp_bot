@@ -20,6 +20,10 @@ on:
         description: "Railway project (as `railway status` prints it)"
         type: string
         default: "Tori"
+      pattern:
+        description: "Also show lines matching this (grep -i -E), e.g. 'receipt|Invoice' — blank skips"
+        type: string
+        default: ""
 
 jobs:
   read:
@@ -30,6 +34,7 @@ jobs:
       SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
       PROJECT: ${{ inputs.project }}
       LINES: ${{ inputs.lines }}
+      PATTERN: ${{ inputs.pattern }}
     steps:
       - run: npm i -g @railway/cli
       - run: railway link --project "$PROJECT" --environment "$RAILWAY_ENVIRONMENT" || true
@@ -48,3 +53,16 @@ jobs:
           echo ""
           echo "Status callbacks seen at all (is the webhook even reaching us):"
           grep -ci "whatsapp webhook" /tmp/logs.json || echo "0"
+          if [ -n "$PATTERN" ]; then
+            echo ""
+            echo "Lines matching '$PATTERN':"
+            # Only the message text, so a matching line is readable rather than a JSON blob.
+            grep -i -E "$PATTERN" /tmp/logs.json | python3 -c '
+          import sys, json
+          for line in sys.stdin:
+              try:
+                  o = json.loads(line); print(o.get("timestamp", "")[:19], o.get("message", line.strip())[:600])
+              except Exception:
+                  print(line.strip()[:600])
+          ' | tail -80 || true
+          fi
