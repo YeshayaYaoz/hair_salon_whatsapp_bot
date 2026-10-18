@@ -1540,6 +1540,7 @@ export async function runTool(
           error: "No invoicing provider is connected. Tell the owner to connect one on the Payments page in the dashboard.",
         });
       }
+      console.error(`[issue_receipt] ${businessId}: provider refused —`, err instanceof Error ? err.message : err);
       // The provider's own words, verbatim. Paraphrased into "a glitch, try later" the owner went
       // looking for a fault in Tori; quoted, "missing document settings" sends them to the one
       // place that can fix it — their PayPlus / Green Invoice account.
