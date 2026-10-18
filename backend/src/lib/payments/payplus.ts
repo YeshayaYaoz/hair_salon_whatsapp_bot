@@ -26,6 +26,9 @@ export const payplusProvider: PaymentProvider = {
         sendEmailApproval: true,
         sendEmailFailure: false,
         more_info: params.referenceId,
+        // חשבונית+ issues the document from this page's details after payment. Their own
+        // dashboard's instruction for "create a document from a payment link", verbatim.
+        ...(params.autoInvoice ? { initial_invoice: true } : {}),
         // Overrides the account-level Callback field in PayPlus's dashboard, which is why several
         // businesses can share one merchant account — see CreatePaymentLinkParams.callbackUrl.
         ...(params.callbackUrl ? { refURL_callback: params.callbackUrl } : {}),

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { depositCallbackUrl } from "./index.js";
 import { payplusProvider } from "./payplus.js";
 
@@ -138,5 +138,18 @@ describe("cardcom createPaymentLink", () => {
     expect(typeof sent.SuccessRedirectUrl).toBe("string");
     expect(typeof sent.FailedRedirectUrl).toBe("string");
     expect(sent.TerminalNumber).toBe(1000);
+  });
+});
+
+describe("initial_invoice on a PayPlus link", () => {
+  it("is sent only when asked for", async () => {
+    const { payplusProvider } = await import("./payplus.js");
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: { payment_page_link: "https://p", page_request_uid: "u" } }) });
+    vi.stubGlobal("fetch", fetchMock);
+    await payplusProvider.createPaymentLink({ apiKey: "k", apiSecret: "s", pageUid: "p" }, { amountIls: 1, description: "x", referenceId: "r", autoInvoice: true });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).initial_invoice).toBe(true);
+    await payplusProvider.createPaymentLink({ apiKey: "k", apiSecret: "s", pageUid: "p" }, { amountIls: 1, description: "x", referenceId: "r" });
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).not.toHaveProperty("initial_invoice");
+    vi.unstubAllGlobals();
   });
 });

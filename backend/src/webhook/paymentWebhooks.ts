@@ -288,6 +288,7 @@ paymentWebhookRouter.post("/:provider/:businessId/:webhookSecret", async (req, r
       description: "תשלום עבור טיפול",
       customerName: event.customerName,
       customerPhone: event.customerPhone,
+      paymentMethod: "card",
     });
     console.log(
       `[payments webhook] Auto-issued receipt for ${businessId} (delivery: ${receipt.delivery}): ${receipt.documentUrl}`

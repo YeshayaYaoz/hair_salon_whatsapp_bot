@@ -1585,6 +1585,7 @@ businessRouter.post("/customers/:id/receipt", async (req: AuthedRequest, res) =>
     .object({
       amountIls: z.number().positive().max(100000),
       description: z.string().trim().min(1).max(200),
+      paymentMethod: z.enum(["cash", "card", "transfer", "app", "other"]).optional(),
     })
     .safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
@@ -1601,6 +1602,7 @@ businessRouter.post("/customers/:id/receipt", async (req: AuthedRequest, res) =>
       customerId: customer.id,
       amountIls: parsed.data.amountIls,
       description: parsed.data.description,
+      paymentMethod: parsed.data.paymentMethod,
       // Providers require a name on the document. A customer who has never given one still needs a
       // receipt, and "לקוח" is what the salon would write on a paper one.
       customerName: customer.name?.trim() || "לקוח",

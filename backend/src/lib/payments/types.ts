@@ -26,6 +26,14 @@ export interface CreatePaymentLinkParams {
    * forget during onboarding.
    */
   callbackUrl?: string;
+  /**
+   * Ask the provider to issue the tax document itself once the customer pays. PayPlus's
+   * חשבונית+ does this from the payment page's own details (initial_invoice), a minute or two
+   * after the charge, and reports the document in the callback. Set only when PayPlus is also the
+   * business's invoicing provider — otherwise another provider issues it and the customer would
+   * get two.
+   */
+  autoInvoice?: boolean;
 }
 
 export interface PaymentLinkResult {

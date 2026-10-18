@@ -23,6 +23,8 @@ export type DepositBusiness = {
   paymentApiSecret: string | null;
   paymentPageUid?: string | null;
   paymentWebhookSecret?: string | null;
+  /** When present and "payplus-invoice", PayPlus is asked to issue the receipt itself. */
+  invoiceProvider?: string | null;
 };
 
 /**
@@ -79,6 +81,7 @@ export async function createDepositLink(params: {
     customerPhone,
     referenceId: appointmentId,
     callbackUrl: depositCallbackUrl(businessId, biz.paymentProvider!, biz.paymentWebhookSecret ?? null) ?? undefined,
+    autoInvoice: biz.paymentProvider === "payplus" && biz.invoiceProvider === "payplus-invoice",
   });
 
   await attachDepositPaymentLink(appointmentId, {

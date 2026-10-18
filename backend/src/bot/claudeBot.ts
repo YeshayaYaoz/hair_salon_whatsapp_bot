@@ -99,6 +99,11 @@ const managerTools: GenericTool[] = [
         },
         amountIls: { type: "number", description: "Amount received, in shekels" },
         description: { type: "string", description: "What it was for, e.g. 'תספורת וצבע'" },
+        paymentMethod: {
+          type: "string",
+          enum: ["cash", "card", "transfer", "app", "other"],
+          description: "How the money arrived — 'במזומן' cash, 'באשראי' card, 'בהעברה' transfer, 'בביט'/'בפייבוקס' app. It is printed on the receipt, so ask if the owner did not say.",
+        },
         confirmed: {
           type: "boolean",
           description: "Only true on the second call, after the owner explicitly confirmed the details you read back.",
@@ -1507,6 +1512,7 @@ export async function runTool(
           customer: customer.name ?? customer.phone,
           amountIls,
           description,
+          paymentMethod: input.paymentMethod ?? "other (ask the owner how it was paid)",
         },
         note: "Read these details back to the owner and ask them to confirm. Only if they say yes, call issue_receipt again with the same values and confirmed:true. Nothing has been issued yet.",
       });
@@ -1519,6 +1525,8 @@ export async function runTool(
         description,
         customerName: customer.name?.trim() || "לקוח",
         customerPhone: customer.phone,
+        customerId: customer.id,
+        paymentMethod: (["cash", "card", "transfer", "app", "other"] as const).find((m) => m === input.paymentMethod) ?? "other",
       });
       return JSON.stringify({
         issued: true,
@@ -1615,7 +1623,7 @@ export async function runTool(
       select: {
         timezone: true, name: true,
         depositEnabled: true, depositAmountIls: true, depositHoldMinutes: true,
-        paymentProvider: true, paymentApiKey: true, paymentApiSecret: true, paymentPageUid: true, paymentWebhookSecret: true,
+        paymentProvider: true, paymentApiKey: true, paymentApiSecret: true, paymentPageUid: true, paymentWebhookSecret: true, invoiceProvider: true,
       },
     });
 

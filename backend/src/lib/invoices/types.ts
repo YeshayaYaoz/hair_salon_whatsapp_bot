@@ -6,12 +6,17 @@ export interface InvoiceCredentials {
   apiSecret: string;
 }
 
+/** How the money arrived. A receipt states this; "credit card" on a cash payment is a wrong document. */
+export type PaymentMethod = "card" | "cash" | "transfer" | "app" | "other";
+
 export interface CreateReceiptParams {
   amountIls: number;
   description: string;
   customerName: string;
   customerPhone?: string;
   customerEmail?: string;
+  /** Defaults to "other" for a manual receipt and "card" for one following an online payment. */
+  paymentMethod?: PaymentMethod;
 }
 
 export interface ReceiptResult {

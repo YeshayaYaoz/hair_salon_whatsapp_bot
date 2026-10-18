@@ -1,6 +1,6 @@
 import { prisma } from "./prisma.js";
 import { sendingIdentity } from "./sendingIdentity.js";
-import { getInvoiceProvider, resolveInvoiceCredentials } from "./invoices/index.js";
+import { getInvoiceProvider, resolveInvoiceCredentials, type PaymentMethod } from "./invoices/index.js";
 import { sendWhatsAppMessage, sendWhatsAppTemplate, RE_ENGAGEMENT_ERROR_CODE, WhatsAppSendError } from "../webhook/whatsappClient.js";
 import { captureError } from "./errorMonitoring.js";
 import { receiptTemplate } from "./whatsappTemplates.js";
@@ -125,6 +125,7 @@ export async function issueAndSendReceipt(params: {
   customerName: string;
   customerPhone?: string;
   customerEmail?: string;
+  paymentMethod?: PaymentMethod;
   /** Links the Receipt row to the customer and, for a recurring charge, to its ChargeDue. */
   customerId?: string;
   chargeDueId?: string;
@@ -144,6 +145,7 @@ export async function issueAndSendReceipt(params: {
     customerName: params.customerName,
     customerPhone: params.customerPhone,
     customerEmail: params.customerEmail,
+    paymentMethod: params.paymentMethod,
   });
 
   // Recorded before delivery: the button link needs the id, and a document the provider issued

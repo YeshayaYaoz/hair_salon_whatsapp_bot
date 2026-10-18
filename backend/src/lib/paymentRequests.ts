@@ -68,6 +68,7 @@ export async function createPaymentRequest(params: {
       customerPhone: params.customer.phone,
       referenceId: row.id,
       callbackUrl: depositCallbackUrl(business.id, business.paymentProvider, business.paymentWebhookSecret ?? null) ?? undefined,
+      autoInvoice: business.paymentProvider === "payplus" && business.invoiceProvider === "payplus-invoice",
     });
   } catch (err) {
     await prisma.paymentRequest.delete({ where: { id: row.id } }).catch(() => {});
@@ -177,6 +178,7 @@ export async function settlePaymentRequest(
       const receipt = await issueAndSendReceipt({
         businessId, amountIls: request.amountIls, description: request.description,
         customerName: request.customer.name?.trim() || "לקוח", customerPhone: request.customer.phone, customerId: request.customer.id,
+        paymentMethod: "card",
       });
       await prisma.paymentRequest.update({ where: { id: request.id }, data: { receiptId: receipt.receiptId } });
       receiptNote = `\nקבלה: ${receipt.documentUrl}`;
