@@ -17,6 +17,7 @@ import {
 } from "./managerActions.js";
 import { issueAndSendReceipt, NoInvoiceProviderError, DELIVERY_MESSAGE_HE } from "../lib/receipts.js";
 import { listPendingDues, confirmChargeDue, skipChargeDue } from "../lib/recurringCharges.js";
+import { createPaymentRequest, NoPaymentProviderError } from "../lib/paymentRequests.js";
 import { normalizePhone } from "../lib/phone.js";
 import { quoteCustomerCoupon, redeemCustomerCoupon, releaseCustomerCoupon, CustomerCouponError, CUSTOMER_COUPON_FAILURE_HE } from "../booking/customerCoupons.js";
 import { isDepositRequired, depositHoldFields, createDepositLink, releaseHold } from "../booking/deposits.js";
@@ -61,7 +62,7 @@ const MUTATING_TOOLS = new Set([
   "issue_receipt", "block_time", "cancel_booking", "set_hours", "upsert_service", "manage_staff",
   "add_faq", "remove_block", "set_bot_enabled", "book_for_customer", "add_customer",
   "set_customer_note", "message_customer", "create_discount_code",
-  "confirm_recurring_charges", "add_recurring_charge",
+  "confirm_recurring_charges", "add_recurring_charge", "send_payment_link",
 ]);
 
 export function chooseTier(messageText: string, hadToolError: boolean, lastAssistantText?: string): "cheap" | "smart" {
@@ -321,6 +322,22 @@ const managerTools: GenericTool[] = [
     description:
       "What happened to the most recent campaign this business sent — how many were delivered, read, failed, or still pending. Use when the owner asks 'מה קרה עם הקמפיין', 'כמה קיבלו את ההודעה'. Delivery arrives over the minutes after a send, so a report taken immediately shows mostly pending; say so.",
     input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "send_payment_link",
+    description:
+      "Send a customer a link to pay the business a given amount — 'תשלחי לאורי קישור לתשלום על 300 שקל', 'תביא לדנה לינק ל-150'. For a payment that is NOT a booking deposit: a treatment already given, a product, a balance. The link is the business's own payment provider's page; when the customer pays, the owner is told and a receipt is issued automatically. For a new customer give phone. Two-step: call without confirmed to read back customer, amount and what for; only on a clear yes call again with confirmed:true.",
+    input_schema: {
+      type: "object",
+      properties: {
+        customerName: { type: "string", description: "Name or phone as the owner said it" },
+        phone: { type: "string", description: "For a customer not yet known" },
+        amountIls: { type: "number" },
+        description: { type: "string", description: "What the payment is for, as it should appear on the receipt" },
+        confirmed: { type: "boolean" },
+      },
+      required: ["customerName", "amountIls", "description"],
+    },
   },
   {
     name: "recurring_charges_due",
@@ -1085,6 +1102,42 @@ export async function runTool(
     });
   }
 
+  if (name === "send_payment_link") {
+    const amountIls = Number(input.amountIls);
+    const description = String(input.description ?? "").trim();
+    if (!Number.isFinite(amountIls) || amountIls <= 0) return JSON.stringify({ error: "Ask the owner for the amount." });
+    if (!description) return JSON.stringify({ error: "Ask what the payment is for — it goes on the receipt." });
+    let target = await findCustomerByNameOrPhone(businessId, String(input.customerName ?? ""));
+    const phone = input.phone ? normalizePhone(String(input.phone)) : null;
+    if (!target && !phone) return JSON.stringify({ error: `No customer matching "${input.customerName}". Ask for their phone number.` });
+
+    const gate = confirmFirst(input, { customer: target?.name ?? String(input.customerName), phone: target?.phone ?? phone, amountIls, for: description }, "willSend");
+    if (gate) return gate;
+
+    if (!target) {
+      target = await prisma.customer.upsert({
+        where: { businessId_phone: { businessId, phone: phone! } },
+        create: { businessId, phone: phone!, name: String(input.customerName).trim() },
+        update: {},
+        select: { id: true, name: true, phone: true },
+      });
+    }
+    try {
+      const out = await createPaymentRequest({ businessId, customer: target, amountIls, description });
+      return JSON.stringify({
+        sent: out.delivery === "sent" || out.delivery === "template",
+        paymentUrl: out.paymentUrl,
+        delivery: DELIVERY_MESSAGE_HE[out.delivery].replace("הקבלה", "הקישור").replace("הופקה", "נוצר"),
+        note: "When the customer pays, the owner gets a WhatsApp message and the receipt is issued automatically. If not delivered, give the owner the link to forward.",
+      });
+    } catch (err) {
+      if (err instanceof NoPaymentProviderError) {
+        return JSON.stringify({ error: "No payment provider is connected. Tell the owner to connect one (PayPlus, Grow, Cardcom…) on the Payments page in the dashboard." });
+      }
+      return JSON.stringify({ error: `The payment provider refused to create the link: ${err instanceof Error ? err.message : String(err)}. Quote this to the owner — it is their provider's own answer.` });
+    }
+  }
+
   if (name === "recurring_charges_due") {
     const dues = await listPendingDues(businessId);
     if (dues.length === 0) return JSON.stringify({ pending: [], note: "Nothing is waiting. Dues appear on each charge's day of the month." });
@@ -1271,6 +1324,7 @@ export async function runTool(
         ],
         כסף: [
           "'תוציא קבלה לדנה על 200 שקל, תספורת'",
+          "'תשלחי לאורי קישור לתשלום על 300 שקל' — כשישלם, אודיע לך ואוציא קבלה",
           "'תוסיפי לדנה מנוי חודשי 350 שקל כל 1 לחודש' — ובכל חודש אשאל אם שולם: 'התקבל מדנה' · 'אשרי את כל החיובים' · 'מי עוד לא שילם?'",
           "'כמה הכנסתי החודש?'",
           "'תפתח קוד הנחה WELCOME10 של 10 אחוז'",
@@ -1478,7 +1532,13 @@ export async function runTool(
           error: "No invoicing provider is connected. Tell the owner to connect one on the Payments page in the dashboard.",
         });
       }
-      throw err;
+      // The provider's own words, verbatim. Paraphrased into "a glitch, try later" the owner went
+      // looking for a fault in Tori; quoted, "missing document settings" sends them to the one
+      // place that can fix it — their PayPlus / Green Invoice account.
+      return JSON.stringify({
+        error: `The invoicing provider refused to issue the document: ${err instanceof Error ? err.message : String(err)}`,
+        note: "Quote the provider's reason to the owner word for word; it is about their invoicing account's setup, not about Tori. For PayPlus 'חשבונית+' this usually means the document settings (business details, numbering) are not completed in the PayPlus dashboard.",
+      });
     }
   }
 

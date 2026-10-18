@@ -9,6 +9,7 @@ import { sendWhatsAppMessage } from "./whatsappClient.js";
 import { syncAppointmentToCalendar } from "../lib/googleCalendar.js";
 import { notifyOwner } from "../lib/ownerNotify.js";
 import { parsePayPlusCallback } from "../lib/payplusCallback.js";
+import { settlePaymentRequest } from "../lib/paymentRequests.js";
 
 export const paymentWebhookRouter = asyncRouter();
 
@@ -166,6 +167,10 @@ paymentWebhookRouter.post("/:provider/:businessId/:webhookSecret", async (req, r
     if (!event.referenceId && typeof req.query.ref === "string") {
       event.referenceId = req.query.ref;
     }
+
+    // A payment the owner asked for ("send Uri a link for ₪300"): the reference is the request's
+    // id. Settled in its own module — paid, owner told, receipt issued — and nothing below applies.
+    if (event.referenceId && (await settlePaymentRequest(businessId, event.referenceId, event))) return;
 
     // Deposit-before-booking: the payment link's referenceId is the appointment's own id (see
     // claudeBot.ts book_appointment). If this event matches a still-pending hold, confirm it —

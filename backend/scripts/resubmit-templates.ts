@@ -29,6 +29,9 @@ import {
   RECEIPT_EXAMPLE,
   RECEIPT_BUTTON_TEXT,
   receiptLinkBase,
+  PAYMENT_LINK_BODY,
+  PAYMENT_LINK_EXAMPLE,
+  PAYMENT_LINK_BUTTON_TEXT,
 } from "../src/lib/whatsappTemplates.js";
 
 function arg(name: string): string | undefined {
@@ -82,6 +85,7 @@ async function main() {
     ["owner alert", OWNER_ALERT_TEXT],
     ["owner alert (button)", { body: OWNER_ALERT_CTA_BODY, example: OWNER_ALERT_CTA_EXAMPLE }],
     ["receipt (button)", { body: RECEIPT_BODY, example: RECEIPT_EXAMPLE }],
+    ["payment link (button)", { body: PAYMENT_LINK_BODY, example: PAYMENT_LINK_EXAMPLE }],
     ...CAMPAIGN_TEMPLATES.map((t) => [`campaign: ${t.name} (MARKETING)`, t] as const),
   ] as const) {
     let filled = t.body;
@@ -95,6 +99,8 @@ async function main() {
       console.log(`    button: [${OWNER_ALERT_CTA_BUTTON.text}] → ${OWNER_ALERT_CTA_BUTTON.url}`);
     } else if (label === "receipt (button)") {
       console.log(`    button: [${RECEIPT_BUTTON_TEXT}] → ${receiptLinkBase()}/r/{{1}}`);
+    } else if (label === "payment link (button)") {
+      console.log(`    button: [${PAYMENT_LINK_BUTTON_TEXT}] → ${receiptLinkBase()}/p/{{1}}`);
     } else if (label.startsWith("campaign:") && "copyCode" in t && t.copyCode) {
       console.log(`    button: [copy code, e.g. ${CAMPAIGN_COUPON_CODE_EXAMPLE}]   footer: ${CAMPAIGN_COUPON_FOOTER}`);
     } else if (label.startsWith("campaign:")) {

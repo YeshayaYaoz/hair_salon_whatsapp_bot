@@ -549,3 +549,19 @@ export function receiptLinkBase(): string {
 export function receiptTemplate(): TemplateConfig {
   return { name: process.env.WHATSAPP_RECEIPT_TEMPLATE || RECEIPT_TEMPLATE_NAME, languageCode: DEFAULT_LANG };
 }
+
+/**
+ * A payment request, as a UTILITY template with a button to the payment page.
+ *
+ * The owner says "send Uri a link for ₪300"; Uri last wrote to the business weeks ago, so a plain
+ * message with the link is dropped. Same arrangement as the receipt: fixed domain on the button,
+ * /p/<request id> here redirects to the provider's hosted page.
+ */
+export const PAYMENT_LINK_TEMPLATE_NAME = "tori_payment_link";
+export const PAYMENT_LINK_BODY = "היי {{1}}, {{2}} שלחו לך בקשת תשלום על {{3}} בסך ₪{{4}}. לתשלום מאובטח לחצו על הכפתור.";
+export const PAYMENT_LINK_EXAMPLE = ["אורי", "סטודיו רונית", "טיפול", "300"];
+export const PAYMENT_LINK_BUTTON_TEXT = "לתשלום";
+
+export function paymentLinkTemplate(): TemplateConfig {
+  return { name: process.env.WHATSAPP_PAYMENT_LINK_TEMPLATE || PAYMENT_LINK_TEMPLATE_NAME, languageCode: DEFAULT_LANG };
+}

@@ -310,6 +310,7 @@ model Business {
   recurringCharges   RecurringCharge[]
   chargesDue         ChargeDue[]
   receipts           Receipt[]
+  paymentRequests    PaymentRequest[]
 }
 
 // A salon we sent to a provider's signup page through our affiliate link, and whether it came back
@@ -577,6 +578,7 @@ model Customer {
   recurringCharges    RecurringCharge[]
   chargesDue          ChargeDue[]
   receipts            Receipt[]
+  paymentRequests     PaymentRequest[]
 
   @@unique([businessId, phone])
   @@index([businessId])
@@ -628,6 +630,32 @@ model ChargeDue {
   receipt           Receipt?
 
   @@unique([recurringChargeId, dueDate])
+  @@index([businessId, status])
+}
+
+/// A payment the owner asked a customer for — "send Uri a link for ₪300" — and what became of it.
+///
+/// Not a deposit: no appointment, no hold, no slot. The link is the business's own provider's
+/// hosted page; the provider calls back on payment, the row goes to "paid", and the receipt is
+/// issued and sent in the same breath. more_info on the link is this row's id.
+model PaymentRequest {
+  id          String    @id @default(cuid())
+  businessId  String
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  amountIls   Float
+  description String
+  paymentUrl  String
+  providerRef String?
+  /// "pending" | "paid"
+  status      String    @default("pending")
+  /// How the link reached the customer — same vocabulary as Receipt.delivery.
+  delivery    String    @default("pending")
+  createdAt   DateTime  @default(now())
+  paidAt      DateTime?
+  receiptId   String?
+
   @@index([businessId, status])
 }
 

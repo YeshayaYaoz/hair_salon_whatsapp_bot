@@ -21,3 +21,15 @@ receiptRedirectRouter.get("/:id", async (req, res) => {
   if (!receipt) return res.status(404).type("text/plain").send("הקבלה לא נמצאה");
   res.redirect(302, receipt.documentUrl);
 });
+
+/** /p/<payment request id> → the provider's hosted payment page. Same reasoning as /r. */
+export const paymentLinkRedirectRouter = asyncRouter();
+paymentLinkRedirectRouter.use(rateLimit({ windowMs: 60 * 1000, max: 30, keyPrefix: "payment-redirect" }));
+paymentLinkRedirectRouter.get("/:id", async (req, res) => {
+  const id = String(req.params.id ?? "");
+  if (!/^[a-z0-9]{10,40}$/i.test(id)) return res.status(404).type("text/plain").send("לא נמצא");
+  const request = await prisma.paymentRequest.findUnique({ where: { id }, select: { paymentUrl: true, status: true } });
+  if (!request) return res.status(404).type("text/plain").send("בקשת התשלום לא נמצאה");
+  if (request.status === "paid") return res.status(200).type("text/plain; charset=utf-8").send("התשלום הזה כבר בוצע. תודה!");
+  res.redirect(302, request.paymentUrl);
+});

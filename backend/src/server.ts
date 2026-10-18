@@ -30,7 +30,7 @@ import { runInboundRecoveryJob } from "./webhook/whatsappInbox.js";
 import { runJobWatchdogJob } from "./lib/jobWatchdog.js";
 import { runVoiceNumberRenewalJob } from "./lib/voiceNumberRenewal.js";
 import { runRecurringChargesJob } from "./lib/recurringCharges.js";
-import { receiptRedirectRouter } from "./lib/receiptRedirect.js";
+import { receiptRedirectRouter, paymentLinkRedirectRouter } from "./lib/receiptRedirect.js";
 import { setSendObserver } from "./webhook/whatsappClient.js";
 import { recordOutbound } from "./lib/outboundLedger.js";
 
@@ -105,6 +105,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/public", publicRouter);
 // Receipt buttons on WhatsApp open /r/<id>, which redirects to the provider's document.
 app.use("/r", receiptRedirectRouter);
+app.use("/p", paymentLinkRedirectRouter);
 app.use("/api/business", businessRouter);
 app.use("/api/billing", payplusBillingRouter);
 app.use("/api/leadfinder", leadFinderRouter);

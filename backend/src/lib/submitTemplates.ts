@@ -23,6 +23,10 @@ import {
   RECEIPT_EXAMPLE,
   RECEIPT_BUTTON_TEXT,
   receiptLinkBase,
+  paymentLinkTemplate,
+  PAYMENT_LINK_BODY,
+  PAYMENT_LINK_EXAMPLE,
+  PAYMENT_LINK_BUTTON_TEXT,
 } from "./whatsappTemplates.js";
 
 /**
@@ -56,6 +60,7 @@ export async function submitWhatsAppTemplates(
     const ownerAlert = ownerAlertTemplate();
     const ownerAlertCta = ownerAlertCtaTemplate();
     const receipt = receiptTemplate();
+    const paymentLink = paymentLinkTemplate();
 
     // A zimmer has no "תור" and sells no "תספורת". Same template names and same variable order —
     // the sending code passes positional parameters and knows nothing about wording — but a guest
@@ -94,6 +99,15 @@ export async function submitWhatsAppTemplates(
         bodyText: RECEIPT_BODY,
         bodyExample: RECEIPT_EXAMPLE,
         urlButton: { text: RECEIPT_BUTTON_TEXT, url: `${receiptLinkBase()}/r/{{1}}`, example: `${receiptLinkBase()}/r/clx0example000` },
+      }),
+      // A payment request with a button to the hosted payment page. UTILITY: the customer asked
+      // for the service, the owner is asking for the money.
+      createMessageTemplate(wabaId, accessToken, {
+        name: paymentLink.name,
+        languageCode: paymentLink.languageCode,
+        bodyText: PAYMENT_LINK_BODY,
+        bodyExample: PAYMENT_LINK_EXAMPLE,
+        urlButton: { text: PAYMENT_LINK_BUTTON_TEXT, url: `${receiptLinkBase()}/p/{{1}}`, example: `${receiptLinkBase()}/p/clx0example000` },
       }),
       // The campaign library — see whatsappTemplates.ts. MARKETING by declaration, with the opt-out
       // as a reply button and again in the footer: the button is what people tap, the footer is
