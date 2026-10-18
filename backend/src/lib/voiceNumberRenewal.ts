@@ -296,7 +296,7 @@ function renderReport(r: RenewalReport): string {
   if (r.prolonged.length) parts.push(`<h3 style="color:#fff;">Prepaid a month</h3><ul style="color:#a1a1aa;">${li(r.prolonged)}</ul>`);
   if (r.prepaid.length) parts.push(`<h3 style="color:#fff;">Bought ${PREPAY_MONTHS} months at once</h3><ul style="color:#a1a1aa;">${li(r.prepaid)}</ul>`);
   if (r.smsRefused.length) parts.push(`<h3 style="color:#fff;">SMS reception refused by the carrier</h3><ul style="color:#a1a1aa;">${li(r.smsRefused)}</ul><p style="color:#a1a1aa;">Usually the account's documents. The line is bought and rings; only SMS is missing.</p>`);
-  if (r.prepaySkipped.length) parts.push(`<h3 style="color:#fff;">Not bought ahead — balance would not cover the other lines</h3><ul style="color:#a1a1aa;">${li(r.prepaySkipped)}</ul>`);
+  if (r.prepaySkipped.length) parts.push(`<h3 style="color:#fff;">Not bought ahead — the reason is beside each line</h3><ul style="color:#a1a1aa;">${li(r.prepaySkipped)}</ul>`);
   if (r.held.length) parts.push(`<p style="color:#a1a1aa;">Held for businesses that stopped paying (Tori pays): ${r.held.join("; ")}</p>`);
   if (r.repaired.length) parts.push(`<p style="color:#a1a1aa;">Autorenew switched on for: ${r.repaired.join(", ")}</p>`);
   return parts.join("");

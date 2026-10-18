@@ -153,13 +153,18 @@ export async function setAutoprolongation(number: string, on: boolean): Promise<
 /**
  * Prepays the number for a whole number of months, from the balance, and returns the new stop
  * date. Belt and braces for a line that is days from lapsing and whose autorenew could not be
- * switched on — spending early is cheaper than a salon whose phone has stopped ringing.
+ * switched on — spending early is cheaper than a salon whose phone has stopped ringing — and the
+ * way every paying line is moved onto the three-month package.
+ *
+ * POST, not PUT: Zadarma documents this one as POST while its neighbours (autoprolongation,
+ * receive_sms, set_sip_id) are PUT, and sending PUT here is answered with "Wrong parameters" —
+ * the parameters were fine, the verb was not. That cost one night of every line's purchase.
  */
 export async function prolongNumber(
   number: string,
   months: number
 ): Promise<{ stopDate: Date | null; totalPaid: number; currency: string }> {
-  const body = await request("PUT", "/v1/direct_numbers/prolong/", {
+  const body = await request("POST", "/v1/direct_numbers/prolong/", {
     number: number.replace(/\D/g, ""),
     months: String(months),
   });
