@@ -1,0 +1,36 @@
+name: Create the demo business
+
+# Creates (or reports) the public demo salon on Tori's shared line. Prints its id for
+# TORI_DEMO_BUSINESS_ID. Unticked, it only says what it would do.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Actually create it"
+        type: boolean
+        default: false
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_SERVICE: ${{ secrets.RAILWAY_SERVICE || vars.RAILWAY_SERVICE || 'hair_salon_whatsapp_bot' }}
+      RAILWAY_ENVIRONMENT: ${{ secrets.RAILWAY_ENVIRONMENT || vars.RAILWAY_ENVIRONMENT || 'production' }}
+      CONFIRM: ${{ inputs.confirm == true && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm i -g @railway/cli
+      - name: Create
+        run: |
+          railway run --service "$RAILWAY_SERVICE" --environment "$RAILWAY_ENVIRONMENT" \
+            npx tsx scripts/create-demo-business.ts ${CONFIRM:+--confirm}
