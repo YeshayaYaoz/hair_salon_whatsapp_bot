@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { apiFetch, setToken, reloadAs, friendlyError } from "../lib/api";
 import { DIAL_CODES, DEFAULT_DIAL_CODE } from "../lib/dialCodes";
 import { useLanguage } from "../lib/LanguageContext";
+import { signupSource, forgetArrival } from "../lib/attribution";
+import { trackSignup } from "../lib/Analytics";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -86,9 +88,13 @@ export default function LoginPage() {
       const path = mode === "login" ? "/api/auth/login" : "/api/auth/signup";
       const body = mode === "login"
         ? { email, password }
-        : { name, email, password, notificationPhone: phone, notificationPhoneDialCode: dialCode };
+        : { name, email, password, notificationPhone: phone, notificationPhoneDialCode: dialCode, source: signupSource() || undefined };
       const { token } = await apiFetch<{ token: string }>(path, { method: "POST", body: JSON.stringify(body) });
       setToken(token);
+      if (mode === "signup") {
+        trackSignup();
+        forgetArrival();
+      }
       // Full load rather than router.push: signing in changes who the app is for, and anything
       // rendered from a previous session in this tab — a logged-out owner switching accounts, or
       // an admin who just left impersonation — would otherwise survive the navigation.

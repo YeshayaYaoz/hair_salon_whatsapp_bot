@@ -138,6 +138,7 @@ describe("number expiry and renewal", () => {
     );
     const r = await mod.prolongNumber("972559000001", 1);
     expect(r).toEqual({ stopDate: new Date("2026-11-06T12:00:00.000Z"), totalPaid: 3, currency: "USD" });
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/v1/direct_numbers/prolong/");
     expect(String(fetchMock.mock.calls[0][1].body)).toBe("months=1&number=972559000001");
     // POST, unlike its PUT neighbours. Sent as PUT, Zadarma answers "Wrong parameters" — and one
     // night's purchases for every line were refused on exactly that.

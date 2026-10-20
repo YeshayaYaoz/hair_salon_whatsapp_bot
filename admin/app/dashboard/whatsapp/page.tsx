@@ -5,6 +5,7 @@ import { apiFetch } from "../../lib/api";
 import { useLanguage } from "../../lib/LanguageContext";
 import { SavedBadge } from "../../lib/SavedBadge";
 import { NumberProvisionOffer } from "../../lib/NumberProvisionOffer";
+import { SharedLineCard } from "../../lib/SharedLineCard";
 
 declare global {
   interface Window {
@@ -697,6 +698,11 @@ export default function WhatsAppPage() {
           )}
         </div>
       )}
+
+      {/* Until a number of their own is connected, the business runs from Tori's line — the bot
+          works today, with a link to hand out. Shown first among the not-connected sections
+          because it is the one that needs no waiting. */}
+      {!connected && <SharedLineCard />}
 
       {/* Message templates — needed to reach customers outside the 24h reply window */}
       {connected && tokenValid && (

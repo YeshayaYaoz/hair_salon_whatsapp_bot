@@ -18,6 +18,11 @@ import { checkManager } from "../bot/managerAuth.js";
 import { planHasBot } from "../lib/planFeatures.js";
 import { handleTemplateStatusUpdate } from "./templateStatus.js";
 import { handleOutreachReply, isOutreachNumber } from "../leadfinder/inboundReplies.js";
+import { demoFooter, isDemoBusiness, noteDemoStarted } from "../lib/demoLine.js";
+import { resolveSharedStranger } from "../lib/sharedLineRouting.js";
+import { checkSharedLineCap, capNoticeSentRecently, SHARED_LINE_CAP_NOTICE } from "../lib/sharedLineCap.js";
+import { sendAdminAlertEmail } from "../lib/email.js";
+import { classifyReply } from "../leadfinder/inboundReplies.js";
 import { Prisma } from "@prisma/client";
 import { captureError } from "../lib/errorMonitoring.js";
 import { transcribeWhatsAppVoiceNote, TranscriptionNotConfiguredError } from "../lib/transcription.js";
@@ -312,13 +317,33 @@ export async function processWhatsAppPayload(payload: any): Promise<void> {
     // receiving number is the same for all of them:
     //   1. The owner of a business with no number of its own (Receipts plan, or a trial that has
     //      not connected) — runs their business from here exactly as from their own line.
-    //   2. A customer of such a business, replying to a receipt — gets one line saying who sent
-    //      it, and their opt-out is honoured. There is no bot for them on this line, by design:
-    //      one business's spam reports would cost every business the line.
-    //   3. A prospect answering cold outreach — handled by the lead finder, as before.
+    //   2. A customer of a business that runs its bot from here — identified by the business's
+    //      code in the message, by "דמו" for the public demo, or by having talked to that business
+    //      recently (sharedLineRouting.ts) — gets that business's bot, exactly as on its own line.
+    //   3. A customer of a Receipts-plan business, replying to a receipt — gets one line saying who
+    //      sent it, and their opt-out is honoured. There is no bot for them, by design.
+    //   4. A prospect answering cold outreach — handled by the lead finder, as before.
+    // An opt-out skips (2): a bot is never what answers "הסר". It goes to (3) or (4) as it always did.
     let sharedOwner: Awaited<ReturnType<typeof resolveBusinessBySender>> | null = null;
+    let demoStarting = false;
     if (isOutreachNumber(phoneNumberId) || isSharedNumber(phoneNumberId)) {
       sharedOwner = await resolveBusinessBySender(message.from as string);
+      if (!sharedOwner) {
+        // Raw body rather than `extracted`, which classifies bot keywords a prospect never meant:
+        // a lead whose reply happens to be a reset keyword would otherwise arrive as "(לא טקסט)".
+        const replyText =
+          (message.text?.body as string | undefined)?.trim() ||
+          (extracted.kind === "text" ? extracted.text : "(הודעה שאינה טקסט)");
+        const optingOut = extracted.kind === "optOut" || classifyReply(replyText) === "opt_out";
+        const routed = optingOut ? null : await resolveSharedStranger(message.from as string, replyText);
+        if (routed) {
+          sharedOwner = routed.business;
+          // The first message of a demo thread is a lead waking up: told to the operator, and
+          // footed with what this is (below). Later messages are an ordinary conversation.
+          demoStarting = routed.opening && isDemoBusiness(routed.business.id);
+          if (demoStarting) void noteDemoStarted(message.from as string, replyText);
+        }
+      }
       if (!sharedOwner) {
         const viaBusiness = await resolveSharedCustomerBusiness(message.from as string);
         const shared = sharedIdentity();
@@ -340,8 +365,6 @@ export async function processWhatsAppPayload(payload: any): Promise<void> {
           }).catch((err) => console.error("[webhook] Shared-line customer reply failed (non-fatal):", err));
           return;
         }
-        // Raw body rather than `extracted`, which classifies bot keywords a prospect never meant:
-        // a lead whose reply happens to be a reset keyword would otherwise arrive as "(לא טקסט)".
         const replyText =
           (message.text?.body as string | undefined)?.trim() ||
           (extracted.kind === "text" ? extracted.text : "(הודעה שאינה טקסט)");
@@ -479,6 +502,37 @@ export async function processWhatsAppPayload(payload: any): Promise<void> {
       return;
     }
 
+    /**
+     * A trial business on Tori's shared line has a ceiling on bot replies (sharedLineCap.ts).
+     * Past it the bot is quiet for its customers: the message is kept for the transcript, the
+     * customer is told once a day, and the owner is told once — with the two ways out.
+     */
+    if (identity.shared && customerPhone !== business.notificationPhone) {
+      const shared = await checkSharedLineCap(business);
+      if (shared.exceeded) {
+        const preview = extracted.kind === "text" ? extracted.text : "[הודעה]";
+        await appendTurn(business.id, customerPhone, { role: "user", content: preview });
+        console.warn(`[sharedLine] trial cap reached for business ${business.id} (${shared.used}/${shared.cap}) — staying silent`);
+        if (shared.justCrossed) {
+          await notifyOwner(
+            business.id,
+            `⚠️ הבוט הגיע למגבלת ${shared.cap} ההודעות של תקופת הניסיון על הקו של תורי, ומפסיק לענות ללקוחות. כדי להמשיך: חברו מספר וואטסאפ משלכם (דשבורד → וואטסאפ), או הפעילו מנוי.`
+          ).catch(() => {});
+          sendAdminAlertEmail(
+            `🔥 עסק בניסיון מיצה את מכסת הקו המשותף: ${business.name}`,
+            `<strong>${business.name}</strong> (${business.email}) שלח ${shared.used} תשובות בוט ב-30 יום על הקו של תורי. הבוט שלו הושתק. זה הזמן להתקשר ולסגור.`
+          ).catch(() => {});
+        }
+        if (!(await capNoticeSentRecently(business.id, customerPhone))) {
+          await appendTurn(business.id, customerPhone, { role: "assistant", content: SHARED_LINE_CAP_NOTICE });
+          await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: SHARED_LINE_CAP_NOTICE }).catch((err) => {
+            console.error("[sharedLine] cap notice failed (non-fatal):", err);
+          });
+        }
+        return;
+      }
+    }
+
     if (extracted.kind === "reset") {
       await clearHistory(business.id, customerPhone);
       await sendWhatsAppMessage({ phoneNumberId, accessToken, to: customerPhone, text: "השיחה אופסה. איך אפשר לעזור? 😊" });
@@ -531,7 +585,12 @@ export async function processWhatsAppPayload(payload: any): Promise<void> {
     // canned replies and interactive UI pieces.
     const lang: "he" | "en" = detectLang(textToProcess);
 
-    const { text: reply, offeredSlots, photos, isFirstReply, greetingText } = await handleIncomingMessage(business.id, customerPhone, textToProcess);
+    const bot = await handleIncomingMessage(business.id, customerPhone, textToProcess);
+    const { offeredSlots, photos, isFirstReply, greetingText } = bot;
+    // The demo introduces itself exactly once, on the reply that opened the thread. On the opening
+    // message by the webhook's own count rather than the bot's: a thread the idle reset emptied
+    // reopens as a demo too, and that reader has also forgotten what this number is.
+    const reply = (demoStarting || isFirstReply) && isDemoBusiness(business.id) ? bot.text + demoFooter(lang) : bot.text;
 
     // A greeting with a button turns the first thing a customer sees into something they can act
     // on, instead of a wall of text with a URL they have to notice, select and paste. Only on the

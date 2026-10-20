@@ -139,6 +139,64 @@ button instead of typing back a time. Customers can also say "cancel my appointm
 "reschedule" — the bot has `cancel_appointment` and `list_my_appointments` tools in addition to
 `check_availability` / `book_appointment`.
 
+## Running a business from Tori's shared line
+
+A business that has not connected a number of its own — a trial that signed up last night and is
+waiting on Meta, or one that never wants its own number — runs its bot from Tori's line
+(`backend/src/lib/sharedLineRouting.ts`). Set `TORI_SHARED_WHATSAPP_NUMBER` to the dialable form
+of the outreach number and:
+
+- The WhatsApp page in the dashboard shows "your bot already works" with a link to hand out. The
+  link opens WhatsApp on Tori's number with the business named and its short code (`#ab3k7m`,
+  `Business.sharedLineCode`, minted on first use) in the first message. The public booking page
+  offers the same link.
+- On the shared line the sender decides the tenant: the code wins, then "דמו" for the public demo,
+  then memory — a phone that talked to a shared-line business in the last 90 days is still its
+  customer, so a returning customer needs no link. The demo is remembered only while its thread
+  is live, so a prospect answering cold outreach days later reaches a person.
+- Replies, booking confirmations, reminders and review requests all go out from Tori's line with
+  the business's name in the text (the templates are approved on Tori's WABA). Owner alerts
+  already did.
+- An opt-out never reaches a bot: it goes to the receipt sender's opt-out or the lead finder's
+  consent log, as before. A Receipts-plan business is never reachable this way (no bot on it).
+- A **trial** business on the shared line may send `SHARED_LINE_TRIAL_MESSAGE_CAP` bot replies
+  (default 150) per rolling 30 days (`backend/src/lib/sharedLineCap.ts`). Past that its bot goes
+  quiet: the customer is told once a day, the owner and the operator are told once, and the
+  dashboard card shows the meter. Connecting a number or paying lifts it. Owner-side traffic,
+  reminders and the demo are not counted. One trial can no longer cost the line its standing.
+- Once the business connects a number of its own, the code stops resolving and everything moves
+  to that number. Customers who wrote to Tori's number need the new one — the link should be
+  swapped wherever it was posted.
+
+## Growth: the public demo, outreach and attribution
+
+The product is its own best pitch, so the shared line doubles as a public demo
+(`backend/src/lib/demoLine.ts`):
+
+1. In the dashboard, create a business to be the demo salon — services, hours, a greeting, a
+   Standard plan (set it from the super-admin panel), and leave WhatsApp unconnected so it sits on
+   Tori's shared line.
+2. Set `TORI_DEMO_BUSINESS_ID` to its id on the backend. From then on a stranger who writes
+   "דמו" (or "demo") to `TORI_OUTREACH_PHONE_NUMBER_ID` is treated as that salon's customer:
+   the real bot, the real slot picker, a real booking. The first reply carries a one-line
+   "this is a demo of Tori" footer; later messages are a normal conversation. The operator gets
+   an email on every new demo thread, and a matching Lead Finder lead moves to "replied".
+3. Set `TORI_DEMO_WA_LINK` (backend) to `https://wa.me/<number>?text=דמו` so WhatsApp outreach
+   drafts invite the prospect to try it, and `NEXT_PUBLIC_DEMO_WHATSAPP` (admin) to the bare number
+   so the landing page's "talk to the bot" section opens that chat instead of the scripted mock.
+
+Opt-outs and plain replies to cold outreach still reach the lead finder, never the demo.
+
+The Lead Finder's per-lead drafts have a third channel, **personal WhatsApp**: a short message to
+send from your own phone after a call or a visit (never cold, never from Tori's line — that is
+what the templated broadcast is for). "פתח בוואטסאפ" opens the thread with the text filled in.
+
+Signups record where they came from (`Business.signupSource`: UTM parameters or the referring
+site, captured on the landing page and sent with the form) and the super-admin list shows it.
+Google Analytics 4 and the Meta pixel load on the public pages only when
+`NEXT_PUBLIC_GA_MEASUREMENT_ID` / `NEXT_PUBLIC_META_PIXEL_ID` are set; signup fires one
+conversion event. The salon booking page's "Powered by תורי" is a link with UTM attribution.
+
 ## Not yet built (flagged for later, out of v1 scope)
 
 - Multiple subscription tiers / usage-based billing (current model is a single flat plan gate).

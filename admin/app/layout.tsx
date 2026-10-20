@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { Metadata, Viewport } from "next";
 import { Assistant, IBM_Plex_Sans_Hebrew } from "next/font/google";
 import { LanguageProvider } from "./lib/LanguageContext";
+import Analytics from "./lib/Analytics";
 import "./globals.css";
 
 const SITE_URL = "https://torionline.com";
@@ -147,6 +148,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           (password reset, OAuth callbacks) set their own background and text colours. */}
       <body className="min-h-screen font-[family-name:var(--font-assistant)]">
         <LanguageProvider>{children}</LanguageProvider>
+        <Analytics />
       </body>
     </html>
   );

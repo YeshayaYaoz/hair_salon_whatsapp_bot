@@ -104,9 +104,11 @@ interface BusinessSearchResult {
   subscriptionStatus: string;
 }
 
+type OutreachChannel = "email" | "manual_call" | "whatsapp";
+
 interface OutreachMessage {
   id: string;
-  channel: "email" | "manual_call";
+  channel: OutreachChannel;
   angle: string | null;
   subject: string | null;
   body: string;
@@ -1106,14 +1108,22 @@ const APPROVAL_LABELS: Record<string, { he: string; en: string }> = {
 };
 const CHANNEL_LABELS: Record<string, { he: string; en: string }> = {
   email: { he: "מייל", en: "Email" }, manual_call: { he: "שיחת טלפון", en: "Phone call" },
+  whatsapp: { he: "וואטסאפ אישי", en: "Personal WhatsApp" },
 };
 
-function OutreachPanel({ leadId }: { leadId: string }) {
+/** wa.me needs digits with a country code; Google Places gives "04-123-4567" or "+972 4-123-4567". */
+function waMeLink(phone: string, text: string): string {
+  let digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("0")) digits = `972${digits.slice(1)}`;
+  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+}
+
+function OutreachPanel({ leadId, phone }: { leadId: string; phone: string | null }) {
   const { lang } = useLanguage();
   const he = lang === "he";
   const [messages, setMessages] = useState<OutreachMessage[] | null>(null);
   const [generating, setGenerating] = useState(false);
-  const [channel, setChannel] = useState<"email" | "manual_call">("email");
+  const [channel, setChannel] = useState<OutreachChannel>("whatsapp");
   const [angle, setAngle] = useState<"initial" | "follow_up_1">("initial");
   const [err, setErr] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -1200,9 +1210,10 @@ function OutreachPanel({ leadId }: { leadId: string }) {
       {err && <div className="bg-red-50 border border-red-200 text-red-600 text-xs rounded-lg px-3 py-2 mb-3">{err}</div>}
 
       <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <select value={channel} onChange={(e) => setChannel(e.target.value as "email" | "manual_call")} className="text-xs">
-          <option value="email">מייל</option>
+        <select value={channel} onChange={(e) => setChannel(e.target.value as OutreachChannel)} className="text-xs">
+          <option value="whatsapp">וואטסאפ אישי (אחרי שיחה)</option>
           <option value="manual_call">תסריט שיחה</option>
+          <option value="email">מייל</option>
         </select>
         <select value={angle} onChange={(e) => setAngle(e.target.value as "initial" | "follow_up_1")} className="text-xs">
           <option value="initial">פנייה ראשונה</option>
@@ -1302,12 +1313,24 @@ function OutreachPanel({ leadId }: { leadId: string }) {
                           className="text-xs flex-1 min-w-[160px]"
                         />
                       )}
+                      {/* The message leaves from the operator's own phone, not from here: wa.me opens
+                          the thread with the text filled in, and "סמן כנשלח" records that it went. */}
+                      {m.channel === "whatsapp" && phone && (
+                        <a
+                          href={waMeLink(phone, m.body)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-medium px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700 whitespace-nowrap"
+                        >
+                          פתח בוואטסאפ
+                        </a>
+                      )}
                       <button
                         disabled={busyId === m.id || (m.channel === "email" && !sendToEmail.trim())}
                         onClick={() => send(m)}
                         className="text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap"
                       >
-                        {m.channel === "email" ? "שלח מייל" : "סמן כבוצע"}
+                        {m.channel === "email" ? "שלח מייל" : m.channel === "whatsapp" ? "סמן כנשלח" : "סמן כבוצע"}
                       </button>
                     </>
                   )}
@@ -1388,7 +1411,7 @@ function LeadDetailView({ leadId, onBack }: { leadId: string; onBack: () => void
 
       <ConversionPanel lead={lead} onChanged={load} />
 
-      <OutreachPanel leadId={lead.id} />
+      <OutreachPanel leadId={lead.id} phone={lead.phone} />
 
       <div className="grid md:grid-cols-2 gap-4 mb-6">
         <div className="bg-white border border-gray-200 rounded-xl p-4">

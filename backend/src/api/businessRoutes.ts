@@ -1,4 +1,6 @@
 import { asyncRouter } from "../lib/asyncRouter.js";
+import { checkSharedLineCap } from "../lib/sharedLineCap.js";
+import { ensureSharedLineCode, sharedLineLink } from "../lib/sharedLineRouting.js";
 import crypto from "crypto";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
@@ -66,6 +68,31 @@ businessRouter.use(receiptsRouter);
 
 // --- Business profile + WhatsApp credentials ---
 
+/**
+ * The link a business hands out while it runs from Tori's shared line — before Meta has verified
+ * a number of its own, or instead of ever having one. Null `link` means the deployment has no
+ * shared number to put in it (TORI_SHARED_WHATSAPP_NUMBER), and the dashboard shows nothing.
+ */
+businessRouter.get("/me/shared-line", async (req: AuthedRequest, res) => {
+  const business = await prisma.business.findUniqueOrThrow({
+    where: { id: req.businessId! },
+    select: { name: true, whatsappPhoneNumberId: true, subscriptionPlan: true, subscriptionStatus: true },
+  });
+  if (business.whatsappPhoneNumberId || !planHasBot(business.subscriptionPlan)) {
+    return res.json({ active: false, code: null, link: null, cap: null });
+  }
+  const code = await ensureSharedLineCode(req.businessId!);
+  // The trial ceiling on replies from the shared line, so the owner sees it coming rather than
+  // learning about it from a silent bot. Null when it does not apply (a paying business).
+  const status = await checkSharedLineCap({ id: req.businessId!, ...business });
+  res.json({
+    active: true,
+    code,
+    link: sharedLineLink(code, business.name),
+    cap: status.applies ? { used: status.used, limit: status.cap } : null,
+  });
+});
+
 businessRouter.get("/me", async (req: AuthedRequest, res) => {
   const business = await prisma.business.findUniqueOrThrow({ where: { id: req.businessId! } });
   // subscriptionToken is stripped for the same reason as the keys beside it. It is encrypted at
@@ -132,6 +159,8 @@ businessRouter.get("/admin/businesses", requireSuperAdmin, async (_req: AuthedRe
       // starting point for proactively calling a business that's stuck mid-setup, and an
       // unverified email means email outreach silently won't reach them at all.
       notificationPhone: true, emailVerifiedAt: true,
+      // Which channel brought them — the only way to learn what marketing is worth repeating.
+      signupSource: true,
       subscriptionStatus: true, subscriptionPlan: true, billingCycle: true,
       whatsappPhoneNumberId: true, whatsappTokenValid: true,
       paymentProvider: true, invoiceProvider: true, depositEnabled: true,

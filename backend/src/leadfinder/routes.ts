@@ -339,7 +339,11 @@ leadFinderRouter.get("/leads/:id/outreach", async (req: AuthedRequest, res) => {
 // never auto-sent. Always saved with approvalStatus "draft" so the operator reviews/edits before
 // anything goes out; see POST /outreach/:id/send below for the only path that actually sends.
 const generateOutreachSchema = z.object({
-  channel: z.enum(["email", "manual_call"]),
+  // "whatsapp" is a personal message the operator sends from their own phone after a call or a
+  // visit — never from Tori's line (Meta allows cold numbers templates only, see the broadcast
+  // below) and never cold: a first contact that the prospect did not agree to is the spam-law
+  // case the consent log exists for. Marking it sent records the hand-off, like manual_call.
+  channel: z.enum(["email", "manual_call", "whatsapp"]),
   angle: z.enum(["initial", "follow_up_1"]).default("initial"),
 });
 leadFinderRouter.post("/leads/:id/outreach/generate", async (req: AuthedRequest, res) => {
@@ -439,7 +443,8 @@ leadFinderRouter.post("/outreach/:id/send", async (req: AuthedRequest, res) => {
       return res.status(502).json({ error: err instanceof Error ? err.message : "Send failed" });
     }
   }
-  // manual_call: nothing to send programmatically — marking sentAt just records the call happened.
+  // manual_call / whatsapp: nothing to send programmatically — marking sentAt just records that the
+  // call happened, or that the operator sent the message from their own phone.
 
   const updated = await prisma.outreachMessage.update({ where: { id: message.id }, data: { sentAt: new Date() } });
   res.json(updated);

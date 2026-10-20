@@ -156,9 +156,13 @@ export default function PrivacyPolicy() {
 
           <Section id="cookies" title="9. Cookies & Local Storage">
             <p>
-              Tori does not use tracking cookies or third-party advertising/analytics scripts. Our dashboard
-              stores a session token in your browser's local storage to keep you signed in — this token never
-              leaves your device except to authenticate requests to our own API, and is cleared when you log out.
+              Our public pages (the landing page and sign-up) may load Google Analytics and the Meta
+              pixel, which set their own cookies to measure visits and sign-ups and to attribute them to the
+              campaign that brought you. The dashboard loads neither. The landing page also remembers, in
+              your browser's local storage, which link brought you here (UTM parameters or the referring site)
+              so that we can record it with your sign-up; it is cleared once you sign up. Our dashboard stores
+              a session token in your browser's local storage to keep you signed in — this token never leaves
+              your device except to authenticate requests to our own API, and is cleared when you log out.
             </p>
           </Section>
 

@@ -7,8 +7,13 @@ import {
 } from "lucide-react";
 import { jsonLd } from "./lib/jsonLd";
 import { ltr } from "./lib/bidi";
+import { rememberArrival } from "./lib/attribution";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+// Tori's own WhatsApp number, digits only with country code (9725XXXXXXX). When set, the demo
+// section sends the visitor to the real bot on WhatsApp with "דמו" pre-filled, and the scripted
+// chat below becomes the fallback for a deployment without one. See backend/src/lib/demoLine.ts.
+const DEMO_WHATSAPP = (process.env.NEXT_PUBLIC_DEMO_WHATSAPP ?? "").replace(/\D/g, "");
 
 /* Lucide (MIT) — professionally drawn stroke icons, one consistent style across the page. Replaces
    the emoji that served as feature and section icons — emoji stay only inside the chat mockups,
@@ -132,6 +137,11 @@ export default function LandingPage() {
     const el = demoScrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [demoMsgs]);
+
+  // First-touch attribution for the signup form — see lib/attribution.ts.
+  useEffect(() => {
+    rememberArrival();
+  }, []);
 
   // Live social proof — the real counts, or nothing. The line only renders once the numbers are
   // big enough to help; padding them with an invented baseline made every visible number a claim
@@ -1780,6 +1790,23 @@ export default function LandingPage() {
             <p className="reveal" style={{ textAlign: "center", color: "#666", fontSize: 16, marginBottom: 40 }}>
               כתוב הודעה כאילו אתה לקוח — ותראה איך תורי עונה. ללא התקנה, כאן ועכשיו.
             </p>
+            {DEMO_WHATSAPP ? (
+              <div className="reveal" style={{ textAlign: "center", marginBottom: 36 }}>
+                <a
+                  className="btn-green"
+                  href={`https://wa.me/${DEMO_WHATSAPP}?text=${encodeURIComponent("דמו")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 10 }}
+                >
+                  <Icon name="chat" size={20} />
+                  דברו עם תורי בוואטסאפ עכשיו
+                </a>
+                <div style={{ color: "#666", fontSize: 14, marginTop: 12 }}>
+                  נפתח בוואטסאפ שלכם. כתבו לו למשל &quot;רוצה תספורת מחר&quot; — ותראו אותו קובע תור אמיתי.
+                </div>
+              </div>
+            ) : null}
             <div className="lp-demo-chat reveal">
               <div className="lp-demo-header">
                 <div className="lp-demo-avatar"><img src="/tori_logo_transparent.png" alt="תורי" /></div>

@@ -1,4 +1,6 @@
 import { asyncRouter } from "../lib/asyncRouter.js";
+import { ensureSharedLineCode, sharedLineLink, sharedLineNumber } from "../lib/sharedLineRouting.js";
+import { planHasBot } from "../lib/planFeatures.js";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { findAvailableSlots, createAppointment, OutsideBusinessHoursError, SlotUnavailableError } from "../booking/availability.js";
@@ -71,6 +73,14 @@ publicRouter.get("/:businessId", async (req, res) => {
       durationMin: s.durationMin,
     })),
     hours: business.hours,
+    // Where this business's customers can book over WhatsApp, when it runs from Tori's shared
+    // line. Null for a business with a number of its own (its customers already have it) and
+    // for one whose plan has no bot. The code is minted here if it has not been yet — a
+    // customer reaching the page is as good a first use as the owner opening the dashboard.
+    whatsappLink:
+      !business.whatsappPhoneNumberId && planHasBot(business.subscriptionPlan) && sharedLineNumber()
+        ? sharedLineLink(await ensureSharedLineCode(business.id), business.name)
+        : null,
   });
 });
 
